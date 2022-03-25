@@ -1,4 +1,22 @@
 
+// Lifted from jomme and simplified. No zip loading and whatnot because it's not necessary. Only barebones functionality.
+// Also no searchpaths. What you enter as path is what you get.
+
+// Original file notice:
+/*****************************************************************************
+ * name:		files.c
+ *
+ * desc:		handle based filesystem for Quake III Arena
+ *
+ * $Archive: /MissionPack/code/qcommon/files.c $
+ * $Author: Zaphod $
+ * $Revision: 81 $
+ * $Modtime: 5/30/01 2:31p $
+ * $Date: 5/30/01 2:31p $
+ *
+ *****************************************************************************/
+
+
 #include "demoCut.h"
 
 

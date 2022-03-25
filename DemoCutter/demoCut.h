@@ -1,4 +1,8 @@
 #pragma once
+// Code is 99%-100% from jomme, from various header files.
+// Most of it is likely still the same as in the original Jedi Knight source code releases
+//
+
 #include <iostream>
 #include <cstdlib>
 #include <cstdarg>

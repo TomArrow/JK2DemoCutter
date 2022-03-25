@@ -1,4 +1,5 @@
-
+// Lifted basically 1:1 from jomme. Should be pretty close to what the original Jedi Knight source code releases contained, save for a few smaller changes
+//
 #include "demoCut.h"
 
 #ifdef _DONETPROFILE_

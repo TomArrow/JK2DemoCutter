@@ -1,6 +1,11 @@
 #include "demoCut.h"
 
 
+// Code is 99%-100% from jomme, from various files.
+// Most of it is likely still the same as in the original Jedi Knight source code releases
+//
+
+
 static	int			cmd_argc;
 static	char* cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
 static	char		cmd_tokenized[BIG_INFO_STRING + MAX_STRING_TOKENS];	// will have 0 bytes inserted

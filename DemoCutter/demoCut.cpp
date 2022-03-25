@@ -1,5 +1,8 @@
 #include "demoCut.h"
 
+// Most of this code is from cl_demos_cut.cpp from jomma/jamme
+//
+
 demo_t			demo;
 
 
