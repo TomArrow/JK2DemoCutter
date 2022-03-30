@@ -153,7 +153,8 @@ std::string FS_BuildOSPath(const char* base, const char* game, const char* qpath
 	//	game = fs_gamedir;
 	//}
 
-	Com_sprintf(temp, sizeof(temp), "/%s", qpath);
+	//Com_sprintf(temp, sizeof(temp), "/%s", qpath);
+	Com_sprintf(temp, sizeof(temp), "%s", qpath);
 	FS_ReplaceSeparators(temp);
 	Com_sprintf(ospath, sizeof(ospath), "%s%s", base, temp);
 
@@ -169,7 +170,8 @@ qboolean FS_CreatePath(char* OSPath, qboolean quiet) {
 
 	// make absolutely sure that it can't back up the path
 	// FIXME: is c: allowed???
-	if (strstr(OSPath, "..") || strstr(OSPath, "::")) {
+	// TA 2022-03-30: Don't really care, this is just a demo cutter tool
+	/*if (strstr(OSPath, "..") || strstr(OSPath, "::")) {
 #ifdef ALLOWRELPATHSDEBUG
 		if (!quiet) {
 			Com_Printf("WARNING: creating relative path. Only allowed in Debug mode. \"%s\"\n", OSPath);
@@ -178,7 +180,7 @@ qboolean FS_CreatePath(char* OSPath, qboolean quiet) {
 		Com_Printf("WARNING: refusing to create relative path \"%s\"\n", OSPath);
 		return qtrue;
 #endif
-	}
+	}*/
 
 	for (ofs = OSPath + 1; *ofs; ofs++) {
 		if (*ofs == PATH_SEP) {
@@ -204,7 +206,7 @@ fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet) { // quiet 
 	fsh[f].zipFile = qfalse;
 
 	//ospath = FS_BuildOSPath(fs_homepath->string, fs_gamedir, filename);
-	ospath = FS_BuildOSPath(".", "", filename);
+	ospath = FS_BuildOSPath("", "", filename);
 
 	//if (fs_debug->integer && !quiet) {
 	//	Com_Printf("FS_FOpenFileWrite: %s\n", ospath.c_str());
@@ -233,7 +235,7 @@ qboolean FS_FileExists(const char* file)
 	FILE* f;
 	std::string testpath;
 
-	testpath = FS_BuildOSPath(".", "", file);
+	testpath = FS_BuildOSPath("", "", file);
 
 	f = fopen(testpath.c_str(), "rb");
 	if (f) {
@@ -247,7 +249,7 @@ qboolean FS_FileErase(const char* file)
 {
 	std::string testpath;
 
-	testpath = FS_BuildOSPath(".", "", file);
+	testpath = FS_BuildOSPath("", "", file);
 
 	return (qboolean)(_unlink(testpath.c_str()) == 0);
 }
@@ -324,10 +326,11 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 	// make absolutely sure that it can't back up the path.
 	// The searchpaths do guarantee that something will always
 	// be prepended, so we don't need to worry about "c:" or "//limbo" 
-	if (strstr(filename, "..") || strstr(filename, "::")) {
-		*file = 0;
-		return -1;
-	}
+	// TA 2022-03-30 dont care this is a demo cutting tool
+	//if (strstr(filename, "..") || strstr(filename, "::")) {
+	//	*file = 0;
+	//	return -1;
+	//}
 
 	//
 	// search through the path, one element at a time
@@ -338,7 +341,7 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 	fsh[*file].handleFiles.unique = uniqueFILE;
 
 
-	netpath = FS_BuildOSPath(".", "", filename);
+	netpath = FS_BuildOSPath("", "", filename);
 	fsh[*file].handleFiles.file.o = fopen(netpath.c_str(), "rb");
 	if (!fsh[*file].handleFiles.file.o) {
 		Com_DPrintf("Can't find %s\n", filename);

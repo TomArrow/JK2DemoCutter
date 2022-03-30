@@ -83,6 +83,11 @@ typedef struct _iobuf
 #define	CS_SYSTEMINFO		1		// an info string for server system to client system configuration (timescale, etc)
 
 #define	RESERVED_CONFIGSTRINGS	2	// game can't modify below this, only the system can
+#define	MAX_MODELS			256	
+#define	MAX_SOUNDS			256	
+#define	CS_MODELS				32
+#define	CS_SOUNDS				(CS_MODELS+MAX_MODELS)
+#define	CS_PLAYERS				(CS_SOUNDS+MAX_SOUNDS)
 
 #define	MAX_GAMESTATE_CHARS	16000
 
@@ -914,6 +919,7 @@ enum svc_ops_e {
 	svc_EOF
 };
 
+char* Info_ValueForKey(const char* s, const char* key);
 
 
 

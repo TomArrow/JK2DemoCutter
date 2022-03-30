@@ -1,4 +1,18 @@
 #include "demoCut.h"
+#define PCRE2_STATIC
+#include "jpcre2.hpp"
+#include <fstream>
+#include <algorithm>
+#include <iomanip>
+
+typedef jpcre2::select<char> jp;
+jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
+
+std::map<int,int> playerFirstVisible;
+std::map<int,int> playerFirstFollowed;
+std::map<int,int> playerFirstFollowedOrVisible;
+
+
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
@@ -422,14 +436,14 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 #endif
 
 
-qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const char* outputName) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile) {
 	fileHandle_t	oldHandle = 0;
-	fileHandle_t	newHandle = 0;
+	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
-	char			newName[MAX_OSPATH];
+	//char			newName[MAX_OSPATH];
 	int				buf;
 	int				readGamestate = 0;
 	//demoPlay_t* play = demo.play.handle;
@@ -440,8 +454,13 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
 	int				demoCurrentTime = 0;
-
+	int				lastGameStateChange = 0;
+	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
+
+	std::ofstream outputBatHandle;
+
+	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
 
 	//mvprotocol_t	protocol;
 
@@ -478,7 +497,7 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 	}
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
 	if (!oldHandle) {
-		Com_Printf("Failed to open %s for cutting.\n", oldName);
+		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
 	memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
@@ -544,24 +563,21 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
 				break;
 			case svc_gamestate:
-				if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
-					Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
-					goto cutcomplete;
-				}
+				lastGameStateChange = demo.cut.Cl.snap.serverTime;
+				lastGameStateChangeInDemoTime = demoCurrentTime;
+				//if (readGamestate > demo.currentNum) {
+				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
+				//	goto cutcomplete;
+				//}
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,demoType)) {
 					goto cuterror;
 				}
-				if (outputName) {
-					Com_sprintf(newName, sizeof(newName), "%s%s", outputName, ext);
-				}
-				else {
-					Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
-				}
-				newHandle = FS_FOpenFileWrite(newName);
-				if (!newHandle) {
-					Com_Printf("Failed to open %s for target cutting.\n", newName);
-					return qfalse;
-				}
+				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
+				//newHandle = FS_FOpenFileWrite(newName);
+				//if (!newHandle) {
+				//	Com_Printf("Failed to open %s for target cutting.\n", newName);
+				//	return qfalse;
+				//}
 				readGamestate++;
 				break;
 			case svc_snapshot:
@@ -571,8 +587,6 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
 					demoStartTime = demo.cut.Cl.snap.serverTime;
-					//startTime += demo.cut.Cl.snap.serverTime;
-					//endTime += demo.cut.Cl.snap.serverTime;
 				}
 				if (demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
 					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
@@ -580,6 +594,45 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
+
+				for (int p = 0; p < MAX_CLIENTS; p++) {
+					// Go through parseenttities of last snap to see if client is in it
+					bool clientIsInSnapshot = false;
+					bool clientVisibleOrFollowed = false;
+					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum+demo.cut.Cl.snap.numEntities; pe++) {
+
+						if (demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)].number == p) {
+							clientIsInSnapshot = true;
+						}
+					}
+					if (clientIsInSnapshot) {
+						clientVisibleOrFollowed = true;
+						if (playerFirstVisible[p] == -1) {
+							playerFirstVisible[p] = demo.cut.Cl.snap.serverTime;
+						}
+					}
+					else {
+						playerFirstVisible[p] = -1;
+					}
+					if (demo.cut.Cl.snap.ps.clientNum == p) {
+						clientVisibleOrFollowed = true;
+						if (playerFirstFollowed[p] == -1) {
+							playerFirstFollowed[p] = demo.cut.Cl.snap.serverTime;
+						}
+					}
+					else {
+						playerFirstFollowed[p] = -1;
+					}
+					if (clientVisibleOrFollowed) {
+						if (playerFirstFollowedOrVisible[p] == -1) {
+							playerFirstFollowedOrVisible[p] = demo.cut.Cl.snap.serverTime;
+						}
+					}
+					else {
+						playerFirstFollowedOrVisible[p] = -1;
+					}
+				}
+				
 				break;
 			case svc_download:
 				// read block number
@@ -611,12 +664,81 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 					goto cuterror;
 				}
 			}
+			if (!strcmp(cmd, "print")) {
+				//Looking for 
+				//"^2[^7OC-System^2]: bizzle^7 has finished in [^200:24.860^7] which is his personal best time. ^2Top10 time!^7 Difference to best: [^200:00.000^7]."
+
+				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
+				
+
+
+				jp::VecNum vec_num;
+				jp::RegexMatch rm;
+				std::string printText = Cmd_Argv(1);
+				size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
+					.setSubject(&printText)                         //set subject string
+					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+					.match();
+				for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+					const char * info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+					std::string mapname = Info_ValueForKey(info, "mapname");
+					std::string playername = vec_num[matchNum][1];
+					int minutes = atoi(vec_num[matchNum][2].c_str());
+					std::string secondString = vec_num[matchNum][3];
+					float seconds = atof(vec_num[matchNum][3].c_str());
+					int milliSeconds = (1000.0f* seconds)+0.5f;
+					int pureMilliseconds = milliSeconds % 1000;
+					int pureSeconds = milliSeconds / 1000;
+
+					bool isLogged = vec_num[matchNum][3].length() > 0;
+
+					//int totalSeconds = minutes * 60 + seconds;
+					int totalMilliSeconds = minutes * 60000 + milliSeconds;
+
+					// Find player
+					int playerNumber = -1;
+					for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
+
+						const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
+						std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");
+						if (playerNameCompare == playername) {
+							playerNumber = clientNum;
+						}
+					}
+					
+					bool wasFollowed = false;
+					bool wasVisible = false;
+					bool wasVisibleOrFollowed = false;
+					if (playerNumber != -1) {
+						if (playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
+							wasFollowed = true;
+						}
+						if (playerFirstVisible[playerNumber] != -1 && playerFirstVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
+							wasVisible = true;
+						}
+						if (playerFirstFollowedOrVisible[playerNumber] != -1 && playerFirstFollowedOrVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
+							wasVisibleOrFollowed = true;
+						}
+					}
+					int runStart = demoCurrentTime - totalMilliSeconds;
+					int startTime = runStart - bufferTime;
+					int endTime = demoCurrentTime + bufferTime;
+					startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
+					
+					outputBatHandle << "\nrem demoCurrentTime: "<< demoCurrentTime;
+					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << mapname << std::setfill('0') << "___" << std::setw(0) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isLogged?"":"___unlogged") <<  (wasFollowed ? "":(wasVisibleOrFollowed ?"___thirdperson":"___NOTvisible" ))<< "\" " << startTime << " " << endTime;
+					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+				}
+
+				
+				
+			}
 		}
-		if (demoCurrentTime > endTime) {
+		/*if (demo.cut.Cl.snap.serverTime > endTime) {
 			goto cutcomplete;
 		}
 		else if (framesSaved > 0) {
-			/* this msg is in range, write it */
+			// this msg is in range, write it 
 			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum)) {
 				demoCutWriteDemoMessage(&oldMsg, newHandle, &demo.cut.Clc);
 			}
@@ -625,24 +747,23 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 			}
 			framesSaved++;
 		}
-		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
-		else if (demoCurrentTime >= startTime) {
+		else if (demo.cut.Cl.snap.serverTime >= startTime) {
 			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType);
 			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType);
 			// copy rest
 			framesSaved = 1;
-		}
+		}*/
 	}
 cutcomplete:
-	if (newHandle) {
+	/*if (newHandle) {
 		buf = -1;
 		FS_Write(&buf, 4, newHandle);
 		FS_Write(&buf, 4, newHandle);
 		ret = qtrue;
-	}
+	}*/
 cuterror:
 	//remove previosly converted demo from the same cut
-	if (newHandle) {
+	/*if (newHandle) {
 		memset(newName, 0, sizeof(newName));
 		if (demo.currentNum > 0) {
 			Com_sprintf(newName, sizeof(newName), "mmedemos/%s.%d_cut.mme", oldName, demo.currentNum);
@@ -652,9 +773,9 @@ cuterror:
 		}
 		if (FS_FileExists(newName))
 			FS_FileErase(newName);
-	}
+	}*/
 	FS_FCloseFile(oldHandle);
-	FS_FCloseFile(newHandle);
+	//FS_FCloseFile(newHandle);
 	return ret;
 }
 
@@ -689,30 +810,18 @@ cuterror:
 
 
 int main(int argc, char** argv) {
-	if (argc < 4) {
-		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime";
+	if (argc < 3) {
+		std::cout << "need 2 arguments at least: demoname and buffer (before and after highlight) in milliseconds";
+		std::cin.get();
 		return 1;
 	}
-	char* demoName = NULL;
-	char* outputName = NULL;
-	float startTime = 0;
-	float endTime = 0;
-	if (argc == 4) {
-		demoName = argv[1];
-		startTime = atof(argv[2]);
-		endTime = atof(argv[3]);
-	}
-	else if(argc == 5) {
-		demoName = argv[1];
-		outputName = argv[2];
-		startTime = atof(argv[3]);
-		endTime = atof(argv[4]);
-	}
-	if (demoCut(demoName, startTime, endTime, outputName)) {
-		Com_Printf("Demo %s got successfully cut\n", demoName);
+	char* demoName = argv[1];
+	float bufferTime = atof(argv[2]);
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat")) {
+		Com_Printf("Highlights successfully found.\n", demoName);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
+		Com_Printf("Finding highlights in demo %s has resulted in errors\n", demoName);
 	}
 #ifdef DEBUG
 	std::cin.get();
