@@ -250,6 +250,46 @@ char* QDECL va(const char* format, ...) {
 	return buf;
 }
 
+void sanitizeFilename(const char* input, char* output) {
+
+	while (*input) {
+		if ((*input >= 32 && *input < 47)
+			|| (*input >= 48 && *input < 60)
+			|| (*input == 61)
+			|| (*input >= 64 && *input < 92)
+			|| (*input >= 93 && *input < 124)
+			|| (*input >= 125 && *input < 127)
+			) {
+			*output++ = *input;
+		}
+		else if (*input == '|') {
+			*output++ = 'I';
+		}
+		input++;
+	}
+	*output = 0;
+}
+
+/*void sanitizeFilename(std::string input, std::stringstream output) {
+
+	while (*input) {
+		if ((*input >= 32 && *input < 47)
+			|| (*input >= 48 && *input < 60)
+			|| (*input == 61)
+			|| (*input >= 64 && *input < 92)
+			|| (*input >= 93 && *input < 124)
+			|| (*input >= 125 && *input < 127)
+			) {
+			*output++ = *input;
+		}
+		else if (*input == '|') {
+			*output++ = 'I';
+		}
+		input++;
+	}
+	*output = 0;
+}*/
+
 /*
 ===============
 Info_ValueForKey

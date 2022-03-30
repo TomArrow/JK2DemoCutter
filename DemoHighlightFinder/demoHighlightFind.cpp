@@ -4,6 +4,7 @@
 #include <fstream>
 #include <algorithm>
 #include <iomanip>
+#include <sstream>
 
 typedef jpcre2::select<char> jp;
 jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
@@ -725,8 +726,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int endTime = demoCurrentTime + bufferTime;
 					startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
 					
+
+					std::stringstream ss;
+					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible"));
+
+					std::string targetFilename = ss.str();
+					char* targetFilenameFiltered = new char[targetFilename.length()+1];
+					sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+
 					outputBatHandle << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isLogged?"":"___unlogged") <<  (wasFollowed ? "":(wasVisibleOrFollowed ?"___thirdperson":"___NOTvisible" ))<< "\" " << startTime << " " << endTime;
+					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+					delete[] targetFilenameFiltered;
 					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 				}
 

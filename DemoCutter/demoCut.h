@@ -1013,3 +1013,5 @@ enum demoType_t {
 	DM_15,
 	DM_16
 };
+
+void sanitizeFilename(const char* input, char* output);
