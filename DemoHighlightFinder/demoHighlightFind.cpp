@@ -690,7 +690,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int pureMilliseconds = milliSeconds % 1000;
 					int pureSeconds = milliSeconds / 1000;
 
-					bool isLogged = vec_num[matchNum][3].length() > 0;
+					bool isLogged = vec_num[matchNum][4].length() > 0;
 
 					//int totalSeconds = minutes * 60 + seconds;
 					int totalMilliSeconds = minutes * 60000 + milliSeconds;
@@ -726,7 +726,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
 					
 					outputBatHandle << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << mapname << std::setfill('0') << "___" << std::setw(0) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isLogged?"":"___unlogged") <<  (wasFollowed ? "":(wasVisibleOrFollowed ?"___thirdperson":"___NOTvisible" ))<< "\" " << startTime << " " << endTime;
+					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isLogged?"":"___unlogged") <<  (wasFollowed ? "":(wasVisibleOrFollowed ?"___thirdperson":"___NOTvisible" ))<< "\" " << startTime << " " << endTime;
 					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 				}
 
