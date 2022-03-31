@@ -46,6 +46,14 @@ typedef struct _iobuf
 
 #define	GENTITYNUM_BITS		10		// don't need to send any more
 #define	MAX_GENTITIES		(1<<GENTITYNUM_BITS)
+
+// entitynums are communicated with GENTITY_BITS, so any reserved
+// values thatare going to be communcated over the net need to
+// also be in this range
+#define	ENTITYNUM_NONE		(MAX_GENTITIES-1)
+#define	ENTITYNUM_WORLD		(MAX_GENTITIES-2)
+#define	ENTITYNUM_MAX_NORMAL	(MAX_GENTITIES-2)
+
 #define	MAX_PARSE_ENTITIES	2048
 
 #define	MAX_PS_EVENTS			2
@@ -923,6 +931,316 @@ char* Info_ValueForKey(const char* s, const char* key);
 
 
 
+// entityState_t->event values
+// entity events are for effects that take place reletive
+// to an existing entities origin.  Very network efficient.
+
+// two bits at the top of the entityState->event field
+// will be incremented with each change in the event so
+// that an identical event started twice in a row can
+// be distinguished.  And off the value with ~EV_EVENT_BITS
+// to retrieve the actual event number
+#define	EV_EVENT_BIT1		0x00000100
+#define	EV_EVENT_BIT2		0x00000200
+#define	EV_EVENT_BITS		(EV_EVENT_BIT1|EV_EVENT_BIT2)
+
+#define	EVENT_VALID_MSEC	300
+
+//
+// entityState_t->eType
+//
+typedef enum {
+	ET_GENERAL,
+	ET_PLAYER,
+	ET_ITEM,
+	ET_MISSILE,
+	ET_SPECIAL,				// rww - force fields
+	ET_HOLOCRON,			// rww - holocron icon displays
+	ET_MOVER,
+	ET_BEAM,
+	ET_PORTAL,
+	ET_SPEAKER,
+	ET_PUSH_TRIGGER,
+	ET_TELEPORT_TRIGGER,
+	ET_INVISIBLE,
+	ET_GRAPPLE,				// grapple hooked on wall
+	ET_TEAM,
+	ET_BODY,
+
+	ET_EVENTS				// any of the EV_* events can be added freestanding
+							// by setting eType to ET_EVENTS + eventNum
+							// this avoids having to set eFlags and eventNum
+} entityType_t;
+
+typedef enum {
+	EV_NONE,
+
+	EV_CLIENTJOIN,
+
+	EV_FOOTSTEP,
+	EV_FOOTSTEP_METAL,
+	EV_FOOTSPLASH,
+	EV_FOOTWADE,
+	EV_SWIM,
+
+	EV_STEP_4,
+	EV_STEP_8,
+	EV_STEP_12,
+	EV_STEP_16,
+
+	EV_FALL,
+
+	EV_JUMP_PAD,			// boing sound at origin, jump sound on player
+
+	EV_PRIVATE_DUEL,
+
+	EV_JUMP,
+	EV_ROLL,
+	EV_WATER_TOUCH,	// foot touches
+	EV_WATER_LEAVE,	// foot leaves
+	EV_WATER_UNDER,	// head touches
+	EV_WATER_CLEAR,	// head leaves
+
+	EV_ITEM_PICKUP,			// normal item pickups are predictable
+	EV_GLOBAL_ITEM_PICKUP,	// powerup / team sounds are broadcast to everyone
+
+	EV_NOAMMO,
+	EV_CHANGE_WEAPON,
+	EV_FIRE_WEAPON,
+	EV_ALT_FIRE,
+	EV_SABER_ATTACK,
+	EV_SABER_HIT,
+	EV_SABER_BLOCK,
+	EV_SABER_UNHOLSTER,
+	EV_BECOME_JEDIMASTER,
+	EV_DISRUPTOR_MAIN_SHOT,
+	EV_DISRUPTOR_SNIPER_SHOT,
+	EV_DISRUPTOR_SNIPER_MISS,
+	EV_DISRUPTOR_HIT,
+	EV_DISRUPTOR_ZOOMSOUND,
+
+	EV_PREDEFSOUND,
+
+	EV_TEAM_POWER,
+
+	EV_SCREENSHAKE,
+
+	EV_USE,			// +Use key
+
+	EV_USE_ITEM0,
+	EV_USE_ITEM1,
+	EV_USE_ITEM2,
+	EV_USE_ITEM3,
+	EV_USE_ITEM4,
+	EV_USE_ITEM5,
+	EV_USE_ITEM6,
+	EV_USE_ITEM7,
+	EV_USE_ITEM8,
+	EV_USE_ITEM9,
+	EV_USE_ITEM10,
+	EV_USE_ITEM11,
+	EV_USE_ITEM12,
+	EV_USE_ITEM13,
+	EV_USE_ITEM14,
+	EV_USE_ITEM15,
+
+	EV_ITEMUSEFAIL,
+
+	EV_ITEM_RESPAWN,
+	EV_ITEM_POP,
+	EV_PLAYER_TELEPORT_IN,
+	EV_PLAYER_TELEPORT_OUT,
+
+	EV_GRENADE_BOUNCE,		// eventParm will be the soundindex
+	EV_MISSILE_STICK,		// eventParm will be the soundindex
+
+	EV_PLAY_EFFECT,
+	EV_PLAY_EFFECT_ID,
+
+	EV_MUTE_SOUND,
+	EV_GENERAL_SOUND,
+	EV_GLOBAL_SOUND,		// no attenuation
+	EV_GLOBAL_TEAM_SOUND,
+	EV_ENTITY_SOUND,
+
+	EV_PLAY_ROFF,
+
+	EV_GLASS_SHATTER,
+	EV_DEBRIS,
+
+	EV_MISSILE_HIT,
+	EV_MISSILE_MISS,
+	EV_MISSILE_MISS_METAL,
+	EV_BULLET,				// otherEntity is the shooter
+
+	EV_PAIN,
+	EV_DEATH1,
+	EV_DEATH2,
+	EV_DEATH3,
+	EV_OBITUARY,
+
+	EV_POWERUP_QUAD,
+	EV_POWERUP_BATTLESUIT,
+	//EV_POWERUP_REGEN,
+
+	EV_FORCE_DRAINED,
+
+	EV_GIB_PLAYER,			// gib a previously living player
+	EV_SCOREPLUM,			// score plum
+
+	EV_CTFMESSAGE,
+
+	EV_SAGA_ROUNDOVER,
+	EV_SAGA_OBJECTIVECOMPLETE,
+
+	EV_DESTROY_GHOUL2_INSTANCE,
+
+	EV_DESTROY_WEAPON_MODEL,
+
+	EV_GIVE_NEW_RANK,
+	EV_SET_FREE_SABER,
+	EV_SET_FORCE_DISABLE,
+
+	EV_WEAPON_CHARGE,
+	EV_WEAPON_CHARGE_ALT,
+
+	EV_SHIELD_HIT,
+
+	EV_DEBUG_LINE,
+	EV_TESTLINE,
+	EV_STOPLOOPINGSOUND,
+	EV_STARTLOOPINGSOUND,
+	EV_TAUNT,
+	EV_TAUNT_YES,
+	EV_TAUNT_NO,
+	EV_TAUNT_FOLLOWME,
+	EV_TAUNT_GETFLAG,
+	EV_TAUNT_GUARDBASE,
+	EV_TAUNT_PATROL,
+
+	EV_BODY_QUEUE_COPY,
+
+} entity_event_t;			// There is a maximum of 256 events (8 bits transmission, 2 high bits for uniqueness)
+
+// entityState_t->eFlags
+#define	EF_DEAD				0x00000001		// don't draw a foe marker over players with EF_DEAD
+#define	EF_BOUNCE_SHRAPNEL	0x00000002		// special shrapnel flag
+#define	EF_TELEPORT_BIT		0x00000004		// toggled every time the origin abruptly changes
+
+//doesn't do anything
+#define	EF_AWARD_EXCELLENT	0x00000008		// draw an excellent sprite
+
+#define EF_PLAYER_EVENT		0x00000010
+#define	EF_BOUNCE			0x00000010		// for missiles
+
+#define	EF_BOUNCE_HALF		0x00000020		// for missiles
+
+//doesn't do anything
+#define	EF_AWARD_GAUNTLET	0x00000040		// draw a gauntlet sprite
+
+#define	EF_NODRAW			0x00000080		// may have an event, but no model (unspawned items)
+#define	EF_FIRING			0x00000100		// for lightning gun
+#define EF_ALT_FIRING		0x00000200		// for alt-fires, mostly for lightning guns though
+#define	EF_MOVER_STOP		0x00000400		// will push otherwise
+
+//doesn't do anything
+#define EF_AWARD_CAP		0x00000800		// draw the capture sprite
+
+#define	EF_TALK				0x00001000		// draw a talk balloon
+#define	EF_CONNECTION		0x00002000		// draw a connection trouble sprite
+#define	EF_VOTED			0x00004000		// already cast a vote
+
+//next 4 don't actually do anything
+#define	EF_AWARD_IMPRESSIVE	0x00008000		// draw an impressive sprite
+#define	EF_AWARD_DEFEND		0x00010000		// draw a defend sprite
+#define	EF_AWARD_ASSIST		0x00020000		// draw a assist sprite
+#define EF_AWARD_DENIED		0x00040000		// denied
+
+#define EF_TEAMVOTED		0x00080000		// already cast a team vote
+#define EF_SEEKERDRONE		0x00100000		// show seeker drone floating around head
+#define EF_MISSILE_STICK	0x00200000		// missiles that stick to the wall.
+#define EF_ITEMPLACEHOLDER	0x00400000		// item effect
+#define EF_SOUNDTRACKER		0x00800000		// sound position needs to be updated in relation to another entity
+#define EF_DROPPEDWEAPON	0x01000000		// it's a dropped weapon
+#define EF_DISINTEGRATION	0x02000000		// being disintegrated by the disruptor
+#define EF_INVULNERABLE		0x04000000		// just spawned in or whatever, so is protected
+
+typedef enum {
+	PW_NONE,
+
+	PW_QUAD,
+	PW_BATTLESUIT,
+	PW_HASTE,
+	//PW_INVIS, //rww - removed
+	//PW_REGEN, //rww - removed
+	//PW_FLIGHT, //rww - removed
+
+	PW_REDFLAG,
+	PW_BLUEFLAG,
+	PW_NEUTRALFLAG,
+
+	PW_SHIELDHIT,
+
+	//PW_SCOUT, //rww - removed
+	//PW_GUARD, //rww - removed
+	//PW_DOUBLER, //rww - removed
+	//PW_AMMOREGEN, //rww - removed
+	PW_SPEEDBURST,
+	PW_DISINT_4,
+	PW_SPEED,
+	PW_FORCE_LIGHTNING,
+	PW_FORCE_ENLIGHTENED_LIGHT,
+	PW_FORCE_ENLIGHTENED_DARK,
+	PW_FORCE_BOON,
+	PW_YSALAMIRI,
+
+	PW_NUM_POWERUPS
+
+} powerup_t;
+
+// means of death
+typedef enum {
+	MOD_UNKNOWN,
+	MOD_STUN_BATON,
+	MOD_MELEE,
+	MOD_SABER,
+	MOD_BRYAR_PISTOL,
+	MOD_BRYAR_PISTOL_ALT,
+	MOD_BLASTER,
+	MOD_DISRUPTOR,
+	MOD_DISRUPTOR_SPLASH,
+	MOD_DISRUPTOR_SNIPER,
+	MOD_BOWCASTER,
+	MOD_REPEATER,
+	MOD_REPEATER_ALT,
+	MOD_REPEATER_ALT_SPLASH,
+	MOD_DEMP2,
+	MOD_DEMP2_ALT,
+	MOD_FLECHETTE,
+	MOD_FLECHETTE_ALT_SPLASH,
+	MOD_ROCKET,
+	MOD_ROCKET_SPLASH,
+	MOD_ROCKET_HOMING,
+	MOD_ROCKET_HOMING_SPLASH,
+	MOD_THERMAL,
+	MOD_THERMAL_SPLASH,
+	MOD_TRIP_MINE_SPLASH,
+	MOD_TIMED_MINE_SPLASH,
+	MOD_DET_PACK_SPLASH,
+	MOD_FORCE_DARK,
+	MOD_SENTRY,
+	MOD_WATER,
+	MOD_SLIME,
+	MOD_LAVA,
+	MOD_CRUSH,
+	MOD_TELEFRAG,
+	MOD_FALLING,
+	MOD_SUICIDE,
+	MOD_TARGET_LASER,
+	MOD_TRIGGER_HURT,
+	MOD_MAX
+} meansOfDeath_t;
+
 
 
 
@@ -1006,7 +1324,11 @@ typedef struct {
 	} cut;
 } demo_t;
 
+
 extern demo_t demo;
+
+
+
 
 
 enum demoType_t {

@@ -12,7 +12,16 @@ jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has fin
 std::map<int,int> playerFirstVisible;
 std::map<int,int> playerFirstFollowed;
 std::map<int,int> playerFirstFollowedOrVisible;
+std::map<int,int> lastEvent;
+int lastKnownRedFlagCarrier = -1;
+int lastKnownBlueFlagCarrier = -1;
 
+enum highlightSearchMode_t {
+	SEARCH_ALL,
+	SEARCH_INTERESTING,
+	SEARCH_MY_CTF_RETURNS,
+	SEARCH_CTF_RETURNS,
+};
 
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -436,8 +445,60 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 //#pragma optimize("", off)
 #endif
 
+int demoCutGetEvent(entityState_t* es) {
+	if (lastEvent.find(es->number) == lastEvent.end()) {
+		lastEvent[es->number] = 0;
+	}
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile) {
+	// check for event-only entities
+	/*if (es->eType > ET_EVENTS) {
+		if (cent->previousEvent) {
+			return;	// already fired
+		}
+		// if this is a player event set the entity number of the client entity number
+		if (es->eFlags & EF_PLAYER_EVENT) {
+			es->number = es->otherEntityNum;
+		}
+
+		cent->previousEvent = 1;
+
+		es->event = es->eType - ET_EVENTS;
+	}
+	else {
+		// check for events riding with another entity
+		if (es->event == cent->previousEvent) {
+			return;
+		}
+		cent->previousEvent = es->event;
+		if ((es->event & ~EV_EVENT_BITS) == 0) {
+			return;
+		}
+	}*/
+
+	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
+	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
+
+	if (eventNumberRaw == lastEvent[es->number]) {
+		return 0;
+	}
+
+	lastEvent[es->number] = eventNumberRaw;
+	return eventNumber;
+	
+}
+
+entityState_t* findEntity(int number) {
+	for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
+
+		if (demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)].number == number) {
+			return &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+		}
+	}
+	return NULL;
+}
+
+
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -585,6 +646,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType)) {
 					goto cuterror;
 				}
+
+				// Time related stuff
 				if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
 					demoStartTime = demo.cut.Cl.snap.serverTime;
@@ -596,14 +659,99 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 
+
+				// Fire events
+				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
+
+					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+					int eventNumber = demoCutGetEvent(thisEs);
+					if (eventNumber) {
+						
+
+						// Handle kills
+						if (eventNumber == EV_OBITUARY) {
+							int				target = thisEs->otherEntityNum;
+							int				attacker = thisEs->otherEntityNum2;
+							int				mod = thisEs->eventParm;
+							bool			victimIsFlagCarrier = false;
+							bool			isSuicide;
+							bool			isDoomKill;
+							bool			isWorldKill = false;
+							bool			isVisible = false;
+							if (target < 0 || target >= MAX_CLIENTS) {
+								std::cout << "CG_Obituary: target out of range. This should never happen really.";
+							}
+
+							if (attacker < 0 || attacker >= MAX_CLIENTS) {
+								attacker = ENTITYNUM_WORLD;
+								isWorldKill = true;
+							}
+							entityState_t* targetEntity = findEntity(target);
+							if (targetEntity) {
+								isVisible = true;
+								/*if (targetEntity->powerups & (1 << PW_REDFLAG) || targetEntity->powerups & (1 << PW_BLUEFLAG)) {
+									// If the victim isn't visible, his entity won't be available, thus this won't be set
+									// But we're trying to find interesting moments, so stuff that's not even visible is not that interesting to us
+									victimIsFlagCarrier = true;
+								}*/
+							}
+							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
+
+							isSuicide = target == attacker;
+							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
+							
+							isDoomKill = mod == MOD_FALLING;
+							
+							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
+							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
+
+							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
+
+							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
+
+							const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+							std::string mapname = Info_ValueForKey(info, "mapname");
+							const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
+							std::string playername = Info_ValueForKey(playerInfo, "n");
+							playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
+							std::string victimname = Info_ValueForKey(playerInfo, "n");
+
+							std::stringstream ss;
+							ss << mapname << std::setfill('0') << "___RET" << (isDoomKill ? "_DOOM" : "") << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson");
+
+							std::string targetFilename = ss.str();
+							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+
+							int startTime = demoCurrentTime - bufferTime;
+							int endTime = demoCurrentTime + bufferTime;
+
+							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
+							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							delete[] targetFilenameFiltered;
+							std::cout << mapname << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
+
+						}
+					}
+				}
+
+
+				// Find out which players are visible / followed
+				// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
+				lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
 				for (int p = 0; p < MAX_CLIENTS; p++) {
 					// Go through parseenttities of last snap to see if client is in it
 					bool clientIsInSnapshot = false;
 					bool clientVisibleOrFollowed = false;
 					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum+demo.cut.Cl.snap.numEntities; pe++) {
-
-						if (demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)].number == p) {
+						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+						if (thisEntity->number == p) {
 							clientIsInSnapshot = true;
+						}
+						if (thisEntity->powerups & (1 << PW_REDFLAG)) {
+							lastKnownRedFlagCarrier = thisEntity->number;
+						}else if ( thisEntity->powerups& (1 << PW_BLUEFLAG)) {
+							lastKnownBlueFlagCarrier = thisEntity->number;
 						}
 					}
 					if (clientIsInSnapshot) {
@@ -671,7 +819,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
 				
-
+				if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL) continue;
 
 				jp::VecNum vec_num;
 				jp::RegexMatch rm;
@@ -680,6 +828,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					.setSubject(&printText)                         //set subject string
 					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
 					.match();
+				
 				for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
 					const char * info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					std::string mapname = Info_ValueForKey(info, "mapname");
@@ -825,9 +974,22 @@ int main(int argc, char** argv) {
 		std::cin.get();
 		return 1;
 	}
+
 	char* demoName = argv[1];
 	float bufferTime = atof(argv[2]);
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat")) {
+
+	highlightSearchMode_t searchMode = SEARCH_INTERESTING;
+	if (argc > 3) {
+		// Searchmode specified
+		char* searchModeText = argv[3];
+		if (!_stricmp(searchModeText, "myctfreturns")) {
+			searchMode = SEARCH_MY_CTF_RETURNS;
+		}else if (!_stricmp(searchModeText, "ctfreturns")) {
+			searchMode = SEARCH_CTF_RETURNS;
+		}
+	}
+
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat", searchMode)) {
 		Com_Printf("Highlights successfully found.\n", demoName);
 	}
 	else {
