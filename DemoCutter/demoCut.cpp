@@ -551,12 +551,27 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,demoType)) {
 					goto cuterror;
 				}
-				if (outputName) {
-					Com_sprintf(newName, sizeof(newName), "%s%s", outputName, ext);
-				}
-				else {
-					Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
-				}
+				{int dupeIterator = 0;
+				while (!dupeIterator || FS_FileExists(newName)) {
+					if (!dupeIterator) {
+						if (outputName) {
+							Com_sprintf(newName, sizeof(newName), "%s%s", outputName, ext);
+						}
+						else {
+							Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
+						}
+					}
+					else {
+						if (outputName) {
+							Com_sprintf(newName, sizeof(newName), "%s(%d)%s", outputName, 1 + dupeIterator, ext);
+						}
+						else {
+							Com_sprintf(newName, sizeof(newName), "%s_cut(%d)%s", oldName, 1 + dupeIterator, ext);
+						}
+					}
+					dupeIterator++;
+				}}
+
 				newHandle = FS_FOpenFileWrite(newName);
 				if (!newHandle) {
 					Com_Printf("Failed to open %s for target cutting.\n", newName);

@@ -253,7 +253,8 @@ char* QDECL va(const char* format, ...) {
 void sanitizeFilename(const char* input, char* output) {
 
 	while (*input) {
-		if ((*input >= 32 && *input < 47)
+		if ((*input >= 32 && *input < 42)
+			|| (*input >= 43 && *input < 47)
 			|| (*input >= 48 && *input < 60)
 			|| (*input == 61)
 			|| (*input >= 64 && *input < 92)
