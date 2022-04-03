@@ -254,8 +254,9 @@ void sanitizeFilename(const char* input, char* output) {
 
 	while (*input) {
 		if ((*input >= 32 && *input < 42)
-			|| (*input >= 43 && *input < 47)
-			|| (*input >= 48 && *input < 60)
+			|| (*input >= 43 && *input < 46)
+			|| (*input >= 48 && *input < 58)
+			|| (*input >= 59 && *input < 60)
 			|| (*input == 61)
 			|| (*input >= 64 && *input < 92)
 			|| (*input >= 93 && *input < 124)
@@ -265,6 +266,9 @@ void sanitizeFilename(const char* input, char* output) {
 		}
 		else if (*input == '|') {
 			*output++ = 'I';
+		}
+		else {
+			*output++ = '-';
 		}
 		input++;
 	}
