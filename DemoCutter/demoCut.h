@@ -9,6 +9,8 @@
 #include <cstdio>
 #include <cassert>
 #include <cstring>
+#include <map>
+
 
 #define NULL 0
 
@@ -1241,9 +1243,197 @@ typedef enum {
 	MOD_MAX
 } meansOfDeath_t;
 
+typedef enum {
+	WP_NONE,
 
+	WP_STUN_BATON,
+	WP_SABER,				 // NOTE: lots of code assumes this is the first weapon (... which is crap) so be careful -Ste.
+	WP_BRYAR_PISTOL,
+	WP_BLASTER,
+	WP_DISRUPTOR,
+	WP_BOWCASTER,
+	WP_REPEATER,
+	WP_DEMP2,
+	WP_FLECHETTE,
+	WP_ROCKET_LAUNCHER,
+	WP_THERMAL,
+	WP_TRIP_MINE,
+	WP_DET_PACK,
+	WP_EMPLACED_GUN,
+	WP_TURRET,
 
+	//	WP_GAUNTLET,
+	//	WP_MACHINEGUN,			// Bryar
+	//	WP_SHOTGUN,				// Blaster
+	//	WP_GRENADE_LAUNCHER,	// Thermal
+	//	WP_LIGHTNING,			// 
+	//	WP_RAILGUN,				// 
+	//	WP_GRAPPLING_HOOK,
 
+	WP_NUM_WEAPONS
+} weapon_t;
+
+extern int weaponFromMOD[MOD_MAX];
+
+enum
+{
+	FORCE_LEVEL_0,
+	FORCE_LEVEL_1,
+	FORCE_LEVEL_2,
+	FORCE_LEVEL_3,
+	NUM_FORCE_POWER_LEVELS
+};
+
+typedef enum {
+	// Invalid, or saber not armed
+	LS_NONE = 0,
+
+	// General movements with saber
+	LS_READY,
+	LS_DRAW,
+	LS_PUTAWAY,
+
+	// Attacks
+	LS_A_TL2BR,//4
+	LS_A_L2R,
+	LS_A_BL2TR,
+	LS_A_BR2TL,
+	LS_A_R2L,
+	LS_A_TR2BL,
+	LS_A_T2B,
+	LS_A_BACKSTAB,
+	LS_A_BACK,
+	LS_A_BACK_CR,
+	LS_A_LUNGE,
+	LS_A_JUMP_T__B_,
+	LS_A_FLIP_STAB,
+	LS_A_FLIP_SLASH,
+
+	//starts
+	LS_S_TL2BR,//26
+	LS_S_L2R,
+	LS_S_BL2TR,//# Start of attack chaining to SLASH LR2UL
+	LS_S_BR2TL,//# Start of attack chaining to SLASH LR2UL
+	LS_S_R2L,
+	LS_S_TR2BL,
+	LS_S_T2B,
+
+	//returns
+	LS_R_TL2BR,//33
+	LS_R_L2R,
+	LS_R_BL2TR,
+	LS_R_BR2TL,
+	LS_R_R2L,
+	LS_R_TR2BL,
+	LS_R_T2B,
+
+	//transitions
+	LS_T1_BR__R,//40
+	LS_T1_BR_TR,
+	LS_T1_BR_T_,
+	LS_T1_BR_TL,
+	LS_T1_BR__L,
+	LS_T1_BR_BL,
+	LS_T1__R_BR,//46
+	LS_T1__R_TR,
+	LS_T1__R_T_,
+	LS_T1__R_TL,
+	LS_T1__R__L,
+	LS_T1__R_BL,
+	LS_T1_TR_BR,//52
+	LS_T1_TR__R,
+	LS_T1_TR_T_,
+	LS_T1_TR_TL,
+	LS_T1_TR__L,
+	LS_T1_TR_BL,
+	LS_T1_T__BR,//58
+	LS_T1_T___R,
+	LS_T1_T__TR,
+	LS_T1_T__TL,
+	LS_T1_T___L,
+	LS_T1_T__BL,
+	LS_T1_TL_BR,//64
+	LS_T1_TL__R,
+	LS_T1_TL_TR,
+	LS_T1_TL_T_,
+	LS_T1_TL__L,
+	LS_T1_TL_BL,
+	LS_T1__L_BR,//70
+	LS_T1__L__R,
+	LS_T1__L_TR,
+	LS_T1__L_T_,
+	LS_T1__L_TL,
+	LS_T1__L_BL,
+	LS_T1_BL_BR,//76
+	LS_T1_BL__R,
+	LS_T1_BL_TR,
+	LS_T1_BL_T_,
+	LS_T1_BL_TL,
+	LS_T1_BL__L,
+
+	//Bounces
+	LS_B1_BR,
+	LS_B1__R,
+	LS_B1_TR,
+	LS_B1_T_,
+	LS_B1_TL,
+	LS_B1__L,
+	LS_B1_BL,
+
+	//Deflected attacks
+	LS_D1_BR,
+	LS_D1__R,
+	LS_D1_TR,
+	LS_D1_T_,
+	LS_D1_TL,
+	LS_D1__L,
+	LS_D1_BL,
+	LS_D1_B_,
+
+	//Reflected attacks
+	LS_V1_BR,
+	LS_V1__R,
+	LS_V1_TR,
+	LS_V1_T_,
+	LS_V1_TL,
+	LS_V1__L,
+	LS_V1_BL,
+	LS_V1_B_,
+
+	// Broken parries
+	LS_H1_T_,//
+	LS_H1_TR,
+	LS_H1_TL,
+	LS_H1_BR,
+	LS_H1_B_,
+	LS_H1_BL,
+
+	// Knockaways
+	LS_K1_T_,//
+	LS_K1_TR,
+	LS_K1_TL,
+	LS_K1_BR,
+	LS_K1_BL,
+
+	// Parries
+	LS_PARRY_UP,//
+	LS_PARRY_UR,
+	LS_PARRY_UL,
+	LS_PARRY_LR,
+	LS_PARRY_LL,
+
+	// Projectile Reflections
+	LS_REFLECT_UP,//
+	LS_REFLECT_UR,
+	LS_REFLECT_UL,
+	LS_REFLECT_LR,
+	LS_REFLECT_LL,
+
+	LS_MOVE_MAX//
+} saberMoveName_t;
+
+extern std::map <int, std::string>  saberMoveNames;
+extern std::map <int, std::string>  saberStyleNames;
 
 
 

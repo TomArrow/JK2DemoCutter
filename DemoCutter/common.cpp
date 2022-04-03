@@ -349,3 +349,205 @@ char* Info_ValueForKey(const char* s, const char* key) {
 
 	return "";
 }
+
+
+// MOD-weapon mapping array.
+int weaponFromMOD[MOD_MAX] =
+{
+	WP_NONE,				//MOD_UNKNOWN,
+	WP_STUN_BATON,			//MOD_STUN_BATON,
+	WP_NONE,				//MOD_MELEE,
+	WP_SABER,				//MOD_SABER,
+	WP_BRYAR_PISTOL,		//MOD_BRYAR_PISTOL,
+	WP_BRYAR_PISTOL,		//MOD_BRYAR_PISTOL_ALT,
+	WP_BLASTER,				//MOD_BLASTER,
+	WP_DISRUPTOR,			//MOD_DISRUPTOR,
+	WP_DISRUPTOR,			//MOD_DISRUPTOR_SPLASH,
+	WP_DISRUPTOR,			//MOD_DISRUPTOR_SNIPER,
+	WP_BOWCASTER,			//MOD_BOWCASTER,
+	WP_REPEATER,			//MOD_REPEATER,
+	WP_REPEATER,			//MOD_REPEATER_ALT,
+	WP_REPEATER,			//MOD_REPEATER_ALT_SPLASH,
+	WP_DEMP2,				//MOD_DEMP2,
+	WP_DEMP2,				//MOD_DEMP2_ALT,
+	WP_FLECHETTE,			//MOD_FLECHETTE,
+	WP_FLECHETTE,			//MOD_FLECHETTE_ALT_SPLASH,
+	WP_ROCKET_LAUNCHER,		//MOD_ROCKET,
+	WP_ROCKET_LAUNCHER,		//MOD_ROCKET_SPLASH,
+	WP_ROCKET_LAUNCHER,		//MOD_ROCKET_HOMING,
+	WP_ROCKET_LAUNCHER,		//MOD_ROCKET_HOMING_SPLASH,
+	WP_THERMAL,				//MOD_THERMAL,
+	WP_THERMAL,				//MOD_THERMAL_SPLASH,
+	WP_TRIP_MINE,			//MOD_TRIP_MINE_SPLASH,
+	WP_TRIP_MINE,			//MOD_TIMED_MINE_SPLASH,
+	WP_DET_PACK,			//MOD_DET_PACK_SPLASH,
+	WP_NONE,				//MOD_FORCE_DARK,
+	WP_NONE,				//MOD_SENTRY,
+	WP_NONE,				//MOD_WATER,
+	WP_NONE,				//MOD_SLIME,
+	WP_NONE,				//MOD_LAVA,
+	WP_NONE,				//MOD_CRUSH,
+	WP_NONE,				//MOD_TELEFRAG,
+	WP_NONE,				//MOD_FALLING,
+	WP_NONE,				//MOD_SUICIDE,
+	WP_NONE,				//MOD_TARGET_LASER,
+	WP_NONE,				//MOD_TRIGGER_HURT,
+};
+
+std::map <int, std::string>  saberMoveNames
+{
+	// Invalid, or saber not armed
+	  std::make_pair(LS_NONE, "_WEIRD"),
+
+	  // General movements with saber
+	  std::make_pair(LS_READY, "_IDLE"),
+	  std::make_pair(LS_DRAW, "_DRAW"),
+	  std::make_pair(LS_PUTAWAY, "_PUTAWAY"),
+
+	  // Attacks
+	  std::make_pair(LS_A_TL2BR, ""),//4
+	  std::make_pair(LS_A_L2R, ""),
+	  std::make_pair(LS_A_BL2TR, ""),
+	  std::make_pair(LS_A_BR2TL, ""),
+	  std::make_pair(LS_A_R2L, ""),
+	  std::make_pair(LS_A_TR2BL, ""),
+	  std::make_pair(LS_A_T2B, ""),
+	  std::make_pair(LS_A_BACKSTAB, "_BLUBS"),
+	  std::make_pair(LS_A_BACK, "_BS"),
+	  std::make_pair(LS_A_BACK_CR, "_DBS"),
+	  std::make_pair(LS_A_LUNGE, "_UPCUT"),
+	  std::make_pair(LS_A_JUMP_T__B_, "_DFA"),
+	  std::make_pair(LS_A_FLIP_STAB, "_YDFA"),
+	  std::make_pair(LS_A_FLIP_SLASH, "_YDFA"),
+
+	  //starts
+	  std::make_pair(LS_S_TL2BR, ""),//26
+	  std::make_pair(LS_S_L2R, ""),
+	  std::make_pair(LS_S_BL2TR, ""),//# Start of attack chaining to SLASH LR2UL
+	  std::make_pair(LS_S_BR2TL, ""),//# Start of attack chaining to SLASH LR2UL
+	  std::make_pair(LS_S_R2L, ""),
+	  std::make_pair(LS_S_TR2BL, ""),
+	  std::make_pair(LS_S_T2B, ""),
+
+	  //returns
+	  std::make_pair(LS_R_TL2BR, ""),//33
+	  std::make_pair(LS_R_L2R, ""),
+	  std::make_pair(LS_R_BL2TR, ""),
+	  std::make_pair(LS_R_BR2TL, ""),
+	  std::make_pair(LS_R_R2L, ""),
+	  std::make_pair(LS_R_TR2BL, ""),
+	  std::make_pair(LS_R_T2B, ""),
+
+	  //transitions
+	  std::make_pair(LS_T1_BR__R, ""),//40
+	  std::make_pair(LS_T1_BR_TR, ""),
+	  std::make_pair(LS_T1_BR_T_, ""),
+	  std::make_pair(LS_T1_BR_TL, ""),
+	  std::make_pair(LS_T1_BR__L, ""),
+	  std::make_pair(LS_T1_BR_BL, ""),
+	  std::make_pair(LS_T1__R_BR, ""),//46
+	  std::make_pair(LS_T1__R_TR, ""),
+	  std::make_pair(LS_T1__R_T_, ""),
+	  std::make_pair(LS_T1__R_TL, ""),
+	  std::make_pair(LS_T1__R__L, ""),
+	  std::make_pair(LS_T1__R_BL, ""),
+	  std::make_pair(LS_T1_TR_BR, ""),//52
+	  std::make_pair(LS_T1_TR__R, ""),
+	  std::make_pair(LS_T1_TR_T_, ""),
+	  std::make_pair(LS_T1_TR_TL, ""),
+	  std::make_pair(LS_T1_TR__L, ""),
+	  std::make_pair(LS_T1_TR_BL, ""),
+	  std::make_pair(LS_T1_T__BR, ""),//58
+	  std::make_pair(LS_T1_T___R, ""),
+	  std::make_pair(LS_T1_T__TR, ""),
+	  std::make_pair(LS_T1_T__TL, ""),
+	  std::make_pair(LS_T1_T___L, ""),
+	  std::make_pair(LS_T1_T__BL, ""),
+	  std::make_pair(LS_T1_TL_BR, ""),//64
+	  std::make_pair(LS_T1_TL__R, ""),
+	  std::make_pair(LS_T1_TL_TR, ""),
+	  std::make_pair(LS_T1_TL_T_, ""),
+	  std::make_pair(LS_T1_TL__L, ""),
+	  std::make_pair(LS_T1_TL_BL, ""),
+	  std::make_pair(LS_T1__L_BR, ""),//70
+	  std::make_pair(LS_T1__L__R, ""),
+	  std::make_pair(LS_T1__L_TR, ""),
+	  std::make_pair(LS_T1__L_T_, ""),
+	  std::make_pair(LS_T1__L_TL, ""),
+	  std::make_pair(LS_T1__L_BL, ""),
+	  std::make_pair(LS_T1_BL_BR, ""),//76
+	  std::make_pair(LS_T1_BL__R, ""),
+	  std::make_pair(LS_T1_BL_TR, ""),
+	  std::make_pair(LS_T1_BL_T_, ""),
+	  std::make_pair(LS_T1_BL_TL, ""),
+	  std::make_pair(LS_T1_BL__L, ""),
+
+	  //Bounces
+	  std::make_pair(LS_B1_BR, "_BOUNCE"),
+	  std::make_pair(LS_B1__R, "_BOUNCE"),
+	  std::make_pair(LS_B1_TR, "_BOUNCE"),
+	  std::make_pair(LS_B1_T_, "_BOUNCE"),
+	  std::make_pair(LS_B1_TL, "_BOUNCE"),
+	  std::make_pair(LS_B1__L, "_BOUNCE"),
+	  std::make_pair(LS_B1_BL, "_BOUNCE"),
+
+	  //Deflected attacks
+	  std::make_pair(LS_D1_BR, "_DEFLECT"),
+	  std::make_pair(LS_D1__R, "_DEFLECT"),
+	  std::make_pair(LS_D1_TR, "_DEFLECT"),
+	  std::make_pair(LS_D1_T_, "_DEFLECT"),
+	  std::make_pair(LS_D1_TL, "_DEFLECT"),
+	  std::make_pair(LS_D1__L, "_DEFLECT"),
+	  std::make_pair(LS_D1_BL, "_DEFLECT"),
+	  std::make_pair(LS_D1_B_, "_DEFLECT"),
+
+	  //Reflected attacks
+	  std::make_pair(LS_V1_BR, "_REFLECT"),
+	  std::make_pair(LS_V1__R, "_REFLECT"),
+	  std::make_pair(LS_V1_TR, "_REFLECT"),
+	  std::make_pair(LS_V1_T_, "_REFLECT"),
+	  std::make_pair(LS_V1_TL, "_REFLECT"),
+	  std::make_pair(LS_V1__L, "_REFLECT"),
+	  std::make_pair(LS_V1_BL, "_REFLECT"),
+	  std::make_pair(LS_V1_B_, "_REFLECT"),
+
+	  // Broken parries
+	  std::make_pair(LS_H1_T_, "_BPARRY"),//
+	  std::make_pair(LS_H1_TR, "_BPARRY"),
+	  std::make_pair(LS_H1_TL, "_BPARRY"),
+	  std::make_pair(LS_H1_BR, "_BPARRY"),
+	  std::make_pair(LS_H1_B_, "_BPARRY"),
+	  std::make_pair(LS_H1_BL, "_BPARRY"),
+
+	  // Knockaways
+	  std::make_pair(LS_K1_T_, "_KNOCKAWAY"),//
+	  std::make_pair(LS_K1_TR, "_KNOCKAWAY"),
+	  std::make_pair(LS_K1_TL, "_KNOCKAWAY"),
+	  std::make_pair(LS_K1_BR, "_KNOCKAWAY"),
+	  std::make_pair(LS_K1_BL, "_KNOCKAWAY"),
+
+	  // Parries
+	  std::make_pair(LS_PARRY_UP, "_PARRY"),//
+	  std::make_pair(LS_PARRY_UR, "_PARRY"),
+	  std::make_pair(LS_PARRY_UL, "_PARRY"),
+	  std::make_pair(LS_PARRY_LR, "_PARRY"),
+	  std::make_pair(LS_PARRY_LL, "_PARRY"),
+
+	  // Projectile Reflections
+	  std::make_pair(LS_REFLECT_UP, "_PREFLECT"),//
+	  std::make_pair(LS_REFLECT_UR, "_PREFLECT"),
+	  std::make_pair(LS_REFLECT_UL, "_PREFLECT"),
+	  std::make_pair(LS_REFLECT_LR, "_PREFLECT"),
+	  std::make_pair(LS_REFLECT_LL, "_PREFLECT"),
+
+	  //std::make_pair(LS_MOVE_MAX, "")//
+};
+
+std::map <int, std::string>  saberStyleNames
+{
+	std::make_pair(FORCE_LEVEL_0, "_BLU"),
+	std::make_pair(FORCE_LEVEL_1, "_BLU"),
+	std::make_pair(FORCE_LEVEL_2, "_YEL"),
+	std::make_pair(FORCE_LEVEL_3, "_RED"),
+	std::make_pair(NUM_FORCE_POWER_LEVELS, "")
+};

@@ -708,6 +708,131 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
 
 							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
+							
+							entityState_t* attackerEntity = findEntity(attacker);
+
+							// Find extra info for means of death.
+							std::stringstream modInfo;
+							weapon_t probableKillingWeapon = (weapon_t)weaponFromMOD[mod];
+							
+							qboolean needMoreInfo = qtrue;
+							if (probableKillingWeapon == WP_NONE) { // means something like doom kill
+								switch (mod) {
+									case MOD_UNKNOWN:
+										modInfo << "_WEIRD";
+										break;
+									case MOD_FORCE_DARK:
+										modInfo << "_FORCE";
+										needMoreInfo = qfalse;
+										break;
+									case MOD_SENTRY:
+										modInfo << "_SENTRY";
+										needMoreInfo = qfalse;
+										break;
+									case MOD_WATER:
+										modInfo << "_DROWN";
+										break;
+									case MOD_SLIME:
+										modInfo << "_SLIME";
+										break;
+									case MOD_LAVA:
+										modInfo << "_LAVA";
+										break;
+									case MOD_CRUSH:
+										modInfo << "_CRUSH";
+										break;
+									case MOD_TELEFRAG:
+										modInfo << "_TELE";
+										break;
+									case MOD_FALLING:
+										modInfo << "_DOOM";
+										break;
+									case MOD_SUICIDE:
+										modInfo << "_SUIC";
+										break;
+									case MOD_TARGET_LASER:
+										modInfo << "_LASER";
+										break;
+									case MOD_TRIGGER_HURT:
+										modInfo << "_TRIG";
+										break;
+								}
+								if(needMoreInfo)
+									modInfo << "_~";
+								if (attackerIsFollowed) {
+									probableKillingWeapon = (weapon_t)demo.cut.Cl.snap.ps.weapon;
+								}
+								else if (attackerEntity) {
+									probableKillingWeapon = (weapon_t)attackerEntity->weapon;
+								}
+							}
+							if (needMoreInfo) {
+								switch (probableKillingWeapon) {
+									case WP_SABER:
+										if (attackerIsFollowed) {
+
+											modInfo << saberMoveNames[demo.cut.Cl.snap.ps.saberMove];
+											if (!modInfo.str().size()) {
+												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
+											}
+										}
+										else {
+
+											if (attackerEntity) {
+												modInfo << saberMoveNames[attackerEntity->saberMove];
+												if (!modInfo.str().size()) {
+													modInfo << saberStyleNames[attackerEntity->fireflag];
+												}
+											}
+										}
+										break;
+									case WP_STUN_BATON:
+										modInfo << "_STUN";
+										break;
+									case WP_BRYAR_PISTOL:
+										modInfo << "_BRYAR";
+										break;
+									case WP_BLASTER:
+										modInfo << "_BLASTER";
+										break;
+									case WP_DISRUPTOR:
+										modInfo << "_DISRUPTOR";
+										break;
+									case WP_BOWCASTER:
+										modInfo << "_BOWCAST";
+										break;
+									case WP_REPEATER:
+										modInfo << "_REPEATER";
+										break;
+									case WP_DEMP2:
+										modInfo << "_DEMP2";
+										break;
+									case WP_FLECHETTE:
+										modInfo << "_FLECH";
+										break;
+									case WP_ROCKET_LAUNCHER:
+										modInfo << "_ROCKET";
+										break;
+									case WP_THERMAL:
+										modInfo << "_THERMAL";
+										break;
+									case WP_TRIP_MINE:
+										modInfo << "_MINE";
+										break;
+									case WP_DET_PACK:
+										modInfo << "_DTPCK";
+										break;
+									case WP_EMPLACED_GUN:
+										modInfo << "_EMPLACED";
+										break;
+									case WP_TURRET:
+										modInfo << "_TURRET";
+										break;
+
+									default:
+										break;
+								}
+							}
 
 							const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 							std::string mapname = Info_ValueForKey(info, "mapname");
@@ -717,7 +842,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::string victimname = Info_ValueForKey(playerInfo, "n");
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << (isDoomKill ? "_DOOM" : "") << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson");
+							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson");
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -729,7 +854,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
 							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
-							std::cout << mapname << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
+							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
 
 						}
 					}
