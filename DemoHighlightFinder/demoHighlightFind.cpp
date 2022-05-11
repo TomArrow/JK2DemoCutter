@@ -7,7 +7,8 @@
 #include <sstream>
 
 typedef jpcre2::select<char> jp;
-jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
+//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
+jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
 
 std::map<int,int> playerFirstVisible;
 std::map<int,int> playerFirstFollowed;
@@ -21,6 +22,7 @@ enum highlightSearchMode_t {
 	SEARCH_INTERESTING,
 	SEARCH_MY_CTF_RETURNS,
 	SEARCH_CTF_RETURNS,
+	SEARCH_TOP10_DEFRAG, // Top10 Defrags, even if not number 1.
 };
 
 
@@ -926,7 +928,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		}
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 		// process any new server commands
-		for (; demo.cut.Clc.lastExecutedServerCommand < demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
+		for (; demo.cut.Clc.lastExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
 			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
 			char* cmd = Cmd_Argv(0);
@@ -944,11 +946,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
 				
-				if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL) continue;
+				if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 
 				jp::VecNum vec_num;
 				jp::RegexMatch rm;
 				std::string printText = Cmd_Argv(1);
+#if DEBUG
+				std::cout << printText << "\n";
+#endif
+
 				size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
 					.setSubject(&printText)                         //set subject string
 					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
@@ -966,6 +972,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int pureSeconds = milliSeconds / 1000;
 
 					bool isLogged = vec_num[matchNum][4].length() > 0;
+					bool isNumberOne = vec_num[matchNum][6].length() > 0;
+
+					if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
 
 					//int totalSeconds = minutes * 60 + seconds;
 					int totalMilliSeconds = minutes * 60000 + milliSeconds;
@@ -1002,7 +1011,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					
 
 					std::stringstream ss;
-					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible"));
+					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible"));
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
@@ -1011,13 +1020,19 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					outputBatHandle << "\nrem demoCurrentTime: "<< demoCurrentTime;
 					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 					delete[] targetFilenameFiltered;
-					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 				}
 
 				
 				
 			}
 		}
+
+#if DEBUG
+		if (oldSize == 0) {
+			goto cutcomplete;
+		}
+#endif
 		/*if (demo.cut.Cl.snap.serverTime > endTime) {
 			goto cutcomplete;
 		}
@@ -1039,6 +1054,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		}*/
 	}
 cutcomplete:
+	ret = qtrue;
 	/*if (newHandle) {
 		buf = -1;
 		FS_Write(&buf, 4, newHandle);
@@ -1060,7 +1076,7 @@ cuterror:
 	}*/
 	FS_FCloseFile(oldHandle);
 	//FS_FCloseFile(newHandle);
-	return ret;
+ 	return ret;
 }
 
 /*void CL_DemoCut_f(void) {
@@ -1111,6 +1127,8 @@ int main(int argc, char** argv) {
 			searchMode = SEARCH_MY_CTF_RETURNS;
 		}else if (!_stricmp(searchModeText, "ctfreturns")) {
 			searchMode = SEARCH_CTF_RETURNS;
+		}else if (!_stricmp(searchModeText, "top10defrag")) {
+			searchMode = SEARCH_TOP10_DEFRAG;
 		}
 	}
 

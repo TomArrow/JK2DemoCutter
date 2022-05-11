@@ -617,7 +617,7 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 		}
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 		// process any new server commands
-		for (; demo.cut.Clc.lastExecutedServerCommand < demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
+		for (; demo.cut.Clc.lastExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
 			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
 			char* cmd = Cmd_Argv(0);
