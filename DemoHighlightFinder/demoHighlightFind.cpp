@@ -874,11 +874,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 						if (thisEntity->number == p) {
 							clientIsInSnapshot = true;
-						}
-						if (thisEntity->powerups & (1 << PW_REDFLAG)) {
-							lastKnownRedFlagCarrier = thisEntity->number;
-						}else if ( thisEntity->powerups& (1 << PW_BLUEFLAG)) {
-							lastKnownBlueFlagCarrier = thisEntity->number;
+
+							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
+								lastKnownRedFlagCarrier = thisEntity->number;
+							}
+							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
+								lastKnownBlueFlagCarrier = thisEntity->number;
+							}
 						}
 					}
 					if (clientIsInSnapshot) {

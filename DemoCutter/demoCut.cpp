@@ -1,5 +1,7 @@
 #include "demoCut.h"
 
+// TODO attach amount of dropped frames in filename.
+
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
 
