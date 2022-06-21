@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoCutter", "DemoCutter\De
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoHighlightFinder", "DemoHighlightFinder\DemoHighlightFinder.vcxproj", "{ABB32A82-7A77-445B-9391-F721046B8987}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoDefragCombiner", "DemoDefragCombiner\DemoDefragCombiner.vcxproj", "{093B6C6C-31DD-4375-944E-6A639679CFCD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{ABB32A82-7A77-445B-9391-F721046B8987}.Release|x64.Build.0 = Release|x64
 		{ABB32A82-7A77-445B-9391-F721046B8987}.Release|x86.ActiveCfg = Release|Win32
 		{ABB32A82-7A77-445B-9391-F721046B8987}.Release|x86.Build.0 = Release|Win32
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Debug|x64.ActiveCfg = Debug|x64
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Debug|x64.Build.0 = Debug|x64
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Debug|x86.ActiveCfg = Debug|Win32
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Debug|x86.Build.0 = Debug|Win32
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Release|x64.ActiveCfg = Release|x64
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Release|x64.Build.0 = Release|x64
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Release|x86.ActiveCfg = Release|Win32
+		{093B6C6C-31DD-4375-944E-6A639679CFCD}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
