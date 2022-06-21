@@ -564,7 +564,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
-	memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	memset(&demo, 0, sizeof(demo));
 
 	int messageOffset = 0;
 

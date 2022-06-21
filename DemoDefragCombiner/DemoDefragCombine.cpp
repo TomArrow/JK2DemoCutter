@@ -1,3 +1,4 @@
+#include "DemoReader.h"
 #include "demoCut.h"
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
@@ -17,13 +18,6 @@ std::map<int,int> lastEvent;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 
-enum highlightSearchMode_t {
-	SEARCH_ALL,
-	SEARCH_INTERESTING,
-	SEARCH_MY_CTF_RETURNS,
-	SEARCH_CTF_RETURNS,
-	SEARCH_TOP10_DEFRAG, // Top10 Defrags, even if not number 1.
-};
 
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -564,7 +558,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
-	memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	memset(&demo, 0, sizeof(demo));
 
 	int messageOffset = 0;
 

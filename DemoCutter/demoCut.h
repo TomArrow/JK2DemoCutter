@@ -1497,7 +1497,7 @@ typedef struct {
 } demoPlay_t;*/
 
 typedef struct {
-	int						nextNum, currentNum;
+	int						/*nextNum,*/ currentNum;
 	/*struct {
 		demoPlay_t* handle;
 		int					snapCount;

@@ -483,7 +483,8 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 		Com_Printf("Failed to open %s for cutting.\n", oldName);
 		return qfalse;
 	}
-	memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	memset(&demo, 0, sizeof(demo));
 
 	int messageOffset = 0;
 

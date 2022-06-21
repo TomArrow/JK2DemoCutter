@@ -24,11 +24,13 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp" />
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="DemoDefragCombine.cpp" />
+    <ClCompile Include="DemoReader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h" />
     <ClInclude Include="..\shared\include\jpcre2.hpp" />
     <ClInclude Include="..\shared\include\pcre2.h" />
+    <ClInclude Include="DemoReader.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
