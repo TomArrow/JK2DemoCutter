@@ -659,7 +659,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
-			tmpConfigString = demoReaders[0].GetPlayerConfigString(spectatedClient);
+			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient);
 			if (strlen(tmpConfigString)) {
 				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			}
@@ -686,6 +686,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	// Write demo header
 	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType);
 	demo.cut.Clc.reliableSequence++;
+	demo.cut.Clc.serverMessageSequence++;
 
 	float time = 0;
 	float fps = 60.0f;
@@ -695,12 +696,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	int currentCommand = 1;
 	// Start writing snapshots.
 	while(1){
+		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].SeekToTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
 				tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS.clientNum = i;
+				tmpPS.commandTime = time;
 				if (i == 0) {
 					mainPlayerPS = tmpPS;
 				}
@@ -708,6 +711,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					playerEntities[i]= tmpES;
 				}
+			}
+			if (!demoReaders[i].EndReached()) {
+				allSourceDemosFinished = qfalse;
 			}
 		}
 
@@ -721,6 +727,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 		time += 1000.0f / fps;
 		demo.cut.Clc.reliableSequence++;
+		demo.cut.Clc.serverMessageSequence++;
+
+		if (allSourceDemosFinished) break;
 	}
 
 cutcomplete:

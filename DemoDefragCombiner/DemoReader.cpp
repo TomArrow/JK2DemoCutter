@@ -317,6 +317,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
 	char* ext;
+	oldHandle = 0; // TODO if already loaded, gracefully close
 
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
 	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
@@ -342,7 +343,6 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
 
-	oldHandle = 0;
 	readGamestate = 0;
 
 	demoStartTime = 0;
@@ -728,11 +728,11 @@ readNext:
 		}
 	}
 
-#if DEBUG
+/*#if DEBUG
 	if (oldSize == 0) {
 		goto cutcomplete;
 	}
-#endif
+#endif*/
 
 	
 }
