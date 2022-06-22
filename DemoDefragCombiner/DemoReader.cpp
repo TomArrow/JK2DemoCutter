@@ -364,11 +364,28 @@ qboolean DemoReader::CloseDemo() {
 	FS_FCloseFile(oldHandle);
 	return qtrue;
 }
+qboolean DemoReader::AnySnapshotParsed() {
+
+	return anySnapshotParsed;
+}
+qboolean DemoReader::EndReached() {
+
+	return endReached;
+}
 
 qboolean DemoReader::SeekToTime(int time) {
-	while (demoCurrentTime < time) {
+	while (demoCurrentTime < time && !endReached) {
 		ReadMessage();
 	}
+	if (demoCurrentTime < time && endReached) return qfalse;
+	return qtrue;
+}
+qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
+	while (!anySnapshotParsed && !endReached) {
+		ReadMessage();
+	}
+	if (!anySnapshotParsed && endReached) return qfalse;
+	return qtrue;
 }
 playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
@@ -377,8 +394,19 @@ playerState_t DemoReader::GetCurrentPlayerState() {
 const char* DemoReader::GetPlayerConfigString(int playerNum) {
 	return thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
 }
+const char* DemoReader::GetConfigString(int configStringNum) {
+	return thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[ configStringNum];
+}
 
 qboolean DemoReader::ReadMessage() {
+	if (endReached) return qfalse;
+	if (!ReadMessageReal()) {
+		endReached = qtrue;
+		return qfalse;
+	}
+	return qtrue;
+}
+qboolean DemoReader::ReadMessageReal() {
 
 readNext:
 	int				buf;
@@ -464,6 +492,8 @@ readNext:
 			if (!ParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
 				return qfalse;
 			}
+
+			anySnapshotParsed = qtrue;
 
 			// Time related stuff
 			if (messageOffset++ == 0) {

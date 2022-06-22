@@ -1,30 +1,60 @@
-#include "DemoReader.h"
 #include "demoCut.h"
-#define PCRE2_STATIC
-#include "jpcre2.hpp"
-#include <fstream>
-#include <algorithm>
-#include <iomanip>
-#include <sstream>
+#include "DemoReader.h"
+#include <vector>
 
-typedef jpcre2::select<char> jp;
-//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
-jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
-
-std::map<int,int> playerFirstVisible;
-std::map<int,int> playerFirstFollowed;
-std::map<int,int> playerFirstFollowedOrVisible;
-std::map<int,int> lastEvent;
-int lastKnownRedFlagCarrier = -1;
-int lastKnownBlueFlagCarrier = -1;
-
-
+// TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
 
 demo_t			demo;
 
+
+qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value) {
+	char* old;
+	const char* s;
+	int			i, index;
+	const char* dup;
+	gameState_t	oldGs;
+	int			len;
+	index = configStringNum;
+	if (index < 0 || index >= MAX_CONFIGSTRINGS) {
+		Com_Printf("demoCutConfigstringModified: bad index %i", index);
+		return qtrue;
+	}
+	// get everything after "cs <num>"
+	s = value;
+	old = clCut->gameState.stringData + clCut->gameState.stringOffsets[index];
+	if (!strcmp(old, s)) {
+		return qtrue; // unchanged
+	}
+	// build the new gameState_t
+	oldGs = clCut->gameState;
+	Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
+	// leave the first 0 for uninitialized strings
+	clCut->gameState.dataCount = 1;
+	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
+		if (i == index) {
+			dup = s;
+		}
+		else {
+			dup = oldGs.stringData + oldGs.stringOffsets[i];
+		}
+		if (!dup[0]) {
+			continue; // leave with the default empty string
+		}
+		len = strlen(dup);
+		if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
+			Com_Printf("MAX_GAMESTATE_CHARS exceeded");
+			return qfalse;
+		}
+		// append it to the gameState string buffer
+		clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
+		Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, dup, len + 1);
+		clCut->gameState.dataCount += len + 1;
+	}
+	return qtrue;
+}
 
 qboolean demoCutConfigstringModified(clientActive_t* clCut) {
 	char* old, * s;
@@ -104,7 +134,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 			continue;
 		}
 		MSG_WriteByte(&buf, svc_baseline);
-		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue,(qboolean)(demoType == DM_15));
+		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue, (qboolean)(demoType == DM_15));
 	}
 	MSG_WriteByte(&buf, svc_EOF);
 	// finished writing the gamestate stuff
@@ -170,7 +200,7 @@ static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_
 		}
 		if (newnum > oldnum) {
 			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue,(qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, (qboolean)(demoType == DM_15));
 			oldindex++;
 			continue;
 		}
@@ -336,7 +366,7 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	// read playerinfo
 	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, (qboolean)(demoType == DM_15));
 	// read packet entities
-	demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut,demoType);
+	demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
 	// if not valid, dump the entire thing now that it has
 	// been properly read
 	if (!newSnap.valid) {
@@ -425,6 +455,21 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 	clcCut->checksumFeed = MSG_ReadLong(msg);
 	return qtrue;
 }
+qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed) {
+	int				i;
+	entityState_t* es;
+	int				newnum;
+	entityState_t	nullstate;
+	int				cmd;
+	char* s;
+	clcCut->connectPacketCount = 0;
+	Com_Memset(clCut, 0, sizeof(*clCut));
+	clcCut->serverCommandSequence = serverCommandSequence;
+	clCut->gameState.dataCount = 1;
+	clcCut->clientNum = clientNum;
+	clcCut->checksumFeed = checksumFeed;
+	return qtrue;
+}
 
 void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	int index;
@@ -441,67 +486,10 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 //#pragma optimize("", off)
 #endif
 
-int demoCutGetEvent(entityState_t* es) {
-	if (lastEvent.find(es->number) == lastEvent.end()) {
-		lastEvent[es->number] = 0;
-	}
 
-	// check for event-only entities
-	/*if (es->eType > ET_EVENTS) {
-		if (cent->previousEvent) {
-			return;	// already fired
-		}
-		// if this is a player event set the entity number of the client entity number
-		if (es->eFlags & EF_PLAYER_EVENT) {
-			es->number = es->otherEntityNum;
-		}
-
-		cent->previousEvent = 1;
-
-		es->event = es->eType - ET_EVENTS;
-	}
-	else {
-		// check for events riding with another entity
-		if (es->event == cent->previousEvent) {
-			return;
-		}
-		cent->previousEvent = es->event;
-		if ((es->event & ~EV_EVENT_BITS) == 0) {
-			return;
-		}
-	}*/
-
-	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
-	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
-
-	if (eventNumberRaw == lastEvent[es->number]) {
-		return 0;
-	}
-
-	lastEvent[es->number] = eventNumberRaw;
-	return eventNumber;
-	
-}
-
-entityState_t* findEntity(int number) {
-	for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
-
-		if (demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)].number == number) {
-			return &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-		}
-	}
-	return NULL;
-}
-
-
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode) {
-	fileHandle_t	oldHandle = 0;
-	//fileHandle_t	newHandle = 0;
-	msg_t			oldMsg;
-	byte			oldData[MAX_MSGLEN];
-	int				oldSize;
-	char			oldName[MAX_OSPATH];
-	//char			newName[MAX_OSPATH];
+qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
+	fileHandle_t	newHandle = 0;
+	char			newName[MAX_OSPATH];
 	int				buf;
 	int				readGamestate = 0;
 	//demoPlay_t* play = demo.play.handle;
@@ -509,571 +497,76 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int				framesSaved = 0;
 	char* ext;
 	demoType_t		demoType;
-	int				demoStartTime = 0;
-	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int				demoCurrentTime = 0;
-	int				lastGameStateChange = 0;
-	int				lastGameStateChangeInDemoTime = 0;
-	int				lastKnownTime = 0;
 
-	std::ofstream outputBatHandle;
 
-	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
-
-	//mvprotocol_t	protocol;
-
-	// Since not in MME:
-	/*if (!play) {
-		Com_Printf("Demo cutting is allowed in mme mode only.\n");
-		return qfalse;
-	}*/
-	//startTime += play->startTime;
-	//endTime += play->startTime;
-	
-
-	//protocol = MV_GetCurrentProtocol();
-	//if (protocol == PROTOCOL_UNDEF)
-	//	ext = ".dm_16";
-	//else
-	//	ext = va(".dm_%i", protocol);
-	//ext = Cvar_FindVar("mme_demoExt")->string;
-	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
-	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+	ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
-		demoType = DM_16;
-		ext = ".dm_16";
+		demoType = DM_15;
+		ext = ".dm_15";
 	}
-	else if (!_stricmp(ext,".dm_15")) {
+	else if (!_stricmp(ext, ".dm_15")) {
 
 		demoType = DM_15;
 		ext = ".dm_15";
 	}
-	else if (!_stricmp(ext,".dm_16")) {
+	else if (!_stricmp(ext, ".dm_16")) {
 
 		demoType = DM_16;
 		ext = ".dm_16";
 	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
-	if (!oldHandle) {
-		Com_Printf("Failed to open %s for reading.\n", oldName);
-		return qfalse;
+	else {
+		// TODO Maybe just check output files too and judge based on them?
+		demoType = DM_15;
+		ext = ".dm_15";
 	}
-	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+
 	memset(&demo, 0, sizeof(demo));
 
-	int messageOffset = 0;
-
-	//	Com_SetLoadingMsg("Cutting the demo...");
-	while (oldSize > 0) {
-	cutcontinue:
-		MSG_Init(&oldMsg, oldData, sizeof(oldData));
-		/* Read the sequence number */
-		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
-			goto cuterror;
-		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
-		oldSize -= 4;
-		/* Read the message size */
-		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
-			goto cuterror;
-		oldMsg.cursize = LittleLong(oldMsg.cursize);
-		oldSize -= 4;
-		/* Negative size signals end of demo */
-		if (oldMsg.cursize < 0)
-			break;
-		if (oldMsg.cursize > oldMsg.maxsize)
-			goto cuterror;
-		/* Read the actual message */
-		if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
-			goto cuterror;
-		oldSize -= oldMsg.cursize;
-		// init the bitstream
-		MSG_BeginReading(&oldMsg);
-		// Skip the reliable sequence acknowledge number
-		MSG_ReadLong(&oldMsg);
-		//
-		// parse the message
-		//
-		while (1) {
-			byte cmd;
-			if (oldMsg.readcount > oldMsg.cursize) {
-				Com_Printf("Demo cutter, read past end of server message.\n");
-				goto cuterror;
-			}
-			cmd = MSG_ReadByte(&oldMsg);
-			if (cmd == svc_EOF) {
-				break;
-			}
-			// skip all the gamestates until we reach needed
-			if (readGamestate < demo.currentNum) {
-				//if (readGamestate < (demo.nextNum-1)) { // not sure if this is correct tbh... but I dont wanna rewrite entire cl_demos
-				if (cmd == svc_gamestate) {
-					readGamestate++;
-				}
-				goto cutcontinue;
-			}
-			// other commands
-			switch (cmd) {
-			default:
-				Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
-				goto cuterror;
-			case svc_nop:
-				break;
-			case svc_serverCommand:
-				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
-				break;
-			case svc_gamestate:
-				lastGameStateChange = demo.cut.Cl.snap.serverTime;
-				lastGameStateChangeInDemoTime = demoCurrentTime;
-				//if (readGamestate > demo.currentNum) {
-				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
-				//	goto cutcomplete;
-				//}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,demoType)) {
-					goto cuterror;
-				}
-				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
-				//newHandle = FS_FOpenFileWrite(newName);
-				//if (!newHandle) {
-				//	Com_Printf("Failed to open %s for target cutting.\n", newName);
-				//	return qfalse;
-				//}
-				readGamestate++;
-				break;
-			case svc_snapshot:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType)) {
-					goto cuterror;
-				}
-
-				// Time related stuff
-				if (messageOffset++ == 0) {
-					// first message in demo. Get servertime offset from here to cut correctly.
-					demoStartTime = demo.cut.Cl.snap.serverTime;
-				}
-				if (demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
-					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
-					demoStartTime = demo.cut.Cl.snap.serverTime;
-				}
-				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
-				lastKnownTime = demo.cut.Cl.snap.serverTime;
-
-
-				// Fire events
-				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
-
-					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-					int eventNumber = demoCutGetEvent(thisEs);
-					if (eventNumber) {
-						
-
-						// Handle kills
-						if (eventNumber == EV_OBITUARY) {
-							int				target = thisEs->otherEntityNum;
-							int				attacker = thisEs->otherEntityNum2;
-							int				mod = thisEs->eventParm;
-							bool			victimIsFlagCarrier = false;
-							bool			isSuicide;
-							bool			isDoomKill;
-							bool			isWorldKill = false;
-							bool			isVisible = false;
-							if (target < 0 || target >= MAX_CLIENTS) {
-								std::cout << "CG_Obituary: target out of range. This should never happen really.";
-							}
-
-							if (attacker < 0 || attacker >= MAX_CLIENTS) {
-								attacker = ENTITYNUM_WORLD;
-								isWorldKill = true;
-							}
-							entityState_t* targetEntity = findEntity(target);
-							if (targetEntity) {
-								isVisible = true;
-								/*if (targetEntity->powerups & (1 << PW_REDFLAG) || targetEntity->powerups & (1 << PW_BLUEFLAG)) {
-									// If the victim isn't visible, his entity won't be available, thus this won't be set
-									// But we're trying to find interesting moments, so stuff that's not even visible is not that interesting to us
-									victimIsFlagCarrier = true;
-								}*/
-							}
-							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
-
-							isSuicide = target == attacker;
-							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
-							
-							isDoomKill = mod == MOD_FALLING;
-							
-							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
-							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
-
-							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
-
-							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
-							
-							entityState_t* attackerEntity = findEntity(attacker);
-
-							// Find extra info for means of death.
-							std::stringstream modInfo;
-							weapon_t probableKillingWeapon = (weapon_t)weaponFromMOD[mod];
-							
-							qboolean needMoreInfo = qtrue;
-							if (probableKillingWeapon == WP_NONE) { // means something like doom kill
-								switch (mod) {
-									case MOD_UNKNOWN:
-										modInfo << "_WEIRD";
-										break;
-									case MOD_FORCE_DARK:
-										modInfo << "_FORCE";
-										needMoreInfo = qfalse;
-										break;
-									case MOD_SENTRY:
-										modInfo << "_SENTRY";
-										needMoreInfo = qfalse;
-										break;
-									case MOD_WATER:
-										modInfo << "_DROWN";
-										break;
-									case MOD_SLIME:
-										modInfo << "_SLIME";
-										break;
-									case MOD_LAVA:
-										modInfo << "_LAVA";
-										break;
-									case MOD_CRUSH:
-										modInfo << "_CRUSH";
-										break;
-									case MOD_TELEFRAG:
-										modInfo << "_TELE";
-										break;
-									case MOD_FALLING:
-										modInfo << "_DOOM";
-										break;
-									case MOD_SUICIDE:
-										modInfo << "_SUIC";
-										break;
-									case MOD_TARGET_LASER:
-										modInfo << "_LASER";
-										break;
-									case MOD_TRIGGER_HURT:
-										modInfo << "_TRIG";
-										break;
-								}
-								if(needMoreInfo)
-									modInfo << "_~";
-								if (attackerIsFollowed) {
-									probableKillingWeapon = (weapon_t)demo.cut.Cl.snap.ps.weapon;
-								}
-								else if (attackerEntity) {
-									probableKillingWeapon = (weapon_t)attackerEntity->weapon;
-								}
-							}
-							if (needMoreInfo) {
-								switch (probableKillingWeapon) {
-									case WP_SABER:
-										if (attackerIsFollowed) {
-
-											modInfo << saberMoveNames[demo.cut.Cl.snap.ps.saberMove];
-											if (!modInfo.str().size()) {
-												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
-											}
-										}
-										else {
-
-											if (attackerEntity) {
-												modInfo << saberMoveNames[attackerEntity->saberMove];
-												if (!modInfo.str().size()) {
-													modInfo << saberStyleNames[attackerEntity->fireflag];
-												}
-											}
-										}
-										break;
-									case WP_STUN_BATON:
-										modInfo << "_STUN";
-										break;
-									case WP_BRYAR_PISTOL:
-										modInfo << "_BRYAR";
-										break;
-									case WP_BLASTER:
-										modInfo << "_BLASTER";
-										break;
-									case WP_DISRUPTOR:
-										modInfo << "_DISRUPTOR";
-										break;
-									case WP_BOWCASTER:
-										modInfo << "_BOWCAST";
-										break;
-									case WP_REPEATER:
-										modInfo << "_REPEATER";
-										break;
-									case WP_DEMP2:
-										modInfo << "_DEMP2";
-										break;
-									case WP_FLECHETTE:
-										modInfo << "_FLECH";
-										break;
-									case WP_ROCKET_LAUNCHER:
-										modInfo << "_ROCKET";
-										break;
-									case WP_THERMAL:
-										modInfo << "_THERMAL";
-										break;
-									case WP_TRIP_MINE:
-										modInfo << "_MINE";
-										break;
-									case WP_DET_PACK:
-										modInfo << "_DTPCK";
-										break;
-									case WP_EMPLACED_GUN:
-										modInfo << "_EMPLACED";
-										break;
-									case WP_TURRET:
-										modInfo << "_TURRET";
-										break;
-
-									default:
-										break;
-								}
-							}
-
-							const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-							std::string mapname = Info_ValueForKey(info, "mapname");
-							const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
-							std::string playername = Info_ValueForKey(playerInfo, "n");
-							playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
-							std::string victimname = Info_ValueForKey(playerInfo, "n");
-
-							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson");
-
-							std::string targetFilename = ss.str();
-							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
-							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
-
-							int startTime = demoCurrentTime - bufferTime;
-							int endTime = demoCurrentTime + bufferTime;
-
-							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
-							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-							delete[] targetFilenameFiltered;
-							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
-
-						}
-					}
-				}
-
-
-				// Find out which players are visible / followed
-				// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
-				lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
-				for (int p = 0; p < MAX_CLIENTS; p++) {
-					// Go through parseenttities of last snap to see if client is in it
-					bool clientIsInSnapshot = false;
-					bool clientVisibleOrFollowed = false;
-					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum+demo.cut.Cl.snap.numEntities; pe++) {
-						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-						if (thisEntity->number == p) {
-							clientIsInSnapshot = true;
-
-							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
-								lastKnownRedFlagCarrier = thisEntity->number;
-							}
-							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
-								lastKnownBlueFlagCarrier = thisEntity->number;
-							}
-						}
-					}
-					if (clientIsInSnapshot) {
-						clientVisibleOrFollowed = true;
-						if (playerFirstVisible[p] == -1) {
-							playerFirstVisible[p] = demo.cut.Cl.snap.serverTime;
-						}
-					}
-					else {
-						playerFirstVisible[p] = -1;
-					}
-					if (demo.cut.Cl.snap.ps.clientNum == p) {
-						clientVisibleOrFollowed = true;
-						if (playerFirstFollowed[p] == -1) {
-							playerFirstFollowed[p] = demo.cut.Cl.snap.serverTime;
-						}
-					}
-					else {
-						playerFirstFollowed[p] = -1;
-					}
-					if (clientVisibleOrFollowed) {
-						if (playerFirstFollowedOrVisible[p] == -1) {
-							playerFirstFollowedOrVisible[p] = demo.cut.Cl.snap.serverTime;
-						}
-					}
-					else {
-						playerFirstFollowedOrVisible[p] = -1;
-					}
-				}
-				
-				break;
-			case svc_download:
-				// read block number
-				buf = MSG_ReadShort(&oldMsg);
-				if (!buf)	//0 block, read file size
-					MSG_ReadLong(&oldMsg);
-				// read block size
-				buf = MSG_ReadShort(&oldMsg);
-				// read the data block
-				for (; buf > 0; buf--)
-					MSG_ReadByte(&oldMsg);
-				break;
-			case svc_mapchange:
-				// nothing to parse.
-				break;
-			}
-		}
-		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
-		// process any new server commands
-		for (; demo.cut.Clc.lastExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
-			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
-			Cmd_TokenizeString(command);
-			char* cmd = Cmd_Argv(0);
-			if (cmd[0]) {
-				firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
-			}
-			if (!strcmp(cmd, "cs")) {
-				if (!demoCutConfigstringModified(&demo.cut.Cl)) {
-					goto cuterror;
-				}
-			}
-			if (!strcmp(cmd, "print")) {
-				//Looking for 
-				//"^2[^7OC-System^2]: bizzle^7 has finished in [^200:24.860^7] which is his personal best time. ^2Top10 time!^7 Difference to best: [^200:00.000^7]."
-
-				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
-				
-				if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
-
-				jp::VecNum vec_num;
-				jp::RegexMatch rm;
-				std::string printText = Cmd_Argv(1);
-#if DEBUG
-				std::cout << printText << "\n";
-#endif
-
-				size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
-					.setSubject(&printText)                         //set subject string
-					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
-					.match();
-				
-				for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
-					const char * info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-					std::string mapname = Info_ValueForKey(info, "mapname");
-					std::string playername = vec_num[matchNum][1];
-					int minutes = atoi(vec_num[matchNum][2].c_str());
-					std::string secondString = vec_num[matchNum][3];
-					float seconds = atof(vec_num[matchNum][3].c_str());
-					int milliSeconds = (1000.0f* seconds)+0.5f;
-					int pureMilliseconds = milliSeconds % 1000;
-					int pureSeconds = milliSeconds / 1000;
-
-					bool isLogged = vec_num[matchNum][4].length() > 0;
-					bool isNumberOne = vec_num[matchNum][6].length() > 0;
-
-					if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-
-					//int totalSeconds = minutes * 60 + seconds;
-					int totalMilliSeconds = minutes * 60000 + milliSeconds;
-
-					// Find player
-					int playerNumber = -1;
-					for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
-
-						const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
-						std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");
-						if (playerNameCompare == playername) {
-							playerNumber = clientNum;
-						}
-					}
-					
-					bool wasFollowed = false;
-					bool wasVisible = false;
-					bool wasVisibleOrFollowed = false;
-					if (playerNumber != -1) {
-						if (playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-							wasFollowed = true;
-						}
-						if (playerFirstVisible[playerNumber] != -1 && playerFirstVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-							wasVisible = true;
-						}
-						if (playerFirstFollowedOrVisible[playerNumber] != -1 && playerFirstFollowedOrVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-							wasVisibleOrFollowed = true;
-						}
-					}
-					int runStart = demoCurrentTime - totalMilliSeconds;
-					int startTime = runStart - bufferTime;
-					int endTime = demoCurrentTime + bufferTime;
-					startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
-					
-
-					std::stringstream ss;
-					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible"));
-
-					std::string targetFilename = ss.str();
-					char* targetFilenameFiltered = new char[targetFilename.length()+1];
-					sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
-
-					outputBatHandle << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-					delete[] targetFilenameFiltered;
-					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
-				}
-
-				
-				
-			}
-		}
-
-#if DEBUG
-		if (oldSize == 0) {
-			goto cutcomplete;
-		}
-#endif
-		/*if (demo.cut.Cl.snap.serverTime > endTime) {
-			goto cutcomplete;
-		}
-		else if (framesSaved > 0) {
-			// this msg is in range, write it 
-			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum)) {
-				demoCutWriteDemoMessage(&oldMsg, newHandle, &demo.cut.Clc);
-			}
-			else {
-				demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl,demoType);
-			}
-			framesSaved++;
-		}
-		else if (demo.cut.Cl.snap.serverTime >= startTime) {
-			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType);
-			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType);
-			// copy rest
-			framesSaved = 1;
-		}*/
+	std::vector<DemoReader> demoReaders;
+	for (int i = 0; i < inputFiles->size(); i++) {
+		demoReaders.emplace_back();
+		demoReaders.back().LoadDemo((*inputFiles)[i].c_str());
 	}
+
+	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
+
+	const char* tmpConfigString;
+	// Copy over configstrings from first demo.
+	// Later maybe we can do something more refined and clever.
+	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
+		if (i >= CS_PLAYERS && i < (CS_PLAYERS + MAX_CLIENTS)) continue; // Player stuff will be copied manually.
+		tmpConfigString = demoReaders[0].GetConfigString(i);
+		if (strlen(tmpConfigString)) {
+			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
+		}
+	}
+	// Copy over player config strings
+	for (int i = 0; i < demoReaders.size(); i++) {
+		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
+			tmpConfigString = demoReaders[0].GetPlayerConfigString(spectatedClient);
+			if (strlen(tmpConfigString)) {
+				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
+			}
+		}
+	}
+
+	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
+
+
+
+	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType);
+
 cutcomplete:
-	ret = qtrue;
-	/*if (newHandle) {
+	if (newHandle) {
 		buf = -1;
 		FS_Write(&buf, 4, newHandle);
 		FS_Write(&buf, 4, newHandle);
 		ret = qtrue;
-	}*/
+	}
 cuterror:
-	//remove previosly converted demo from the same cut
-	/*if (newHandle) {
-		memset(newName, 0, sizeof(newName));
-		if (demo.currentNum > 0) {
-			Com_sprintf(newName, sizeof(newName), "mmedemos/%s.%d_cut.mme", oldName, demo.currentNum);
-		}
-		else {
-			Com_sprintf(newName, sizeof(newName), "mmedemos/%s_cut.mme", oldName);
-		}
-		if (FS_FileExists(newName))
-			FS_FileErase(newName);
-	}*/
-	FS_FCloseFile(oldHandle);
-	//FS_FCloseFile(newHandle);
- 	return ret;
+	FS_FCloseFile(newHandle);
+	return ret;
 }
 
 /*void CL_DemoCut_f(void) {
@@ -1093,7 +586,7 @@ cuterror:
 		Com_Printf("invalid range: less than 50 milliseconds is not allowed\n");
 		return;
 	}
-	// convert to msec 
+	// convert to msec
 	startTime *= 1000;
 	endTime *= 1000;
 	Com_sprintf(demoName, MAX_OSPATH, mme_demoFileName->string);
@@ -1107,33 +600,29 @@ cuterror:
 
 
 int main(int argc, char** argv) {
-	if (argc < 3) {
-		std::cout << "need 2 arguments at least: demoname and buffer (before and after highlight) in milliseconds";
-		std::cin.get();
+	if (argc < 4) {
+		std::cout << "need 3 arguments at least: outputname, demoname1, demoname2, [demoname3,...]";
 		return 1;
 	}
+	char* demoName = NULL;
+	char* outputName = NULL;
 
-	char* demoName = argv[1];
-	float bufferTime = atof(argv[2]);
+	outputName = argv[1];
+	char* filteredOutputName = new char[strlen(outputName) + 1];
+	sanitizeFilename(outputName, filteredOutputName);
+	strcpy(outputName, filteredOutputName);
+	delete[] filteredOutputName;
 
-	highlightSearchMode_t searchMode = SEARCH_INTERESTING;
-	if (argc > 3) {
-		// Searchmode specified
-		char* searchModeText = argv[3];
-		if (!_stricmp(searchModeText, "myctfreturns")) {
-			searchMode = SEARCH_MY_CTF_RETURNS;
-		}else if (!_stricmp(searchModeText, "ctfreturns")) {
-			searchMode = SEARCH_CTF_RETURNS;
-		}else if (!_stricmp(searchModeText, "top10defrag")) {
-			searchMode = SEARCH_TOP10_DEFRAG;
-		}
+	std::vector<std::string> inputFiles;
+	for (int i = 2; i < argc; i++) {
+		inputFiles.emplace_back(argv[i]);
 	}
 
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat", searchMode)) {
-		Com_Printf("Highlights successfully found.\n", demoName);
+	if (demoCut(outputName,&inputFiles)) {
+		Com_Printf("Demo %s got successfully cut\n", demoName);
 	}
 	else {
-		Com_Printf("Finding highlights in demo %s has resulted in errors\n", demoName);
+		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
 	}
 #ifdef DEBUG
 	std::cin.get();

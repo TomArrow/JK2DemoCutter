@@ -41,6 +41,9 @@ class DemoReader {
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
 
+	qboolean		anySnapshotParsed = qfalse;
+	qboolean		endReached = qfalse;
+
 	int messageOffset = 0;
 
 	qboolean ConfigstringModified(clientActive_t* clCut);
@@ -58,12 +61,17 @@ class DemoReader {
 	};
 
 	qboolean ReadMessage();
+	qboolean ReadMessageReal();
 
 public:
 
 	qboolean SeekToTime(int time);
+	qboolean SeekToAnySnapshotIfNotYet();
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
+	const char* GetConfigString(int configStringNum);
 	const char* GetPlayerConfigString(int playerNum);
+	qboolean AnySnapshotParsed();
+	qboolean EndReached();
 };
