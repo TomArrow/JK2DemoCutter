@@ -390,6 +390,9 @@ qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
 }
+clSnapshot_t DemoReader::GetCurrentSnap() {
+	return thisDemo.cut.Cl.snap;
+}
 
 const char* DemoReader::GetPlayerConfigString(int playerNum) {
 	return thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];

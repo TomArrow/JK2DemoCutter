@@ -104,8 +104,65 @@ typedef struct _iobuf
 
 
 
+typedef enum {
+	PM_NORMAL,		// can accelerate and turn
+	PM_FLOAT,		// float with no gravity in general direction of velocity (intended for gripping)
+	PM_NOCLIP,		// noclip movement
+	PM_SPECTATOR,	// still run into walls
+	PM_DEAD,		// no acceleration or turning, but free falling
+	PM_FREEZE,		// stuck in place with no control
+	PM_INTERMISSION,	// no movement or status bar
+	PM_SPINTERMISSION	// no movement or status bar
+} pmtype_t;
+// player_state->stats[] indexes
+// NOTE: may not have more than 16
+typedef enum {
+	STAT_HEALTH,
+	STAT_HOLDABLE_ITEM,
+	STAT_HOLDABLE_ITEMS,
+	STAT_PERSISTANT_POWERUP,
+	STAT_WEAPONS,					// 16 bit fields
+	STAT_ARMOR,
+	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
+	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
+	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
+	STAT_DASHTIME,
+	STAT_LASTJUMPSPEED,
+	STAT_RACEMODE,
+	STAT_ONLYBHOP,
+	STAT_MOVEMENTSTYLE,
+	STAT_JUMPTIME,
+	STAT_WJTIME
+} statIndex_t;
+
+#define	GIB_HEALTH			-40
+
+
 #define Q_min(x,y) ((x)<(y)?(x):(y))
 #define Q_max(x,y) ((x)>(y)?(x):(y))
+#define DotProduct(x,y)			((x)[0]*(y)[0]+(x)[1]*(y)[1]+(x)[2]*(y)[2])
+#define VectorSubtract(a,b,c)	((c)[0]=(a)[0]-(b)[0],(c)[1]=(a)[1]-(b)[1],(c)[2]=(a)[2]-(b)[2])
+#define VectorAdd(a,b,c)		((c)[0]=(a)[0]+(b)[0],(c)[1]=(a)[1]+(b)[1],(c)[2]=(a)[2]+(b)[2])
+#define VectorCopy(a,b)			((b)[0]=(a)[0],(b)[1]=(a)[1],(b)[2]=(a)[2])
+#define	VectorScale(v, s, o)	((o)[0]=(v)[0]*(s),(o)[1]=(v)[1]*(s),(o)[2]=(v)[2]*(s))
+#define	VectorMA(v, s, b, o)	((o)[0]=(v)[0]+(b)[0]*(s),(o)[1]=(v)[1]+(b)[1]*(s),(o)[2]=(v)[2]+(b)[2]*(s))
+#define VectorLerp( f, s, e, r ) ((r)[0]=(s)[0]+(f)*((e)[0]-(s)[0]),\
+  (r)[1]=(s)[1]+(f)*((e)[1]-(s)[1]),\
+  (r)[2]=(s)[2]+(f)*((e)[2]-(s)[2])) 
+
+
+#define VectorClear(a)			((a)[0]=(a)[1]=(a)[2]=0)
+#define VectorNegate(a,b)		((b)[0]=-(a)[0],(b)[1]=-(a)[1],(b)[2]=-(a)[2])
+#define VectorSet(v, x, y, z)	((v)[0]=(x), (v)[1]=(y), (v)[2]=(z))
+#define Vector4Copy(a,b)		((b)[0]=(a)[0],(b)[1]=(a)[1],(b)[2]=(a)[2],(b)[3]=(a)[3])
+
+#define	SnapVector(v) {v[0]=((int)(v[0]));v[1]=((int)(v[1]));v[2]=((int)(v[2]));}
+
+
+// angle indexes
+#define	PITCH				0		// up / down
+#define	YAW					1		// left / right
+#define	ROLL				2		// fall over
 
 typedef unsigned char 		byte;
 
@@ -1436,7 +1493,7 @@ extern std::map <int, std::string>  saberMoveNames;
 extern std::map <int, std::string>  saberStyleNames;
 
 
-
+void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap);
 
 
 

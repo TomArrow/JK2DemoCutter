@@ -57,19 +57,20 @@ class DemoReader {
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
 
-	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
-	};
-
 	qboolean ReadMessage();
 	qboolean ReadMessageReal();
 
 public:
+
+	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
+	};
 
 	qboolean SeekToTime(int time);
 	qboolean SeekToAnySnapshotIfNotYet();
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
+	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum);
 	const char* GetPlayerConfigString(int playerNum);
 	qboolean AnySnapshotParsed();

@@ -207,6 +207,66 @@ static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_
 	}
 	MSG_WriteBits(msg, (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
 }
+static void demoCutEmitPacketEntitiesManual(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities) {
+	entityState_t* oldent, * newent;
+	int oldindex, newindex;
+	int oldnum, newnum;
+	int from_num_entities;
+	// generate the delta update
+	if (!from) {
+		from_num_entities = 0;
+	}
+	else {
+		from_num_entities = from->numEntities;
+	}
+	newent = NULL;
+	oldent = NULL;
+	newindex = 0;
+	auto newIterator = entities->begin();
+	oldindex = 0;
+	while (newindex < entities->size() || oldindex < from_num_entities) {
+		if (newindex >= entities->size()) {
+			newnum = 9999;
+		}
+		else {
+			//newent = &clCut->parseEntities[(to->parseEntitiesNum + newindex) & (MAX_PARSE_ENTITIES - 1)];
+			//newnum = newent->number;
+			newnum = newIterator->first;
+			newent = &newIterator->second;
+		}
+		if (oldindex >= from_num_entities) {
+			oldnum = 9999;
+		}
+		else {
+			oldent = &clCut->parseEntities[(from->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
+			oldnum = oldent->number;
+		}
+		if (newnum == oldnum) {
+			// delta update from old position
+			// because the force parm is qfalse, this will not result
+			// in any bytes being emited if the entity has not changed at all
+			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, (qboolean)(demoType == DM_15));
+			oldindex++;
+			newindex++;
+			newIterator++;
+			continue;
+		}
+		if (newnum < oldnum) {
+			// this is a new entity, send it from the baseline
+			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, (qboolean)(demoType == DM_15));
+			newindex++;
+			newIterator++;
+			continue;
+		}
+		if (newnum > oldnum) {
+			// the old entity isn't present in the new message
+			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, (qboolean)(demoType == DM_15));
+			oldindex++;
+			continue;
+		}
+	}
+	MSG_WriteBits(msg, (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
+}
 
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut) {
 	int len;
@@ -270,6 +330,60 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
+	MSG_WriteByte(msg, svc_EOF);
+	demoCutWriteDemoMessage(msg, f, clcCut);
+}
+void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities) {
+	msg_t			msgImpl, * msg = &msgImpl;
+	byte			msgData[MAX_MSGLEN];
+	clSnapshot_t* frame, * oldframe;
+	int				lastframe = 0;
+	int				snapFlags;
+	MSG_Init(msg, msgData, sizeof(msgData));
+	MSG_Bitstream(msg);
+	MSG_WriteLong(msg, clcCut->reliableSequence);
+	// copy over any commands
+	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
+		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
+		MSG_WriteByte(msg, svc_serverCommand);
+		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
+		MSG_WriteString(msg, command);
+	}
+	// this is the snapshot we are creating
+	frame = &clCut->snap;
+	if (clCut->snap.messageNum > 0 && !forceNonDelta) {
+		lastframe = 1;
+		oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
+		if (!oldframe->valid) {
+			// not yet set
+			lastframe = 0;
+			oldframe = NULL;
+		}
+	}
+	else {
+		lastframe = 0;
+		oldframe = NULL;
+	}
+	MSG_WriteByte(msg, svc_snapshot);
+	// send over the current server time so the client can drift
+	// its view of time to try to match
+	MSG_WriteLong(msg, frame->serverTime);
+	// what we are delta'ing from
+	MSG_WriteByte(msg, lastframe);
+	snapFlags = frame->snapFlags;
+	MSG_WriteByte(msg, snapFlags);
+	// send over the areabits
+	MSG_WriteByte(msg, sizeof(frame->areamask));
+	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
+	// delta encode the playerstate
+	if (oldframe) {
+		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, (qboolean)(demoType == DM_15));
+	}
+	else {
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, (qboolean)(demoType == DM_15));
+	}
+	// delta encode the entities
+	demoCutEmitPacketEntitiesManual(oldframe, frame, msg, clCut, demoType, entities);
 	MSG_WriteByte(msg, svc_EOF);
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
@@ -489,6 +603,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 
 qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
 	fileHandle_t	newHandle = 0;
+	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
 	int				buf;
 	int				readGamestate = 0;
@@ -498,7 +613,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	char* ext;
 	demoType_t		demoType;
 
-
+	strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 	ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
 		demoType = DM_15;
@@ -552,10 +667,61 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	}
 
 	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
+	// Note: We will simply use a null state as entity baselines. Not memory efficient but it should do for starters. Don't hav to do anything for that, since we already nulled the whole demo_t struct
 
+	// Create unique output file.
+	int dupeIterator = 2;
+	Com_sprintf(newName, sizeof(newName), "%s%s", outputNameNoExt, ext);
+	while (FS_FileExists(newName)) {
+		Com_sprintf(newName, sizeof(newName), "%s(%d)%s", outputNameNoExt, dupeIterator, ext);
+		dupeIterator++;
+	}
 
+	newHandle = FS_FOpenFileWrite(newName);
+	if (!newHandle) {
+		Com_Printf("Failed to open %s for target cutting.\n", newName);
+		return qfalse;
+	}
 
+	// Write demo header
 	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType);
+	demo.cut.Clc.reliableSequence++;
+
+	float time = 0;
+	float fps = 60.0f;
+	std::map<int, entityState_t> playerEntities;
+	playerState_t tmpPS, mainPlayerPS;
+	entityState_t tmpES;
+	int currentCommand = 1;
+	// Start writing snapshots.
+	while(1){
+		playerEntities.clear();
+		for (int i = 0; i < demoReaders.size(); i++) {
+			if (demoReaders[i].SeekToTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+				
+				tmpPS = demoReaders[i].GetCurrentPlayerState();
+				tmpPS.clientNum = i;
+				if (i == 0) {
+					mainPlayerPS = tmpPS;
+				}
+				else {
+					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+					playerEntities[i]= tmpES;
+				}
+			}
+		}
+
+		demo.cut.Cl.snap.serverTime = time;
+		demo.cut.Cl.snap.ps = mainPlayerPS;
+
+		clSnapshot_t mainPlayerSnapshot = demoReaders[0].GetCurrentSnap();
+		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
+
+		demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities);
+
+		time += 1000.0f / fps;
+		demo.cut.Clc.reliableSequence++;
+	}
 
 cutcomplete:
 	if (newHandle) {
