@@ -390,6 +390,14 @@ qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
 }
+std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
+	std::map<int, entityState_t> retVal;
+	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
+		entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+		retVal[thisEntity->number] = *thisEntity;
+	}
+	return retVal;
+}
 clSnapshot_t DemoReader::GetCurrentSnap() {
 	return thisDemo.cut.Cl.snap;
 }

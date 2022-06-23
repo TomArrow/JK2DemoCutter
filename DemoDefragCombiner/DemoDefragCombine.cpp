@@ -701,6 +701,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].SeekToTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
+				std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS.clientNum = i;
 				tmpPS.commandTime = time;
@@ -775,8 +776,8 @@ cuterror:
 
 
 int main(int argc, char** argv) {
-	if (argc < 4) {
-		std::cout << "need 3 arguments at least: outputname, demoname1, demoname2, [demoname3,...]";
+	if (argc <3) {
+		std::cout << "need 2 arguments at least: outputname, demoname1, [demoname2, demoname3,...]";
 		return 1;
 	}
 	char* demoName = NULL;

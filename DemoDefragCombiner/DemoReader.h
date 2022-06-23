@@ -70,6 +70,7 @@ public:
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
+	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum);
 	const char* GetPlayerConfigString(int playerNum);
