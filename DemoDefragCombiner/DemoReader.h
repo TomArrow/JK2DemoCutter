@@ -79,6 +79,7 @@ public:
 	};
 
 	qboolean SeekToTime(int time);
+	qboolean SeekToCommandTime(int serverTime);
 	qboolean SeekToAnySnapshotIfNotYet();
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();

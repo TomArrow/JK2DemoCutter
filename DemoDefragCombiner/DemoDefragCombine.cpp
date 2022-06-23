@@ -207,23 +207,30 @@ static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_
 	}
 	MSG_WriteBits(msg, (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
 }
-static void demoCutEmitPacketEntitiesManual(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities) {
+
+std::map<int, entityState_t> emptyEntities;
+
+static void demoCutEmitPacketEntitiesManual( msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities) {
 	entityState_t* oldent, * newent;
 	int oldindex, newindex;
 	int oldnum, newnum;
 	int from_num_entities;
 	// generate the delta update
-	if (!from) {
+	//if (!from) {
+	if (!fromEntities) {
 		from_num_entities = 0;
+		fromEntities = &emptyEntities;
 	}
 	else {
-		from_num_entities = from->numEntities;
+		//from_num_entities = from->numEntities;
+		from_num_entities = fromEntities->size();
 	}
 	newent = NULL;
 	oldent = NULL;
 	newindex = 0;
 	auto newIterator = entities->begin();
 	oldindex = 0;
+	auto oldIterator = fromEntities->begin();
 	while (newindex < entities->size() || oldindex < from_num_entities) {
 		if (newindex >= entities->size()) {
 			newnum = 9999;
@@ -238,8 +245,10 @@ static void demoCutEmitPacketEntitiesManual(clSnapshot_t* from, clSnapshot_t* to
 			oldnum = 9999;
 		}
 		else {
-			oldent = &clCut->parseEntities[(from->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
-			oldnum = oldent->number;
+			//oldent = &clCut->parseEntities[(from->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
+			//oldnum = oldent->number;
+			oldent = &oldIterator->second;
+			oldnum = oldIterator->first;
 		}
 		if (newnum == oldnum) {
 			// delta update from old position
@@ -247,6 +256,7 @@ static void demoCutEmitPacketEntitiesManual(clSnapshot_t* from, clSnapshot_t* to
 			// in any bytes being emited if the entity has not changed at all
 			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, (qboolean)(demoType == DM_15));
 			oldindex++;
+			oldIterator++;
 			newindex++;
 			newIterator++;
 			continue;
@@ -262,6 +272,7 @@ static void demoCutEmitPacketEntitiesManual(clSnapshot_t* from, clSnapshot_t* to
 			// the old entity isn't present in the new message
 			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, (qboolean)(demoType == DM_15));
 			oldindex++;
+			oldIterator++;
 			continue;
 		}
 	}
@@ -333,10 +344,11 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteByte(msg, svc_EOF);
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
-void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities) {
+void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
-	clSnapshot_t* frame, * oldframe;
+	qboolean		doDelta = qfalse;
+	clSnapshot_t* frame;// , * oldframe;
 	int				lastframe = 0;
 	int				snapFlags;
 	MSG_Init(msg, msgData, sizeof(msgData));
@@ -351,18 +363,20 @@ void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qbo
 	}
 	// this is the snapshot we are creating
 	frame = &clCut->snap;
-	if (clCut->snap.messageNum > 0 && !forceNonDelta) {
+	if (fromEntities && fromPS && /*clCut->snap.messageNum > 0 &&*/ !forceNonDelta) {
 		lastframe = 1;
-		oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
+		//lastframe = clcCut->reliableSequence-1;
+		doDelta = qtrue;
+		/*oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
 		if (!oldframe->valid) {
 			// not yet set
 			lastframe = 0;
 			oldframe = NULL;
-		}
+		}*/
 	}
 	else {
 		lastframe = 0;
-		oldframe = NULL;
+		//oldframe = NULL;
 	}
 	MSG_WriteByte(msg, svc_snapshot);
 	// send over the current server time so the client can drift
@@ -376,14 +390,14 @@ void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qbo
 	MSG_WriteByte(msg, sizeof(frame->areamask));
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
-	if (oldframe) {
-		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, (qboolean)(demoType == DM_15));
+	if (doDelta) {
+		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps, (qboolean)(demoType == DM_15));
 	}
 	else {
 		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, (qboolean)(demoType == DM_15));
 	}
 	// delta encode the entities
-	demoCutEmitPacketEntitiesManual(oldframe, frame, msg, clCut, demoType, entities);
+	demoCutEmitPacketEntitiesManual(msg, clCut, demoType, entities, fromEntities);
 	MSG_WriteByte(msg, svc_EOF);
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
@@ -692,10 +706,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	float time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	float fps = 60.0f;
 	std::map<int, entityState_t> playerEntities;
-	playerState_t tmpPS, mainPlayerPS;
+	std::map<int, entityState_t> playerEntitiesOld;
+	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;
 	int currentCommand = 1;
 	// Start writing snapshots.
+	qboolean isFirstSnapshot = qtrue;
 	while(1){
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
@@ -726,12 +742,24 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		clSnapshot_t mainPlayerSnapshot = demoReaders[0].GetCurrentSnap();
 		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
-		demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities);
+		if (isFirstSnapshot) {
+			demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);
+			isFirstSnapshot = qfalse;
+		}
+		else {
+			demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld);
+		}
 
 		time += 1000.0f / fps;
 		sourceTime += 1000.0f / fps;
 		demo.cut.Clc.reliableSequence++;
 		demo.cut.Clc.serverMessageSequence++;
+
+		mainPlayerPSOld = mainPlayerPS;
+		playerEntitiesOld.clear();
+		for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
+			playerEntitiesOld[it->first] = it->second;
+		}
 
 		if (allSourceDemosFinished) break;
 	}

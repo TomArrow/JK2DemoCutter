@@ -394,6 +394,13 @@ qboolean DemoReader::SeekToTime(int time) {
 	if (demoCurrentTime < time && endReached) return qfalse;
 	return qtrue;
 }
+qboolean DemoReader::SeekToCommandTime(int serverTime) {
+	while (lastKnownCommandTime < serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownCommandTime < serverTime && endReached) return qfalse;
+	return qtrue;
+}
 qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 	while (!anySnapshotParsed && !endReached) {
 		ReadMessage();
@@ -410,10 +417,12 @@ playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time);
-	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
 
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
+	SeekToCommandTime(time);
+
+	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
 
 	// Ok now we are sure we have at least one snapshot. Good.
 	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
@@ -421,7 +430,8 @@ playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
 	int lastPastSnap = -1;
 	int lastPastSnapCommandTime = -1;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-		if (it->second.serverTime <= time) {
+		//if (it->second.serverTime <= time) {
+		if (it->second.playerState.commandTime <= time) {
 			lastPastSnap = it->first;
 			lastPastSnapCommandTime = it->second.playerState.commandTime;
 		}
@@ -476,10 +486,12 @@ void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotI
 		//CG_ComputeCommandSmoothPlayerstates(&tps, &nexttps, &nextPsTeleport);
 		curps = &from->playerState;
 		currentTime = curps->commandTime;
+		//currentTime = from->serverTime;
 		currentServerTime = from->serverTime;
 		if (to) {
 			nextps = &to->playerState;
 			nextTime = nextps->commandTime;
+			//nextTime = to->serverTime; // Testing. See if we can find the perfect way to do it ... hmm
 			nextServerTime = to->serverTime;
 		}
 	}
