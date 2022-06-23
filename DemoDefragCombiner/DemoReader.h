@@ -14,6 +14,13 @@ enum highlightSearchMode_t {
 	SEARCH_TOP10_DEFRAG, // Top10 Defrags, even if not number 1.
 };
 
+class SnapshotInfo {
+public:
+	std::map<int, entityState_t> entities;
+	playerState_t playerState;
+	int serverTime;
+};
+
 class DemoReader {
 
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
@@ -24,6 +31,9 @@ class DemoReader {
 	std::map<int, int> playerFirstFollowed;
 	std::map<int, int> playerFirstFollowedOrVisible;
 	std::map<int, int> lastEvent;
+
+	std::map<int, SnapshotInfo> snapshotInfos;
+
 	int lastKnownRedFlagCarrier = -1;
 	int lastKnownBlueFlagCarrier = -1;
 	demo_t			thisDemo;
@@ -40,6 +50,7 @@ class DemoReader {
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
+	int				lastKnownCommandTime = 0;
 
 	qboolean		anySnapshotParsed = qfalse;
 	qboolean		endReached = qfalse;
@@ -53,6 +64,8 @@ class DemoReader {
 	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 	qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	entityState_t* findEntity(int number);
+
+	void InterpolatePlayerState(float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
 
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
@@ -70,6 +83,7 @@ public:
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
+	playerState_t GetInterpolatedPlayerState(float time);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum);

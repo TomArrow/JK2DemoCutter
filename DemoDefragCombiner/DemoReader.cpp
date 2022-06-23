@@ -186,6 +186,18 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	// save the frame off in the backup array for later delta comparisons
 	clCut->snapshots[clCut->snap.messageNum & PACKET_MASK] = clCut->snap;
 	clCut->newSnapshots = qtrue;
+
+	SnapshotInfo snapshotInfo;
+	snapshotInfo.serverTime = clCut->snap.serverTime;
+	for (int pe = clCut->snap.parseEntitiesNum; pe < clCut->snap.parseEntitiesNum + clCut->snap.numEntities; pe++) {
+		entityState_t* thisEntity = &clCut->parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+		snapshotInfo.entities[thisEntity->number] = *thisEntity;
+	}
+	snapshotInfo.playerState = clCut->snap.ps;
+	snapshotInfos[clCut->snap.messageNum] = snapshotInfo;
+
+	lastKnownCommandTime = clCut->snap.ps.commandTime;
+
 	return qtrue;
 }
 
@@ -351,8 +363,10 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastGameStateChange = 0;
 	lastGameStateChangeInDemoTime = 0;
 	lastKnownTime = 0;
-
+	lastKnownCommandTime = 0;
 	messageOffset = 0;
+
+	snapshotInfos.clear();
 
 	//while (oldSize > 0) ReadMessage();
 
@@ -390,6 +404,177 @@ qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
 }
+
+playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
+	playerState_t retVal;
+	Com_Memset(&retVal, 0, sizeof(playerState_t));
+	SeekToAnySnapshotIfNotYet();
+	SeekToTime(time);
+	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
+
+	// Now let's translate time into server time
+	time = time - demoBaseTime + demoStartTime;
+
+	// Ok now we are sure we have at least one snapshot. Good.
+	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
+	
+	int lastPastSnap = -1;
+	int lastPastSnapCommandTime = -1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		if (it->second.serverTime <= time) {
+			lastPastSnap = it->first;
+			lastPastSnapCommandTime = it->second.playerState.commandTime;
+		}
+	}
+
+	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have.
+		return snapshotInfos.begin()->second.playerState;
+	}
+
+	// Ok now we wanna make sure we have at least one snap after the last one before "time" that has a different commandTime so we have something to interpolate.
+	while (lastPastSnapCommandTime >= lastKnownCommandTime && !endReached) {
+		ReadMessage();
+	}
+
+	// already at end, nothing we can interpolate.
+	if (lastPastSnapCommandTime >= lastKnownCommandTime && endReached) {
+		return thisDemo.cut.Cl.snap.ps;
+	}
+
+	// Okay now we want to locate the first snap with a different commandtime than lastPastSnap and then interpolate between the two.
+	int firstNextSnap =-1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		if (it->second.playerState.commandTime > lastPastSnapCommandTime) {
+			firstNextSnap = it->first;
+			break;
+		}
+	}
+
+	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
+	InterpolatePlayerState(time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
+
+	return retVal;
+}
+
+
+void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS) {
+	float			f;
+	int				i;
+	playerState_t* out;
+	//snapshot_t* prev, * next;
+	playerState_t* curps = NULL, * nextps = NULL;
+	qboolean		nextPsTeleport = qfalse;
+	int currentTime = 0, nextTime = 0, currentServerTime = 0, nextServerTime = 0;
+
+	out = outPS;
+	*out = from->playerState;
+	//prev = cg.snap;
+	//next = cg.nextSnap;
+
+	if (1) {
+		//timedPlayerState_t* tps, * nexttps;
+		//CG_ComputeCommandSmoothPlayerstates(&tps, &nexttps, &nextPsTeleport);
+		curps = &from->playerState;
+		currentTime = curps->commandTime;
+		currentServerTime = from->serverTime;
+		if (to) {
+			nextps = &to->playerState;
+			nextTime = nextps->commandTime;
+			nextServerTime = to->serverTime;
+		}
+	}
+	if (!to) {
+		return;
+	}/*
+#ifdef _DEBUG
+	if (!(currentTime <= cg.time + (double)cg.timeFraction && nextTime >= cg.time + (double)cg.timeFraction)) {
+		Com_Printf("WARNING: Couldn't locate slots with correct time\n");
+	}
+	if (nextTime - currentTime < 0) {
+		Com_Printf("WARNING: nexttps->time - tps->time < 0 (%d, %d)\n", nextTime, currentTime);
+	}
+#endif
+	if (currentTime != nextTime) {
+		f = ((double)cg.timeFraction + (cg.time - currentTime)) / (nextTime - currentTime);
+#ifdef _DEBUG
+		if (f > 1) {
+			Com_Printf("EXTRAPOLATING (f=%f)\n", f);
+		}
+		else if (f < 0) {
+			Com_Printf("GOING BACKWARDS (f=%f)\n", f);
+		}
+#endif
+	}
+	else {
+		f = 0;
+	}
+	*/
+	f = ((double)time - (double)currentTime) / ((double)nextTime - (double)currentTime);
+	*out = *curps;
+	//out->stats[STAT_HEALTH] = cg.snap->ps.stats[STAT_HEALTH];
+
+
+	// if the next frame is a teleport, we can't lerp to it
+	if (nextPsTeleport) { // TODO make that actually matter
+		return;
+	}
+
+	/*if ( !next || next->serverTime <= prev->serverTime ) {
+		return;
+	}*/
+
+	i = nextps->bobCycle;
+	if (i < curps->bobCycle) {
+		i += 256;		// handle wraparound
+	}
+	out->bobCycle = curps->bobCycle + f * (i - curps->bobCycle);
+
+	for (i = 0; i < 3; i++) {
+		out->origin[i] = curps->origin[i] + f * (nextps->origin[i] - curps->origin[i]);
+		//if (!grabAngles) {
+			out->viewangles[i] = LerpAngle(
+				curps->viewangles[i], nextps->viewangles[i], f);
+		//}
+		out->velocity[i] = curps->velocity[i] +
+			f * (nextps->velocity[i] - curps->velocity[i]);
+	}
+
+	// requires commandSmooth 2, since it needs entity state history of the mover
+	/*if (cg_commandSmooth.integer > 1) {
+		// adjust for the movement of the groundentity
+		// step 1: remove the delta introduced by cur->next origin interpolation
+		int curTime = currentServerTime + (int)(f * (nextServerTime - currentServerTime));
+		float curTimeFraction = (f * (nextServerTime - currentServerTime));
+		curTimeFraction -= (long)curTimeFraction;
+		CG_AdjustInterpolatedPositionForMover(out->origin,
+			curps->groundEntityNum, curTime, curTimeFraction, currentServerTime, 0, out->origin);
+		// step 2: mover state should now be what it was at currentServerTime, now redo calculation of mover effect to cg.time
+		CG_AdjustInterpolatedPositionForMover(out->origin,
+			curps->groundEntityNum, currentServerTime, 0, cg.time, cg.timeFraction, out->origin);
+	}*/ // TODO Fix this?
+
+	//curps->stats[STAT_HEALTH] = cg.snap->ps.stats[STAT_HEALTH];
+	//BG_PlayerStateToEntityState(curps, &cg_entities[curps->clientNum].currentState, qfalse);
+	//BG_PlayerStateToEntityState(nextps, &cg_entities[nextps->clientNum].nextState, qfalse);
+	//cg.playerInterpolation = f;
+	
+	/*if (cg.timeFraction >= cg.nextSnap->serverTime - cg.time) {
+		cg.physicsTime = cg.nextSnap->serverTime;
+	}
+	else {
+		cg.physicsTime = cg.snap->serverTime;
+	}*/ // TODO Relevant?
+
+
+	// TODO: What about this? not in jamme
+	//cg.predictedTimeFrac = f * (next->ps.commandTime - prev->ps.commandTime);
+	//cg.predictedTimeFrac = f * (nextps->commandTime - curps->commandTime);
+}
+
+
+
+
+
 std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 	std::map<int, entityState_t> retVal;
 	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
@@ -398,6 +583,7 @@ std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 	}
 	return retVal;
 }
+
 clSnapshot_t DemoReader::GetCurrentSnap() {
 	return thisDemo.cut.Cl.snap;
 }

@@ -1495,7 +1495,7 @@ extern std::map <int, std::string>  saberStyleNames;
 
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap);
 
-
+float LerpAngle(float from, float to, float frac);
 
 
 

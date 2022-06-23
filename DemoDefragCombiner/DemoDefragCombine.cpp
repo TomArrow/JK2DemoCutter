@@ -688,6 +688,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;
 
+	float sourceTime = 0.0f;
 	float time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	float fps = 60.0f;
 	std::map<int, entityState_t> playerEntities;
@@ -699,10 +700,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].SeekToTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (demoReaders[i].SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
 				std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
-				tmpPS = demoReaders[i].GetCurrentPlayerState();
+				//tmpPS = demoReaders[i].GetCurrentPlayerState();
+				tmpPS = demoReaders[i].GetInterpolatedPlayerState(sourceTime);
 				tmpPS.clientNum = i;
 				tmpPS.commandTime = time;
 				if (i == 0) {
@@ -727,6 +729,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities);
 
 		time += 1000.0f / fps;
+		sourceTime += 1000.0f / fps;
 		demo.cut.Clc.reliableSequence++;
 		demo.cut.Clc.serverMessageSequence++;
 
