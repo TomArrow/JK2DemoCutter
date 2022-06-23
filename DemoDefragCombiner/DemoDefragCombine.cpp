@@ -688,7 +688,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;
 
-	float time = 0;
+	float time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	float fps = 60.0f;
 	std::map<int, entityState_t> playerEntities;
 	playerState_t tmpPS, mainPlayerPS;
