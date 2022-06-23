@@ -844,15 +844,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
 							std::string victimname = Info_ValueForKey(playerInfo, "n");
 
+
+							int startTime = demoCurrentTime - bufferTime;
+							int endTime = demoCurrentTime + bufferTime;
+							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+							bool isTruncated = false;
+							if (earliestPossibleStart > startTime) {
+								startTime = earliestPossibleStart;
+								isTruncated = true;
+							}
+
+
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson");
+							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-							int startTime = demoCurrentTime - bufferTime;
-							int endTime = demoCurrentTime + bufferTime;
 
 							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
 							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
@@ -1010,11 +1019,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int runStart = demoCurrentTime - totalMilliSeconds;
 					int startTime = runStart - bufferTime;
 					int endTime = demoCurrentTime + bufferTime;
-					startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
+					int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+					bool isTruncated = false;
+					if (earliestPossibleStart > startTime) {
+						startTime = earliestPossibleStart;
+						isTruncated = true;
+					}
+					//startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
 					
 
 					std::stringstream ss;
-					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible"));
+					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" <<  playerNumber << "_" <<  demo.cut.Clc.clientNum << (isTruncated?"_tr":"");
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
