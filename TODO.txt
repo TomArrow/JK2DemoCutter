@@ -3,9 +3,14 @@ keep date modified
 dbs speed
 top10 inferred (top10i)
 automatically save invalid delta frame thingie
-detect teleport KINDA DONE
 better prediction for laggy demos with gravity?
 detect changes of who is spectated! (and if so add teleport flag) EF_TELEPORT_BIT
-EV_PLAYER_TELEPORT_IN
-EV_PLAYER_TELEPORT_OUT
-demoCurrentTime happens after parsesnapshot but we add commands in parsesnapshot?
+What about player state / player entity events? How to handle those? 
+
+
+DONE: 
+
+detect teleport KINDA DONE
+demoCurrentTime happens after parsesnapshot but we add commands in parsesnapshot? FALSE ALARM I THINK, REMEMBERED WRONG
+EV_PLAYER_TELEPORT_IN DONE
+EV_PLAYER_TELEPORT_OUT DONE
