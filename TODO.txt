@@ -1,0 +1,10 @@
+lost packet count
+keep date modified
+dbs speed
+top10 inferred (top10i)
+automatically save invalid delta frame thingie
+detect teleport KINDA DONE
+better prediction for laggy demos with gravity?
+detect changes of who is spectated! (and if so add teleport flag) EF_TELEPORT_BIT
+EV_PLAYER_TELEPORT_IN
+EV_PLAYER_TELEPORT_OUT
