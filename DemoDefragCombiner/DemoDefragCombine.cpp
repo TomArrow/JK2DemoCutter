@@ -344,7 +344,8 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteByte(msg, svc_EOF);
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
-void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
+//void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
+void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
 	qboolean		doDelta = qfalse;
@@ -355,11 +356,16 @@ void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qbo
 	MSG_Bitstream(msg);
 	MSG_WriteLong(msg, clcCut->reliableSequence);
 	// copy over any commands
-	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
+	/*for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
 		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
 		MSG_WriteByte(msg, svc_serverCommand);
-		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
+		MSG_WriteLong(msg, serverCommand)// + serverCommandOffset);
 		MSG_WriteString(msg, command);
+	}*/
+	for (int i = 0; i<newCommands->size(); i++) {
+		MSG_WriteByte(msg, svc_serverCommand);
+		MSG_WriteLong(msg, ++clcCut->serverCommandSequence/* + serverCommandOffset*/);
+		MSG_WriteString(msg, (*newCommands)[i].c_str());
 	}
 	// this is the snapshot we are creating
 	frame = &clCut->snap;
@@ -707,12 +713,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	float fps = 60.0f;
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
+	std::vector<std::string> commandsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;
 	int currentCommand = 1;
 	// Start writing snapshots.
 	qboolean isFirstSnapshot = qtrue;
 	while(1){
+		commandsToAdd.clear();
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		for (int i = 0; i < demoReaders.size(); i++) {
@@ -730,6 +738,19 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					playerEntities[i]= tmpES;
 				}
+
+				// Get new commands
+				std::vector<std::string> newCommandsHere = demoReaders[i].GetNewCommands(sourceTime);
+				for (int c = 0; c < newCommandsHere.size(); c++) {
+
+					Cmd_TokenizeString(newCommandsHere[c].c_str());
+					char* cmd = Cmd_Argv(0);
+					if (!strcmp(cmd, "print") || !strcmp(cmd, "chat")/* || !strcmp(cmd, "cp")*/) {
+						if (!strstr(newCommandsHere[c].c_str(),"!respos") && !strstr(newCommandsHere[c].c_str(), "!savepos")) { // TODO Make this case insensitive for absolute protection!
+							commandsToAdd.push_back(newCommandsHere[c]);
+						}
+					}
+				}
 			}
 			if (!demoReaders[i].EndReached()) {
 				allSourceDemosFinished = qfalse;
@@ -743,11 +764,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
 		if (isFirstSnapshot) {
-			demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);
 			isFirstSnapshot = qfalse;
 		}
 		else {
-			demoCutWriteDeltaSnapshotManual(currentCommand, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld);
 		}
 
 		time += 1000.0f / fps;

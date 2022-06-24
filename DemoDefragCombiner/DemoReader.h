@@ -20,6 +20,11 @@ public:
 	playerState_t playerState;
 	int serverTime;
 };
+class Command {
+public:
+	int demoTime;
+	std::string command;
+};
 
 class DemoReader {
 
@@ -33,6 +38,7 @@ class DemoReader {
 	std::map<int, int> lastEvent;
 
 	std::map<int, SnapshotInfo> snapshotInfos;
+	std::vector<Command> readCommands;
 
 	int lastKnownRedFlagCarrier = -1;
 	int lastKnownBlueFlagCarrier = -1;
@@ -51,6 +57,8 @@ class DemoReader {
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
 	int				lastKnownCommandTime = 0;
+
+	float			lastGottenCommandsTime = 0;
 
 	qboolean		anySnapshotParsed = qfalse;
 	qboolean		endReached = qfalse;
@@ -86,6 +94,7 @@ public:
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(float time);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
+	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum);
 	const char* GetPlayerConfigString(int playerNum);

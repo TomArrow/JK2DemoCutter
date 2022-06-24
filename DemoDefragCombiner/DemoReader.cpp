@@ -365,6 +365,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastKnownTime = 0;
 	lastKnownCommandTime = 0;
 	messageOffset = 0;
+	lastGottenCommandsTime = 0;
 
 	snapshotInfos.clear();
 
@@ -593,6 +594,18 @@ std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 		entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 		retVal[thisEntity->number] = *thisEntity;
 	}
+	return retVal;
+}
+
+std::vector<std::string> DemoReader::GetNewCommands(float time) {
+	std::vector<std::string> retVal;
+	SeekToTime(time);
+	for (int i = 0; i < readCommands.size(); i++) {
+		if (readCommands[i].demoTime < time && readCommands[i].demoTime >= lastGottenCommandsTime) {
+			retVal.push_back(readCommands[i].command);
+		}
+	}
+	lastGottenCommandsTime = time;
 	return retVal;
 }
 
@@ -857,6 +870,10 @@ readNext:
 	// process any new server commands
 	for (; thisDemo.cut.Clc.lastExecutedServerCommand <= thisDemo.cut.Clc.serverCommandSequence; thisDemo.cut.Clc.lastExecutedServerCommand++) {
 		char* command = thisDemo.cut.Clc.serverCommands[thisDemo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
+		Command readCommand;
+		readCommand.command = command;
+		readCommand.demoTime = demoCurrentTime;
+		readCommands.push_back(readCommand);
 		Cmd_TokenizeString(command);
 		char* cmd = Cmd_Argv(0);
 		if (cmd[0]) {
