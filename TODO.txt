@@ -8,3 +8,4 @@ better prediction for laggy demos with gravity?
 detect changes of who is spectated! (and if so add teleport flag) EF_TELEPORT_BIT
 EV_PLAYER_TELEPORT_IN
 EV_PLAYER_TELEPORT_OUT
+demoCurrentTime happens after parsesnapshot but we add commands in parsesnapshot?

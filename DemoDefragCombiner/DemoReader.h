@@ -27,6 +27,13 @@ public:
 	std::string command;
 };
 
+class Event {
+public:
+	int demoTime;
+	entityState_t theEvent;
+	int eventNumber;
+};
+
 class DemoReader {
 
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
@@ -40,6 +47,7 @@ class DemoReader {
 
 	std::map<int, SnapshotInfo> snapshotInfos;
 	std::vector<Command> readCommands;
+	std::vector<Event> readEvents;
 
 	int lastKnownRedFlagCarrier = -1;
 	int lastKnownBlueFlagCarrier = -1;
@@ -60,6 +68,7 @@ class DemoReader {
 	int				lastKnownCommandTime = 0;
 
 	float			lastGottenCommandsTime = 0;
+	float			lastGottenEventsTime = 0;
 
 	qboolean		anySnapshotParsed = qfalse;
 	qboolean		endReached = qfalse;
@@ -100,6 +109,7 @@ public:
 	playerState_t GetInterpolatedPlayerState(float time);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
+	std::vector<Event> DemoReader::GetNewEvents(float time);
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum);
 	const char* GetPlayerConfigString(int playerNum);

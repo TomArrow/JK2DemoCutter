@@ -391,6 +391,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastKnownCommandTime = 0;
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
+	lastGottenEventsTime = 0;
 
 	snapshotInfos.clear();
 
@@ -634,6 +635,17 @@ std::vector<std::string> DemoReader::GetNewCommands(float time) {
 	lastGottenCommandsTime = time;
 	return retVal;
 }
+std::vector<Event> DemoReader::GetNewEvents(float time) {
+	std::vector<Event> retVal;
+	SeekToTime(time);
+	for (int i = 0; i < readEvents.size(); i++) {
+		if (readEvents[i].demoTime < time && readEvents[i].demoTime >= lastGottenEventsTime) {
+			retVal.push_back(readEvents[i]);
+		}
+	}
+	lastGottenEventsTime = time;
+	return retVal;
+}
 
 clSnapshot_t DemoReader::GetCurrentSnap() {
 	return thisDemo.cut.Cl.snap;
@@ -761,6 +773,12 @@ readNext:
 
 				entityState_t* thisEs = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 				int eventNumber = GetEvent(thisEs);
+
+				Event thisEvent;
+				thisEvent.demoTime = demoCurrentTime;
+				thisEvent.theEvent = *thisEs;
+				thisEvent.eventNumber = eventNumber;
+				readEvents.push_back(thisEvent);
 				if (eventNumber) {
 
 

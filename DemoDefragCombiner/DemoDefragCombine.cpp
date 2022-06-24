@@ -714,6 +714,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
 	std::vector<std::string> commandsToAdd;
+	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;
 	int currentCommand = 1;
@@ -721,6 +722,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	qboolean isFirstSnapshot = qtrue;
 	while(1){
 		commandsToAdd.clear();
+		eventsToAdd.clear();
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		for (int i = 0; i < demoReaders.size(); i++) {
@@ -729,6 +731,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS = demoReaders[i].GetInterpolatedPlayerState(sourceTime);
+				int originalPlayerstateClientNum = tmpPS.clientNum;
 				tmpPS.clientNum = i;
 				tmpPS.commandTime = time;
 				if (i == 0) {
@@ -751,9 +754,36 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 						}
 					}
 				}
+
+				// Get new events and remember them.
+				std::vector<Event> newEventsHere = demoReaders[i].GetNewEvents(sourceTime);
+				for (int c = 0; c < newEventsHere.size(); c++) {
+					Event* thisEvent = &newEventsHere[c];
+					int eventNumber = thisEvent->eventNumber;
+					qboolean addThisEvent = qfalse;
+					if (eventNumber == EV_PLAYER_TELEPORT_IN || eventNumber == EV_PLAYER_TELEPORT_OUT) {
+						if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
+							thisEvent->theEvent.clientNum = i;
+							addThisEvent = qtrue;
+						}
+					}
+					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
+				}
 			}
 			if (!demoReaders[i].EndReached()) {
 				allSourceDemosFinished = qfalse;
+			}
+		}
+
+		// Find empty places in entities and add events.
+		for (int i = 0; i < eventsToAdd.size(); i++) {
+			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-1; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
+				if (playerEntities.find(e) == playerEntities.end()) {
+					// Let's add it!
+					eventsToAdd[i].theEvent.number = e;
+					playerEntities[e] = eventsToAdd[i].theEvent;
+					break;
+				}
 			}
 		}
 
