@@ -106,6 +106,27 @@ void DemoReader::ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapsh
 	}
 }
 
+qboolean DemoReader::PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap) {
+	// if the next frame is a teleport for the playerstate, we
+	// can't interpolate during demos
+	if (lastSnap && ((snap->ps.eFlags ^ lastSnap->ps.eFlags) & EF_TELEPORT_BIT)) {
+		return qtrue;
+	}
+
+	// if changing follow mode, don't interpolate
+	if (snap->ps.clientNum != lastSnap->ps.clientNum) {
+		return qtrue;
+	}
+
+	// if changing server restarts, don't interpolate
+	if ((snap->snapFlags ^ lastSnap->snapFlags) & SNAPFLAG_SERVERCOUNT) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+
 qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
 	int len;
 	clSnapshot_t* oldSnap;
@@ -194,9 +215,12 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 		snapshotInfo.entities[thisEntity->number] = *thisEntity;
 	}
 	snapshotInfo.playerState = clCut->snap.ps;
+	snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&lastSnap,&clCut->snap);
 	snapshotInfos[clCut->snap.messageNum] = snapshotInfo;
 
 	lastKnownCommandTime = clCut->snap.ps.commandTime;
+
+	lastSnap = clCut->snap;
 
 	return qtrue;
 }
@@ -354,6 +378,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	}
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
+	memset(&lastSnap, 0, sizeof(lastSnap));
 
 	readGamestate = 0;
 
@@ -474,7 +499,8 @@ void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotI
 	playerState_t* out;
 	//snapshot_t* prev, * next;
 	playerState_t* curps = NULL, * nextps = NULL;
-	qboolean		nextPsTeleport = qfalse;
+	//qboolean		nextPsTeleport = qfalse;
+	qboolean		nextPsTeleport = to->playerStateTeleport;
 	int currentTime = 0, nextTime = 0, currentServerTime = 0, nextServerTime = 0;
 
 	out = outPS;

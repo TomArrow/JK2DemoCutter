@@ -19,6 +19,7 @@ public:
 	std::map<int, entityState_t> entities;
 	playerState_t playerState;
 	int serverTime;
+	qboolean playerStateTeleport;
 };
 class Command {
 public:
@@ -63,6 +64,9 @@ class DemoReader {
 	qboolean		anySnapshotParsed = qfalse;
 	qboolean		endReached = qfalse;
 
+
+	clSnapshot_t lastSnap;
+
 	int messageOffset = 0;
 
 	qboolean ConfigstringModified(clientActive_t* clCut);
@@ -71,6 +75,7 @@ class DemoReader {
 	qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 	qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
+	qboolean PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap);
 	entityState_t* findEntity(int number);
 
 	void InterpolatePlayerState(float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
