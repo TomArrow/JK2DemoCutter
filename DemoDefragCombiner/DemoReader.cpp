@@ -774,13 +774,13 @@ readNext:
 				entityState_t* thisEs = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 				int eventNumber = GetEvent(thisEs);
 
-				Event thisEvent;
-				thisEvent.demoTime = demoCurrentTime;
-				thisEvent.theEvent = *thisEs;
-				thisEvent.eventNumber = eventNumber;
-				readEvents.push_back(thisEvent);
 				if (eventNumber) {
 
+					Event thisEvent;
+					thisEvent.demoTime = demoCurrentTime;
+					thisEvent.theEvent = *thisEs;
+					thisEvent.eventNumber = eventNumber;
+					readEvents.push_back(thisEvent);
 
 					// Handle kills
 					if (eventNumber == EV_OBITUARY) {
