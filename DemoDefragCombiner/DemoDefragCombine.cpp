@@ -1,6 +1,7 @@
 #include "demoCut.h"
 #include "DemoReader.h"
 #include <vector>
+#include <sstream>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -675,6 +676,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
 		}
 	}
+
+	std::map<int, int> lastSpectatedClientNums; // Need this for later.
+
 	// Copy over player config strings
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
@@ -683,6 +687,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 			if (strlen(tmpConfigString)) {
 				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			}
+			lastSpectatedClientNums[i] = spectatedClient;
 		}
 	}
 
@@ -720,6 +725,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	int currentCommand = 1;
 	// Start writing snapshots.
 	qboolean isFirstSnapshot = qtrue;
+	std::stringstream ss;
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -734,6 +740,21 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				int originalPlayerstateClientNum = tmpPS.clientNum;
 				tmpPS.clientNum = i;
 				tmpPS.commandTime = time;
+
+				// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
+				if (lastSpectatedClientNums[i] != originalPlayerstateClientNum) {
+					tmpConfigString = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum);
+					if (strlen(tmpConfigString)) {
+						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
+					}
+					ss.str(std::string());
+					ss << "cs " << (CS_PLAYERS + i) << " " << tmpConfigString;
+					commandsToAdd.push_back(ss.str());
+					tmpPS.eFlags |= EF_TELEPORT_BIT;
+				}
+				lastSpectatedClientNums[i]= originalPlayerstateClientNum;
+
+				// self explanatory.
 				if (i == 0) {
 					mainPlayerPS = tmpPS;
 				}
@@ -741,6 +762,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					playerEntities[i]= tmpES;
 				}
+
 
 				// Get new commands
 				std::vector<std::string> newCommandsHere = demoReaders[i].GetNewCommands(sourceTime);
