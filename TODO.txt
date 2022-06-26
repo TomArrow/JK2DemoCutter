@@ -8,10 +8,10 @@ detect changes of who is spectated! (and if so add teleport flag) EF_TELEPORT_BI
 What about player state / player entity events? How to handle those? 
 Obituary event makes zero sense atm... lol. Just using original clientnums that make no sense in the new demo
 
-
 DONE: 
 
 detect teleport KINDA DONE
 demoCurrentTime happens after parsesnapshot but we add commands in parsesnapshot? FALSE ALARM I THINK, REMEMBERED WRONG
 EV_PLAYER_TELEPORT_IN DONE
 EV_PLAYER_TELEPORT_OUT DONE
+sv_hostname in 0 and configstring 4 DONE

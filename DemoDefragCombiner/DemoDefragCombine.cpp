@@ -693,6 +693,15 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000");
 
+	// Add "fake demo" server name.
+	char infoCopy[MAX_INFO_STRING];
+	infoCopy[0] = 0;
+	strcpy_s(infoCopy, MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
+	Info_SetValueForKey_Big(infoCopy, "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy);
+
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially created using JK2DemoCutter tools.");
+
 	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
 	// Note: We will simply use a null state as entity baselines. Not memory efficient but it should do for starters. Don't hav to do anything for that, since we already nulled the whole demo_t struct
 

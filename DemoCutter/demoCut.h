@@ -1020,7 +1020,10 @@ enum svc_ops_e {
 };
 
 char* Info_ValueForKey(const char* s, const char* key);
-
+void Info_RemoveKey(char* s, const char* key);
+void Info_RemoveKey_Big(char* s, const char* key);
+qboolean Info_SetValueForKey(char* s, const char* key, const char* value);
+void Info_SetValueForKey_Big(char* s, const char* key, const char* value);
 
 
 // entityState_t->event values
