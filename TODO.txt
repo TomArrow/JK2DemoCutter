@@ -6,6 +6,7 @@ automatically save invalid delta frame thingie
 better prediction for laggy demos with gravity?
 detect changes of who is spectated! (and if so add teleport flag) EF_TELEPORT_BIT
 What about player state / player entity events? How to handle those? 
+Obituary event makes zero sense atm... lol. Just using original clientnums that make no sense in the new demo
 
 
 DONE: 

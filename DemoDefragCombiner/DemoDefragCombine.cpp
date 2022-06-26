@@ -690,6 +690,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 			lastSpectatedClientNums[i] = spectatedClient;
 		}
 	}
+	
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000");
 
 	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
 	// Note: We will simply use a null state as entity baselines. Not memory efficient but it should do for starters. Don't hav to do anything for that, since we already nulled the whole demo_t struct
@@ -788,6 +790,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 							thisEvent->theEvent.clientNum = i;
 							addThisEvent = qtrue;
 						}
+					}
+					if (eventNumber == EV_OBITUARY) {
+						addThisEvent = qtrue; // TODO Fix this, this is nonsensical here really...just for testing
 					}
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
