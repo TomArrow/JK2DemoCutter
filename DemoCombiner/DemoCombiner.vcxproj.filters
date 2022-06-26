@@ -13,7 +13,7 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="DemoDefragCombine.cpp" />
+    <ClCompile Include="DemoCombine.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp">
       <Filter>Common</Filter>
     </ClCompile>

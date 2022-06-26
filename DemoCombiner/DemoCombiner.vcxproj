@@ -24,7 +24,7 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp" />
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
-    <ClCompile Include="DemoDefragCombine.cpp" />
+    <ClCompile Include="DemoCombine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h" />
@@ -35,7 +35,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{093B6C6C-31DD-4375-944E-6A639679CFCD}</ProjectGuid>
+    <ProjectGuid>{946D9336-341E-4835-AA4C-B247C53C5252}</ProjectGuid>
     <RootNamespace>DemoHighlightFinder</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
