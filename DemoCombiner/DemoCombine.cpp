@@ -1,5 +1,6 @@
 #include "demoCut.h"
 #include "DemoReader.h"
+#include "ini.h"
 #include <vector>
 #include <sstream>
 
@@ -892,13 +893,47 @@ cuterror:
 	}
 }*/
 
+std::vector<std::string> splitString(std::string input,std::string separator,bool trim=true,bool allowEmpty=false) {
+	std::vector<std::string> retVal;
+	int position = 0;
+	size_t foundPos = 0;
+	size_t lastFoundPos = -1;
+
+	while (std::string::npos != (foundPos = input.find(separator, lastFoundPos+1))) {
+		std::string newString = input.substr(lastFoundPos + 1, foundPos - lastFoundPos - 1);
+		if (trim) {
+			size_t tmpLocation = newString.find_last_not_of(" ");
+			if (tmpLocation != std::string::npos && tmpLocation < (newString.size()-1)) {
+				newString.erase(tmpLocation+1);
+			}
+			newString.erase(0, std::max((int)newString.find_first_not_of(" "),0));
+		}
+		if(allowEmpty || newString.size() > 0)
+			retVal.push_back(newString);
+		lastFoundPos = foundPos;
+	}
+	if (lastFoundPos != input.size() - 1) {
+		std::string newString = input.substr(lastFoundPos + 1, input.size() - lastFoundPos - 1);
+		if (trim) {
+			size_t tmpLocation = newString.find_last_not_of(" ");
+			if (tmpLocation != std::string::npos && tmpLocation < (newString.size() - 1)) {
+				newString.erase(tmpLocation + 1);
+			}
+			newString.erase(0, std::max((int)newString.find_first_not_of(" "), 0));
+		}
+		if (allowEmpty || newString.size() > 0)
+			retVal.push_back(newString);
+	}
+	return retVal;
+}
+
 
 int main(int argc, char** argv) {
 	if (argc <3) {
-		std::cout << "need 2 arguments at least: outputname, demoname1, [demoname2, demoname3,...]";
+		std::cout << "need 2 arguments: outputname, scriptname";
 		return 1;
 	}
-	char* demoName = NULL;
+	char* scriptName = NULL;
 	char* outputName = NULL;
 
 	outputName = argv[1];
@@ -907,17 +942,48 @@ int main(int argc, char** argv) {
 	strcpy(outputName, filteredOutputName);
 	delete[] filteredOutputName;
 
+	// Read the script
+	scriptName = argv[2];
 	std::vector<std::string> inputFiles;
+	mINI::INIFile file(scriptName);
+	mINI::INIStructure ini;
+	file.read(ini);
+
+	for (auto const& it : ini)
+	{
+		auto const& section = it.first;
+		auto const& collection = it.second;
+		std::cout << "[" << section << "]" << std::endl;
+		std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
+		std::cout << "path: " << collection.get("path") << std::endl;
+
+		std::vector<std::string> players = splitString(collection.get("players"),",");
+
+		for (int i = 0; i < players.size(); i++) {
+			std::cout << "player: " << players[i] << std::endl;
+		}
+		std::cout << std::endl;
+
+		/*for (auto const& it2 : collection)
+		{
+			auto const& key = it2.first;
+			auto const& value = it2.second;
+			std::cout << key << "=" << value << std::endl;
+		}*/
+	}
+
+
+	/*
 	for (int i = 2; i < argc; i++) {
 		inputFiles.emplace_back(argv[i]);
 	}
 
 	if (demoCut(outputName,&inputFiles)) {
-		Com_Printf("Demo %s got successfully cut\n", demoName);
+		Com_Printf("Demo %s got successfully cut\n", scriptName);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
-	}
+		Com_Printf("Demo %s has failed to get cut or cut with errors\n", scriptName);
+	}*/
 #ifdef DEBUG
 	std::cin.get();
 #endif

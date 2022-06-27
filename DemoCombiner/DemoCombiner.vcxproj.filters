@@ -39,5 +39,8 @@
     <ClInclude Include="..\shared\DemoReader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\include\ini.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
