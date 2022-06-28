@@ -213,12 +213,25 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	for (int pe = clCut->snap.parseEntitiesNum; pe < clCut->snap.parseEntitiesNum + clCut->snap.numEntities; pe++) {
 		entityState_t* thisEntity = &clCut->parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 		snapshotInfo.entities[thisEntity->number] = *thisEntity;
+
+		lastMessageWithEntity[thisEntity->number] = clCut->snap.messageNum;
+
+		// See if we can figure out the command time of this entity if it's a player.
+		if (thisEntity->number >= 0 && thisEntity->number < MAX_CLIENTS) {
+			if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
+				snapshotInfo.playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = thisEntity->pos.trTime;
+			}
+			else {
+				snapshotInfo.playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = clCut->snap.serverTime; // Otherwise just use servertime. Lame but oh well. Maybe we could do sth better where we try to detect changes in values or such if we truly need to.
+			}
+		}
 	}
 	snapshotInfo.playerState = clCut->snap.ps;
 	snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&lastSnap,&clCut->snap);
 	snapshotInfos[clCut->snap.messageNum] = snapshotInfo;
 
 	lastKnownCommandTime = clCut->snap.ps.commandTime;
+	snapshotInfo.playerCommandOrServerTimes[clCut->snap.ps.clientNum] = lastKnownCommandOrServerTimes[clCut->snap.ps.clientNum] = clCut->snap.ps.commandTime;
 
 	lastSnap = clCut->snap;
 
@@ -389,6 +402,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastGameStateChangeInDemoTime = 0;
 	lastKnownTime = 0;
 	lastKnownCommandTime = 0;
+	lastKnownCommandOrServerTimes.clear();
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
 	lastGottenEventsTime = 0;
@@ -428,6 +442,20 @@ qboolean DemoReader::SeekToCommandTime(int serverTime) {
 	if (lastKnownCommandTime < serverTime && endReached) return qfalse;
 	return qtrue;
 }
+qboolean DemoReader::SeekToPlayerCommandOrServerTime(int clientNum,int serverTime) {
+	while (lastKnownCommandOrServerTimes[clientNum] < serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownCommandOrServerTimes[clientNum] < serverTime && endReached) return qfalse;
+	return qtrue;
+}
+qboolean DemoReader::SeekToPlayerInPacket(int clientNum) {
+	while (lastKnownCommandOrServerTimes[clientNum] <=0 && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownCommandOrServerTimes[clientNum] <= 0 && endReached) return qfalse;
+	return qtrue;
+}
 qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 	while (!anySnapshotParsed && !endReached) {
 		ReadMessage();
@@ -437,6 +465,117 @@ qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 }
 playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
+}
+
+playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfo* snap) {
+	if (snap->playerState.clientNum == clientNum) {
+		return snap->playerState;
+	}
+	else {
+		playerState_t retVal;
+		Com_Memset(&retVal, 0, sizeof(playerState_t));
+
+		entityState_t* thisEntity = &snap->entities[clientNum];
+		// Need to convert the entity.
+		CG_EntityStateToPlayerState(thisEntity, &retVal);
+
+		if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
+			retVal.commandTime = thisEntity->pos.trTime;
+		}
+		else {
+			retVal.commandTime = snap->serverTime; // Otherwise just use servertime. Lame but oh well. Maybe we could do sth better where we try to detect changes in values or such if we truly need to.
+		}
+		return retVal;
+	}
+}
+
+playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time) {
+	playerState_t retVal;
+	Com_Memset(&retVal, 0, sizeof(playerState_t));
+	SeekToAnySnapshotIfNotYet();
+	SeekToTime(time);
+
+	// Now let's translate time into server time
+	time = time - demoBaseTime + demoStartTime;
+	SeekToPlayerCommandOrServerTime(clientNum,time);
+
+	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
+
+	// Ok now we are sure we have at least one snapshot. Good.
+	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
+
+	int lastPastSnap = -1;
+	int lastPastSnapCommandTime = -1;
+	int firstPacketWithPlayerInIt = -1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		//if (it->second.serverTime <= time) {
+		
+		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		
+		if (firstPacketWithPlayerInIt == -1) firstPacketWithPlayerInIt = it->first;
+		
+		if (it->second.playerCommandOrServerTimes[clientNum] <= time) {
+			lastPastSnap = it->first;
+			lastPastSnapCommandTime = it->second.playerState.commandTime;
+		}
+	}
+	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
+		if (firstPacketWithPlayerInIt == -1) {
+			// Uhm. Ok. Maybe handle this better at some later time but for now we just return that empty playerState.
+			// We should probably keep seeking then or sth.
+			return retVal;
+		}
+		else {
+			return GetPlayerFromSnapshot(clientNum,&snapshotInfos[firstPacketWithPlayerInIt]);
+			/*SnapshotInfo* thatSnapshot = &snapshotInfos[firstPacketWithPlayerInIt];
+			if (thatSnapshot->playerState.clientNum == clientNum) {
+				return thatSnapshot->playerState;
+			}
+			else {
+				// Need to convert the entity.
+				CG_EntityStateToPlayerState(&thatSnapshot->entities[clientNum],&retVal);
+				return retVal;
+			}*/
+		}
+	}
+
+	// Ok now we wanna make sure we have at least one snap after the last one before "time" that has a different commandTime so we have something to interpolate.
+	while (lastPastSnapCommandTime >= lastKnownCommandOrServerTimes[clientNum] && !endReached) {
+		ReadMessage();
+	}
+
+	// already at end, nothing we can interpolate.
+	// Just return the last state we have about this player.
+	// TODO actually: give way to return info about whether demo is over and such. So we dont end up with stuck entities in one place, tehy should disappear instead.
+	// Although... in case of short visibility interruptions it might actually be better to keep returning interpolated values?
+	if (lastPastSnapCommandTime >= lastKnownCommandOrServerTimes[clientNum] && endReached) {
+		if (lastMessageWithEntity.find(clientNum) == lastMessageWithEntity.end()) {
+			// We never knew anything about this player at all.
+			return retVal;
+		}
+		else {
+			return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
+		}
+	}
+
+	// Okay now we want to locate the first snap with a different commandtime than lastPastSnap and then interpolate between the two.
+	int firstNextSnap = -1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+
+		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+
+		if (it->second.playerCommandOrServerTimes[clientNum] > lastPastSnapCommandTime) {
+			firstNextSnap = it->first;
+			break;
+		}
+	}
+
+	
+	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
+	InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
+
+	return retVal;
+	
 }
 
 playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
@@ -518,6 +657,127 @@ void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotI
 		currentServerTime = from->serverTime;
 		if (to) {
 			nextps = &to->playerState;
+			nextTime = nextps->commandTime;
+			//nextTime = to->serverTime; // Testing. See if we can find the perfect way to do it ... hmm
+			nextServerTime = to->serverTime;
+		}
+	}
+	if (!to) {
+		return;
+	}/*
+#ifdef _DEBUG
+	if (!(currentTime <= cg.time + (double)cg.timeFraction && nextTime >= cg.time + (double)cg.timeFraction)) {
+		Com_Printf("WARNING: Couldn't locate slots with correct time\n");
+	}
+	if (nextTime - currentTime < 0) {
+		Com_Printf("WARNING: nexttps->time - tps->time < 0 (%d, %d)\n", nextTime, currentTime);
+	}
+#endif
+	if (currentTime != nextTime) {
+		f = ((double)cg.timeFraction + (cg.time - currentTime)) / (nextTime - currentTime);
+#ifdef _DEBUG
+		if (f > 1) {
+			Com_Printf("EXTRAPOLATING (f=%f)\n", f);
+		}
+		else if (f < 0) {
+			Com_Printf("GOING BACKWARDS (f=%f)\n", f);
+		}
+#endif
+	}
+	else {
+		f = 0;
+	}
+	*/
+	f = ((double)time - (double)currentTime) / ((double)nextTime - (double)currentTime);
+	*out = *curps;
+	//out->stats[STAT_HEALTH] = cg.snap->ps.stats[STAT_HEALTH];
+
+
+	// if the next frame is a teleport, we can't lerp to it
+	if (nextPsTeleport) { // TODO make that actually matter
+		return;
+	}
+
+	/*if ( !next || next->serverTime <= prev->serverTime ) {
+		return;
+	}*/
+
+	i = nextps->bobCycle;
+	if (i < curps->bobCycle) {
+		i += 256;		// handle wraparound
+	}
+	out->bobCycle = curps->bobCycle + f * (i - curps->bobCycle);
+
+	for (i = 0; i < 3; i++) {
+		out->origin[i] = curps->origin[i] + f * (nextps->origin[i] - curps->origin[i]);
+		//if (!grabAngles) {
+			out->viewangles[i] = LerpAngle(
+				curps->viewangles[i], nextps->viewangles[i], f);
+		//}
+		out->velocity[i] = curps->velocity[i] +
+			f * (nextps->velocity[i] - curps->velocity[i]);
+	}
+
+	// requires commandSmooth 2, since it needs entity state history of the mover
+	/*if (cg_commandSmooth.integer > 1) {
+		// adjust for the movement of the groundentity
+		// step 1: remove the delta introduced by cur->next origin interpolation
+		int curTime = currentServerTime + (int)(f * (nextServerTime - currentServerTime));
+		float curTimeFraction = (f * (nextServerTime - currentServerTime));
+		curTimeFraction -= (long)curTimeFraction;
+		CG_AdjustInterpolatedPositionForMover(out->origin,
+			curps->groundEntityNum, curTime, curTimeFraction, currentServerTime, 0, out->origin);
+		// step 2: mover state should now be what it was at currentServerTime, now redo calculation of mover effect to cg.time
+		CG_AdjustInterpolatedPositionForMover(out->origin,
+			curps->groundEntityNum, currentServerTime, 0, cg.time, cg.timeFraction, out->origin);
+	}*/ // TODO Fix this?
+
+	//curps->stats[STAT_HEALTH] = cg.snap->ps.stats[STAT_HEALTH];
+	//BG_PlayerStateToEntityState(curps, &cg_entities[curps->clientNum].currentState, qfalse);
+	//BG_PlayerStateToEntityState(nextps, &cg_entities[nextps->clientNum].nextState, qfalse);
+	//cg.playerInterpolation = f;
+	
+	/*if (cg.timeFraction >= cg.nextSnap->serverTime - cg.time) {
+		cg.physicsTime = cg.nextSnap->serverTime;
+	}
+	else {
+		cg.physicsTime = cg.snap->serverTime;
+	}*/ // TODO Relevant?
+
+
+	// TODO: What about this? not in jamme
+	//cg.predictedTimeFrac = f * (next->ps.commandTime - prev->ps.commandTime);
+	//cg.predictedTimeFrac = f * (nextps->commandTime - curps->commandTime);
+}
+
+void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS) {
+	float			f;
+	int				i;
+	playerState_t* out;
+	//snapshot_t* prev, * next;
+	playerState_t* curps = NULL, * nextps = NULL;
+	//qboolean		nextPsTeleport = qfalse;
+	qboolean		nextPsTeleport = to->playerStateTeleport;
+	int currentTime = 0, nextTime = 0, currentServerTime = 0, nextServerTime = 0;
+
+	out = outPS;
+	*out = from->playerState;
+	//prev = cg.snap;
+	//next = cg.nextSnap;
+
+	playerState_t inPsConverted, outPsConverted;
+
+	if (1) {
+
+
+		inPsConverted = GetPlayerFromSnapshot(clientNum,from);
+		curps = &inPsConverted;
+		currentTime = curps->commandTime;
+		//currentTime = from->serverTime;
+		currentServerTime = from->serverTime;
+		if (to) {
+			outPsConverted = GetPlayerFromSnapshot(clientNum, to);
+			nextps = &outPsConverted;
 			nextTime = nextps->commandTime;
 			//nextTime = to->serverTime; // Testing. See if we can find the perfect way to do it ... hmm
 			nextServerTime = to->serverTime;

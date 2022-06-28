@@ -9,6 +9,7 @@ What about player state / player entity events? How to handle those?
 Obituary event makes zero sense atm... lol. Just using original clientnums that make no sense in the new demo
 look at BG_EvaluateTrajectory for non player entity trajectories
 and BG_PlayerStateToEntityStateExtraPolate and CG_AddToHistory for player entity trajectories
+Clean up older SnapshotInfos (that are just too old to be useful, like 30+ sec?) to save RAM on long demos.
 
 DONE: 
 

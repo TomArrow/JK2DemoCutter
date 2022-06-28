@@ -887,6 +887,123 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 }
 
 
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps) {
+	int		i;
+
+	ps->clientNum = s->number;
+
+	VectorCopy(s->pos.trBase, ps->origin);
+
+	VectorCopy(s->pos.trDelta, ps->velocity);
+
+	VectorCopy(s->apos.trBase, ps->viewangles);
+
+	ps->fd.forceMindtrickTargetIndex = s->trickedentindex;
+	ps->fd.forceMindtrickTargetIndex2 = s->trickedentindex2;
+	ps->fd.forceMindtrickTargetIndex3 = s->trickedentindex3;
+	ps->fd.forceMindtrickTargetIndex4 = s->trickedentindex4;
+
+	ps->saberLockFrame = s->forceFrame;
+
+	ps->electrifyTime = s->emplacedOwner;
+
+	ps->speed = s->speed;
+
+	ps->genericEnemyIndex = s->genericenemyindex;
+
+	ps->activeForcePass = s->activeForcePass;
+
+	ps->movementDir = s->angles2[YAW];
+	ps->legsAnim = s->legsAnim;
+	ps->torsoAnim = s->torsoAnim;
+	ps->clientNum = s->clientNum;
+
+	ps->eFlags = s->eFlags;
+
+	ps->saberInFlight = s->saberInFlight;
+	ps->saberEntityNum = s->saberEntityNum;
+	ps->saberMove = s->saberMove;
+	ps->fd.forcePowersActive = s->forcePowersActive;
+
+	if (s->bolt1)
+	{
+		ps->duelInProgress = qtrue;
+	}
+	else
+	{
+		ps->duelInProgress = qfalse;
+	}
+
+	if (s->bolt2)
+	{
+		ps->dualBlade = qtrue;
+	}
+	else
+	{
+		ps->dualBlade = qfalse;
+	}
+
+	ps->emplacedIndex = s->otherEntityNum2;
+
+	ps->saberHolstered = s->shouldtarget; //reuse bool in entitystate for players differently
+	ps->usingATST = (qboolean)s->teamowner;
+
+	/*
+	if (ps->genericEnemyIndex != -1)
+	{
+		s->eFlags |= EF_SEEKERDRONE;
+	}
+	*/
+	ps->genericEnemyIndex = -1; //no real option for this
+
+	//The client has no knowledge of health levels (except for the client entity)
+	if (s->eFlags & EF_DEAD)
+	{
+		ps->stats[STAT_HEALTH] = 0;
+	}
+	else
+	{
+		ps->stats[STAT_HEALTH] = 100;
+	}
+
+	/*
+	if ( ps->externalEvent ) {
+		s->event = ps->externalEvent;
+		s->eventParm = ps->externalEventParm;
+	} else if ( ps->entityEventSequence < ps->eventSequence ) {
+		int		seq;
+
+		if ( ps->entityEventSequence < ps->eventSequence - MAX_PS_EVENTS) {
+			ps->entityEventSequence = ps->eventSequence - MAX_PS_EVENTS;
+		}
+		seq = ps->entityEventSequence & (MAX_PS_EVENTS-1);
+		s->event = ps->events[ seq ] | ( ( ps->entityEventSequence & 3 ) << 8 );
+		s->eventParm = ps->eventParms[ seq ];
+		ps->entityEventSequence++;
+	}
+	*/
+	//Eh.
+
+	ps->weapon = s->weapon;
+	ps->groundEntityNum = s->groundEntityNum;
+
+	for (i = 0; i < MAX_POWERUPS; i++) {
+		if (s->powerups & (1 << i))
+		{
+			ps->powerups[i] = 30;
+		}
+		else
+		{
+			ps->powerups[i] = 0;
+		}
+	}
+
+	ps->loopSound = s->loopSound;
+	ps->generic1 = s->generic1;
+}
+
+
+
 /*
 ===============
 LerpAngle
@@ -905,4 +1022,40 @@ float LerpAngle(float from, float to, float frac) {
 	a = from + frac * (to - from);
 
 	return a;
+}
+
+
+
+std::vector<std::string> splitString(std::string input, std::string separator, bool trim, bool allowEmpty) {
+	std::vector<std::string> retVal;
+	int position = 0;
+	size_t foundPos = 0;
+	size_t lastFoundPos = -1;
+
+	while (std::string::npos != (foundPos = input.find(separator, lastFoundPos + 1))) {
+		std::string newString = input.substr(lastFoundPos + 1, foundPos - lastFoundPos - 1);
+		if (trim) {
+			size_t tmpLocation = newString.find_last_not_of(" ");
+			if (tmpLocation != std::string::npos && tmpLocation < (newString.size() - 1)) {
+				newString.erase(tmpLocation + 1);
+			}
+			newString.erase(0, std::max((int)newString.find_first_not_of(" "), 0));
+		}
+		if (allowEmpty || newString.size() > 0)
+			retVal.push_back(newString);
+		lastFoundPos = foundPos;
+	}
+	if (lastFoundPos != input.size() - 1) {
+		std::string newString = input.substr(lastFoundPos + 1, input.size() - lastFoundPos - 1);
+		if (trim) {
+			size_t tmpLocation = newString.find_last_not_of(" ");
+			if (tmpLocation != std::string::npos && tmpLocation < (newString.size() - 1)) {
+				newString.erase(tmpLocation + 1);
+			}
+			newString.erase(0, std::max((int)newString.find_first_not_of(" "), 0));
+		}
+		if (allowEmpty || newString.size() > 0)
+			retVal.push_back(newString);
+	}
+	return retVal;
 }

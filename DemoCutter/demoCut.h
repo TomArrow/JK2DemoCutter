@@ -9,7 +9,9 @@
 #include <cstdio>
 #include <cassert>
 #include <cstring>
+#include <algorithm>
 #include <map>
+#include <vector>
 
 
 #define NULL 0
@@ -1530,6 +1532,7 @@ extern std::map <int, std::string>  saberStyleNames;
 
 
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap);
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps);
 
 float LerpAngle(float from, float to, float frac);
 
@@ -1623,3 +1626,6 @@ enum demoType_t {
 };
 
 void sanitizeFilename(const char* input, char* output);
+
+
+std::vector<std::string> splitString(std::string input, std::string separator, bool trim = true, bool allowEmpty = false);

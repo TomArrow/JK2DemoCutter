@@ -893,39 +893,6 @@ cuterror:
 	}
 }*/
 
-std::vector<std::string> splitString(std::string input,std::string separator,bool trim=true,bool allowEmpty=false) {
-	std::vector<std::string> retVal;
-	int position = 0;
-	size_t foundPos = 0;
-	size_t lastFoundPos = -1;
-
-	while (std::string::npos != (foundPos = input.find(separator, lastFoundPos+1))) {
-		std::string newString = input.substr(lastFoundPos + 1, foundPos - lastFoundPos - 1);
-		if (trim) {
-			size_t tmpLocation = newString.find_last_not_of(" ");
-			if (tmpLocation != std::string::npos && tmpLocation < (newString.size()-1)) {
-				newString.erase(tmpLocation+1);
-			}
-			newString.erase(0, std::max((int)newString.find_first_not_of(" "),0));
-		}
-		if(allowEmpty || newString.size() > 0)
-			retVal.push_back(newString);
-		lastFoundPos = foundPos;
-	}
-	if (lastFoundPos != input.size() - 1) {
-		std::string newString = input.substr(lastFoundPos + 1, input.size() - lastFoundPos - 1);
-		if (trim) {
-			size_t tmpLocation = newString.find_last_not_of(" ");
-			if (tmpLocation != std::string::npos && tmpLocation < (newString.size() - 1)) {
-				newString.erase(tmpLocation + 1);
-			}
-			newString.erase(0, std::max((int)newString.find_first_not_of(" "), 0));
-		}
-		if (allowEmpty || newString.size() > 0)
-			retVal.push_back(newString);
-	}
-	return retVal;
-}
 
 
 int main(int argc, char** argv) {

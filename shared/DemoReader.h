@@ -17,6 +17,7 @@ enum highlightSearchMode_t {
 class SnapshotInfo {
 public:
 	std::map<int, entityState_t> entities;
+	std::map<int, int> playerCommandOrServerTimes;
 	playerState_t playerState;
 	int serverTime;
 	qboolean playerStateTeleport;
@@ -66,6 +67,8 @@ class DemoReader {
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
 	int				lastKnownCommandTime = 0;
+	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
+	std::map<int,int>	lastMessageWithEntity; 
 
 	float			lastGottenCommandsTime = 0;
 	float			lastGottenEventsTime = 0;
@@ -88,12 +91,14 @@ class DemoReader {
 	entityState_t* findEntity(int number);
 
 	void InterpolatePlayerState(float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
+	void InterpolatePlayer(int clientNum, float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
 
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
 
 	qboolean ReadMessage();
 	qboolean ReadMessageReal();
+	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfo* snap);
 
 public:
 
@@ -102,11 +107,14 @@ public:
 
 	qboolean SeekToTime(int time);
 	qboolean SeekToCommandTime(int serverTime);
+	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
+	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
 	qboolean SeekToAnySnapshotIfNotYet();
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(float time);
+	playerState_t GetInterpolatedPlayer(int clientNum, float time);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	std::vector<Event> DemoReader::GetNewEvents(float time);
