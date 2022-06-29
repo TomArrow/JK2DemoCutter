@@ -665,8 +665,8 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 		// Find matching player name
 		for (int c = 0; c < MAX_CLIENTS; c++) {
 			tmpConfigString = reader->GetPlayerConfigString(c);
-			std::string nameHere = Info_ValueForKey(tmpConfigString, "name");
-			std::string nameHereLower = Info_ValueForKey(tmpConfigString, "name");
+			std::string nameHere = Info_ValueForKey(tmpConfigString, "n");
+			std::string nameHereLower = nameHere;
 			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
 
 			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {
@@ -888,6 +888,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						mainPlayerPS = tmpPS;
 					}
 					else {
+						Com_Memset(&tmpES, 0, sizeof(tmpES));
 						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 						playerEntities[copiedPlayerIndex] = tmpES;
 					}
