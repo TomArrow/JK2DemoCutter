@@ -228,10 +228,10 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	}
 	snapshotInfo.playerState = clCut->snap.ps;
 	snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&lastSnap,&clCut->snap);
+	snapshotInfo.playerCommandOrServerTimes[clCut->snap.ps.clientNum] = lastKnownCommandOrServerTimes[clCut->snap.ps.clientNum] = clCut->snap.ps.commandTime;
 	snapshotInfos[clCut->snap.messageNum] = snapshotInfo;
 
 	lastKnownCommandTime = clCut->snap.ps.commandTime;
-	snapshotInfo.playerCommandOrServerTimes[clCut->snap.ps.clientNum] = lastKnownCommandOrServerTimes[clCut->snap.ps.clientNum] = clCut->snap.ps.commandTime;
 
 	lastSnap = clCut->snap;
 
