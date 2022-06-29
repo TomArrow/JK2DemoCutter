@@ -9,6 +9,22 @@
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
 
+
+
+class DemoSource {
+public:
+	std::string sourceName;
+	std::string demoPath;
+	std::vector<std::string> playersToCopy;
+};
+
+class DemoReaderWrapper {
+public:
+	DemoReader reader;
+	std::vector<int> playersToCopy;
+	DemoSource* sourceInfo;
+};
+
 demo_t			demo;
 
 
@@ -622,8 +638,88 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 //#pragma optimize("", off)
 #endif
 
+char tolowerSignSafe(char in) {
+	return (char)tolower((unsigned char)in);
+}
 
-qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
+class NameMatch {
+public:
+	std::string matchedName;
+	int clientNum;
+};
+
+int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
+	const char* tmpConfigString;
+	int clientNumHere = -1;
+	if (thisPlayer->size() <= 2 && isdigit((*thisPlayer)[0]) && isdigit((*thisPlayer)[1])) {
+		// It's a number. ClientNum. Just parse it.
+		clientNumHere = atoi(thisPlayer->c_str());
+	}
+	else {
+		std::string thisPlayerLower = *thisPlayer;
+		std::transform(thisPlayerLower.begin(), thisPlayerLower.end(), thisPlayerLower.begin(), tolowerSignSafe);
+
+		std::vector<NameMatch> caseInsensitiveMatches;
+		std::vector<NameMatch> matches;
+
+		// Find matching player name
+		for (int c = 0; c < MAX_CLIENTS; c++) {
+			tmpConfigString = reader->GetPlayerConfigString(c);
+			std::string nameHere = Info_ValueForKey(tmpConfigString, "name");
+			std::string nameHereLower = Info_ValueForKey(tmpConfigString, "name");
+			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
+
+			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {
+				NameMatch nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				matches.push_back(nm);
+			}
+			if (strstr(nameHereLower.c_str(), thisPlayerLower.c_str())) {
+				NameMatch nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				caseInsensitiveMatches.push_back(nm);
+			}
+		}
+
+		if (matches.size() > 1) {
+			std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+			for (int c = 0; c < matches.size(); c++) {
+				std::cout << matches[c].matchedName << "(" << matches[c].clientNum << ")" << std::endl;
+			}
+			std::cout << "Picking first match '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")" << std::endl;
+			clientNumHere = matches[0].clientNum;
+		}
+		else if (matches.size() == 1) {
+			std::cout <<"'" << *thisPlayer << "' matches '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")" << std::endl;
+			clientNumHere = matches[0].clientNum;
+		}
+		else {
+			// No match. Try case insensitive
+			if (caseInsensitiveMatches.size() > 1) {
+				std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+				for (int c = 0; c < caseInsensitiveMatches.size(); c++) {
+					std::cout << caseInsensitiveMatches[c].matchedName << "(" << caseInsensitiveMatches[c].clientNum << ")" << std::endl;
+				}
+				std::cout << "Picking first match '" << caseInsensitiveMatches[0].matchedName << "' ("<<caseInsensitiveMatches[0].clientNum<<")" << std::endl;
+				clientNumHere = caseInsensitiveMatches[0].clientNum;
+			}
+			else if (caseInsensitiveMatches.size() == 1) {
+				std::cout << "'" << *thisPlayer << "' matches '" << caseInsensitiveMatches[0].matchedName << "' (" << caseInsensitiveMatches[0].clientNum << ")" << std::endl;
+				clientNumHere = caseInsensitiveMatches[0].clientNum;
+			}
+			else {
+				std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding." << std::endl;
+				// No match. Try case insensitive
+			}
+		}
+	}
+	return clientNumHere;
+}
+
+
+qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -659,10 +755,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	memset(&demo, 0, sizeof(demo));
 
-	std::vector<DemoReader> demoReaders;
+	std::vector<DemoReaderWrapper> demoReaders;
 	for (int i = 0; i < inputFiles->size(); i++) {
 		demoReaders.emplace_back();
-		demoReaders.back().LoadDemo((*inputFiles)[i].c_str());
+		demoReaders.back().reader.LoadDemo((*inputFiles)[i].demoPath.c_str());
+		demoReaders.back().sourceInfo = &(*inputFiles)[i];
 	}
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
@@ -672,7 +769,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	// Later maybe we can do something more refined and clever.
 	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
 		if (i >= CS_PLAYERS && i < (CS_PLAYERS + MAX_CLIENTS)) continue; // Player stuff will be copied manually.
-		tmpConfigString = demoReaders[0].GetConfigString(i);
+		tmpConfigString = demoReaders[0].reader.GetConfigString(i);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
 		}
@@ -680,17 +777,30 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	std::map<int, int> lastSpectatedClientNums; // Need this for later.
 
-	// Copy over player config strings
+	int copiedPlayerIndex = 0;
+
+	// Find correct player numbers and copy configstrings for players
 	for (int i = 0; i < demoReaders.size(); i++) {
-		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
-			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
-			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient);
-			if (strlen(tmpConfigString)) {
-				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
+		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, just for whatever's sake. Maybe not necessary? Could help with stuff like DARK Homebase demos, since player configstrings are sent a bit later?
+			
+			for (int p = 0; p < demoReaders[i].sourceInfo->playersToCopy.size(); p++) {
+
+				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
+				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
+				if (clientNumHere != -1) {
+					demoReaders[i].playersToCopy.push_back(clientNumHere);
+					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere);
+
+					if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
+						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
+					}
+				}
 			}
+			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
 			lastSpectatedClientNums[i] = spectatedClient;
 		}
 	}
+	
 	
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000");
 
@@ -743,41 +853,49 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		eventsToAdd.clear();
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
+
+		copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (demoReaders[i].reader.SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
-				std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
-				//tmpPS = demoReaders[i].GetCurrentPlayerState();
-				tmpPS = demoReaders[i].GetInterpolatedPlayerState(sourceTime);
-				int originalPlayerstateClientNum = tmpPS.clientNum;
-				tmpPS.clientNum = i;
-				tmpPS.commandTime = time;
+				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
-				// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
-				if (lastSpectatedClientNums[i] != originalPlayerstateClientNum) {
-					tmpConfigString = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum);
-					if (strlen(tmpConfigString)) {
-						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
+					int clientNumHere = demoReaders[i].playersToCopy[c];
+
+					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
+					//tmpPS = demoReaders[i].GetCurrentPlayerState();
+					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime);
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere,sourceTime);
+					//int originalPlayerstateClientNum = tmpPS.clientNum;
+					tmpPS.clientNum = copiedPlayerIndex;
+					tmpPS.commandTime = time;
+
+					// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
+					/*if (lastSpectatedClientNums[i] != originalPlayerstateClientNum) {
+						tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(originalPlayerstateClientNum);
+						if (strlen(tmpConfigString)) {
+							demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
+						}
+						ss.str(std::string());
+						ss << "cs " << (CS_PLAYERS + i) << " " << tmpConfigString;
+						commandsToAdd.push_back(ss.str());
+						tmpPS.eFlags |= EF_TELEPORT_BIT;
 					}
-					ss.str(std::string());
-					ss << "cs " << (CS_PLAYERS + i) << " " << tmpConfigString;
-					commandsToAdd.push_back(ss.str());
-					tmpPS.eFlags |= EF_TELEPORT_BIT;
-				}
-				lastSpectatedClientNums[i]= originalPlayerstateClientNum;
+					lastSpectatedClientNums[i]= originalPlayerstateClientNum;*/
 
-				// self explanatory.
-				if (i == 0) {
-					mainPlayerPS = tmpPS;
+					// self explanatory.
+					if (copiedPlayerIndex == 0) {
+						mainPlayerPS = tmpPS;
+					}
+					else {
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+						playerEntities[copiedPlayerIndex] = tmpES;
+					}
+					copiedPlayerIndex++;
 				}
-				else {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
-					playerEntities[i]= tmpES;
-				}
-
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].GetNewCommands(sourceTime);
+				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
@@ -790,13 +908,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 
 				// Get new events and remember them.
-				std::vector<Event> newEventsHere = demoReaders[i].GetNewEvents(sourceTime);
+				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime);
 				for (int c = 0; c < newEventsHere.size(); c++) {
 					Event* thisEvent = &newEventsHere[c];
 					int eventNumber = thisEvent->eventNumber;
 					qboolean addThisEvent = qfalse;
 					if (eventNumber == EV_PLAYER_TELEPORT_IN || eventNumber == EV_PLAYER_TELEPORT_OUT) {
-						if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
+						//if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
+						if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(),thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
 							thisEvent->theEvent.clientNum = i;
 							addThisEvent = qtrue;
 						}
@@ -807,7 +926,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
 			}
-			if (!demoReaders[i].EndReached()) {
+			if (!demoReaders[i].reader.EndReached()) {
 				allSourceDemosFinished = qfalse;
 			}
 		}
@@ -827,7 +946,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		clSnapshot_t mainPlayerSnapshot = demoReaders[0].GetCurrentSnap();
+		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
 		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
 		if (isFirstSnapshot) {
@@ -911,26 +1030,40 @@ int main(int argc, char** argv) {
 
 	// Read the script
 	scriptName = argv[2];
-	std::vector<std::string> inputFiles;
+	//std::vector<std::string> inputFiles;
 	mINI::INIFile file(scriptName);
 	mINI::INIStructure ini;
 	file.read(ini);
 
+	std::vector<DemoSource> demoSources;
+
 	for (auto const& it : ini)
 	{
+		DemoSource demoSource;
 		auto const& section = it.first;
 		auto const& collection = it.second;
+		demoSource.sourceName = section;
 		std::cout << "[" << section << "]" << std::endl;
-		std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
+		//std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
 		std::cout << "path: " << collection.get("path") << std::endl;
+		demoSource.demoPath = collection.get("path");
 
 		std::vector<std::string> players = splitString(collection.get("players"),",");
 
 		for (int i = 0; i < players.size(); i++) {
 			std::cout << "player: " << players[i] << std::endl;
+			if (players[i].size() > 0) {
+				demoSource.playersToCopy.push_back(players[i]);
+			}
+		}
+
+		if (demoSource.playersToCopy.size() > 0) {
+			demoSources.push_back(demoSource);
+		}
+		else {
+			std::cout << section << "was not added: No players specified." << std::endl;
 		}
 		std::cout << std::endl;
-
 		/*for (auto const& it2 : collection)
 		{
 			auto const& key = it2.first;
@@ -940,17 +1073,18 @@ int main(int argc, char** argv) {
 	}
 
 
+
 	/*
 	for (int i = 2; i < argc; i++) {
 		inputFiles.emplace_back(argv[i]);
 	}
-
-	if (demoCut(outputName,&inputFiles)) {
+	*/
+	if (demoCut(outputName,&demoSources)) {
 		Com_Printf("Demo %s got successfully cut\n", scriptName);
 	}
 	else {
 		Com_Printf("Demo %s has failed to get cut or cut with errors\n", scriptName);
-	}*/
+	}
 #ifdef DEBUG
 	std::cin.get();
 #endif
