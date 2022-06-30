@@ -948,7 +948,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
 		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
-		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
+		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
+		Com_Memset(demo.cut.Cl.snap.areamask,0,sizeof(demo.cut.Cl.snap.areamask));
 
 		if (isFirstSnapshot) {
 			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);

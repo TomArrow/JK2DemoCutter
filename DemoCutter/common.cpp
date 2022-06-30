@@ -887,7 +887,7 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 }
 
 
-void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps) {
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean allValues) {
 	int		i;
 
 	ps->clientNum = s->number;
@@ -1000,6 +1000,19 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps) {
 
 	ps->loopSound = s->loopSound;
 	ps->generic1 = s->generic1;
+
+	if (allValues) { // Wasn't included in original ToPlayerstate for some reason
+		ps->weaponstate = s->modelindex2;
+		ps->weaponChargeTime = s->constantLight;
+
+		VectorCopy(s->origin2,ps->lastHitLoc);
+
+		ps->isJediMaster = s->isJediMaster;
+
+		ps->holocronBits = s->time2;
+
+		ps->fd.saberAnimLevel = s->fireflag;
+	}
 }
 
 

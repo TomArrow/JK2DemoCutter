@@ -516,7 +516,8 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time) {
 		
 		if (it->second.playerCommandOrServerTimes[clientNum] <= time) {
 			lastPastSnap = it->first;
-			lastPastSnapCommandTime = it->second.playerState.commandTime;
+			//lastPastSnapCommandTime = it->second.playerState.commandTime;
+			lastPastSnapCommandTime = it->second.playerCommandOrServerTimes[clientNum];
 		}
 	}
 	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
