@@ -25,6 +25,54 @@ public:
 	DemoSource* sourceInfo;
 };
 
+
+class SlotManager {
+	struct sourceDemoMapping {
+		int demoIndex;
+		int entityNum;
+	};
+
+	std::map<int, sourceDemoMapping> mappings;
+	typedef std::map<int, sourceDemoMapping>::iterator mappingIterator;
+public:
+	int getPlayerSlot(int demoIndex, int clientNum) {
+		// Check if mapping already exists
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == clientNum) {
+				return it->first;
+			}
+		}
+		// Else, create new mapping in free slot.
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+			if (mappings.find(i) == mappings.end()) {
+				// Free slot!
+				mappings[i] = { demoIndex,clientNum };
+				return i;
+			}
+		}
+		// Error: No free slot found
+		return -1;
+	}
+	int getSlotIfExists(int demoIndex, int clientNum) {
+		// Check if mapping already exists
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == clientNum) {
+				return it->first;
+			}
+		}
+		return -1;
+	}
+	int freeSlots(int demoIndex) {
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
+			mappingIterator iteratorHere = it;
+			it++;
+			if (iteratorHere->second.demoIndex == demoIndex) {
+				mappings.erase(iteratorHere);
+			}
+		}
+	}
+};
+
 demo_t			demo;
 
 
@@ -777,7 +825,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	std::map<int, int> lastSpectatedClientNums; // Need this for later.
 
-	int copiedPlayerIndex = 0;
+	//int copiedPlayerIndex = 0;
+
+	SlotManager slotManager;
+
 
 	// Find correct player numbers and copy configstrings for players
 	for (int i = 0; i < demoReaders.size(); i++) {
@@ -789,10 +840,12 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
 				if (clientNumHere != -1) {
 					demoReaders[i].playersToCopy.push_back(clientNumHere);
+					int targetClientNum = slotManager.getPlayerSlot(i,clientNumHere);
 					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere);
 
 					if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
-						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
+						//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
+						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + targetClientNum, tmpConfigString);
 					}
 				}
 			}
@@ -854,7 +907,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 
-		copiedPlayerIndex = 0;
+		//copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].reader.SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
@@ -867,7 +920,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime);
 					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere,sourceTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
-					tmpPS.clientNum = copiedPlayerIndex;
+
+					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
+					//tmpPS.clientNum = copiedPlayerIndex;
+					tmpPS.clientNum = targetClientNum;
 					tmpPS.commandTime = time;
 
 					// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
@@ -884,15 +940,17 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					lastSpectatedClientNums[i]= originalPlayerstateClientNum;*/
 
 					// self explanatory.
-					if (copiedPlayerIndex == 0) {
+					//if (copiedPlayerIndex == 0) {
+					if (targetClientNum == 0) {
 						mainPlayerPS = tmpPS;
 					}
 					else {
 						Com_Memset(&tmpES, 0, sizeof(tmpES));
 						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
-						playerEntities[copiedPlayerIndex] = tmpES;
+						//playerEntities[copiedPlayerIndex] = tmpES;
+						playerEntities[targetClientNum] = tmpES;
 					}
-					copiedPlayerIndex++;
+					//copiedPlayerIndex++;
 				}
 
 				// Get new commands
@@ -922,7 +980,19 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 					}
 					if (eventNumber == EV_OBITUARY) {
-						addThisEvent = qtrue; // TODO Fix this, this is nonsensical here really...just for testing
+
+						//int				target = ent->otherEntityNum;
+						//int				attacker = ent->otherEntityNum2;
+
+						// Check if we are tracking these players.
+						int target = slotManager.getSlotIfExists(i,thisEvent->theEvent.otherEntityNum);
+						int attacker = slotManager.getSlotIfExists(i,thisEvent->theEvent.otherEntityNum2);
+						if (target != -1 && attacker != -1) {
+							thisEvent->theEvent.otherEntityNum = target;
+							thisEvent->theEvent.otherEntityNum2 = attacker;
+
+							addThisEvent = qtrue;
+						}
 					}
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
