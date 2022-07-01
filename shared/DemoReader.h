@@ -118,6 +118,7 @@ public:
 	playerState_t GetInterpolatedPlayerState(float time);
 	playerState_t GetInterpolatedPlayer(int clientNum, float time);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
+	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time);
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	std::vector<Event> DemoReader::GetNewEvents(float time);
 	clSnapshot_t GetCurrentSnap();
@@ -125,4 +126,5 @@ public:
 	const char* GetPlayerConfigString(int playerNum);
 	qboolean AnySnapshotParsed();
 	qboolean EndReached();
+	qboolean EndReachedAtTime(float time);
 };

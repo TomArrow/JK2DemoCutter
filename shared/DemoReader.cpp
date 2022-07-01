@@ -427,6 +427,10 @@ qboolean DemoReader::EndReached() {
 
 	return endReached;
 }
+qboolean DemoReader::EndReachedAtTime(float time) {
+	SeekToTime(time);
+	return (qboolean)(demoCurrentTime < time);
+}
 
 qboolean DemoReader::SeekToTime(int time) {
 	while (demoCurrentTime < time && !endReached) {
@@ -883,6 +887,31 @@ std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 		retVal[thisEntity->number] = *thisEntity;
 	}
 	return retVal;
+}
+
+std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+
+	SeekToAnySnapshotIfNotYet();
+	SeekToTime(time);
+
+	// Now let's translate time into server time
+	time = time - demoBaseTime + demoStartTime;
+
+	if (endReached && !anySnapshotParsed) return std::map<int, entityState_t>(); // Nothing to do really lol.
+
+	// Ok now we are sure we have at least one snapshot. Good.
+	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
+
+	int lastPastSnap = -1;
+	int lastPastSnapCommandTime = -1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		if (it->second.serverTime <= time) {
+			lastPastSnap = it->first;
+			lastPastSnapCommandTime = it->second.serverTime;
+		}
+	}
+	
+	return snapshotInfos[lastPastSnap].entities;
 }
 
 std::vector<std::string> DemoReader::GetNewCommands(float time) {

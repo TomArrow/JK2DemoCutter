@@ -53,6 +53,33 @@ public:
 		// Error: No free slot found
 		return -1;
 	}
+	int getEntitySlot(int demoIndex, int entityNum) {
+		// Check if mapping already exists
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
+				return it->first;
+			}
+		}
+		// Else, create new mapping in free slot.
+		for (int i = MAX_CLIENTS; i < MAX_GENTITIES-1; i++) {
+			if (mappings.find(i) == mappings.end()) {
+				// Free slot!
+				mappings[i] = { demoIndex,entityNum };
+				return i;
+			}
+		}
+		// Error: No free slot found
+		return -1;
+	}
+	int getEntitySlotIfExists(int demoIndex, int entityNum) {
+		// Check if mapping already exists
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
+				return it->first;
+			}
+		}
+		return -1;
+	}
 	int getSlotIfExists(int demoIndex, int clientNum) {
 		// Check if mapping already exists
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
@@ -910,7 +937,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		//copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].reader.SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
-				
+
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c];
@@ -918,7 +945,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime);
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere,sourceTime);
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
 					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
@@ -960,7 +987,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
 					char* cmd = Cmd_Argv(0);
 					if (!strcmp(cmd, "print") || !strcmp(cmd, "chat")/* || !strcmp(cmd, "cp")*/) {
-						if (!strstr(newCommandsHere[c].c_str(),"!respos") && !strstr(newCommandsHere[c].c_str(), "!savepos")) { // TODO Make this case insensitive for absolute protection!
+						if (!strstr(newCommandsHere[c].c_str(), "!respos") && !strstr(newCommandsHere[c].c_str(), "!savepos")) { // TODO Make this case insensitive for absolute protection!
 							commandsToAdd.push_back(newCommandsHere[c]);
 						}
 					}
@@ -974,7 +1001,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					qboolean addThisEvent = qfalse;
 					if (eventNumber == EV_PLAYER_TELEPORT_IN || eventNumber == EV_PLAYER_TELEPORT_OUT) {
 						//if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
-						if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(),thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
+						if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(), thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
 							thisEvent->theEvent.clientNum = i;
 							addThisEvent = qtrue;
 						}
@@ -985,8 +1012,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						//int				attacker = ent->otherEntityNum2;
 
 						// Check if we are tracking these players.
-						int target = slotManager.getSlotIfExists(i,thisEvent->theEvent.otherEntityNum);
-						int attacker = slotManager.getSlotIfExists(i,thisEvent->theEvent.otherEntityNum2);
+						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
+						int attacker = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum2);
 						if (target != -1 && attacker != -1) {
 							thisEvent->theEvent.otherEntityNum = target;
 							thisEvent->theEvent.otherEntityNum2 = attacker;
@@ -996,6 +1023,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
+			}
+			else {
+				// We reached the end of this demo.
+				slotManager.freeSlots(i);
 			}
 			if (!demoReaders[i].reader.EndReached()) {
 				allSourceDemosFinished = qfalse;
