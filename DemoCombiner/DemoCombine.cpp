@@ -71,7 +71,7 @@ public:
 		// Error: No free slot found
 		return -1;
 	}
-	int getEntitySlotIfExists(int demoIndex, int entityNum) {
+	int getSlotIfExists(int demoIndex, int entityNum) {
 		// Check if mapping already exists
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
 			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
@@ -80,23 +80,29 @@ public:
 		}
 		return -1;
 	}
-	int getSlotIfExists(int demoIndex, int clientNum) {
-		// Check if mapping already exists
-		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
-			if (it->second.demoIndex == demoIndex && it->second.entityNum == clientNum) {
-				return it->first;
-			}
-		}
-		return -1;
-	}
 	int freeSlots(int demoIndex) {
+		int countErased = 0;
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
 			mappingIterator iteratorHere = it;
 			it++;
 			if (iteratorHere->second.demoIndex == demoIndex) {
 				mappings.erase(iteratorHere);
+				countErased++;
 			}
 		}
+		return countErased;
+	}
+	int freeSlot(int demoIndex, int entityNum) {
+		int countErased = 0;
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
+			mappingIterator iteratorHere = it;
+			it++;
+			if (iteratorHere->second.demoIndex == demoIndex && iteratorHere->second.entityNum == entityNum) {
+				mappings.erase(iteratorHere);
+				countErased++;
+			}
+		}
+		return countErased;
 	}
 };
 
@@ -918,8 +924,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	float sourceTime = 0.0f;
 	float time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	float fps = 60.0f;
-	std::map<int, entityState_t> playerEntities;
-	std::map<int, entityState_t> playerEntitiesOld;
+	std::map<int, entityState_t> targetEntities;
+	std::map<int, entityState_t> targetEntitiesOld;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
@@ -932,7 +938,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		commandsToAdd.clear();
 		eventsToAdd.clear();
 		qboolean allSourceDemosFinished = qtrue;
-		playerEntities.clear();
+		targetEntities.clear();
 
 		//copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
@@ -975,9 +981,35 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						Com_Memset(&tmpES, 0, sizeof(tmpES));
 						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 						//playerEntities[copiedPlayerIndex] = tmpES;
-						playerEntities[targetClientNum] = tmpES;
+						targetEntities[targetClientNum] = tmpES;
 					}
 					//copiedPlayerIndex++;
+				}
+
+				// Get various related entities
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime);
+				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
+					// Players are already handled otherwhere
+					if (it->first >= MAX_CLIENTS) {
+						// Is this a corpse?
+						if (it->second.eType == ET_BODY) {
+							// Check if we are tracking this player
+							int targetPlayerSlot = slotManager.getSlotIfExists(i,it->second.clientNum);
+							if (targetPlayerSlot != -1) {
+								int targetEntitySlot = slotManager.getEntitySlot(i,it->first);
+								if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+									entityState_t tmpEntity = it->second;
+									tmpEntity.clientNum = targetPlayerSlot;
+									tmpEntity.number = targetEntitySlot;
+									tmpEntity.pos.trTime = time;
+									if (EV_BODY_QUEUE_COPY == (tmpEntity.event & ~EV_EVENT_BITS)) {
+										tmpEntity.eventParm = targetPlayerSlot;
+									}
+									targetEntities[targetEntitySlot] = tmpEntity;
+								}
+							}
+						}
+					}
 				}
 
 				// Get new commands
@@ -1021,6 +1053,16 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
+					/*if (eventNumber == EV_BODY_QUEUE_COPY) { // This is actually part of the ET_BODY I'm copying over anyway?
+
+						// Check if we are tracking this player.
+						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.eventParm);
+						if (target != -1) {
+							thisEvent->theEvent.eventParm = target;
+
+							addThisEvent = qtrue;
+						}
+					}*/
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
 			}
@@ -1036,10 +1078,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		// Find empty places in entities and add events.
 		for (int i = 0; i < eventsToAdd.size(); i++) {
 			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-1; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
-				if (playerEntities.find(e) == playerEntities.end()) {
+				if (targetEntities.find(e) == targetEntities.end()) {
 					// Let's add it!
 					eventsToAdd[i].theEvent.number = e;
-					playerEntities[e] = eventsToAdd[i].theEvent;
+					targetEntities[e] = eventsToAdd[i].theEvent;
 					break;
 				}
 			}
@@ -1053,11 +1095,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		Com_Memset(demo.cut.Cl.snap.areamask,0,sizeof(demo.cut.Cl.snap.areamask));
 
 		if (isFirstSnapshot) {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &targetEntities, NULL,NULL);
 			isFirstSnapshot = qfalse;
 		}
 		else {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &targetEntities, &targetEntitiesOld, &mainPlayerPSOld);
 		}
 
 		time += 1000.0f / fps;
@@ -1066,9 +1108,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		demo.cut.Clc.serverMessageSequence++;
 
 		mainPlayerPSOld = mainPlayerPS;
-		playerEntitiesOld.clear();
-		for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
-			playerEntitiesOld[it->first] = it->second;
+		targetEntitiesOld.clear();
+		for (auto it = targetEntities.begin(); it != targetEntities.end(); it++) {
+			targetEntitiesOld[it->first] = it->second;
 		}
 
 		if (allSourceDemosFinished) break;

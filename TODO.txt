@@ -11,6 +11,8 @@ look at BG_EvaluateTrajectory for non player entity trajectories
 and BG_PlayerStateToEntityStateExtraPolate and CG_AddToHistory for player entity trajectories
 Clean up older SnapshotInfos (that are just too old to be useful, like 30+ sec?) to save RAM on long demos.
 Make demos identifiable so I can avoid re-cutting them
+should we properly map event entities too?
+solve CROUCH when info comes from entities.
 
 DONE: 
 
