@@ -13,6 +13,8 @@
 #include <map>
 #include <vector>
 
+#include "anims.h"
+
 
 #define NULL 0
 
@@ -137,6 +139,39 @@ typedef struct _iobuf
 #define	MAX_GAMESTATE_CHARS	16000
 
 
+
+
+#define	DEFAULT_GRAVITY		800
+#define	GIB_HEALTH			-40
+#define ARMOR_PROTECTION		0.50 // Shields only stop 50% of armor-piercing dmg
+#define ARMOR_REDUCTION_FACTOR	0.50 // Certain damage doesn't take off armor as efficiently
+
+#define	JUMP_VELOCITY		225//270
+
+#define	MAX_ITEMS			256
+
+#define	RANK_TIED_FLAG		0x4000
+
+#define	ITEM_RADIUS			15		// item sizes are needed for client side pickup detection
+
+#define	SCORE_NOT_PRESENT	-9999	// for the CS_SCORES[12] when only one player is present
+
+#define	VOTE_TIME			30000	// 30 seconds before vote times out
+
+#define DEFAULT_MINS_2		-24
+#define DEFAULT_MAXS_2		40
+#define CROUCH_MAXS_2		16
+#define	STANDARD_VIEWHEIGHT_OFFSET -4
+
+#define	MINS_Z				-24
+#define	DEFAULT_VIEWHEIGHT	(DEFAULT_MAXS_2+STANDARD_VIEWHEIGHT_OFFSET)//26
+#define CROUCH_VIEWHEIGHT	(CROUCH_MAXS_2+STANDARD_VIEWHEIGHT_OFFSET)//12
+#define	DEAD_VIEWHEIGHT		-16
+
+
+// flip the togglebit every time an animation
+// changes so a restart of the same anim can be detected
+#define	ANIM_TOGGLEBIT		2048		// Maximum number of animation sequences is 2048 (0-2047).  12th bit is the toggle
 
 
 typedef enum {

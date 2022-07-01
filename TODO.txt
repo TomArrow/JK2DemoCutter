@@ -13,6 +13,7 @@ Clean up older SnapshotInfos (that are just too old to be useful, like 30+ sec?)
 Make demos identifiable so I can avoid re-cutting them
 should we properly map event entities too?
 solve CROUCH when info comes from entities.
+weapon select wheel when switching between entity and playerstate
 
 DONE: 
 

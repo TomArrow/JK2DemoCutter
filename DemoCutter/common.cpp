@@ -1012,6 +1012,22 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean a
 		ps->holocronBits = s->time2;
 
 		ps->fd.saberAnimLevel = s->fireflag;
+
+		// This is my own stuff: (restoring viewheight)
+		if (s->eFlags & EF_DEAD) {
+			ps->viewheight = DEAD_VIEWHEIGHT;
+		}
+		else if (
+			(s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE || (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
+			|| (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK || (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK
+			
+			) {
+			ps->viewheight = CROUCH_VIEWHEIGHT;
+		}
+		else {
+			ps->viewheight = DEFAULT_VIEWHEIGHT;
+		}
+
 	}
 }
 

@@ -1070,7 +1070,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				// We reached the end of this demo.
 				slotManager.freeSlots(i);
 			}
-			if (!demoReaders[i].reader.EndReached()) {
+			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime)) {
 				allSourceDemosFinished = qfalse;
 			}
 		}

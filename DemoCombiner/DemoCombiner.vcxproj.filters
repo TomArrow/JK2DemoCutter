@@ -42,5 +42,8 @@
     <ClInclude Include="..\shared\include\ini.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\DemoCutter\anims.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
