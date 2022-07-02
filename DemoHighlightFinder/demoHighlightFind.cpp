@@ -347,7 +347,7 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	}
 }
 
-qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
+qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,int* lastValidSnap) {
 	int len;
 	clSnapshot_t* oldSnap;
 	clSnapshot_t newSnap;
@@ -368,12 +368,23 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	}
 	else {
 		newSnap.deltaNum = newSnap.messageNum - deltaNum;
+		int lastOneNum = newSnap.deltaNum;
 		oldSnap = &clCut->snapshots[newSnap.deltaNum & PACKET_MASK];
+
+		// Try work with it anyway?
+		if (!oldSnap->valid && *lastValidSnap != -1) {
+			// should never happen
+			oldSnap = &clCut->snapshots[*lastValidSnap & PACKET_MASK]; 
+			lastOneNum = *lastValidSnap;
+			Com_Printf("Delta from invalid frame (not supposed to happen!). Trying to use last valid snap.\n");
+		}
+
 		if (!oldSnap->valid) {
 			// should never happen
 			Com_Printf("Delta from invalid frame (not supposed to happen!).\n");
 		}
-		else if (oldSnap->messageNum != newSnap.deltaNum) {
+		//else if (oldSnap->messageNum != newSnap.deltaNum) {
+		else if (oldSnap->messageNum != lastOneNum) {
 			// The frame that the server did the delta from
 			// is too old, so we can't reconstruct it properly.
 			Com_Printf("Delta frame too old.\n");
@@ -401,6 +412,8 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	if (!newSnap.valid) {
 		return qtrue;
 	}
+	*lastValidSnap = newSnap.messageNum;
+
 	// clear the valid flags of any snapshots between the last
 	// received and this one, so if there was a dropped packet
 	// it won't look like something valid to delta from next
@@ -675,6 +688,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
+	int				lastValidSnap = -1;
 
 	std::ofstream outputBatHandle;
 
@@ -884,7 +898,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				readGamestate++;
 				break;
 			case svc_snapshot:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType)) {
+				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,&lastValidSnap)) {
 					goto cuterror;
 				}
 
@@ -1482,7 +1496,7 @@ cuterror:
 	FS_FCloseFile(oldHandle);
 	//FS_FCloseFile(newHandle);
 
-	std::cout << "done.";
+	std::cout << "\ndone." << "\n\n";
 
 
  	return ret;
@@ -1541,8 +1555,9 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	Com_Printf("Looking at %s.\n", demoName);
 	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat", searchMode)) {
-		Com_Printf("Highlights in %s successfully found.\n", demoName);
+		Com_Printf("Highlights successfully found.\n");
 	}
 	else {
 		Com_Printf("Finding highlights in demo %s has resulted in errors\n", demoName);
