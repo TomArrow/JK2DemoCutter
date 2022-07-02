@@ -14,6 +14,9 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\sqlite\sqlite3.c">
+      <Filter>sqlite</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -21,6 +24,9 @@
     </Filter>
     <Filter Include="Common">
       <UniqueIdentifier>{b00e22a2-6233-4e35-9f63-a0b232a33782}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sqlite">
+      <UniqueIdentifier>{60dc04f0-1a91-4696-98e9-1e5ef41a1cad}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -31,6 +37,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\pcre2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\sqlite\sqlite3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

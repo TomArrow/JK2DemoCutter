@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <chrono>
+#include <filesystem>
+#include "sqlite3.h"
 
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
@@ -16,6 +19,9 @@ std::map<int,int> playerFirstFollowedOrVisible;
 std::map<int,int> lastEvent;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
+
+#define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
+#define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
 
 struct Kill {
 	int time;
@@ -543,7 +549,7 @@ entityState_t* findEntity(int number) {
 
 
 float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
-	float maxSpeed = 0.0f;
+	float maxSpeed = -1.0f;
 	for (auto it = speeds[clientNum].begin(); it != speeds[clientNum].end(); it++) {
 		if (it->first >= fromTime && it->first <= toTime && it->second > maxSpeed) {
 			maxSpeed = it->second;
@@ -626,6 +632,50 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
 
+
+	sqlite3* killDb;
+	sqlite3_open("killDatabase.db",&killDb);
+
+	sqlite3_exec(killDb, "CREATE TABLE kills ("
+		"hash	TEXT,"
+		"shorthash	TEXT,"
+		"map	TEXT NOT NULL,"
+		"killerName	TEXT NOT NULL,"
+		"victimName	TEXT NOT NULL,"
+		"killerClientNum	INTEGER NOT NULL,"
+		"victimClientNum	INTEGER NOT NULL,"
+		"isReturn	BOOLEAN NOT NULL,"
+		"isDoomKill	BOOLEAN NOT NULL,"
+		"isExplosion	BOOLEAN NOT NULL,"
+		"isSuicide	BOOLEAN NOT NULL,"
+		"isVisible	BOOLEAN NOT NULL,"
+		"isFollowed	BOOLEAN NOT NULL,"
+		"meansOfDeath	INTEGER NOT NULL,"
+		"demoRecorderClientnum	INTEGER NOT NULL,"
+		"maxSpeedAttacker	REAL,"
+		"maxSpeedTarget	REAL,"
+		"meansOfDeathString	TEXT NOT NULL,"
+		"probableKillingWeapon	INTEGER NOT NULL,"
+		"positionX	REAL,"
+		"positionY	REAL,"
+		"positionZ	REAL,"
+		"serverTime INTEGER NOT NULL,"
+		"demoDateTime DATETIME NOT NULL,"
+		"PRIMARY KEY(hash)"
+		"); ",
+		NULL,NULL,NULL);
+	char* preparedStatementText = "INSERT INTO kills"
+		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, isVisible,"
+		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
+		"positionY, positionZ, serverTime, demoDateTime)"
+		"VALUES "
+		"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @isVisible,"
+		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
+		"@positionY, @positionZ, @serverTime, @demoDateTime);";
+	sqlite3_stmt* insertStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertStatement,NULL);
+
+
 	//mvprotocol_t	protocol;
 
 	// Since not in MME:
@@ -664,6 +714,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
+
+	std::filesystem::file_time_type filetime = std::filesystem::last_write_time(va("%s%s", oldName, ext));
+	time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
+
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
 
@@ -842,13 +896,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							kills[attacker].push_back(thisKill);
 
-							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
-							
-							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
-							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
-
-
-							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
+							// This is the place that had all the continues originally.
 							
 							entityState_t* attackerEntity = findEntity(attacker);
 
@@ -992,7 +1040,49 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								isTruncated = true;
 							}
 
-							int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
+							float maxSpeedAttackerFloat = getMaxSpeedForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
+							int maxSpeedAttacker = maxSpeedAttackerFloat;
+
+
+							// Log the kill.
+							SQLBIND_TEXT(insertStatement, "@hash", "testhash");
+							SQLBIND_TEXT(insertStatement, "@shorthash", "testhash");
+							SQLBIND_TEXT(insertStatement, "@map", mapname.c_str());
+							SQLBIND_TEXT(insertStatement, "@killerName", playername.c_str());
+							SQLBIND_TEXT(insertStatement, "@victimName", victimname.c_str());
+							SQLBIND(insertStatement, int, "@killerClientNum", attacker);
+							SQLBIND(insertStatement, int, "@victimClientNum", target);
+							SQLBIND(insertStatement, int, "@isReturn", victimIsFlagCarrier);
+							SQLBIND(insertStatement, int, "@isDoomKill", isDoomKill);
+							SQLBIND(insertStatement, int, "@isExplosion", thisKill.isExplosion);
+							SQLBIND(insertStatement, int, "@isSuicide", isSuicide);
+							SQLBIND(insertStatement, int, "@isVisible", isVisible);
+							SQLBIND(insertStatement, int, "@isFollowed", attackerIsFollowed);
+							SQLBIND(insertStatement, int, "@meansOfDeath", mod);
+							SQLBIND(insertStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND(insertStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat);
+							SQLBIND(insertStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat);
+							SQLBIND_TEXT(insertStatement, "@meansOfDeathString", modInfo.str().c_str());
+							SQLBIND(insertStatement, int, "@probableKillingWeapon", probableKillingWeapon);
+							SQLBIND(insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
+							SQLBIND(insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
+							SQLBIND(insertStatement, double, "@positionZ", thisEs->pos.trBase[2]);
+							SQLBIND(insertStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND(insertStatement, int, "@demoDateTime", oldDemoDateModified);
+
+							int queryResult = sqlite3_step(insertStatement);
+							if (queryResult != SQLITE_DONE) {
+								std::cout<< "Error inserting kill into database: " << sqlite3_errmsg(killDb) <<"\n";
+							}
+							sqlite3_reset(insertStatement);
+
+
+
+							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
+							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
+							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
+							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
+
 
 							std::stringstream ss;
 							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
@@ -1278,8 +1368,15 @@ cuterror:
 		if (FS_FileExists(newName))
 			FS_FileErase(newName);
 	}*/
+
+
+	sqlite3_finalize(insertStatement);
+	sqlite3_close(killDb);
+
 	FS_FCloseFile(oldHandle);
 	//FS_FCloseFile(newHandle);
+
+
  	return ret;
 }
 
