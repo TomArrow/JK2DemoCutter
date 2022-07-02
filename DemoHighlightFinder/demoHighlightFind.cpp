@@ -26,7 +26,8 @@ int lastKnownBlueFlagCarrier = -1;
 #define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
 #define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
 
-struct Kill {
+class Kill {
+public:
 	int time;
 	int targetClientNum;
 	meansOfDeath_t mod;
@@ -37,6 +38,7 @@ struct Kill {
 	bool isVisible;
 	bool isFollowed;
 	float victimMaxSpeedPastSecond;
+	std::string hashSourceString;
 };
 
 struct SpreeInfo {
@@ -562,7 +564,7 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 }
 
 
-void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile) {
+void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb) {
 
 	if (spreeInfo->countKills > KILLSTREAK_MIN_KILLS) {
 		const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -571,6 +573,49 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<
 		std::string playername = Info_ValueForKey(playerInfo, "n");
 		//playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
 		//std::string victimname = Info_ValueForKey(playerInfo, "n");
+
+		std::stringstream victimsSS;
+		std::stringstream victimsNumsSS;
+		for (int i = 0; i < victims->size(); i++) {
+			const char* victimInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
+			victimsSS << (*victims)[i] << ": " << Info_ValueForKey(victimInfo, "n") << "\n";
+			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
+		}
+		std::string victimsString = victimsSS.str();
+		std::string victimsNumsString = victimsNumsSS.str();
+
+		//hashss << playername << "_" << victimname << "_" << attacker << "_" << target << "_" << isDoomKill << "_" << isSuicide << "_" << mod << "_" << mapname << "_" << thisEs->pos.trBase[0] << "_" << thisEs->pos.trBase[1] << "_" << thisEs->pos.trBase[2];
+		auto sha3_512 = picosha3::get_sha3_generator<224>();
+		std::string hash_hex_string = sha3_512.get_hex_string(allKillsHashString);
+		std::string shorthash = hash_hex_string.substr(0, 3);
+
+
+		int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(clientNumAttacker, spreeInfo->lastKillTime - spreeInfo->totalTime - 1000, spreeInfo->lastKillTime);
+		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
+
+
+		// Log the kill.
+		SQLBIND_TEXT(insertSpreeStatement, "@hash", hash_hex_string.c_str());
+		SQLBIND_TEXT(insertSpreeStatement, "@shorthash", shorthash.c_str());
+		SQLBIND_TEXT(insertSpreeStatement, "@map", mapname.c_str());
+		SQLBIND_TEXT(insertSpreeStatement, "@killerName", playername.c_str());
+		SQLBIND_TEXT(insertSpreeStatement, "@victimNames", victimsString.c_str());
+		SQLBIND(insertSpreeStatement, int, "@killerClientNum", clientNumAttacker);
+		SQLBIND_TEXT(insertSpreeStatement, "@victimClientNums", victimsNumsString.c_str());
+		SQLBIND(insertSpreeStatement, int, "@countKills", spreeInfo->countKills);
+		SQLBIND(insertSpreeStatement, int, "@countRets", spreeInfo->countRets);
+		SQLBIND(insertSpreeStatement, int, "@countDooms", spreeInfo->countDooms);
+		SQLBIND(insertSpreeStatement, int, "@countExplosions", spreeInfo->countExplosions);
+		SQLBIND(insertSpreeStatement, int, "@countThirdPersons", spreeInfo->countThirdPersons);
+		SQLBIND(insertSpreeStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+		SQLBIND(insertSpreeStatement, int, "@maxSpeedAttacker", maxSpeedAttacker);
+		SQLBIND(insertSpreeStatement, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
+
+		int queryResult = sqlite3_step(insertSpreeStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting killing spree into database: " << sqlite3_errmsg(killDb) << "\n";
+		}
+		sqlite3_reset(insertSpreeStatement);
 
 
 		int startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
@@ -583,15 +628,13 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<
 		}
 
 
-		int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(clientNumAttacker, spreeInfo->lastKillTime - spreeInfo->totalTime - 1000, spreeInfo->lastKillTime);
-		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
 
 		std::stringstream ss;
 		ss << mapname << std::setfill('0') << "___KILLSPREE" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << "___" << playername << "__";
 		for (int i = 0; i < victims->size(); i++) {
 			ss << "_" << (*victims)[i];
 		}
-		ss << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
+		ss << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "") << "_" << shorthash;
 
 		std::string targetFilename = ss.str();
 		char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -667,6 +710,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);
+	sqlite3_exec(killDb, "CREATE TABLE killSprees ("
+		"hash	TEXT,"
+		"shorthash	TEXT,"
+		"killerName	TEXT NOT NULL,"
+		"victimNames	TEXT NOT NULL,"
+		"killerClientNum	INTEGER NOT NULL,"
+		"victimClientNums	TEXT NOT NULL,"
+		"countKills	INTEGER NOT NULL,"
+		"countRets	INTEGER NOT NULL,"
+		"countDooms	INTEGER NOT NULL,"
+		"countExplosions	INTEGER NOT NULL,"
+		"countThirdPersons	INTEGER NOT NULL,"
+		"demoRecorderClientnum	INTEGER NOT NULL,"
+		"maxSpeedAttacker	REAL,"
+		"maxSpeedTargets	REAL,"
+		"PRIMARY KEY(hash)"
+		"); ",
+		NULL,NULL,NULL);
 	char* preparedStatementText = "INSERT INTO kills"
 		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, isVisible,"
 		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
@@ -677,6 +738,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"@positionY, @positionZ, @serverTime, @demoDateTime);";
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertStatement,NULL);
+	preparedStatementText = "INSERT INTO killSprees "
+		"( hash, shorthash, killerName, victimNames , killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
+		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets)"
+		" VALUES "
+		"( @hash, @shorthash, @killerName, @victimNames , @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
+		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets)";
+	sqlite3_stmt* insertSpreeStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
 
 
 	//mvprotocol_t	protocol;
@@ -897,7 +966,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.isFollowed = attackerIsFollowed;
 							thisKill.victimMaxSpeedPastSecond = maxSpeedTargetFloat;
 
-							kills[attacker].push_back(thisKill);
 
 							// This is the place that had all the continues originally.
 							
@@ -1054,6 +1122,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::string hash_hex_string = sha3_512.get_hex_string(hashss.str());
 							std::string shorthash = hash_hex_string.substr(0,3);
 
+							// Ok now with knowing the hash stuff, save into kills list
+							thisKill.hashSourceString = hashss.str();
+							kills[attacker].push_back(thisKill);
+
+
 							std::stringstream logModStringSS;
 							logModStringSS << (victimIsFlagCarrier ? "RET" : "MOD") << modInfo.str();
 							std::string logModString = logModStringSS.str();
@@ -1129,6 +1202,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SpreeInfo spreeInfo;
 					Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
 					std::vector<int> victims;
+					std::stringstream allKillsHashSS;
 
 					if ((clientIt->second.back().time + KILLSTREAK_MAX_INTERVAL) >= demoCurrentTime) continue; // Might still have an unfinished one here!
 
@@ -1149,18 +1223,20 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							spreeInfo.countKills++;
 							spreeInfo.lastKillTime = thisKill->time;
 							spreeInfo.maxVictimSpeed = std::max(spreeInfo.maxVictimSpeed,thisKill->victimMaxSpeedPastSecond);
+							allKillsHashSS << thisKill->hashSourceString;
 						}
 						else {
 							// This kill is not part of a killspree. Reset.
 							// But first, check if this concludes an existing killspree that we can now save.
-							CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims,demoCurrentTime,&outputBatHandle,bufferTime,lastGameStateChangeInDemoTime,sourceDemoFile);
+							CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, allKillsHashSS.str(),demoCurrentTime,&outputBatHandle,bufferTime,lastGameStateChangeInDemoTime,sourceDemoFile, insertSpreeStatement, killDb);
 
 							// Reset.
 							Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
 							victims.clear();
+							allKillsHashSS.str(std::string());
 						}
 					}
-					CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile);
+					CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, allKillsHashSS.str(), demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement,killDb);
 				}
 
 
@@ -1385,6 +1461,7 @@ cuterror:
 	}*/
 
 
+	sqlite3_finalize(insertSpreeStatement);
 	sqlite3_finalize(insertStatement);
 	sqlite3_close(killDb);
 
