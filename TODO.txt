@@ -13,7 +13,18 @@ Clean up older SnapshotInfos (that are just too old to be useful, like 30+ sec?)
 Make demos identifiable so I can avoid re-cutting them
 should we properly map event entities too?
 solve CROUCH when info comes from entities.
+Remember or even interpolate Health/Armor when getting info from entity state? Maybe even ... infer health and such from hit info?
+
 weapon select wheel when switching between entity and playerstate
+I think this is reason for weapon select issue maybe:
+if ( ps->persistant[PERS_SPAWN_COUNT] != ops->persistant[PERS_SPAWN_COUNT] ) {
+		CG_Respawn();
+	}
+Maybe always remember last known full playerstate and copy some stuff from it...
+Do a demo merger. combines multiple demos of same game...
+
+
+
 
 DONE: 
 

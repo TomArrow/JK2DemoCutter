@@ -1,5 +1,11 @@
 #include "demoCut.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include "fileapi.h"
+#include "Handleapi.h"
+#endif
+
 // TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -664,7 +670,7 @@ cutcomplete:
 cuterror:
 	//remove previosly converted demo from the same cut
 	if (newHandle) {
-		memset(newName, 0, sizeof(newName));
+		/*memset(newName, 0, sizeof(newName));
 		if (demo.currentNum > 0) {
 			Com_sprintf(newName, sizeof(newName), "mmedemos/%s.%d_cut.mme", oldName, demo.currentNum);
 		}
@@ -672,10 +678,33 @@ cuterror:
 			Com_sprintf(newName, sizeof(newName), "mmedemos/%s_cut.mme", oldName);
 		}
 		if (FS_FileExists(newName))
-			FS_FileErase(newName);
+			FS_FileErase(newName);*/
 	}
 	FS_FCloseFile(oldHandle);
 	FS_FCloseFile(newHandle);
+
+#ifdef _WIN32
+	// On Windows we now change the Date modified to that of the original file.
+	// TODO Implement for other OSes?
+	wchar_t newNameWide[MAX_OSPATH];
+	wchar_t oldNameWide[MAX_OSPATH];
+	mbstowcs(newNameWide,newName,MAX_OSPATH);
+	mbstowcs(oldNameWide, va("%s%s", oldName, ext),MAX_OSPATH);
+	HANDLE hFile = CreateFile(newNameWide, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hFileOld = CreateFile(oldNameWide, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile != INVALID_HANDLE_VALUE && hFileOld != INVALID_HANDLE_VALUE) // INVALID_FILE_HANDLE / INVALID_HANDLE_VALUE ? 
+	{
+		FILETIME filetime;
+		//SYSTEMTIME systemfile;
+
+		//GetSystemTime(&systemfile);
+		//SystemTimeToFileTime(&systemfile, &filetime);
+		GetFileTime(hFileOld, NULL, NULL, &filetime);
+		SetFileTime(hFile, NULL, NULL, &filetime);
+		CloseHandle(hFileOld);
+		CloseHandle(hFile);
+	}
+#endif
 	return ret;
 }
 
