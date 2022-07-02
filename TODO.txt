@@ -24,6 +24,7 @@ Maybe always remember last known full playerstate and copy some stuff from it...
 Do a demo merger. combines multiple demos of same game...
 MAYBE: detect unintentional kills? where killer wasnt looking at victim? kinda pointless tho due to bs/dbs
 Maybe write server name/subtext into thing as well. Thing I mean... database.
+TODO: Make it overwrite kills in the database if the ones in database are third person and the new one is first person
 
 
 

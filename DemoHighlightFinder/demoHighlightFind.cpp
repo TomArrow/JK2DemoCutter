@@ -711,6 +711,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"isExplosion	BOOLEAN NOT NULL,"
 		"isSuicide	BOOLEAN NOT NULL,"
 		"isVisible	BOOLEAN NOT NULL,"
+		"attackerIsVisible	BOOLEAN NOT NULL,"
 		"isFollowed	BOOLEAN NOT NULL,"
 		"meansOfDeath	INTEGER NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
@@ -750,11 +751,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		NULL,NULL,NULL);
 	
 	char* preparedStatementText = "INSERT INTO kills"
-		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, isVisible,"
+		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, isVisible,attackerIsVisible,"
 		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
 		"positionY, positionZ,demoName,demoTime, serverTime, demoDateTime)"
 		"VALUES "
-		"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @isVisible,"
+		"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @isVisible,@attackerIsVisible,"
 		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 		"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";
 	sqlite3_stmt* insertStatement;
@@ -945,6 +946,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							bool			isDoomKill;
 							bool			isWorldKill = false;
 							bool			isVisible = false;
+							bool			attackerIsVisibleOrFollowed = false;
+							bool			attackerIsVisible = false;
 							if (target < 0 || target >= MAX_CLIENTS) {
 								std::cout << "CG_Obituary: target out of range. This should never happen really.";
 							}
@@ -962,11 +965,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									victimIsFlagCarrier = true;
 								}*/
 							}
+							entityState_t* attackerEntity = findEntity(attacker);
+							if (attacker) {
+								attackerIsVisible = true;
+							}
 							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
 
 							isSuicide = target == attacker;
 							isDoomKill = mod == MOD_FALLING;
 							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
+							attackerIsVisibleOrFollowed = attackerIsFollowed || attackerIsVisible;
+
+							//isVisible = isVisible && attackerIsVisibleOrFollowed; // Make sure both attacker and victim are visible. Some servers send info
 
 							float maxSpeedTargetFloat = getMaxSpeedForClientinTimeFrame(target, demoCurrentTime - 1000, demoCurrentTime);
 							int maxSpeedTarget = maxSpeedTargetFloat;
@@ -995,7 +1005,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							// This is the place that had all the continues originally.
 							
-							entityState_t* attackerEntity = findEntity(attacker);
+							//entityState_t* attackerEntity = findEntity(attacker);
 
 							// Find extra info for means of death.
 							std::stringstream modInfo;
@@ -1171,6 +1181,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertStatement, int, "@isExplosion", thisKill.isExplosion);
 							SQLBIND(insertStatement, int, "@isSuicide", isSuicide);
 							SQLBIND(insertStatement, int, "@isVisible", isVisible);
+							SQLBIND(insertStatement, int, "@attackerIsVisible", attackerIsVisible);
 							SQLBIND(insertStatement, int, "@isFollowed", attackerIsFollowed);
 							SQLBIND(insertStatement, int, "@meansOfDeath", mod);
 							SQLBIND(insertStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
@@ -1198,6 +1209,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
 							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
 							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
+							if (!attackerIsVisibleOrFollowed) continue; // Attacker isn't visible at all. Meh. Leave it.
 
 
 							std::stringstream ss;
