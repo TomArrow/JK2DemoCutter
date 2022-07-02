@@ -734,6 +734,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);
+	
 	char* preparedStatementText = "INSERT INTO kills"
 		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, isVisible,"
 		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
@@ -752,6 +753,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoTime)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
+
+	sqlite3_exec(killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
 
 	//mvprotocol_t	protocol;
@@ -1471,13 +1474,15 @@ cuterror:
 			FS_FileErase(newName);
 	}*/
 
-
+	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
 	sqlite3_finalize(insertSpreeStatement);
 	sqlite3_finalize(insertStatement);
 	sqlite3_close(killDb);
 
 	FS_FCloseFile(oldHandle);
 	//FS_FCloseFile(newHandle);
+
+	std::cout << "done.";
 
 
  	return ret;
@@ -1537,7 +1542,7 @@ int main(int argc, char** argv) {
 	}
 
 	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat", searchMode)) {
-		Com_Printf("Highlights successfully found.\n", demoName);
+		Com_Printf("Highlights in %s successfully found.\n", demoName);
 	}
 	else {
 		Com_Printf("Finding highlights in demo %s has resulted in errors\n", demoName);
