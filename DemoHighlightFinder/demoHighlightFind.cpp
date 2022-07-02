@@ -27,6 +27,7 @@ struct Kill {
 	bool isExplosion;
 	bool isVisible;
 	bool isFollowed;
+	float victimMaxSpeedPastSecond;
 };
 
 struct SpreeInfo {
@@ -37,6 +38,7 @@ struct SpreeInfo {
 	int countDooms = 0;
 	int countExplosions = 0;
 	int countThirdPersons = 0; // Not followed ones.
+	float maxVictimSpeed;
 };
 
 // For detecting killstreaks
@@ -540,6 +542,17 @@ entityState_t* findEntity(int number) {
 }
 
 
+float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
+	float maxSpeed = 0.0f;
+	for (auto it = speeds[clientNum].begin(); it != speeds[clientNum].end(); it++) {
+		if (it->first >= fromTime && it->first <= toTime && it->second > maxSpeed) {
+			maxSpeed = it->second;
+		}
+	}
+	return maxSpeed;
+}
+
+
 void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile) {
 
 	if (spreeInfo->countKills > KILLSTREAK_MIN_KILLS) {
@@ -561,12 +574,15 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<
 		}
 
 
+		int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(clientNumAttacker, spreeInfo->lastKillTime - spreeInfo->totalTime - 1000, spreeInfo->lastKillTime);
+		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
+
 		std::stringstream ss;
 		ss << mapname << std::setfill('0') << "___KILLSPREE" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << "___" << playername << "__";
 		for (int i = 0; i < victims->size(); i++) {
 			ss << "_" << (*victims)[i];
 		}
-		ss << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
+		ss << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
 
 		std::string targetFilename = ss.str();
 		char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -583,7 +599,6 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<
 	}
 
 }
-
 
 qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
@@ -748,6 +763,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 
 
+				// Record speeds.
+				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
+
+					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS && !(thisEs->eFlags & EF_DEAD)) { // Don't count speeds of dead bodies. They get boosts from dying.
+						speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
+					}
+					if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
+						speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
+					}
+				}
+
 				// Fire events
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
@@ -789,6 +816,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							isDoomKill = mod == MOD_FALLING;
 							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
 
+							float maxSpeedTargetFloat = getMaxSpeedForClientinTimeFrame(target, demoCurrentTime - 1000, demoCurrentTime);
+							int maxSpeedTarget = maxSpeedTargetFloat;
 							Kill thisKill;
 							thisKill.isRet = victimIsFlagCarrier;
 							thisKill.isSuicide = isSuicide;
@@ -809,6 +838,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.time = demoCurrentTime;
 							thisKill.isVisible = isVisible;
 							thisKill.isFollowed = attackerIsFollowed;
+							thisKill.victimMaxSpeedPastSecond = maxSpeedTargetFloat;
 
 							kills[attacker].push_back(thisKill);
 
@@ -962,9 +992,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								isTruncated = true;
 							}
 
+							int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
+							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -974,7 +1005,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
 							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
-							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
+							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
 						}
 					}
@@ -1012,6 +1043,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							spreeInfo.totalTime += spreeInfo.countKills == 0? 0: (thisKill->time - spreeInfo.lastKillTime);
 							spreeInfo.countKills++;
 							spreeInfo.lastKillTime = thisKill->time;
+							spreeInfo.maxVictimSpeed = std::max(spreeInfo.maxVictimSpeed,thisKill->victimMaxSpeedPastSecond);
 						}
 						else {
 							// This kill is not part of a killspree. Reset.

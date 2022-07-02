@@ -221,6 +221,7 @@ typedef enum {
   (r)[2]=(s)[2]+(f)*((e)[2]-(s)[2])) 
 
 
+
 #define VectorClear(a)			((a)[0]=(a)[1]=(a)[2]=0)
 #define VectorNegate(a,b)		((b)[0]=-(a)[0],(b)[1]=-(a)[1],(b)[2]=-(a)[2])
 #define VectorSet(v, x, y, z)	((v)[0]=(x), (v)[1]=(y), (v)[2]=(z))
@@ -243,6 +244,9 @@ typedef vec_t vec2_t[2];
 typedef vec_t vec3_t[3];
 typedef vec_t vec4_t[4];
 typedef vec_t vec5_t[5];
+
+
+vec_t VectorLength(const vec3_t v);
 
 
 typedef enum {

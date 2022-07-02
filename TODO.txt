@@ -22,6 +22,7 @@ if ( ps->persistant[PERS_SPAWN_COUNT] != ops->persistant[PERS_SPAWN_COUNT] ) {
 	}
 Maybe always remember last known full playerstate and copy some stuff from it...
 Do a demo merger. combines multiple demos of same game...
+MAYBE: detect unintentional kills? where killer wasnt looking at victim? kinda pointless tho due to bs/dbs
 
 
 

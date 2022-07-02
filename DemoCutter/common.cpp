@@ -12,6 +12,12 @@ static	char		cmd_tokenized[BIG_INFO_STRING + MAX_STRING_TOKENS];	// will have 0 
 
 
 
+vec_t VectorLength(const vec3_t v) {
+	return (vec_t)sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+
+
 
 int		Cmd_Argc(void) {
 	return cmd_argc;
