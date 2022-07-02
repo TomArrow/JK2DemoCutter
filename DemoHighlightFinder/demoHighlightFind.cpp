@@ -579,7 +579,7 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 
 void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename) {
 
-	if (spreeInfo->countKills > KILLSTREAK_MIN_KILLS) {
+	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
 		const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 		std::string mapname = Info_ValueForKey(info, "mapname");
 		const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNumAttacker];
@@ -732,6 +732,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_exec(killDb, "CREATE TABLE killSprees ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
+		"map	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
 		"victimNames	TEXT NOT NULL,"
 		"killerClientNum	INTEGER NOT NULL,"
@@ -761,10 +762,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
-		"( hash, shorthash, killerName, victimNames , killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
+		"( hash, shorthash, map,killerName, victimNames , killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoTime)"
 		" VALUES "
-		"( @hash, @shorthash, @killerName, @victimNames , @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
+		"( @hash, @shorthash, @map, @killerName, @victimNames , @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoTime)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
