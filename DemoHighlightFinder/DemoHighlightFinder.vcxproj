@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h" />
+    <ClInclude Include="..\shared\include\picosha3.h" />
     <ClInclude Include="..\shared\sqlite\sqlite3.h" />
     <ClInclude Include="include\jpcre2.hpp" />
     <ClInclude Include="include\pcre2.h" />

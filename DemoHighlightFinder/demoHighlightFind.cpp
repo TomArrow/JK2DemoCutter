@@ -9,6 +9,9 @@
 #include <filesystem>
 #include "sqlite3.h"
 
+#include <iso646.h>
+#include "picosha3.h"
+
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
 jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
@@ -660,7 +663,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"positionY	REAL,"
 		"positionZ	REAL,"
 		"serverTime INTEGER NOT NULL,"
-		"demoDateTime DATETIME NOT NULL,"
+		"demoDateTime TIMESTAMP NOT NULL,"
 		"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);
@@ -1044,9 +1047,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int maxSpeedAttacker = maxSpeedAttackerFloat;
 
 
+							// Create hash.
+							std::stringstream hashss;
+							hashss << playername << "_" << victimname << "_" << attacker << "_" << target << "_" << isDoomKill << "_" << isSuicide << "_" << mod << "_" << mapname << "_" << thisEs->pos.trBase[0] << "_" << thisEs->pos.trBase[1] << "_" << thisEs->pos.trBase[2];
+							auto sha3_512 = picosha3::get_sha3_generator<224>();
+							std::string hash_hex_string = sha3_512.get_hex_string(hashss.str());
+							std::string shorthash = hash_hex_string.substr(0,3);
+
+							std::stringstream logModStringSS;
+							logModStringSS << (victimIsFlagCarrier ? "RET" : "MOD") << modInfo.str();
+							std::string logModString = logModStringSS.str();
+							const char* modString = logModString.c_str();
+
 							// Log the kill.
-							SQLBIND_TEXT(insertStatement, "@hash", "testhash");
-							SQLBIND_TEXT(insertStatement, "@shorthash", "testhash");
+							SQLBIND_TEXT(insertStatement, "@hash", hash_hex_string.c_str());
+							SQLBIND_TEXT(insertStatement, "@shorthash", shorthash.c_str());
 							SQLBIND_TEXT(insertStatement, "@map", mapname.c_str());
 							SQLBIND_TEXT(insertStatement, "@killerName", playername.c_str());
 							SQLBIND_TEXT(insertStatement, "@victimName", victimname.c_str());
@@ -1060,9 +1075,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertStatement, int, "@isFollowed", attackerIsFollowed);
 							SQLBIND(insertStatement, int, "@meansOfDeath", mod);
 							SQLBIND(insertStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-							SQLBIND(insertStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat);
-							SQLBIND(insertStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat);
-							SQLBIND_TEXT(insertStatement, "@meansOfDeathString", modInfo.str().c_str());
+							SQLBIND(insertStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >=0 ? maxSpeedAttackerFloat : NULL);
+							SQLBIND(insertStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
+							SQLBIND_TEXT(insertStatement, "@meansOfDeathString", modString);
 							SQLBIND(insertStatement, int, "@probableKillingWeapon", probableKillingWeapon);
 							SQLBIND(insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
 							SQLBIND(insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
@@ -1085,7 +1100,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
+							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "")<<"_"<<shorthash;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
