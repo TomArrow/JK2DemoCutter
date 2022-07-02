@@ -17,6 +17,46 @@ std::map<int,int> lastEvent;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 
+struct Kill {
+	int time;
+	int targetClientNum;
+	meansOfDeath_t mod;
+	bool isSuicide;
+	bool isRet;
+	bool isDoom;
+	bool isExplosion;
+	bool isVisible;
+	bool isFollowed;
+};
+
+struct SpreeInfo {
+	int totalTime;
+	int lastKillTime;
+	int countKills = 0;
+	int countRets = 0;
+	int countDooms = 0;
+	int countExplosions = 0;
+	int countThirdPersons = 0; // Not followed ones.
+};
+
+// For detecting killstreaks
+// Killer is the key, kill info is the value
+std::map<int, std::vector<Kill>> kills;
+std::map<int, int> lastKillStreak;
+
+#define KILLSTREAK_MIN_KILLS 3
+#define KILLSTREAK_MAX_INTERVAL 3000
+
+
+
+// For calculating top/average speed of past second.
+// Top level key is clientNum
+// Lower level key is time
+// Value is speed.
+std::map<int, std::map<int, float>> speeds;
+// TODO For future? Have angle saved too. See at what angle the kill comes. Big angle between capper and chaser at high speed is more impressive?
+
+
 enum highlightSearchMode_t {
 	SEARCH_ALL,
 	SEARCH_INTERESTING,
@@ -500,6 +540,51 @@ entityState_t* findEntity(int number) {
 }
 
 
+void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile) {
+
+	if (spreeInfo->countKills > KILLSTREAK_MIN_KILLS) {
+		const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+		std::string mapname = Info_ValueForKey(info, "mapname");
+		const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNumAttacker];
+		std::string playername = Info_ValueForKey(playerInfo, "n");
+		//playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
+		//std::string victimname = Info_ValueForKey(playerInfo, "n");
+
+
+		int startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
+		int endTime = spreeInfo->lastKillTime + bufferTime;
+		int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+		bool isTruncated = false;
+		if (earliestPossibleStart > startTime) {
+			startTime = earliestPossibleStart;
+			isTruncated = true;
+		}
+
+
+		std::stringstream ss;
+		ss << mapname << std::setfill('0') << "___KILLSPREE" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << "___" << playername << "__";
+		for (int i = 0; i < victims->size(); i++) {
+			ss << "_" << (*victims)[i];
+		}
+		ss << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");;
+
+		std::string targetFilename = ss.str();
+		char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+		sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+
+
+		(*outputBatHandle) << "\nrem demoCurrentTime: " << demoCurrentTime;
+		(*outputBatHandle) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+		delete[] targetFilenameFiltered;
+		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
+		std::cout << ss.str() << "\n";
+
+		lastKillStreak[clientNumAttacker] = spreeInfo->lastKillTime;
+	}
+
+}
+
+
 qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
@@ -701,14 +786,37 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
 
 							isSuicide = target == attacker;
-							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
-							
 							isDoomKill = mod == MOD_FALLING;
+							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
+
+							Kill thisKill;
+							thisKill.isRet = victimIsFlagCarrier;
+							thisKill.isSuicide = isSuicide;
+							thisKill.isDoom = isDoomKill;
+							thisKill.isExplosion = (mod == MOD_FLECHETTE ||
+								mod == MOD_FLECHETTE_ALT_SPLASH ||
+								mod == MOD_ROCKET ||
+								mod == MOD_ROCKET_SPLASH ||
+								mod == MOD_ROCKET_HOMING ||
+								mod == MOD_ROCKET_HOMING_SPLASH ||
+								mod == MOD_THERMAL ||
+								mod == MOD_THERMAL_SPLASH ||
+								mod == MOD_TRIP_MINE_SPLASH ||
+								mod == MOD_TIMED_MINE_SPLASH ||
+								mod == MOD_DET_PACK_SPLASH);
+							thisKill.mod = (meansOfDeath_t)mod;
+							thisKill.targetClientNum = target;
+							thisKill.time = demoCurrentTime;
+							thisKill.isVisible = isVisible;
+							thisKill.isFollowed = attackerIsFollowed;
+
+							kills[attacker].push_back(thisKill);
+
+							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
 							
 							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
 							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
 
-							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
 
 							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
 							
@@ -870,6 +978,52 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 						}
 					}
+				}
+
+
+				// Check for killstreaks.
+				// Anything happening within KILLSTREAK_MAX_INTERVAL milliseconds of last kill counts towards it.
+				// Baseline here is 3 seconds, since that is the limit for kill messages to be displayed as one in stacked kill messages.
+				// TODO Also count stuff that maybe isn't within 3 secs but pretty darn close?
+				// KILLSTREAK_MIN_KILLS 3
+				// KILLSTREAK_MAX_INTERVAL 3000
+				// TODO Let it count chains of killstreaks. If there's already a valid killstreak, let there be a single longer gap there.
+				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
+					int clientNumAttacker = clientIt->first;
+					SpreeInfo spreeInfo;
+					Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
+					std::vector<int> victims;
+
+					if ((clientIt->second.back().time + KILLSTREAK_MAX_INTERVAL) >= demoCurrentTime) continue; // Might still have an unfinished one here!
+
+					for (int i = 0; i < clientIt->second.size(); i++) {
+						Kill* thisKill = &clientIt->second[i];
+						if (thisKill->time <= lastKillStreak[clientNumAttacker]) continue; // This one's already been registered.
+						if (thisKill->isSuicide || !thisKill->isVisible) continue; // Uninteresting.
+
+						// Starting or continuing kill spree?
+						if (spreeInfo.countKills == 0 || thisKill->time <= (spreeInfo.lastKillTime + KILLSTREAK_MAX_INTERVAL)) {
+							
+							victims.push_back(thisKill->targetClientNum);
+							if (thisKill->isDoom) spreeInfo.countDooms++;
+							if (thisKill->isRet) spreeInfo.countRets++;
+							if (thisKill->isExplosion) spreeInfo.countExplosions++;
+							if (!thisKill->isFollowed) spreeInfo.countThirdPersons++;
+							spreeInfo.totalTime += spreeInfo.countKills == 0? 0: (thisKill->time - spreeInfo.lastKillTime);
+							spreeInfo.countKills++;
+							spreeInfo.lastKillTime = thisKill->time;
+						}
+						else {
+							// This kill is not part of a killspree. Reset.
+							// But first, check if this concludes an existing killspree that we can now save.
+							CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims,demoCurrentTime,&outputBatHandle,bufferTime,lastGameStateChangeInDemoTime,sourceDemoFile);
+
+							// Reset.
+							Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
+							victims.clear();
+						}
+					}
+					CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile);
 				}
 
 
