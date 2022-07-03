@@ -713,7 +713,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	}
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], s, sizeof(clcCut->serverCommands[index]));
+	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
 #ifdef RELDEBUG
 //#pragma optimize("", off)
@@ -731,6 +731,7 @@ public:
 
 int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 	const char* tmpConfigString;
+	int tmpConfigStringMaxLength;
 	int clientNumHere = -1;
 	if (thisPlayer->size() <= 2 && isdigit((*thisPlayer)[0]) && isdigit((*thisPlayer)[1])) {
 		// It's a number. ClientNum. Just parse it.
@@ -745,8 +746,8 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 
 		// Find matching player name
 		for (int c = 0; c < MAX_CLIENTS; c++) {
-			tmpConfigString = reader->GetPlayerConfigString(c);
-			std::string nameHere = Info_ValueForKey(tmpConfigString, "n");
+			tmpConfigString = reader->GetPlayerConfigString(c,&tmpConfigStringMaxLength);
+			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
 			std::string nameHereLower = nameHere;
 			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
 
@@ -846,11 +847,12 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
 
 	const char* tmpConfigString;
+	int tmpConfigStringMaxLength;
 	// Copy over configstrings from first demo.
 	// Later maybe we can do something more refined and clever.
 	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
 		if (i >= CS_PLAYERS && i < (CS_PLAYERS + MAX_CLIENTS)) continue; // Player stuff will be copied manually.
-		tmpConfigString = demoReaders[0].reader.GetConfigString(i);
+		tmpConfigString = demoReaders[0].reader.GetConfigString(i, &tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
 		}
@@ -874,7 +876,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				if (clientNumHere != -1) {
 					demoReaders[i].playersToCopy.push_back(clientNumHere);
 					int targetClientNum = slotManager.getPlayerSlot(i,clientNumHere);
-					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere);
+					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere,&tmpConfigStringMaxLength);
 
 					if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
 						//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
@@ -894,7 +896,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	char infoCopy[MAX_INFO_STRING];
 	infoCopy[0] = 0;
 	strcpy_s(infoCopy, MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
-	Info_SetValueForKey_Big(infoCopy, "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
+	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy);
 
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially created using JK2DemoCutter tools.");
@@ -904,7 +906,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	// Create unique output file.
 	int dupeIterator = 2;
-	Com_sprintf(newName, sizeof(newName), "%s%s", outputNameNoExt, ext);
+	Com_sprintf(newName, sizeof(newName),  "%s%s", outputNameNoExt, ext);
 	while (FS_FileExists(newName)) {
 		Com_sprintf(newName, sizeof(newName), "%s(%d)%s", outputNameNoExt, dupeIterator, ext);
 		dupeIterator++;

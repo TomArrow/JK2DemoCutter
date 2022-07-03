@@ -29,7 +29,7 @@ char* Cmd_Argv(int arg) {
 	return cmd_argv[arg];
 }
 
-void Q_strncpyz(char* dest, const char* src, int destsize) {
+void Q_strncpyz(char* dest, int destCapacity, const char* src, int destsize) {
 	// bk001129 - also NULL dest
 	if (!dest) {
 		Com_Error(ERR_FATAL, "Q_strncpyz: NULL dest");
@@ -41,7 +41,8 @@ void Q_strncpyz(char* dest, const char* src, int destsize) {
 		Com_Error(ERR_FATAL, "Q_strncpyz: destsize < 1");
 	}
 
-	strncpy(dest, src, destsize - 1);
+	//strncpy(dest, src, destsize - 1);
+	strncpy_s(dest,destCapacity, src, destsize - 1);
 	dest[destsize - 1] = 0;
 }
 
@@ -50,7 +51,8 @@ void QDECL Com_Printf(const char* fmt, ...) {
 	char		msg[MAXPRINTMSG];
 
 	va_start(argptr, fmt);
-	vsprintf(msg, fmt, argptr);
+	//vsprintf(msg, fmt, argptr);
+	vsprintf_s(msg,sizeof(msg), fmt, argptr);
 	va_end(argptr);
 
 	std::cout << msg;
@@ -61,7 +63,8 @@ void QDECL Com_DPrintf(const char* fmt, ...) {
 	char		msg[MAXPRINTMSG];
 
 	va_start(argptr, fmt);
-	vsprintf(msg, fmt, argptr);
+	//vsprintf(msg, fmt, argptr);
+	vsprintf_s(msg,sizeof(msg), fmt, argptr);
 	va_end(argptr);
 
 	std::cout << msg;
@@ -72,7 +75,8 @@ void QDECL Com_Error(int ignore, const char* fmt, ...) {
 	char		msg[MAXPRINTMSG];
 
 	va_start(argptr, fmt);
-	vsprintf(msg, fmt, argptr);
+	//vsprintf(msg, fmt, argptr);
+	vsprintf_s(msg,sizeof(msg), fmt, argptr);
 	va_end(argptr);
 
 	std::cout << msg;
@@ -85,9 +89,11 @@ char* Cmd_ArgsFrom(int arg) {
 	if (arg < 0)
 		arg = 0;
 	for (i = arg; i < cmd_argc; i++) {
-		strcat(cmd_args, cmd_argv[i]);
+		//strcat(cmd_args, cmd_argv[i]);
+		strcat_s(cmd_args,sizeof(cmd_args), cmd_argv[i]);
 		if (i != cmd_argc - 1) {
-			strcat(cmd_args, " ");
+			//strcat(cmd_args, " ");
+			strcat_s(cmd_args,sizeof(cmd_args), " ");
 		}
 	}
 
@@ -106,9 +112,10 @@ void Com_Memset(void* dest, const int val, const size_t count)
 
 
 
-int Q_vsnprintf(char* str, size_t size, const char* format, va_list ap) {
+int Q_vsnprintf(char* str,int capacity, size_t size, const char* format, va_list ap) {
 	int retval;
-	retval = _vsnprintf(str, size, format, ap);
+	//retval = _vsnprintf(str, size, format, ap);
+	retval = _vsnprintf_s(str,capacity, size, format, ap);
 	if (retval < 0 || retval == size) {
 		// Microsoft doesn't adhere to the C99 standard of vsnprintf,
 		// which states that the return value must be the number of
@@ -121,12 +128,12 @@ int Q_vsnprintf(char* str, size_t size, const char* format, va_list ap) {
 	}
 	return retval;
 }
-void QDECL Com_sprintf(char* dest, int size, const char* fmt, ...) {
+void QDECL Com_sprintf(char* dest,int size, const char* fmt, ...) {
 	int		len;
 	va_list		argptr;
 
 	va_start(argptr, fmt);
-	len = Q_vsnprintf(dest, size, fmt, argptr);
+	len = Q_vsnprintf(dest,size, size, fmt, argptr);
 	va_end(argptr);
 	if (len >= size) {
 		Com_Printf("Com_sprintf: overflow of %i in %i\n", len, size);
@@ -240,9 +247,10 @@ void Cmd_TokenizeString(const char* text_in) {
 
 }
 
+#define VABUFFERSIZE 32000
 char* QDECL va(const char* format, ...) {
 	va_list		argptr;
-	static char		string[2][32000];	// in case va is called by nested functions
+	static char		string[2][VABUFFERSIZE];	// in case va is called by nested functions
 	static int		index = 0;
 	char* buf;
 
@@ -250,7 +258,8 @@ char* QDECL va(const char* format, ...) {
 	index++;
 
 	va_start(argptr, format);
-	vsprintf(buf, format, argptr);
+	//vsprintf(buf, format, argptr);
+	vsprintf_s(buf, VABUFFERSIZE, format, argptr);
 	va_end(argptr);
 
 	return buf;
@@ -414,7 +423,7 @@ key and returns the associated value, or an empty string.
 FIXME: overflow check?
 ===============
 */
-char* Info_ValueForKey(const char* s, const char* key) {
+char* Info_ValueForKey(const char* s,int maxLength, const char* key) {
 	char	pkey[BIG_INFO_KEY];
 	static	char value[2][BIG_INFO_VALUE];	// use two buffers so compares
 											// work without stomping on each other
@@ -425,7 +434,8 @@ char* Info_ValueForKey(const char* s, const char* key) {
 		return "";
 	}
 
-	if (strlen(s) >= BIG_INFO_STRING) {
+	//if (strlen(s) >= BIG_INFO_STRING) {
+	if (strnlen_s(s,maxLength) >= BIG_INFO_STRING) {
 		Com_Error(ERR_DROP, "Info_ValueForKey: oversize infostring");
 	}
 
@@ -468,7 +478,7 @@ Info_SetValueForKey
 Changes or adds a key/value pair
 ==================
 */
-qboolean Info_SetValueForKey(char* s, const char* key, const char* value) {
+qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* value) {
 	char	newi[MAX_INFO_STRING];
 
 	if (strlen(s) >= MAX_INFO_STRING) {
@@ -495,7 +505,7 @@ qboolean Info_SetValueForKey(char* s, const char* key, const char* value) {
 	if (!strlen(value))
 		return qfalse;
 
-	Com_sprintf(newi, sizeof(newi), "\\%s\\%s", key, value);
+	Com_sprintf(newi, sizeof(newi),  "\\%s\\%s", key, value);
 
 	// q3infoboom exploit
 	if (strlen(newi) + strlen(s) >= MAX_INFO_STRING) {
@@ -503,8 +513,10 @@ qboolean Info_SetValueForKey(char* s, const char* key, const char* value) {
 		return qfalse;
 	}
 
-	strcat(newi, s);
-	strcpy(s, newi);
+	//strcat(newi, s);
+	strcat_s(newi,sizeof(newi), s);
+	//strcpy(s, newi);
+	strcpy_s(s,capacity, newi);
 	return qtrue;
 }
 
@@ -515,7 +527,7 @@ Info_SetValueForKey_Big
 Changes or adds a key/value pair
 ==================
 */
-void Info_SetValueForKey_Big(char* s, const char* key, const char* value) {
+void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char* value) {
 	char	newi[BIG_INFO_STRING];
 
 	if (strlen(s) >= BIG_INFO_STRING) {
@@ -550,7 +562,8 @@ void Info_SetValueForKey_Big(char* s, const char* key, const char* value) {
 		return;
 	}
 
-	strcat(s, newi);
+	//strcat(s, newi);
+	strcat_s(s, capacity, newi);
 }
 
 

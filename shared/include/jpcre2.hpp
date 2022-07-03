@@ -198,9 +198,11 @@ static inline void _jvassert(bool cond, char const * name, const char* f, size_t
     the doc in MatchEvaluator section.").c_str(), f, line);
 }
 
+// Switched to sprintf_s. Change from original jpcre2 by TA on 3.7.2022
 static inline std::string _tostdstring(unsigned x){
     char buf[128];
-    int written = std::sprintf(buf, "%u", x);
+    //int written = std::sprintf(buf, "%u", x);
+    int written = sprintf_s(buf,sizeof(buf), "%u", x);
     return (written > 0) ? std::string(buf, buf + written) : std::string();
 }
 

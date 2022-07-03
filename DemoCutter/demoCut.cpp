@@ -436,7 +436,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	}
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], s, sizeof(clcCut->serverCommands[index]));
+	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
 #ifdef RELDEBUG
 //#pragma optimize("", off)

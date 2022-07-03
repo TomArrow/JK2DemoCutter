@@ -615,7 +615,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	}
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], s, sizeof(clcCut->serverCommands[index]));
+	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
 #ifdef RELDEBUG
 //#pragma optimize("", off)
@@ -667,11 +667,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
 
 	const char* tmpConfigString;
+	int tmpConfigStringMaxLength;
 	// Copy over configstrings from first demo.
 	// Later maybe we can do something more refined and clever.
 	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
 		if (i >= CS_PLAYERS && i < (CS_PLAYERS + MAX_CLIENTS)) continue; // Player stuff will be copied manually.
-		tmpConfigString = demoReaders[0].GetConfigString(i);
+		tmpConfigString = demoReaders[0].GetConfigString(i,&tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
 		}
@@ -683,7 +684,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
-			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient);
+			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
 			if (strlen(tmpConfigString)) {
 				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			}
@@ -697,7 +698,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	char infoCopy[MAX_INFO_STRING];
 	infoCopy[0] = 0;
 	strcpy_s(infoCopy, MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
-	Info_SetValueForKey_Big(infoCopy, "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
+	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy);
 
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially created using JK2DemoCutter tools.");
@@ -754,7 +755,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 				// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
 				if (lastSpectatedClientNums[i] != originalPlayerstateClientNum) {
-					tmpConfigString = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum);
+					tmpConfigString = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum, &tmpConfigStringMaxLength);
 					if (strlen(tmpConfigString)) {
 						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
 					}

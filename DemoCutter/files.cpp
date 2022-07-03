@@ -219,9 +219,10 @@ fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet) { // quiet 
 	// enabling the following line causes a recursive function call loop
 	// when running with +set logfile 1 +set developer 1
 	//Com_DPrintf( "writing to: %s\n", ospath );
-	fsh[f].handleFiles.file.o = fopen(ospath.c_str(), "wb");
+	//fsh[f].handleFiles.file.o = fopen(ospath.c_str(), "wb");
+	fopen_s(&fsh[f].handleFiles.file.o,ospath.c_str(), "wb");
 
-	Q_strncpyz(fsh[f].name, filename, sizeof(fsh[f].name));
+	Q_strncpyz(fsh[f].name,sizeof(fsh[f].name), filename, sizeof(fsh[f].name));
 
 	fsh[f].handleSync = qfalse;
 	if (!fsh[f].handleFiles.file.o) {
@@ -237,7 +238,8 @@ qboolean FS_FileExists(const char* file)
 
 	testpath = FS_BuildOSPath("", "", file);
 
-	f = fopen(testpath.c_str(), "rb");
+	//f = fopen(testpath.c_str(), "rb");
+	fopen_s(&f,testpath.c_str(), "rb");
 	if (f) {
 		fclose(f);
 		return qtrue;
@@ -342,14 +344,15 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 
 
 	netpath = FS_BuildOSPath("", "", filename);
-	fsh[*file].handleFiles.file.o = fopen(netpath.c_str(), "rb");
+	//fsh[*file].handleFiles.file.o = fopen(netpath.c_str(), "rb");
+	fopen_s(&fsh[*file].handleFiles.file.o,netpath.c_str(), "rb");
 	if (!fsh[*file].handleFiles.file.o) {
 		Com_DPrintf("Can't find %s\n", filename);
 		*file = 0;
 		return -1;
 	}
 	else {
-		Q_strncpyz(fsh[*file].name, filename, sizeof(fsh[*file].name));
+		Q_strncpyz(fsh[*file].name,sizeof(fsh[*file].name), filename, sizeof(fsh[*file].name));
 		fsh[*file].zipFile = qfalse;
 		return FS_filelength(*file);
 	}

@@ -507,7 +507,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	}
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], s, sizeof(clcCut->serverCommands[index]));
+	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
 #ifdef RELDEBUG
 //#pragma optimize("", off)
@@ -580,18 +580,25 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename) {
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
-		const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-		std::string mapname = Info_ValueForKey(info, "mapname");
-		const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNumAttacker];
-		std::string playername = Info_ValueForKey(playerInfo, "n");
+		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+		const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
+		std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+		std::string playername = "WEIRDATTACKER";
+		if (clientNumAttacker >= 0 && clientNumAttacker < MAX_CLIENTS) {
+
+			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNumAttacker];
+			const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+			playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
+		}
 		//playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
 		//std::string victimname = Info_ValueForKey(playerInfo, "n");
 
 		std::stringstream victimsSS;
 		std::stringstream victimsNumsSS;
 		for (int i = 0; i < victims->size(); i++) {
-			const char* victimInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
-			victimsSS << (*victims)[i] << ": " << Info_ValueForKey(victimInfo, "n") << "\n";
+			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
+			const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+			victimsSS << (*victims)[i] << ": " << Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData)-stringOffset, "n") << "\n";
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
 		}
 		std::string victimsString = victimsSS.str();
@@ -1130,13 +1137,20 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										break;
 								}
 							}
-
-							const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-							std::string mapname = Info_ValueForKey(info, "mapname");
-							const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
-							std::string playername = Info_ValueForKey(playerInfo, "n");
-							playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
-							std::string victimname = Info_ValueForKey(playerInfo, "n");
+							
+							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+							const char* info = demo.cut.Cl.gameState.stringData + offset;
+							std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)-offset, "mapname");
+							std::string playername = "WEIRDATTACKER";
+							const char* playerInfo;
+							if (attacker >= 0 && attacker < MAX_CLIENTS) {
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
+								playerInfo = demo.cut.Cl.gameState.stringData + offset;
+								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
+							}
+							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
+							playerInfo = demo.cut.Cl.gameState.stringData + offset;
+							std::string victimname = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- offset, "n");
 
 
 							int startTime = demoCurrentTime - bufferTime;
@@ -1381,8 +1395,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					.match();
 				
 				for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
-					const char * info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-					std::string mapname = Info_ValueForKey(info, "mapname");
+					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+					const char * info = demo.cut.Cl.gameState.stringData + stringOffset;
+					std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
 					std::string playername = vec_num[matchNum][1];
 					int minutes = atoi(vec_num[matchNum][2].c_str());
 					std::string secondString = vec_num[matchNum][3];
@@ -1403,8 +1418,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int playerNumber = -1;
 					for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
 
-						const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
-						std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");
+						int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
+						const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+						std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "n");
 						if (playerNameCompare == playername) {
 							playerNumber = clientNum;
 						}

@@ -122,8 +122,8 @@ public:
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	std::vector<Event> DemoReader::GetNewEvents(float time);
 	clSnapshot_t GetCurrentSnap();
-	const char* GetConfigString(int configStringNum);
-	const char* GetPlayerConfigString(int playerNum);
+	const char* GetConfigString(int configStringNum, int* maxLength);
+	const char* GetPlayerConfigString(int playerNum, int* maxLength);
 	qboolean AnySnapshotParsed();
 	qboolean EndReached();
 	qboolean EndReachedAtTime(float time);

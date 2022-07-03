@@ -1026,7 +1026,7 @@ typedef enum {
 	ERR_NEED_CD					// pop up the need-cd dialog
 } errorParm_t;
 
-void	Q_strncpyz(char* dest, const char* src, int destsize);
+void	Q_strncpyz(char* dest, int destCapacity, const char* src, int destsize);
 char* QDECL va(const char* format, ...);
 
 int		Cmd_Argc(void);
@@ -1042,7 +1042,7 @@ qboolean FS_FileErase(const char* file);
 void	FS_FCloseFile(fileHandle_t f);
 int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE);
 
-void	QDECL Com_sprintf(char* dest, int size, const char* fmt, ...);
+void	QDECL Com_sprintf(char* dest,int size, const char* fmt, ...);
 
 void	Cmd_TokenizeString(const char* text);
 
@@ -1060,11 +1060,11 @@ enum svc_ops_e {
 	svc_EOF
 };
 
-char* Info_ValueForKey(const char* s, const char* key);
+char* Info_ValueForKey(const char* s,int maxLength, const char* key);
 void Info_RemoveKey(char* s, const char* key);
 void Info_RemoveKey_Big(char* s, const char* key);
-qboolean Info_SetValueForKey(char* s, const char* key, const char* value);
-void Info_SetValueForKey_Big(char* s, const char* key, const char* value);
+qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value);
+void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char* value);
 
 
 // entityState_t->event values

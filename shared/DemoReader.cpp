@@ -302,7 +302,7 @@ void DemoReader::ParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	}
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], s, sizeof(clcCut->serverCommands[index]));
+	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
 #ifdef RELDEBUG
 //#pragma optimize("", off)
@@ -941,11 +941,15 @@ clSnapshot_t DemoReader::GetCurrentSnap() {
 	return thisDemo.cut.Cl.snap;
 }
 
-const char* DemoReader::GetPlayerConfigString(int playerNum) {
-	return thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
+const char* DemoReader::GetPlayerConfigString(int playerNum,int* maxLength) {
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
+	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
-const char* DemoReader::GetConfigString(int configStringNum) {
-	return thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[ configStringNum];
+const char* DemoReader::GetConfigString(int configStringNum, int* maxLength) {
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringNum];
+	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
 
 qboolean DemoReader::ReadMessage() {
@@ -1124,12 +1128,19 @@ readNext:
 							}
 						}
 
-						const char* info = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-						std::string mapname = Info_ValueForKey(info, "mapname");
-						const char* playerInfo = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
-						std::string playername = Info_ValueForKey(playerInfo, "n");
-						playerInfo = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
-						std::string victimname = Info_ValueForKey(playerInfo, "n");
+						int stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+						const char* info = thisDemo.cut.Cl.gameState.stringData + stringOffset;
+						std::string mapname = Info_ValueForKey(info,sizeof(thisDemo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
+						const char* playerInfo;
+						std::string playername = "WEIRDATTACKER";
+						if (attacker >= 0 && attacker < MAX_CLIENTS) {
+							stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
+							playerInfo = thisDemo.cut.Cl.gameState.stringData + stringOffset;
+							playername = Info_ValueForKey(playerInfo, sizeof(thisDemo.cut.Cl.gameState.stringData) - stringOffset, "n");
+						}
+						stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
+						playerInfo = thisDemo.cut.Cl.gameState.stringData + stringOffset;
+						std::string victimname = Info_ValueForKey(playerInfo, sizeof(thisDemo.cut.Cl.gameState.stringData) - stringOffset, "n");
 					}
 				}
 			}
