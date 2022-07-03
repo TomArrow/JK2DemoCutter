@@ -24,6 +24,10 @@ Maybe always remember last known full playerstate and copy some stuff from it...
 Do a demo merger. combines multiple demos of same game...
 MAYBE: detect unintentional kills? where killer wasnt looking at victim? kinda pointless tho due to bs/dbs
 some way to filter out afk kills and weirdo shit in ffa
+Dont keep old stuff, it makes stuff slow the bigger the files are. clear the maps regularly, e.g. kills and speeds
+track highest place anyone's ever been!
+track kills where killer jumped over someone else's head. and how many heads? or just. track headjumps before the kill.
+detect allahu akhbar
 
 
 DONE: 

@@ -12,14 +12,19 @@
 #include <iso646.h>
 #include "picosha3.h"
 
+
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
 jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
 
-std::map<int,int> playerFirstVisible;
-std::map<int,int> playerFirstFollowed;
-std::map<int,int> playerFirstFollowedOrVisible;
-std::map<int,int> lastEvent;
+//std::map<int,int> playerFirstVisible;
+//std::map<int,int> playerFirstFollowed;
+//std::map<int,int> playerFirstFollowedOrVisible;
+//std::map<int,int> lastEvent;
+int playerFirstVisible[MAX_CLIENTS];
+int playerFirstFollowed[MAX_CLIENTS];
+int playerFirstFollowedOrVisible[MAX_CLIENTS];
+int lastEvent[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
@@ -57,18 +62,26 @@ struct SpreeInfo {
 // For detecting killstreaks
 // Killer is the key, kill info is the value
 std::map<int, std::vector<Kill>> kills;
-std::map<int, int> lastKillStreak;
+std::map<int, int> timeCheckedForKillStreaks;
 
 #define KILLSTREAK_MIN_KILLS 3
 #define KILLSTREAK_MAX_INTERVAL 3000
-
+#define OLDER_SPEEDS_STORE_LIMIT 2000 // Any speeds older than 2000ms are removed.
+#define MAX_ASSUMED_SERVER_FPS 200
+#define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
 
 
 // For calculating top/average speed of past second.
 // Top level key is clientNum
 // Lower level key is time
 // Value is speed.
-std::map<int, std::map<int, float>> speeds;
+//std::map<int, std::map<int, float>> speeds;
+//std::map<int, float> speeds[MAX_CLIENTS];
+struct Speed {
+	int time;
+	float speed;
+};
+std::vector<Speed> speeds[MAX_CLIENTS];
 // TODO For future? Have angle saved too. See at what angle the kill comes. Big angle between capper and chaser at high speed is more impressive?
 
 
@@ -516,9 +529,9 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 #endif
 
 int demoCutGetEvent(entityState_t* es) {
-	if (lastEvent.find(es->number) == lastEvent.end()) {
-		lastEvent[es->number] = 0;
-	}
+	//if (lastEvent.find(es->number) == lastEvent.end()) {
+	//	lastEvent[es->number] = 0;
+	//} // Not really necessary is it? That's what it will be by default?
 
 	// check for event-only entities
 	/*if (es->eType > ET_EVENTS) {
@@ -570,9 +583,14 @@ entityState_t* findEntity(int number) {
 
 float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 	float maxSpeed = -1.0f;
-	for (auto it = speeds[clientNum].begin(); it != speeds[clientNum].end(); it++) {
+	/*for (auto it = speeds[clientNum].begin(); it != speeds[clientNum].end(); it++) {
 		if (it->first >= fromTime && it->first <= toTime && it->second > maxSpeed) {
 			maxSpeed = it->second;
+		}
+	}*/
+	for (int i = 0;i< speeds[clientNum].size(); i++) {
+		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && speeds[clientNum][i].speed > maxSpeed) {
+			maxSpeed = speeds[clientNum][i].speed;
 		}
 	}
 	return maxSpeed;
@@ -581,7 +599,8 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 
 void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* insertPlayerModelStatement,sqlite3_stmt* updatePlayerModelCountStatement) {
 
-	std::vector<std::string> modelsToAdd;
+	static std::vector<std::string> modelsToAdd;
+	modelsToAdd.clear();
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + i];
@@ -739,7 +758,7 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
 		std::cout << ss.str() << "\n";
 
-		lastKillStreak[clientNumAttacker] = spreeInfo->lastKillTime;
+		//timeCheckedForKillStreaks[clientNumAttacker] = spreeInfo->lastKillTime;
 	}
 
 }
@@ -770,6 +789,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	std::ofstream outputBatHandle;
 
 	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
+
+
+	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
+	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
+	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
+	Com_Memset(lastEvent,0,sizeof(lastEvent));
 
 
 	sqlite3* killDb;
@@ -1066,11 +1091,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS && !(thisEs->eFlags & EF_DEAD)) { // Don't count speeds of dead bodies. They get boosts from dying.
-						speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
+						//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
+						speeds[thisEs->number].push_back({ demoCurrentTime,VectorLength(thisEs->pos.trDelta) });
 					}
-					if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
-						speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
-					}
+				}
+				if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
+					//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
+					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,VectorLength(demo.cut.Cl.snap.ps.velocity) });
 				}
 
 				// Fire events
@@ -1402,20 +1429,34 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				// KILLSTREAK_MIN_KILLS 3
 				// KILLSTREAK_MAX_INTERVAL 3000
 				// TODO Let it count chains of killstreaks. If there's already a valid killstreak, let there be a single longer gap there.
+
+
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
+					static std::vector<int> victims;
+					static std::vector<std::string> hashes;
+					victims.reserve(10);
+					hashes.reserve(10);
+					victims.clear();
+					hashes.clear();
+
 					int clientNumAttacker = clientIt->first;
 					SpreeInfo spreeInfo;
 					Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
-					std::vector<int> victims;
-					std::vector<std::string> hashes;
 					std::stringstream allKillsHashSS;
 
-					if ((clientIt->second.back().time + KILLSTREAK_MAX_INTERVAL) >= demoCurrentTime) continue; // Might still have an unfinished one here!
+					if (clientIt->second.size() == 0 || (clientIt->second.back().time + KILLSTREAK_MAX_INTERVAL) >= demoCurrentTime) continue; // Might still have an unfinished one here!
+
+					int lastKillTime = 0;
 
 					for (int i = 0; i < clientIt->second.size(); i++) {
 						Kill* thisKill = &clientIt->second[i];
-						if (thisKill->time <= lastKillStreak[clientNumAttacker]) continue; // This one's already been registered.
+
+						// Whether it was or wasn't a killstreak, there are no killstreaks up to this point, so earlier than current kill time can be safely cleaned up.
+						timeCheckedForKillStreaks[clientNumAttacker] = thisKill->time - 1;
+
+						if (thisKill->time <= timeCheckedForKillStreaks[clientNumAttacker]) continue; // This one's already been registered.
 						if (thisKill->isSuicide || !thisKill->isVisible) continue; // Uninteresting.
+
 
 						// Starting or continuing kill spree?
 						if (spreeInfo.countKills == 0 || thisKill->time <= (spreeInfo.lastKillTime + KILLSTREAK_MAX_INTERVAL)) {
@@ -1445,6 +1486,36 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 					}
 					CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement,killDb, oldBasename, oldDemoDateModified);
+				
+					// Clean up old kills that no longer have to be stored
+					// We can clear the entire thing since earlier we made sure that we aren't in the middle of an ongoing killstreak
+					// So anything that's in there now was already checked for being part of a killstreak.
+					// So we can get rid of it all.
+					clientIt->second.clear();
+				
+					// Clean up old speeds
+					// We do need to keep speeds of at least OLDER_SPEEDS_STORE_LIMIT because we might have to check past speeds for future kills that aren't logged yet.
+					// So let's find the last speed we're erasing
+					/*std::map<int, float>::iterator lastToRemove;
+					int countToRemove = 0;
+					for (auto speedsIt = speeds[clientNumAttacker].begin(); speedsIt != speeds[clientNumAttacker].end(); speedsIt++) {
+						if ((demoCurrentTime - speedsIt->first) > OLDER_SPEEDS_STORE_LIMIT) {
+							lastToRemove = speedsIt;
+							countToRemove++;
+						}
+					}
+					if (countToRemove) {
+						speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), lastToRemove);
+					}*/
+					int countToRemove = 0;
+					for (int s = 0; s < speeds[clientNumAttacker].size();s++) {
+						if ((demoCurrentTime - speeds[clientNumAttacker][s].time) > OLDER_SPEEDS_STORE_LIMIT) {
+							countToRemove++;
+						}
+					}
+					if (countToRemove) {
+						speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), speeds[clientNumAttacker].begin()+ countToRemove);
+					}
 				}
 
 
