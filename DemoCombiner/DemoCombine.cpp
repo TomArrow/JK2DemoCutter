@@ -719,9 +719,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 //#pragma optimize("", off)
 #endif
 
-char tolowerSignSafe(char in) {
-	return (char)tolower((unsigned char)in);
-}
+
 
 class NameMatch {
 public:

@@ -1668,3 +1668,7 @@ void sanitizeFilename(const char* input, char* output);
 
 
 std::vector<std::string> splitString(std::string input, std::string separator, bool trim = true, bool allowEmpty = false);
+
+
+
+char tolowerSignSafe(char in);

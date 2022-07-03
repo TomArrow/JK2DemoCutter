@@ -1107,3 +1107,8 @@ std::vector<std::string> splitString(std::string input, std::string separator, b
 	}
 	return retVal;
 }
+
+
+char tolowerSignSafe(char in) {
+	return (char)tolower((unsigned char)in);
+}

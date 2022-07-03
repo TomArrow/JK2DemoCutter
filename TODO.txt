@@ -23,17 +23,17 @@ if ( ps->persistant[PERS_SPAWN_COUNT] != ops->persistant[PERS_SPAWN_COUNT] ) {
 Maybe always remember last known full playerstate and copy some stuff from it...
 Do a demo merger. combines multiple demos of same game...
 MAYBE: detect unintentional kills? where killer wasnt looking at victim? kinda pointless tho due to bs/dbs
-Maybe write server name/subtext into thing as well. Thing I mean... database.
-TODO: Make it overwrite kills in the database if the ones in database are third person and the new one is first person
-solve terminated by signal 11 on some demos
-TODO: Have it separate kill and angle. Makes more sense. To know what a demo exists of. Otherwise its just the first one that happens to be analyzed in the database.
 some way to filter out afk kills and weirdo shit in ffa
-add timestamp to killstreaks too
-
 
 
 DONE: 
 
+TODO: Make it overwrite kills in the database if the ones in database are third person and the new one is first person DONE (via split angles and kills)
+TODO: Have it separate kill and angle. Makes more sense. To know what a demo exists of. Otherwise its just the first one that happens to be analyzed in the database. DONE
+Maybe write server name/subtext and playermodels into thing as well. Thing I mean... database. DONE
+add timestamp to killstreaks too DONE
+save duration for killstreaks DONE
+solve terminated by signal 11 on some demos HOPEFULLY SOLVED?
 detect teleport KINDA DONE
 demoCurrentTime happens after parsesnapshot but we add commands in parsesnapshot? FALSE ALARM I THINK, REMEMBERED WRONG
 EV_PLAYER_TELEPORT_IN DONE
