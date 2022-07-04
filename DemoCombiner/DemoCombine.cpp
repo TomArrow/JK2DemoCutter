@@ -731,7 +731,9 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 	const char* tmpConfigString;
 	int tmpConfigStringMaxLength;
 	int clientNumHere = -1;
-	if (thisPlayer->size() <= 2 && isdigit((*thisPlayer)[0]) && isdigit((*thisPlayer)[1])) {
+	int pstrlen = thisPlayer->size();
+	if (!pstrlen) return clientNumHere;
+	if (pstrlen <= 2 && isdigit((*thisPlayer)[0]) && (pstrlen ==1 || isdigit((*thisPlayer)[1]))) {
 		// It's a number. ClientNum. Just parse it.
 		clientNumHere = atoi(thisPlayer->c_str());
 	}
