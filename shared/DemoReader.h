@@ -21,6 +21,7 @@ public:
 	playerState_t playerState;
 	int serverTime;
 	qboolean playerStateTeleport;
+	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
 };
 class Command {
 public:
@@ -116,7 +117,7 @@ public:
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(float time);
-	playerState_t GetInterpolatedPlayer(int clientNum, float time);
+	playerState_t GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time);
 	std::vector<std::string> DemoReader::GetNewCommands(float time);

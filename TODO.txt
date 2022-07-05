@@ -28,6 +28,7 @@ Dont keep old stuff, it makes stuff slow the bigger the files are. clear the map
 track highest place anyone's ever been!
 track kills where killer jumped over someone else's head. and how many heads? or just. track headjumps before the kill.
 detect allahu akhbar
+record speed at when dbs (or other kind of attack) was initiated.
 
 
 DONE: 

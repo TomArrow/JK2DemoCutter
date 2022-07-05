@@ -228,6 +228,7 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	}
 	snapshotInfo.playerState = clCut->snap.ps;
 	snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&lastSnap,&clCut->snap);
+	snapshotInfo.snapFlagServerCount = (qboolean)((lastSnap.snapFlags ^ clCut->snap.snapFlags) & SNAPFLAG_SERVERCOUNT);
 	snapshotInfo.playerCommandOrServerTimes[clCut->snap.ps.clientNum] = lastKnownCommandOrServerTimes[clCut->snap.ps.clientNum] = clCut->snap.ps.commandTime;
 	snapshotInfos[clCut->snap.messageNum] = snapshotInfo;
 
@@ -493,9 +494,13 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfo* sna
 	}
 }
 
-playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time) {
+playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap ) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
+
+	if (oldSnap) *oldSnap = NULL;
+	if (newSnap) *newSnap = NULL;
+
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time);
 
@@ -552,13 +557,16 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time) {
 	// already at end, nothing we can interpolate.
 	// Just return the last state we have about this player.
 	// TODO actually: give way to return info about whether demo is over and such. So we dont end up with stuck entities in one place, tehy should disappear instead.
-	// Although... in case of short visibility interruptions it might actually be better to keep returning interpolated values?
+	// Although... in case of short visibility interruptions it might actually be better to keep returning interpolated values? (but is that related?)
 	if (lastPastSnapCommandTime >= lastKnownCommandOrServerTimes[clientNum] && endReached) {
 		if (lastMessageWithEntity.find(clientNum) == lastMessageWithEntity.end()) {
 			// We never knew anything about this player at all.
 			return retVal;
 		}
 		else {
+
+			if (oldSnap) *oldSnap = &snapshotInfos[lastMessageWithEntity[clientNum]];
+			if (newSnap) *newSnap = &snapshotInfos[lastMessageWithEntity[clientNum]];
 			return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
 		}
 	}
@@ -575,7 +583,9 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time) {
 		}
 	}
 
-	
+	if (oldSnap) *oldSnap = &snapshotInfos[lastPastSnap];
+	if (newSnap) *newSnap = &snapshotInfos[firstNextSnap];
+
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
 	InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
 
@@ -762,7 +772,8 @@ void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from,
 	//snapshot_t* prev, * next;
 	playerState_t* curps = NULL, * nextps = NULL;
 	//qboolean		nextPsTeleport = qfalse;
-	qboolean		nextPsTeleport = to->playerStateTeleport;
+	//qboolean		nextPsTeleport = to->playerStateTeleport;
+	qboolean		nextPsTeleport = qfalse;
 	int currentTime = 0, nextTime = 0, currentServerTime = 0, nextServerTime = 0;
 
 	out = outPS;
@@ -790,7 +801,11 @@ void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from,
 	}
 	if (!to) {
 		return;
-	}/*
+	}
+	
+	nextPsTeleport = (qboolean)( to->snapFlagServerCount || ((curps->eFlags ^ nextps->eFlags) & EF_TELEPORT_BIT));
+	
+	/*
 #ifdef _DEBUG
 	if (!(currentTime <= cg.time + (double)cg.timeFraction && nextTime >= cg.time + (double)cg.timeFraction)) {
 		Com_Printf("WARNING: Couldn't locate slots with correct time\n");

@@ -736,6 +736,9 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 	if (pstrlen <= 2 && isdigit((*thisPlayer)[0]) && (pstrlen ==1 || isdigit((*thisPlayer)[1]))) {
 		// It's a number. ClientNum. Just parse it.
 		clientNumHere = atoi(thisPlayer->c_str());
+		tmpConfigString = reader->GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+		std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
+		std::cout << *thisPlayer << " (interpreted as clientNum) matches '" << nameHere << "' (" << clientNumHere << ")" << std::endl;
 	}
 	else {
 		std::string thisPlayerLower = *thisPlayer;
@@ -953,10 +956,46 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime);
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime);
+					SnapshotInfo* oldSnap = NULL;
+					SnapshotInfo* newSnap = NULL;
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime,&oldSnap,&newSnap);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
 					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
+
+
+					// Check if oldSnap contains ET_BODY of this client and if so, copy it.
+					// We have to do this here because we are using commandtime as the basis for timing, but normal 
+					// serverTime for entities and such.
+					// Hence, there would be a desync normally.
+					// However TODO: This might still be a problem with many clients/bodies? Actually maybe we should just handle this stuff manually or sth?
+					// Idk.
+					if (oldSnap) {
+						for (auto it = oldSnap->entities.begin(); it != oldSnap->entities.end(); it++) {
+							// Players are already handled otherwhere
+							if (it->first >= MAX_CLIENTS) {
+								// Is this a corpse?
+								if (it->second.eType == ET_BODY && it->second.clientNum == clientNumHere) {
+									// Check if we are tracking this player
+									if (targetClientNum != -1) {
+										int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+										if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+											entityState_t tmpEntity = it->second;
+											tmpEntity.clientNum = targetClientNum;
+											tmpEntity.number = targetEntitySlot;
+											tmpEntity.pos.trTime = time;
+											if (EV_BODY_QUEUE_COPY == (tmpEntity.event & ~EV_EVENT_BITS)) {
+												tmpEntity.eventParm = targetClientNum;
+											}
+											targetEntities[targetEntitySlot] = tmpEntity;
+										}
+									}
+								}
+							}
+						}
+					}
+
+
 					//tmpPS.clientNum = copiedPlayerIndex;
 					tmpPS.clientNum = targetClientNum;
 					tmpPS.commandTime = time;
@@ -993,6 +1032,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					// Players are already handled otherwhere
 					if (it->first >= MAX_CLIENTS) {
+						/* Now handling this up there
 						// Is this a corpse?
 						if (it->second.eType == ET_BODY) {
 							// Check if we are tracking this player
@@ -1010,7 +1050,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 									targetEntities[targetEntitySlot] = tmpEntity;
 								}
 							}
-						}
+						}*/
 					}
 				}
 
