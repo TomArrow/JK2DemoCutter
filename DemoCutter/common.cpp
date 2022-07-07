@@ -763,7 +763,7 @@ std::map <int, std::string>  saberMoveNames
 
 std::map <int, std::string>  saberStyleNames
 {
-	std::make_pair(FORCE_LEVEL_0, "_BLU"),
+	std::make_pair(FORCE_LEVEL_0, "_UNKST"),
 	std::make_pair(FORCE_LEVEL_1, "_BLU"),
 	std::make_pair(FORCE_LEVEL_2, "_YEL"),
 	std::make_pair(FORCE_LEVEL_3, "_RED"),
@@ -905,8 +905,8 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	s->fireflag = ps->fd.saberAnimLevel;
 }
 
-
-void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean allValues) {
+// baseState is my modification. It will use values from the base Snap that an entity just doesn't have. PERS_SPAWN_COUNT and precise health/armor
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean allValues, playerState_t* baseState) {
 	int		i;
 
 	ps->clientNum = s->number;
@@ -985,6 +985,10 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean a
 		ps->stats[STAT_HEALTH] = 100;
 	}
 
+	// TODO fix this. For example we want the EV_SABER_ATTACK event to work.
+	// Dirty quick try: Just set it as "externalEvent"
+	ps->externalEvent = s->event;
+	ps->externalEventParm = s->eventParm;
 	/*
 	if ( ps->externalEvent ) {
 		s->event = ps->externalEvent;
@@ -1030,7 +1034,14 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean a
 
 		ps->holocronBits = s->time2;
 
-		ps->fd.saberAnimLevel = s->fireflag;
+		if (s->weapon == WP_SABER && s->fireflag == 0) {
+			// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
+			
+			ps->fd.saberAnimLevel = s->fireflag; // This is invalid. TODO Fix this. Figure it out from anims.
+		}
+		else {
+			ps->fd.saberAnimLevel = s->fireflag; 
+		}
 
 		// This is my own stuff: (restoring viewheight)
 		if (s->eFlags & EF_DEAD) {
@@ -1047,6 +1058,17 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean a
 			ps->viewheight = DEFAULT_VIEWHEIGHT;
 		}
 
+	}
+
+	if (baseState) {
+		//ps->persistant[PERS_SPAWN_COUNT] = baseState->persistant[PERS_SPAWN_COUNT];
+		Com_Memcpy(ps->persistant, baseState->persistant, sizeof(ps->persistant));
+		if (ps->stats[STAT_HEALTH] > 0 && baseState->stats[STAT_HEALTH] > 0) { // don't copy positive health into a dead entity
+			//Com_Memcpy(ps->stats,baseState->stats,sizeof(ps->stats));
+			ps->fd.forcePower = baseState->fd.forcePower;
+			ps->stats[STAT_HEALTH] = baseState->stats[STAT_HEALTH];
+			ps->stats[STAT_ARMOR] = baseState->stats[STAT_ARMOR];
+		}
 	}
 }
 

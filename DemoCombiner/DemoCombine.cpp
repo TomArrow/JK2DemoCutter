@@ -953,15 +953,16 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c];
 
+					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
+
 					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime);
 					SnapshotInfo* oldSnap = NULL;
 					SnapshotInfo* newSnap = NULL;
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime,&oldSnap,&newSnap);
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
-					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
 
 
 					// Check if oldSnap contains ET_BODY of this client and if so, copy it.
@@ -1069,6 +1070,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 				// Get new events and remember them.
 				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime);
+				std::map<int, entityState_t> entitiesHere;
+				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
 				for (int c = 0; c < newEventsHere.size(); c++) {
 					Event* thisEvent = &newEventsHere[c];
 					int eventNumber = thisEvent->eventNumber;
@@ -1094,6 +1097,52 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 							addThisEvent = qtrue;
 						}
+					}
+					if (eventNumber == EV_SHIELD_HIT) {
+
+						// Check if we are tracking this player.
+						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
+						if (target != -1) {
+							thisEvent->theEvent.otherEntityNum = target;
+
+							addThisEvent = qtrue;
+						}
+					}
+					if (eventNumber == EV_SABER_HIT || eventNumber == EV_SABER_BLOCK) { // How to get rid of hits with no corresponding player copied? Check distance?
+
+						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i].reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue);
+
+						// I think default max hitbox is 30x30x64? So middle to farthest point should be vector 15,15,30 length. but i think middle isnt centered?
+						// Is it -24 and then 40 on the top? So let's say max diagonal is distance of 15,15,40. aka sqrt(15*15+15*15+40*40) = 45.27692569068708313286904083492
+						// Let's double it and make it a round 100. Add max saber length *2 for good measure.
+						constexpr float maxDistance = 100.0f + 2.0f * (float)SABER_LENGTH_MAX;
+
+						/*if (eventNumber == EV_SABER_HIT && thisEvent->theEvent.eventParm == 0) {
+							// Not a player hit
+							// This could be a player hitting the floor or sth I think?
+							// Let's allow it and widen the allowed distance by saber length *2.
+							maxDistance += 2.0f*(float)SABER_LENGTH_MAX;
+						}
+						if (eventNumber == EV_SABER_HIT && thisEvent->theEvent.eventParm >1) {
+							// I think this is dismemberment stuff
+							maxDistance += 2.0f*(float)SABER_LENGTH_MAX;
+						}
+						if (eventNumber == EV_SABER_BLOCK) {
+							// This is a saber block.
+							maxDistance += 2.0f * (float)SABER_LENGTH_MAX;
+						}*/
+
+						// Check if there's any tracked player entity nearby, aka whether it makes sense to copy this over.
+						for (auto entitIt = entitiesHere.begin(); entitIt != entitiesHere.end(); entitIt++) {
+							if (entitIt->first < 0 || entitIt->first >= MAX_CLIENTS) break;
+							int target = slotManager.getSlotIfExists(i, entitIt->second.number);
+							vec3_t distanceVec;
+							VectorSubtract(entitIt->second.pos.trBase, thisEvent->theEvent.pos.trBase, distanceVec);
+							if (VectorLength(distanceVec) <= maxDistance) {
+								addThisEvent = qtrue;
+							}
+						}
+
 					}
 					/*if (eventNumber == EV_BODY_QUEUE_COPY) { // This is actually part of the ET_BODY I'm copying over anyway?
 

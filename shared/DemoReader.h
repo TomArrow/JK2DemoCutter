@@ -4,6 +4,8 @@
 #include <demoCut.h>
 
 
+#define PLAYERSTATE_FUTURE_SEEK 10000
+
 typedef jpcre2::select<char> jp;
 
 enum highlightSearchMode_t {
@@ -16,6 +18,7 @@ enum highlightSearchMode_t {
 
 class SnapshotInfo {
 public:
+	int snapNum;
 	std::map<int, entityState_t> entities;
 	std::map<int, int> playerCommandOrServerTimes;
 	playerState_t playerState;
@@ -94,14 +97,15 @@ class DemoReader {
 	entityState_t* findEntity(int number);
 
 	void InterpolatePlayerState(float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
-	void InterpolatePlayer(int clientNum, float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
+	void InterpolatePlayer(int clientNum, float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS = qfalse);
 
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
 
 	qboolean ReadMessage();
 	qboolean ReadMessageReal();
-	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfo* snap);
+	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS = qfalse);
+	qboolean SeekToServerTime(int serverTime);
 
 public:
 
@@ -117,9 +121,10 @@ public:
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(float time);
-	playerState_t GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL);
+	playerState_t GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time);
+	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	std::vector<Event> DemoReader::GetNewEvents(float time);
 	clSnapshot_t GetCurrentSnap();

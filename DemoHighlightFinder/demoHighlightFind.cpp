@@ -12,6 +12,8 @@
 #include <iso646.h>
 #include "picosha3.h"
 
+#define DEBUGSTATSDB
+
 
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
@@ -28,6 +30,13 @@ int lastEvent[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
+
+
+#ifdef DEBUGSTATSDB
+typedef std::tuple<int, int, int, int, int,int> animStanceKey; // demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance
+std::map< animStanceKey, int> animStanceCounts;
+#endif
+
 
 #define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
 #define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
@@ -599,11 +608,16 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 
 void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* insertPlayerModelStatement,sqlite3_stmt* updatePlayerModelCountStatement) {
 
+
+	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
+	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+
 	static std::vector<std::string> modelsToAdd;
 	modelsToAdd.clear();
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 
-		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + i];
+		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + i];
 		const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string modelName = Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "model");
 		if (modelName != lastPlayerModel[i]) {
@@ -634,6 +648,8 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 				//variantCString = variant.c_str();
 			}
 		}
+		SQLBIND_TEXT(insertPlayerModelStatement, "@map", mapname.c_str());
+		SQLBIND_TEXT(updatePlayerModelCountStatement, "@map", mapname.c_str());
 		SQLBIND_TEXT(insertPlayerModelStatement, "@baseModel", baseModel.c_str());
 		SQLBIND_TEXT(updatePlayerModelCountStatement, "@baseModel", baseModel.c_str());
 		if (variantExists) {
@@ -799,7 +815,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 	sqlite3* killDb;
 	sqlite3_open("killDatabase.db",&killDb);
-
 	/*sqlite3_exec(killDb, "CREATE TABLE kills ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
@@ -894,11 +909,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);
-	sqlite3_exec(killDb, "CREATE TABLE playerModels ("
+	sqlite3_exec(killDb, "CREATE TABLE playerModels (" 
+		"map	TEXT NOT NULL,"
 		"baseModel	TEXT NOT NULL,"
 		"variant	TEXT,"
 		"countFound INTEGER NOT NULL,"
-		"PRIMARY KEY(baseModel,variant)"
+		"PRIMARY KEY(map,baseModel,variant)"
 		"); ",
 		NULL,NULL,NULL);
 	
@@ -930,14 +946,40 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoTime,@duration,@serverTime,@demoDateTime)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
-	preparedStatementText = "INSERT OR IGNORE INTO playerModels (baseModel,variant,countFound) VALUES (@baseModel,@variant, 0);";
+	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
 	sqlite3_stmt* insertPlayerModelStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertPlayerModelStatement,NULL);
-	preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE baseModel=@baseModel AND variant=@variant;";
+	preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
 	sqlite3_stmt* updatePlayerModelCountStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&updatePlayerModelCountStatement,NULL);
 
 	sqlite3_exec(killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+
+
+#ifdef DEBUGSTATSDB
+	sqlite3* debugStatsDb;
+	sqlite3_open("debugStatsDb.db", &debugStatsDb);
+
+	sqlite3_exec(debugStatsDb, "CREATE TABLE animStances ("
+		"demoVersion INTEGER NOT NULL,"
+		"saberHolstered BOOLEAN NOT NULL,"
+		"torsoAnim INTEGER NOT NULL,"
+		"legsAnim INTEGER NOT NULL,"
+		"saberMove INTEGER NOT NULL,"
+		"stance INTEGER NOT NULL,"
+		"countFound INTEGER NOT NULL,"
+		"PRIMARY KEY(demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance)"
+		"); ",
+		NULL, NULL, NULL);
+	preparedStatementText = "INSERT OR IGNORE INTO animStances (demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance,countFound) VALUES (@demoVersion,@saberHolstered,@torsoAnim,@legsAnim,@saberMove,@stance, 0);";
+	sqlite3_stmt* insertAnimStanceStatement;
+	sqlite3_prepare_v2(debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertAnimStanceStatement, NULL);
+	preparedStatementText = "UPDATE animStances SET countFound = countFound + @countFound WHERE demoVersion=@demoVersion AND saberHolstered=@saberHolstered AND torsoAnim=@torsoAnim AND @legsAnim=@legsAnim AND saberMove=@saberMove AND stance=@stance;";
+	sqlite3_stmt* updateAnimStanceCountStatement;
+	sqlite3_prepare_v2(debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &updateAnimStanceCountStatement, NULL);
+	sqlite3_exec(debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+#endif
+
 
 
 	//mvprotocol_t	protocol;
@@ -1100,6 +1142,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,VectorLength(demo.cut.Cl.snap.ps.velocity) });
 				}
 
+#ifdef DEBUGSTATSDB
+				if(demo.cut.Cl.snap.ps.weapon==WP_SABER){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
+					
+					animStanceKey keyHere = { demoType,demo.cut.Cl.snap.ps.saberHolstered,demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT,demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT,demo.cut.Cl.snap.ps.saberMove,demo.cut.Cl.snap.ps.fd.saberAnimLevel };  // torsoAnim,legsAnim,saberMove,stance
+					animStanceCounts[keyHere]++;
+					
+				}
+#endif
+
 				// Fire events
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
@@ -1249,7 +1300,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 											if (attackerEntity) {
 												modInfo << saberMoveNames[attackerEntity->saberMove];
 												if (!modInfo.str().size()) {
+													// THIS IS INVALID!
 													modInfo << saberStyleNames[attackerEntity->fireflag];
+													
 												}
 											}
 										}
@@ -1747,6 +1800,59 @@ cuterror:
 		if (FS_FileExists(newName))
 			FS_FileErase(newName);
 	}*/
+
+
+#ifdef DEBUGSTATSDB
+	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
+
+		/*SQLBIND(insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
+		SQLBIND(insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(insertAnimStanceStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(insertAnimStanceStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
+		SQLBIND(insertAnimStanceStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);
+		SQLBIND(updateAnimStanceCountStatement, int, "@countFound", );
+		SQLBIND(updateAnimStanceCountStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
+		SQLBIND(updateAnimStanceCountStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(updateAnimStanceCountStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(updateAnimStanceCountStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
+		SQLBIND(updateAnimStanceCountStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);*/
+		SQLBIND(insertAnimStanceStatement, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND(insertAnimStanceStatement, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND(insertAnimStanceStatement, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND(insertAnimStanceStatement, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND(insertAnimStanceStatement, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND(insertAnimStanceStatement, int, "@stance", std::get<5>(it->first));
+		SQLBIND(updateAnimStanceCountStatement, int, "@countFound", it->second);
+		SQLBIND(updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND(updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND(updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND(updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND(updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND(updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
+
+		int queryResult = sqlite3_step(insertAnimStanceStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(debugStatsDb) << "\n";
+		}
+		sqlite3_reset(insertAnimStanceStatement);
+
+		queryResult = sqlite3_step(updateAnimStanceCountStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(debugStatsDb) << "\n";
+		}
+		sqlite3_reset(updateAnimStanceCountStatement);
+	}
+
+
+
+	sqlite3_exec(debugStatsDb, "COMMIT;", NULL, NULL, NULL);
+
+	sqlite3_finalize(insertAnimStanceStatement);
+	sqlite3_finalize(updateAnimStanceCountStatement);
+	sqlite3_close(debugStatsDb);
+#endif
+
+
 
 	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
 	sqlite3_finalize(insertSpreeStatement);

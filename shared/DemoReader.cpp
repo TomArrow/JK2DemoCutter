@@ -226,6 +226,7 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 			}
 		}
 	}
+	snapshotInfo.snapNum = clCut->snap.messageNum;
 	snapshotInfo.playerState = clCut->snap.ps;
 	snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&lastSnap,&clCut->snap);
 	snapshotInfo.snapFlagServerCount = (qboolean)((lastSnap.snapFlags ^ clCut->snap.snapFlags) & SNAPFLAG_SERVERCOUNT);
@@ -440,6 +441,13 @@ qboolean DemoReader::SeekToTime(int time) {
 	if (demoCurrentTime < time && endReached) return qfalse;
 	return qtrue;
 }
+qboolean DemoReader::SeekToServerTime(int serverTime) {
+	while (lastKnownTime < serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownTime < serverTime && endReached) return qfalse;
+	return qtrue;
+}
 qboolean DemoReader::SeekToCommandTime(int serverTime) {
 	while (lastKnownCommandTime < serverTime && !endReached) {
 		ReadMessage();
@@ -472,7 +480,8 @@ playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
 }
 
-playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfo* snap) {
+playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS) {
+	SnapshotInfo* snap = &snapshotInfos[snapNum];
 	if (snap->playerState.clientNum == clientNum) {
 		return snap->playerState;
 	}
@@ -480,9 +489,27 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfo* sna
 		playerState_t retVal;
 		Com_Memset(&retVal, 0, sizeof(playerState_t));
 
+		int baseSnap = -1;
+		if(detailedPS){ // Try to restore stuff like health/armor, pers_spawn_count etc. Use for main player in demo.
+			int pastSnap = -1;
+			int futureSnap = -1;
+			// Search if there is a past and/or future playerstate.
+			// TODO What about future ones not read yet? It might happen minutes later or whatever...
+			SeekToServerTime(snap->serverTime+ PLAYERSTATE_FUTURE_SEEK);
+			for (auto snapIt = snapshotInfos.begin(); snapIt != snapshotInfos.end(); snapIt++) {
+				if (snapIt->first < snapNum && snapIt->second.playerState.clientNum == clientNum) {
+					pastSnap = snapIt->first;
+				}
+				if (snapIt->first > snapNum && snapIt->second.playerState.clientNum == clientNum) {
+					futureSnap = snapIt->first;
+				}
+			}
+			baseSnap = pastSnap != -1 ? pastSnap : futureSnap;
+		}
+
 		entityState_t* thisEntity = &snap->entities[clientNum];
 		// Need to convert the entity.
-		CG_EntityStateToPlayerState(thisEntity, &retVal);
+		CG_EntityStateToPlayerState(thisEntity, &retVal,qtrue,baseSnap != -1 ? &snapshotInfos[baseSnap].playerState : NULL);
 
 		if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
 			retVal.commandTime = thisEntity->pos.trTime;
@@ -490,11 +517,12 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfo* sna
 		else {
 			retVal.commandTime = snap->serverTime; // Otherwise just use servertime. Lame but oh well. Maybe we could do sth better where we try to detect changes in values or such if we truly need to.
 		}
+
 		return retVal;
 	}
 }
 
-playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap ) {
+playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 
@@ -536,7 +564,8 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, Snaps
 			return retVal;
 		}
 		else {
-			return GetPlayerFromSnapshot(clientNum,&snapshotInfos[firstPacketWithPlayerInIt]);
+			//return GetPlayerFromSnapshot(clientNum,&snapshotInfos[firstPacketWithPlayerInIt]);
+			return GetPlayerFromSnapshot(clientNum,firstPacketWithPlayerInIt, detailedPS);
 			/*SnapshotInfo* thatSnapshot = &snapshotInfos[firstPacketWithPlayerInIt];
 			if (thatSnapshot->playerState.clientNum == clientNum) {
 				return thatSnapshot->playerState;
@@ -567,7 +596,8 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, Snaps
 
 			if (oldSnap) *oldSnap = &snapshotInfos[lastMessageWithEntity[clientNum]];
 			if (newSnap) *newSnap = &snapshotInfos[lastMessageWithEntity[clientNum]];
-			return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
+			//return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
+			return GetPlayerFromSnapshot(clientNum, lastMessageWithEntity[clientNum], detailedPS);
 		}
 	}
 
@@ -587,7 +617,7 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, Snaps
 	if (newSnap) *newSnap = &snapshotInfos[firstNextSnap];
 
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
-	InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
+	InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal, detailedPS);
 
 	return retVal;
 	
@@ -765,7 +795,7 @@ void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotI
 	//cg.predictedTimeFrac = f * (nextps->commandTime - curps->commandTime);
 }
 
-void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS) {
+void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS) {
 	float			f;
 	int				i;
 	playerState_t* out;
@@ -786,13 +816,14 @@ void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from,
 	if (1) {
 
 
-		inPsConverted = GetPlayerFromSnapshot(clientNum,from);
+		//inPsConverted = GetPlayerFromSnapshot(clientNum,from);
+		inPsConverted = GetPlayerFromSnapshot(clientNum,from->snapNum, detailedPS);
 		curps = &inPsConverted;
 		currentTime = curps->commandTime;
 		//currentTime = from->serverTime;
 		currentServerTime = from->serverTime;
 		if (to) {
-			outPsConverted = GetPlayerFromSnapshot(clientNum, to);
+			outPsConverted = GetPlayerFromSnapshot(clientNum, to->snapNum, detailedPS);
 			nextps = &outPsConverted;
 			nextTime = nextps->commandTime;
 			//nextTime = to->serverTime; // Testing. See if we can find the perfect way to do it ... hmm
@@ -927,6 +958,38 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time) { // Can't
 	}
 	
 	return snapshotInfos[lastPastSnap].entities;
+}
+
+std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+
+	SeekToAnySnapshotIfNotYet();
+	SeekToTime(time);
+
+	// Now let's translate time into server time
+	time = time - demoBaseTime + demoStartTime;
+
+	if (endReached && !anySnapshotParsed) return std::map<int, entityState_t>(); // Nothing to do really lol.
+
+	// Ok now we are sure we have at least one snapshot. Good.
+	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
+
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		if (it->second.serverTime == time) {
+			if (includingPS) {
+
+				std::map<int, entityState_t> retVal = it->second.entities;
+				entityState_t psEnt;
+				Com_Memset(&psEnt, 0, sizeof(psEnt));
+				BG_PlayerStateToEntityState(&it->second.playerState, &psEnt,qfalse);
+				retVal[it->second.playerState.clientNum] = psEnt;
+				return retVal;
+			}
+			else {
+				return it->second.entities;
+			}
+		}
+	}
+	return std::map<int, entityState_t>();
 }
 
 std::vector<std::string> DemoReader::GetNewCommands(float time) {
