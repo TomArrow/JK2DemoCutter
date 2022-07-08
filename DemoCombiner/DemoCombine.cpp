@@ -777,7 +777,15 @@ int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* co
 }
 
 
-
+void retimeEntity(entityState_t* entity, float newServerTime, float newDemoTime) {
+	vec3_t newPos;
+	BG_EvaluateTrajectory(&entity->pos, newServerTime, newPos);
+	VectorCopy(newPos, entity->pos.trBase);
+	BG_EvaluateTrajectory(&entity->apos, newServerTime, newPos);
+	VectorCopy(newPos, entity->apos.trBase);
+	entity->pos.trTime = newDemoTime;
+	entity->apos.trTime = newDemoTime;
+}
 
 
 
@@ -1090,7 +1098,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get various related entities
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime);
+				float thisTimeInServerTime;
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime,&thisTimeInServerTime);
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					
 					// EFFECT_EXPLOSION_TRIPMINE (EV_PLAY_EFFECT)
@@ -1119,7 +1128,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								entityState_t tmpEntity = it->second;
 								tmpEntity.genericenemyindex = ownerSlot + 1024;
 								tmpEntity.number = targetEntitySlot;
+								/*vec3_t newPos;
+								BG_EvaluateTrajectory(&tmpEntity.pos, thisTimeInServerTime, newPos);
+								VectorCopy(newPos, tmpEntity.pos.trBase);
+								BG_EvaluateTrajectory(&tmpEntity.apos, thisTimeInServerTime, newPos);
+								VectorCopy(newPos, tmpEntity.apos.trBase);
 								tmpEntity.pos.trTime = time;
+								tmpEntity.apos.trTime = time;*/
+								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 								if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
 								}

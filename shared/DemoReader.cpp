@@ -935,7 +935,7 @@ std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 	return retVal;
 }
 
-std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time, float *translatedTime) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time);
@@ -943,19 +943,24 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time) { // Can't
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
 
+	if (translatedTime) {
+		*translatedTime = time;
+	}
+
 	if (endReached && !anySnapshotParsed) return std::map<int, entityState_t>(); // Nothing to do really lol.
 
 	// Ok now we are sure we have at least one snapshot. Good.
 	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
 
 	int lastPastSnap = -1;
-	int lastPastSnapCommandTime = -1;
+	int lastPastSnapServerTime = -1;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		if (it->second.serverTime <= time) {
 			lastPastSnap = it->first;
-			lastPastSnapCommandTime = it->second.serverTime;
+			lastPastSnapServerTime = it->second.serverTime;
 		}
 	}
+
 	
 	return snapshotInfos[lastPastSnap].entities;
 }

@@ -1,5 +1,6 @@
 #include "demoCut.h"
-
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 // Code is 99%-100% from jomme, from various files.
 // Most of it is likely still the same as in the original Jedi Knight source code releases
@@ -1142,3 +1143,53 @@ char tolowerSignSafe(char in) {
 }
 
 
+
+
+/*
+================
+BG_EvaluateTrajectory
+
+================
+*/
+void BG_EvaluateTrajectory(const trajectory_t* tr, float atTime, vec3_t result) {
+	float		deltaTime;
+	float		phase;
+
+	switch (tr->trType) {
+	case TR_STATIONARY:
+	case TR_INTERPOLATE:
+		VectorCopy(tr->trBase, result);
+		break;
+	case TR_LINEAR:
+		deltaTime = (atTime - (float)tr->trTime) * 0.001;	// milliseconds to seconds
+		VectorMA(tr->trBase, deltaTime, tr->trDelta, result);
+		break;
+	case TR_SINE:
+		deltaTime = (atTime - (float)tr->trTime) / (float)tr->trDuration;
+		phase = sin(deltaTime * M_PI * 2);
+		VectorMA(tr->trBase, phase, tr->trDelta, result);
+		break;
+	case TR_LINEAR_STOP:
+		if (atTime > (float)tr->trTime + tr->trDuration) {
+			atTime = (float)tr->trTime + tr->trDuration;
+		}
+		deltaTime = (atTime - tr->trTime) * 0.001;	// milliseconds to seconds
+		if (deltaTime < 0) {
+			deltaTime = 0;
+		}
+		VectorMA(tr->trBase, deltaTime, tr->trDelta, result);
+		break;
+	case TR_GRAVITY:
+		deltaTime = (atTime - (float)tr->trTime) * 0.001;	// milliseconds to seconds
+		VectorMA(tr->trBase, deltaTime, tr->trDelta, result);
+		result[2] -= 0.5 * DEFAULT_GRAVITY * deltaTime * deltaTime;		// FIXME: local gravity...
+		break;
+	default:
+#ifdef QAGAME
+		Com_Error(ERR_DROP, "BG_EvaluateTrajectory: [GAME SIDE] unknown trType: %i", tr->trType);
+#else
+		Com_Error(ERR_DROP, "BG_EvaluateTrajectory: [CLIENTGAME SIDE] unknown trType: %i", tr->trType);
+#endif
+		break;
+	}
+}

@@ -123,7 +123,7 @@ public:
 	playerState_t GetInterpolatedPlayerState(float time);
 	playerState_t GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
-	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time);
+	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	std::vector<Event> DemoReader::GetNewEvents(float time);

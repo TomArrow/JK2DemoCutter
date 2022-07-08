@@ -1702,3 +1702,6 @@ std::vector<std::string> splitString(std::string input, std::string separator, b
 
 
 char tolowerSignSafe(char in);
+
+
+void BG_EvaluateTrajectory(const trajectory_t* tr, float atTime, vec3_t result);
