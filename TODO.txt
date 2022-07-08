@@ -29,7 +29,9 @@ track highest place anyone's ever been!
 track kills where killer jumped over someone else's head. and how many heads? or just. track headjumps before the kill.
 detect allahu akhbar
 record speed at when dbs (or other kind of attack) was initiated.
-
+detect mutual kills (kills each other on same frame)
+detect speed at which dbs was triggered (first frame of dbs)
+detect amount of people surrounding the kill in past 5 seconds (for nice scenes with lots of ppl)
 
 DONE: 
 

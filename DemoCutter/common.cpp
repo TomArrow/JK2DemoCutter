@@ -1096,6 +1096,12 @@ float LerpAngle(float from, float to, float frac) {
 
 
 
+
+
+
+
+
+
 std::vector<std::string> splitString(std::string input, std::string separator, bool trim, bool allowEmpty) {
 	std::vector<std::string> retVal;
 	int position = 0;
@@ -1134,3 +1140,5 @@ std::vector<std::string> splitString(std::string input, std::string separator, b
 char tolowerSignSafe(char in) {
 	return (char)tolower((unsigned char)in);
 }
+
+

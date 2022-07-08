@@ -720,6 +720,67 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 #endif
 
 
+std::string makeConfigStringCommand(int index, std::string value) {
+	std::stringstream ss;
+	ss << "cs " << index << " " << value;
+	return ss.str();
+}
+
+
+/*
+================
+G_FindConfigstringIndex
+
+================
+*/
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+	int		i;
+	//char	s[MAX_STRING_CHARS];
+	char*	s;
+
+	if (!name || !name[0]) {
+		return 0;
+	}
+
+	for (i = 1; i < max; i++) {
+		//trap_GetConfigstring(start + i, s, sizeof(s));
+		int stringOffset = clCut->gameState.stringOffsets[start + i];
+		s = clCut->gameState.stringData + stringOffset;//sizeof(demo.cut.Cl.gameState.stringData) - stringOffset
+
+		if (!s[0]) {
+			break;
+		}
+		if (!strcmp(s, name)) {
+			return i;
+		}
+	}
+
+	if (!create) {
+		return 0;
+	}
+
+	if (i == max) {
+		Com_Printf("G_FindConfigstringIndex: overflow");
+		return 0;
+		//G_Error("G_FindConfigstringIndex: overflow");
+	}
+
+	//trap_SetConfigstring(start + i, name);
+	demoCutConfigstringModifiedManual(clCut, start+i, name);
+	commandsToAdd->push_back(makeConfigStringCommand(start+i,name));
+
+	return i;
+}
+
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+	return G_FindConfigstringIndex(name, CS_SOUNDS, MAX_SOUNDS, qtrue, clCut,commandsToAdd);
+}
+
+
+
+
+
+
 
 class NameMatch {
 public:
@@ -1031,6 +1092,44 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				// Get various related entities
 				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime);
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
+					
+					// EFFECT_EXPLOSION_TRIPMINE (EV_PLAY_EFFECT)
+					// EV_GENERAL_SOUND te->s.trickedentindex = ent->s.number;
+					if (it->second.eType == ET_GENERAL && it->second.weapon == WP_TRIP_MINE && (it->second.eFlags & EF_MISSILE_STICK)) {
+						// It's a trip mine.
+						int ownerSlot = slotManager.getSlotIfExists(i, it->second.genericenemyindex - 1024);
+						if (it->second.pos.trType == TR_GRAVITY) {
+							// It's flying/in the air.
+							// Only for entities we are tracking, otherwise
+							// mines will come flying out of nowhere
+							
+						}
+						else if (it->second.pos.trType == TR_STATIONARY) {
+							// It's sticking. Let it exist then. Might be used for boosts or sth
+							if (ownerSlot == -1) {
+								ownerSlot = 0; // Just give it to person 0. Is wrong I guess but won't matter unless it's a kill.
+								// Will be the responsibility of the tool user to include the owner of the mine otherwise.
+								// Actually it won't matter anyway because EV_OBITUARY is not dependent on that, if anything at all is.
+							}
+						}
+
+						if (ownerSlot != -1) {
+							int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+							if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+								entityState_t tmpEntity = it->second;
+								tmpEntity.genericenemyindex = ownerSlot + 1024;
+								tmpEntity.number = targetEntitySlot;
+								tmpEntity.pos.trTime = time;
+								if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
+									//tmpEntity.eventParm = targetPlayerSlot;
+								}
+								targetEntities[targetEntitySlot] = tmpEntity;
+							}
+						}
+
+					}
+
+					
 					// Players are already handled otherwhere
 					if (it->first >= MAX_CLIENTS) {
 						/* Now handling this up there
@@ -1064,6 +1163,16 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					if (!strcmp(cmd, "print") || !strcmp(cmd, "chat")/* || !strcmp(cmd, "cp")*/) {
 						if (!strstr(newCommandsHere[c].c_str(), "!respos") && !strstr(newCommandsHere[c].c_str(), "!savepos")) { // TODO Make this case insensitive for absolute protection!
 							commandsToAdd.push_back(newCommandsHere[c]);
+						}
+					}
+					if (!strcmp(cmd, "kg2")/* || !strcmp(cmd, "cp")*/) {
+						char commandString[10]; // highest possible num is 4 digits. kg2 is 3 digits. space is 1 digit. NUL takes 1 digit. Let's make it a round 10 for comfort.
+						commandString[0] = 0;
+						int num = atoi(Cmd_Argv(1));
+						int targetNum = slotManager.getSlotIfExists(i, num);
+						if (targetNum != -1) {
+							Com_sprintf(commandString, sizeof(commandString), "kg2 %d", targetNum);
+							commandsToAdd.push_back(commandString);
 						}
 					}
 				}
