@@ -34,6 +34,9 @@ public:
 
 class Event {
 public:
+#ifdef DEBUG
+	int countGiven;
+#endif
 	int demoTime;
 	entityState_t theEvent;
 	int eventNumber;

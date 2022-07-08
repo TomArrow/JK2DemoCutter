@@ -104,6 +104,12 @@ public:
 		}
 		return countErased;
 	}
+	qboolean isSlotFree(int slotNum) {
+		for (mappingIterator it = mappings.begin(); it != mappings.end();it++ ) {
+			if (it->first == slotNum) return qfalse;
+		}
+		return qtrue;
+	}
 };
 
 demo_t			demo;
@@ -1008,6 +1014,12 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	// Start writing snapshots.
 	qboolean isFirstSnapshot = qtrue;
 	std::stringstream ss;
+
+
+	//std::map<int, float> blockedEntities; // Entities that are blocked because they had an event in the last EVENT_VALID_MSEC timeframe. The value describes the time they started to be blocked.
+	float blockedEntities[MAX_GENTITIES]; // Entities that are blocked because they had an event in the last EVENT_VALID_MSEC timeframe. The value describes the time they started to be blocked.
+	Com_Memset(blockedEntities, 0,sizeof(blockedEntities));
+
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -1223,6 +1235,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
+					if (eventNumber == EV_PLAY_EFFECT) {
+
+						addThisEvent = qtrue;
+					}
 					if (eventNumber == EV_SHIELD_HIT) {
 
 						// Check if we are tracking this player.
@@ -1294,10 +1310,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		// Find empty places in entities and add events.
 		for (int i = 0; i < eventsToAdd.size(); i++) {
 			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-1; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
-				if (targetEntities.find(e) == targetEntities.end()) {
+				if (targetEntities.find(e) == targetEntities.end() && (blockedEntities[e]+EVENT_VALID_MSEC+100.0f) < time && slotManager.isSlotFree(e)) { // Events won't get recognized if they happen on the same entity in a short timeframe. Give it EVENT_VALID_MSEC so the client resets it, and add 100 on top for good measure.
 					// Let's add it!
 					eventsToAdd[i].theEvent.number = e;
 					targetEntities[e] = eventsToAdd[i].theEvent;
+					blockedEntities[e] = time;
 					break;
 				}
 			}

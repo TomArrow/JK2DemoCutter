@@ -1001,7 +1001,7 @@ std::vector<std::string> DemoReader::GetNewCommands(float time) {
 	std::vector<std::string> retVal;
 	SeekToTime(time);
 	for (int i = 0; i < readCommands.size(); i++) {
-		if (readCommands[i].demoTime < time && readCommands[i].demoTime >= lastGottenCommandsTime) {
+		if (readCommands[i].demoTime <= time && readCommands[i].demoTime > lastGottenCommandsTime) {
 			retVal.push_back(readCommands[i].command);
 		}
 	}
@@ -1012,7 +1012,10 @@ std::vector<Event> DemoReader::GetNewEvents(float time) {
 	std::vector<Event> retVal;
 	SeekToTime(time);
 	for (int i = 0; i < readEvents.size(); i++) {
-		if (readEvents[i].demoTime < time && readEvents[i].demoTime >= lastGottenEventsTime) {
+		if (readEvents[i].demoTime <= time && readEvents[i].demoTime > lastGottenEventsTime) {
+#ifdef DEBUG
+			readEvents[i].countGiven++;
+#endif
 			retVal.push_back(readEvents[i]);
 		}
 	}
@@ -1154,6 +1157,7 @@ readNext:
 				if (eventNumber) {
 
 					Event thisEvent;
+					thisEvent.countGiven = 0;
 					thisEvent.demoTime = demoCurrentTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
