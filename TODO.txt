@@ -32,6 +32,7 @@ record speed at when dbs (or other kind of attack) was initiated.
 detect mutual kills (kills each other on same frame)
 detect speed at which dbs was triggered (first frame of dbs)
 detect amount of people surrounding the kill in past 5 seconds (for nice scenes with lots of ppl)
+TODO: For democombiner: regarding reuse of entities for events. also make sure to update the blockedEntities array whenever a slot gets freed. Don't reuse the slot earlier. Also: Don't reserve a slot if it is currently blocked.
 
 DONE: 
 

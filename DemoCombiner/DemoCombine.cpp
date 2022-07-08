@@ -787,8 +787,12 @@ void retimeEntity(entityState_t* entity, float newServerTime, float newDemoTime)
 	vec3_t newPos;
 	BG_EvaluateTrajectory(&entity->pos, newServerTime, newPos);
 	VectorCopy(newPos, entity->pos.trBase);
+	BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
+	VectorCopy(newPos, entity->pos.trDelta);
 	BG_EvaluateTrajectory(&entity->apos, newServerTime, newPos);
 	VectorCopy(newPos, entity->apos.trBase);
+	BG_EvaluateTrajectoryDelta(&entity->apos, newServerTime, newPos);
+	VectorCopy(newPos, entity->apos.trDelta);
 	entity->pos.trTime = newDemoTime;
 	entity->apos.trTime = newDemoTime;
 }
