@@ -781,7 +781,9 @@ int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, cli
 int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
 	return G_FindConfigstringIndex(name, CS_SOUNDS, MAX_SOUNDS, qtrue, clCut,commandsToAdd);
 }
-
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+	return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue, clCut, commandsToAdd);
+}
 
 void retimeEntity(entityState_t* entity, float newServerTime, float newDemoTime) {
 	vec3_t newPos;
@@ -797,7 +799,26 @@ void retimeEntity(entityState_t* entity, float newServerTime, float newDemoTime)
 	entity->apos.trTime = newDemoTime;
 }
 
-
+void remapConfigStrings(entityState_t * tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>*commandsToAdd,qboolean doModelIndex,qboolean doModelIndex2) {
+	int eventHere = tmpEntity->event & ~EV_EVENT_BITS;
+	int maxLength = 0;
+	if (eventHere == EV_GENERAL_SOUND) {
+		int soundIndex = tmpEntity->eventParm;
+		const char* soundName = reader->GetConfigString(CS_SOUNDS + soundIndex,&maxLength);
+		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd);
+		tmpEntity->eventParm = newSoundIndex;
+	}
+	if (doModelIndex && tmpEntity->modelindex) {
+		const char* modelName = reader->GetConfigString(CS_MODELS + tmpEntity->modelindex, &maxLength);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
+		tmpEntity->modelindex = newModelIndex;
+	}
+	if (doModelIndex2 && tmpEntity->modelindex2) {
+		const char* modelName = reader->GetConfigString(CS_MODELS + tmpEntity->modelindex2, &maxLength);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
+		tmpEntity->modelindex2 = newModelIndex;
+	}
+}
 
 
 class NameMatch {
@@ -1122,6 +1143,16 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					// EV_GENERAL_SOUND te->s.trickedentindex = ent->s.number;
 					if (it->second.eType == ET_GENERAL && it->second.weapon == WP_TRIP_MINE && (it->second.eFlags & EF_MISSILE_STICK)) {
 						// It's a trip mine.
+
+						// TODO actually this detection is not reliable because the game reuses entities without clearing them.
+						// Hmmm....
+						// e->inuse = qtrue;
+						// e->classname = "noclass";
+						// e->s.number = e - g_entities;
+						// e->r.ownerNum = ENTITYNUM_NONE;
+						// e->s.modelGhoul2 = 0; //assume not
+						// This is all it does
+
 						int ownerSlot = slotManager.getSlotIfExists(i, it->second.genericenemyindex - 1024);
 						if (it->second.pos.trType == TR_GRAVITY) {
 							// It's flying/in the air.
@@ -1144,13 +1175,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								entityState_t tmpEntity = it->second;
 								tmpEntity.genericenemyindex = ownerSlot + 1024;
 								tmpEntity.number = targetEntitySlot;
-								/*vec3_t newPos;
-								BG_EvaluateTrajectory(&tmpEntity.pos, thisTimeInServerTime, newPos);
-								VectorCopy(newPos, tmpEntity.pos.trBase);
-								BG_EvaluateTrajectory(&tmpEntity.apos, thisTimeInServerTime, newPos);
-								VectorCopy(newPos, tmpEntity.apos.trBase);
-								tmpEntity.pos.trTime = time;
-								tmpEntity.apos.trTime = time;*/
+								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse);
 								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 								if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
