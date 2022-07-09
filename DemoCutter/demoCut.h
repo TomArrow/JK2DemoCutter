@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "anims.h"
+#include "animsStanceMappings.h"
 
 
 #define NULL 0
@@ -1706,3 +1707,6 @@ char tolowerSignSafe(char in);
 
 void BG_EvaluateTrajectory(const trajectory_t* tr, int atTime, vec3_t result);
 void BG_EvaluateTrajectoryDelta(const trajectory_t* tr, int atTime, vec3_t result);
+
+
+int getLikelyStanceFromTorsoAnim(int torsoAnim, demoType_t demoType, byte* probability);

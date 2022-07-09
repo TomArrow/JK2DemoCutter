@@ -1301,7 +1301,23 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 												modInfo << saberMoveNames[attackerEntity->saberMove];
 												if (!modInfo.str().size()) {
 													// THIS IS INVALID!
-													modInfo << saberStyleNames[attackerEntity->fireflag];
+													int saberStance = attackerEntity->fireflag;
+													if (saberStance == 0) {
+														// Server removed this info to prevent cheating I guess...
+														// Let's make a guess.
+														byte stanceProbability = 0; // 0-100
+														int likelyStance = getLikelyStanceFromTorsoAnim(attackerEntity->torsoAnim, demoType, &stanceProbability);
+														if (stanceProbability == 100) {
+															modInfo << saberStyleNames[likelyStance] << "_G";
+														}
+														else {
+															modInfo << saberStyleNames[likelyStance] << "_G" << (int)stanceProbability;
+														}
+													}
+													else {
+
+														modInfo << saberStyleNames[saberStance];
+													}
 													
 												}
 											}

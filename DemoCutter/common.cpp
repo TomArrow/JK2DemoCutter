@@ -1236,3 +1236,59 @@ void BG_EvaluateTrajectoryDelta(const trajectory_t* tr, int atTime, vec3_t resul
 		break;
 	}
 }
+
+
+
+int getLikelyStanceFromTorsoAnim(int torsoAnim,demoType_t demoType, byte* probability) {
+	constexpr int countDm15AnimMappings = sizeof(animStanceMappings15) / sizeof(animStanceMapping_t);
+	constexpr int countDm16AnimMappings = sizeof(animStanceMappings16) / sizeof(animStanceMapping_t);
+
+	if (probability) *probability = 0;
+
+	animStanceMapping_t* mappingHere;
+	if (demoType == DM_15) {
+		if (torsoAnim >= countDm15AnimMappings) {
+			std::cout << "torsoAnim "<< torsoAnim << " higher than max for DM_15 ("<< countDm15AnimMappings <<")\n";
+			return 0;
+		}
+		else {
+			mappingHere = &animStanceMappings15[torsoAnim];
+		}
+	}
+	else {
+		if (torsoAnim >= countDm16AnimMappings) {
+			std::cout << "torsoAnim " << torsoAnim << " higher than max for DM_15 (" << countDm15AnimMappings << ")\n";
+			return 0;
+		}
+		else {
+			mappingHere = &animStanceMappings16[torsoAnim];
+		}
+	}
+
+	if (!mappingHere->totalCount) {
+		return 0; // No idea then.
+	}
+
+	byte highestProbability = 0;
+	int highestProbabilityStance = 0;
+	for (int i = 0; i < POSSIBLE_SABER_STANCE_VALUES; i++) {
+		if (mappingHere->probability[i] > highestProbability) {
+			highestProbability = mappingHere->probability[i];
+			highestProbabilityStance = i;
+		}
+	}
+
+	if (probability) {
+		// Ok I know this looks strange, but the thought is simple:
+		// Even if 100% of our samples indicate a particular stance,
+		// if our sample size for that torsoAnim is under 100, the probability is not that great.
+		// So we take the sqrt of the sample count times 10. Meaning 100 samples = 100% probability still.
+		// But under that, it declines. Then we use whichever probability value ends up smaller.
+		// For sample sizes over 100, effectively the actual probability is used.
+
+		byte actualProbability = (byte)std::min((int)highestProbability,(int)(10.0*sqrt(mappingHere->totalCount)));
+		*probability = actualProbability;
+	}
+	return highestProbabilityStance;
+
+}

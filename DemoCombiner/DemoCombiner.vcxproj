@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\anims.h" />
+    <ClInclude Include="..\DemoCutter\animsStanceMappings.h" />
     <ClInclude Include="..\DemoCutter\demoCut.h" />
     <ClInclude Include="..\shared\DemoReader.h" />
     <ClInclude Include="..\shared\include\ini.h" />

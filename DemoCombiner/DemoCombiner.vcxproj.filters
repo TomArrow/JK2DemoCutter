@@ -45,5 +45,8 @@
     <ClInclude Include="..\DemoCutter\anims.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\DemoCutter\animsStanceMappings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
