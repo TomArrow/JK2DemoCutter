@@ -1292,3 +1292,13 @@ int getLikelyStanceFromTorsoAnim(int torsoAnim,demoType_t demoType, byte* probab
 	return highestProbabilityStance;
 
 }
+
+
+
+float VectorDistance(vec3_t v1, vec3_t v2)
+{
+	vec3_t dir;
+
+	VectorSubtract(v2, v1, dir);
+	return VectorLength(dir);
+} 

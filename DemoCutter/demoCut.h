@@ -1710,3 +1710,6 @@ void BG_EvaluateTrajectoryDelta(const trajectory_t* tr, int atTime, vec3_t resul
 
 
 int getLikelyStanceFromTorsoAnim(int torsoAnim, demoType_t demoType, byte* probability);
+
+
+float VectorDistance(vec3_t v1, vec3_t v2);

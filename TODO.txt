@@ -28,18 +28,18 @@ Dont keep old stuff, it makes stuff slow the bigger the files are. clear the map
 track highest place anyone's ever been!
 track kills where killer jumped over someone else's head. and how many heads? or just. track headjumps before the kill.
 detect allahu akhbar
-record speed at when dbs (or other kind of attack) was initiated.
 detect mutual kills (kills each other on same frame)
-detect speed at which dbs was triggered (first frame of dbs)
 detect amount of people surrounding the kill in past 5 seconds (for nice scenes with lots of ppl)
 TODO: For democombiner: regarding reuse of entities for events. also make sure to update the blockedEntities array whenever a slot gets freed. Don't reuse the slot earlier. Also: Don't reserve a slot if it is currently blocked.
 Also make sure that when reusing entity or player slots, event bits and such are handled properly? 
 use tinfo for health/armor if available.
-in killsprees, show MODs and also main MOD (one with most kills) and also show distance between each kill
 copy door entities. but only copy them from one demo otherwise its chaos. some way to control it...
 
 DONE: 
 
+record speed at when dbs (or other kind of attack) was initiated.
+detect speed at which dbs was triggered (first frame of dbs)
+in killsprees, show MODs and also main MOD (one with most kills) and also show distance between each kill
 TODO: Make it overwrite kills in the database if the ones in database are third person and the new one is first person DONE (via split angles and kills)
 TODO: Have it separate kill and angle. Makes more sense. To know what a demo exists of. Otherwise its just the first one that happens to be analyzed in the database. DONE
 Maybe write server name/subtext and playermodels into thing as well. Thing I mean... database. DONE

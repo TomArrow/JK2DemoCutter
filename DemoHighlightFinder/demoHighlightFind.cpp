@@ -8,6 +8,7 @@
 #include <chrono>
 #include <filesystem>
 #include "sqlite3.h"
+#include <set>
 
 #include <iso646.h>
 #include "picosha3.h"
@@ -47,6 +48,12 @@ std::map< animStanceKey, int> animStanceCounts;
 #define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
 #define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
 
+#define NEARBY_PLAYER_MAX_DISTANCE 1000.0f
+struct NearbyPlayer {
+	int clientNum;
+	float distance;
+};
+
 class Kill {
 public:
 	int time;
@@ -66,6 +73,7 @@ public:
 	std::string attackerName;
 	std::string victimName;
 	std::string modInfoString;
+	std::vector< NearbyPlayer> nearbyPlayers;
 };
 
 struct SpreeInfo {
@@ -708,15 +716,34 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
 		}*/
 		int lastKillTime = 0;
+		std::set<int> nearbyPlayers;
 		for (int i = 0; i < killsOfThisSpree->size(); i++) {
 			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-			victimsSS << (*victims)[i] << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
+			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
 			lastKillTime = (*killsOfThisSpree)[i].time;
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
+			for (int n = 0; n < (*killsOfThisSpree)[i].nearbyPlayers.size(); n++) {
+				nearbyPlayers.insert((*killsOfThisSpree)[i].nearbyPlayers[n].clientNum);
+			}
 		}
 		std::string victimsString = victimsSS.str();
 		std::string victimsNumsString = victimsNumsSS.str();
+
+		// Remove any nearby players that are victims or that are the attacker. (they dont count as nearby players)
+		for (int i = 0; i < killsOfThisSpree->size(); i++) {
+			nearbyPlayers.erase((*killsOfThisSpree)[i].targetClientNum);
+		}
+		nearbyPlayers.erase(clientNumAttacker);
+
+
+		std::stringstream nearbyPlayersSS;
+		int nearbyPlayerscount = 0;
+		for (auto it = nearbyPlayers.begin(); it != nearbyPlayers.end(); it++) {
+			nearbyPlayersSS << (nearbyPlayerscount++ == 0 ? "" : ",") << *it;
+		}
+		std::string nearbyPlayersString = nearbyPlayersSS.str();
+
 
 		std::stringstream killHashesSS;
 		for (int i = 0; i < killHashes->size(); i++) {
@@ -748,6 +775,10 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 		SQLBIND(insertSpreeStatement, int, "@countDooms", spreeInfo->countDooms);
 		SQLBIND(insertSpreeStatement, int, "@countExplosions", spreeInfo->countExplosions);
 		SQLBIND(insertSpreeStatement, int, "@countThirdPersons", spreeInfo->countThirdPersons);
+
+		SQLBIND_TEXT(insertSpreeStatement, "@nearbyPlayers", nearbyPlayers.size() > 0 ? nearbyPlayersString.c_str() : NULL);
+		SQLBIND(insertSpreeStatement, int, "@nearbyPlayerCount", nearbyPlayers.size());
+
 		SQLBIND(insertSpreeStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 		SQLBIND(insertSpreeStatement, int, "@maxSpeedAttacker", maxSpeedAttacker);
 		SQLBIND(insertSpreeStatement, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
@@ -899,6 +930,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"lastSaberMoveChangeSpeed	REAL,"
 		"timeSinceLastSaberMoveChange INTEGER,"
 		"meansOfDeathString	TEXT NOT NULL,"
+		"nearbyPlayers	TEXT,"
+		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"probableKillingWeapon	INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
 		"demoTime INTEGER NOT NULL,"
@@ -920,6 +953,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"countDooms	INTEGER NOT NULL,"
 		"countExplosions	INTEGER NOT NULL,"
 		"countThirdPersons	INTEGER NOT NULL,"
+		"nearbyPlayers	TEXT,"
+		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTargets	REAL,"
@@ -955,17 +990,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange)"
+		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange);";
+		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash, map,killerName, victimNames ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
-		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoTime,duration,serverTime,demoDateTime)"
+		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
 		"( @hash, @shorthash, @map, @killerName, @victimNames ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
-		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoTime,@duration,@serverTime,@demoDateTime)";
+		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
@@ -1464,6 +1499,31 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.modInfoString = modInfo.str();
 							thisKill.attackerName = playername;
 							thisKill.victimName = victimname;
+
+
+							// Find nearby players.
+							std::stringstream nearbyPlayersSS;
+							int nearbyPlayersCount = 0;
+							for (int subPe = demo.cut.Cl.snap.parseEntitiesNum; subPe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; subPe++) {
+								entityState_t* thisEntitySub = &demo.cut.Cl.parseEntities[subPe & (MAX_PARSE_ENTITIES - 1)];
+								if (thisEntitySub->number >= 0 && thisEntitySub->number < MAX_CLIENTS && thisEntitySub->number != attacker && thisEntitySub->number != target) {
+									float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, thisEs->pos.trBase);
+									if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+										nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " ("<<(int)nearbyPlayerDistance<<")";
+										thisKill.nearbyPlayers.push_back({ thisEntitySub->number,nearbyPlayerDistance });
+									}
+								}
+							}
+							if (demo.cut.Cl.snap.ps.clientNum != target && demo.cut.Cl.snap.ps.clientNum != attacker) {
+								float nearbyPlayerDistance = VectorDistance(demo.cut.Cl.snap.ps.origin, thisEs->pos.trBase);
+								if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+									nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << demo.cut.Cl.snap.ps.clientNum << " (" << (int)nearbyPlayerDistance << ")";
+									thisKill.nearbyPlayers.push_back({ demo.cut.Cl.snap.ps.clientNum,nearbyPlayerDistance });
+								}
+							}
+							std::string nearbyPlayersString = nearbyPlayersSS.str();
+
+
 							kills[attacker].push_back(thisKill);
 
 
@@ -1508,6 +1568,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
 							SQLBIND(insertAngleStatement, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
 							SQLBIND_TEXT(insertAngleStatement, "@meansOfDeathString", modString);
+							SQLBIND_TEXT(insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
+							SQLBIND(insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
 							SQLBIND(insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
 							SQLBIND_TEXT(insertAngleStatement, "@demoName", oldBasename.c_str());
 							SQLBIND(insertAngleStatement, int, "@demoTime", demoCurrentTime);
