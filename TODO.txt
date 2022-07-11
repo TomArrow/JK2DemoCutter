@@ -34,6 +34,8 @@ detect speed at which dbs was triggered (first frame of dbs)
 detect amount of people surrounding the kill in past 5 seconds (for nice scenes with lots of ppl)
 TODO: For democombiner: regarding reuse of entities for events. also make sure to update the blockedEntities array whenever a slot gets freed. Don't reuse the slot earlier. Also: Don't reserve a slot if it is currently blocked.
 Also make sure that when reusing entity or player slots, event bits and such are handled properly? 
+use tinfo for health/armor if available.
+in killsprees, show MODs and also main MOD (one with most kills) and also show distance between each kill
 
 DONE: 
 

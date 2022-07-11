@@ -1189,7 +1189,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								}*/
 							}
 							entityState_t* attackerEntity = findEntity(attacker);
-							if (attacker) {
+							if (attackerEntity) {
 								attackerIsVisible = true;
 							}
 							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;

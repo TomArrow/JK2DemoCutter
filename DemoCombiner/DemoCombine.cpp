@@ -1135,6 +1135,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get various related entities
+				int maxLengthTmp;
 				float thisTimeInServerTime;
 				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime,&thisTimeInServerTime);
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
@@ -1144,6 +1145,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					if (it->second.eType == ET_GENERAL && it->second.weapon == WP_TRIP_MINE && (it->second.eFlags & EF_MISSILE_STICK)) {
 						// It's a trip mine.
 
+						// Ignore this: (might be based on mistake)
 						// TODO actually this detection is not reliable because the game reuses entities without clearing them.
 						// Hmmm....
 						// e->inuse = qtrue;
@@ -1177,9 +1179,37 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								tmpEntity.number = targetEntitySlot;
 								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse);
 								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
-								if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
+								/*if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
-								}
+								}*/
+								targetEntities[targetEntitySlot] = tmpEntity;
+							}
+						}
+
+					}
+					
+					// Sentry
+					else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetConfigString(CS_MODELS+ it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
+						// It's a sentry
+
+
+						int ownerSlot = slotManager.getSlotIfExists(i, it->second.owner);
+						if (ownerSlot == -1) {
+							ownerSlot = 0; 
+							// It's a sentry. We want it either way. For now.
+						}
+
+						if (ownerSlot != -1) {
+							int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+							if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+								entityState_t tmpEntity = it->second;
+								tmpEntity.owner = ownerSlot;
+								tmpEntity.number = targetEntitySlot;
+								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse);
+								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+								/*if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
+									//tmpEntity.eventParm = targetPlayerSlot;
+								}*/
 								targetEntities[targetEntitySlot] = tmpEntity;
 							}
 						}
@@ -1267,6 +1297,26 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					if (eventNumber == EV_PLAY_EFFECT) {
 
 						addThisEvent = qtrue;
+					}
+					if (eventNumber == EV_GENERAL_SOUND && thisEvent->theEvent.eType > ET_EVENTS) { // Only copy event entities. Not players with the event or sth.
+
+						// Are we tracking the entity that generated this sound? Actually: This doesnt work bc it only remembers that information if it was a player.
+						if (thisEvent->theEvent.eFlags == EF_SOUNDTRACKER) {
+							// This was a player, so we know which player
+							// So only copy this if we are tracking this player.
+							int soundSourceEntity = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex);
+							if (soundSourceEntity != -1) {
+								thisEvent->theEvent.trickedentindex = soundSourceEntity;
+								remapConfigStrings(&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse);
+								addThisEvent = qtrue;
+							}
+						}
+						else {
+							// Not a player. could be a sentry. Who knows.
+							// We cannot know if we need it, so let's just take it.
+							remapConfigStrings(&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse);
+							addThisEvent = qtrue;
+						}
 					}
 					if (eventNumber == EV_SHIELD_HIT) {
 
