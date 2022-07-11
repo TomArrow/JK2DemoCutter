@@ -921,10 +921,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_exec(killDb, "CREATE TABLE killAngles ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
+		"map	TEXT NOT NULL,"
 		"isReturn	BOOLEAN NOT NULL,"
 		"isVisible	BOOLEAN NOT NULL,"
+		"isSuicide	BOOLEAN NOT NULL,"
 		"attackerIsVisible	BOOLEAN NOT NULL,"
 		"isFollowed	BOOLEAN NOT NULL,"
+		"attackerIsFollowedOrVisible	BOOLEAN NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTarget	REAL,"
@@ -996,9 +999,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ)"
+		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ);";
+		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
@@ -1568,10 +1571,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							SQLBIND_TEXT(insertAngleStatement, "@hash", hash_hex_string.c_str());
 							SQLBIND_TEXT(insertAngleStatement, "@shorthash", shorthash.c_str());
+							SQLBIND_TEXT(insertAngleStatement, "@map", mapname.c_str());
 							SQLBIND(insertAngleStatement, int, "@isReturn", victimIsFlagCarrier);
 							SQLBIND(insertAngleStatement, int, "@isVisible", isVisible);
+							SQLBIND(insertAngleStatement, int, "@isSuicide", isSuicide);
 							SQLBIND(insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
 							SQLBIND(insertAngleStatement, int, "@isFollowed", attackerIsFollowed);
+							SQLBIND(insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
 							SQLBIND(insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
