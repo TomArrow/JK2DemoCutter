@@ -1157,7 +1157,9 @@ readNext:
 				if (eventNumber) {
 
 					Event thisEvent;
+#ifdef DEBUG
 					thisEvent.countGiven = 0;
+#endif
 					thisEvent.demoTime = demoCurrentTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
