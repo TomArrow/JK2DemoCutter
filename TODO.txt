@@ -36,6 +36,7 @@ TODO: For democombiner: regarding reuse of entities for events. also make sure t
 Also make sure that when reusing entity or player slots, event bits and such are handled properly? 
 use tinfo for health/armor if available.
 in killsprees, show MODs and also main MOD (one with most kills) and also show distance between each kill
+copy door entities. but only copy them from one demo otherwise its chaos. some way to control it...
 
 DONE: 
 

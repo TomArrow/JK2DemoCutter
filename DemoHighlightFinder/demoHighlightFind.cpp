@@ -23,6 +23,12 @@ jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has fin
 //std::map<int,int> playerFirstFollowed;
 //std::map<int,int> playerFirstFollowedOrVisible;
 //std::map<int,int> lastEvent;
+struct LastSaberMoveInfo {
+	int lastSaberMove;
+	int lastSaberMoveChange;
+	float speed;
+};
+LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS];
 int playerFirstVisible[MAX_CLIENTS];
 int playerFirstFollowed[MAX_CLIENTS];
 int playerFirstFollowedOrVisible[MAX_CLIENTS];
@@ -52,9 +58,14 @@ public:
 	bool isExplosion;
 	bool isVisible;
 	bool isFollowed;
+	int timeSinceSaberMoveChange;
+	float speedatSaberMoveChange;
 	float victimMaxSpeedPastSecond;
 	std::string hashSourceString;
 	std::string hash;
+	std::string attackerName;
+	std::string victimName;
+	std::string modInfoString;
 };
 
 struct SpreeInfo {
@@ -672,7 +683,7 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 }
 
 
-void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,time_t oldDemoDateModified) {
+void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,time_t oldDemoDateModified) {
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -690,10 +701,18 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker,std::vector<
 
 		std::stringstream victimsSS;
 		std::stringstream victimsNumsSS;
-		for (int i = 0; i < victims->size(); i++) {
+		/*for (int i = 0; i < victims->size(); i++) {
 			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
 			const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-			victimsSS << (*victims)[i] << ": " << Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData)-stringOffset, "n") << "\n";
+			victimsSS << (*victims)[i] << ": " << Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData)-stringOffset, "n") << " ("<< (*killsOfThisSpree)[i].modInfoString<<")" << "\n";
+			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
+		}*/
+		int lastKillTime = 0;
+		for (int i = 0; i < killsOfThisSpree->size(); i++) {
+			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
+			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+			victimsSS << (*victims)[i] << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
+			lastKillTime = (*killsOfThisSpree)[i].time;
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
 		}
 		std::string victimsString = victimsSS.str();
@@ -811,6 +830,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
 	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
 	Com_Memset(lastEvent,0,sizeof(lastEvent));
+	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
 
 
 	sqlite3* killDb;
@@ -876,6 +896,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTarget	REAL,"
+		"lastSaberMoveChangeSpeed	REAL,"
+		"timeSinceLastSaberMoveChange INTEGER,"
 		"meansOfDeathString	TEXT NOT NULL,"
 		"probableKillingWeapon	INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
@@ -933,9 +955,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoTime,serverTime,demoDateTime)"
+		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoTime,@serverTime,@demoDateTime);";
+		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
@@ -1128,18 +1150,34 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 
 
-				// Record speeds.
+				// Record speeds and check sabermove changes
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS && !(thisEs->eFlags & EF_DEAD)) { // Don't count speeds of dead bodies. They get boosts from dying.
 						//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
-						speeds[thisEs->number].push_back({ demoCurrentTime,VectorLength(thisEs->pos.trDelta) });
+						float speed = VectorLength(thisEs->pos.trDelta);
+						speeds[thisEs->number].push_back({ demoCurrentTime,speed });
+
+						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
+						if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
+							playerLastSaberMove[thisEs->number].lastSaberMoveChange = demoCurrentTime;
+							playerLastSaberMove[thisEs->number].lastSaberMove= thisEs->saberMove;
+							playerLastSaberMove[thisEs->number].speed= speed;
+						}
 					}
 				}
 				if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
 					//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
-					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,VectorLength(demo.cut.Cl.snap.ps.velocity) });
+					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
+					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
+
+					// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
+					if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
+						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange = demoCurrentTime;
+						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove = demo.cut.Cl.snap.ps.saberMove;
+						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].speed = speed;
+					}
 				}
 
 #ifdef DEBUGSTATSDB
@@ -1224,6 +1262,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.isVisible = isVisible;
 							thisKill.isFollowed = attackerIsFollowed;
 							thisKill.victimMaxSpeedPastSecond = maxSpeedTargetFloat;
+							thisKill.timeSinceSaberMoveChange = isWorldKill ? -1 : (demoCurrentTime-playerLastSaberMove[attacker].lastSaberMoveChange);
+							thisKill.speedatSaberMoveChange = isWorldKill ? -1 : (playerLastSaberMove[attacker].speed);
 
 
 							// This is the place that had all the continues originally.
@@ -1294,6 +1334,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 											if (!modInfo.str().size()) {
 												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
 											}
+											else {
+												// It's a special attack.
+												// Save speed at which it was executed.
+												modInfo << "_" << (int)thisKill.speedatSaberMoveChange << "u";
+											}
 										}
 										else {
 
@@ -1319,6 +1364,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 														modInfo << saberStyleNames[saberStance];
 													}
 													
+												}
+												else {
+													// It's a special attack.
+													// Save speed at which it was executed.
+													modInfo <<"_" << (int)thisKill.speedatSaberMoveChange<<"u";
 												}
 											}
 										}
@@ -1387,6 +1437,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::string victimname = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- offset, "n");
 
 
+
 							int startTime = demoCurrentTime - bufferTime;
 							int endTime = demoCurrentTime + bufferTime;
 							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
@@ -1410,6 +1461,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							// Ok now with knowing the hash stuff, save into kills list
 							thisKill.hashSourceString = hashss.str();
 							thisKill.hash = hash_hex_string;
+							thisKill.modInfoString = modInfo.str();
+							thisKill.attackerName = playername;
+							thisKill.victimName = victimname;
 							kills[attacker].push_back(thisKill);
 
 
@@ -1451,6 +1505,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
+							SQLBIND(insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
+							SQLBIND(insertAngleStatement, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
 							SQLBIND_TEXT(insertAngleStatement, "@meansOfDeathString", modString);
 							SQLBIND(insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
 							SQLBIND_TEXT(insertAngleStatement, "@demoName", oldBasename.c_str());
@@ -1501,12 +1557,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
+					static std::vector<Kill> killsOfThisSpree;
 					static std::vector<int> victims;
 					static std::vector<std::string> hashes;
 					victims.reserve(10);
 					hashes.reserve(10);
+					killsOfThisSpree.reserve(10);
 					victims.clear();
 					hashes.clear();
+					killsOfThisSpree.clear();
 
 					int clientNumAttacker = clientIt->first;
 					SpreeInfo spreeInfo;
@@ -1532,6 +1591,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							
 							victims.push_back(thisKill->targetClientNum);
 							hashes.push_back(thisKill->hash);
+							killsOfThisSpree.push_back(*thisKill);
 							if (thisKill->isDoom) spreeInfo.countDooms++;
 							if (thisKill->isRet) spreeInfo.countRets++;
 							if (thisKill->isExplosion) spreeInfo.countExplosions++;
@@ -1545,16 +1605,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						else {
 							// This kill is not part of a killspree. Reset.
 							// But first, check if this concludes an existing killspree that we can now save.
-							CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, &hashes, allKillsHashSS.str(),demoCurrentTime,&outputBatHandle,bufferTime,lastGameStateChangeInDemoTime,sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldDemoDateModified);
+							CheckSaveKillstreak(&spreeInfo, clientNumAttacker,&killsOfThisSpree,&victims, &hashes, allKillsHashSS.str(),demoCurrentTime,&outputBatHandle,bufferTime,lastGameStateChangeInDemoTime,sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldDemoDateModified);
 
 							// Reset.
 							Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
 							victims.clear();
 							hashes.clear();
+							killsOfThisSpree.clear();
 							allKillsHashSS.str(std::string());
 						}
 					}
-					CheckSaveKillstreak(&spreeInfo, clientNumAttacker, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement,killDb, oldBasename, oldDemoDateModified);
+					CheckSaveKillstreak(&spreeInfo, clientNumAttacker,&killsOfThisSpree,&victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement,killDb, oldBasename, oldDemoDateModified);
 				
 					// Clean up old kills that no longer have to be stored
 					// We can clear the entire thing since earlier we made sure that we aren't in the middle of an ongoing killstreak
