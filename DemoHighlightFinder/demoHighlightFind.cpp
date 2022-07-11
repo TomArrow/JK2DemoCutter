@@ -934,6 +934,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"probableKillingWeapon	INTEGER NOT NULL,"
+		"directionX	REAL,"
+		"directionY	REAL,"
+		"directionZ	REAL,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
 		"demoTime INTEGER NOT NULL,"
@@ -993,9 +996,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount)"
+		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount);";
+		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
@@ -1578,6 +1581,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND_TEXT(insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
 							SQLBIND(insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
 							SQLBIND(insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
+							if (attackerIsFollowed) {
+								SQLBIND(insertAngleStatement, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
+								SQLBIND(insertAngleStatement, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);
+								SQLBIND(insertAngleStatement, double, "@directionZ", demo.cut.Cl.snap.ps.velocity[2]);
+							}else{
+								SQLBIND(insertAngleStatement, double, "@directionX", attackerEntity? attackerEntity->pos.trDelta[0]:NULL);
+								SQLBIND(insertAngleStatement, double, "@directionY", attackerEntity ? attackerEntity->pos.trDelta[1] : NULL);
+								SQLBIND(insertAngleStatement, double, "@directionZ", attackerEntity ? attackerEntity->pos.trDelta[2] : NULL);
+							} 
 							SQLBIND_TEXT(insertAngleStatement, "@demoName", oldBasename.c_str());
 							SQLBIND_TEXT(insertAngleStatement, "@demoPath", oldPath.c_str());
 							SQLBIND(insertAngleStatement, int, "@demoTime", demoCurrentTime);
