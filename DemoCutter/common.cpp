@@ -1043,10 +1043,10 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		if (s->weapon == WP_SABER && s->fireflag == 0) {
 			// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
 			byte probability;
-			ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType,&probability);
+			ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType,&probability);
 		}
 		else {
-			ps->fd.saberAnimLevel = s->fireflag; 
+			ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = s->fireflag;
 		}
 
 		// This is my own stuff: (restoring viewheight)
