@@ -1601,8 +1601,15 @@ extern std::map <int, std::string>  saberMoveNames;
 extern std::map <int, std::string>  saberStyleNames;
 
 
+
+enum demoType_t {
+	DM_15,
+	DM_16
+};
+
+
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap);
-void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean allValues=qtrue, playerState_t* baseState=NULL);
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues=qtrue, playerState_t* baseState=NULL);
 
 float LerpAngle(float from, float to, float frac);
 
@@ -1689,11 +1696,6 @@ extern demo_t demo;
 
 
 
-
-enum demoType_t {
-	DM_15,
-	DM_16
-};
 
 void sanitizeFilename(const char* input, char* output);
 

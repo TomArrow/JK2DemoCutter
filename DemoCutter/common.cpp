@@ -907,7 +907,7 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 }
 
 // baseState is my modification. It will use values from the base Snap that an entity just doesn't have. PERS_SPAWN_COUNT and precise health/armor
-void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean allValues, playerState_t* baseState) {
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues, playerState_t* baseState) {
 	int		i;
 
 	ps->clientNum = s->number;
@@ -1035,10 +1035,15 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean a
 
 		ps->holocronBits = s->time2;
 
+		if (s->weapon < WP_NUM_WEAPONS) {
+
+			ps->stats[STAT_WEAPONS] |= 1 << s->weapon; // To make weapon select wheel look correct
+		}
+
 		if (s->weapon == WP_SABER && s->fireflag == 0) {
 			// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
-			
-			ps->fd.saberAnimLevel = s->fireflag; // This is invalid. TODO Fix this. Figure it out from anims.
+			byte probability;
+			ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType,&probability);
 		}
 		else {
 			ps->fd.saberAnimLevel = s->fireflag; 
@@ -1069,6 +1074,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, qboolean a
 			ps->fd.forcePower = baseState->fd.forcePower;
 			ps->stats[STAT_HEALTH] = baseState->stats[STAT_HEALTH];
 			ps->stats[STAT_ARMOR] = baseState->stats[STAT_ARMOR];
+			ps->stats[STAT_MAX_HEALTH] = baseState->stats[STAT_MAX_HEALTH];
 		}
 	}
 }
@@ -1240,6 +1246,9 @@ void BG_EvaluateTrajectoryDelta(const trajectory_t* tr, int atTime, vec3_t resul
 
 
 int getLikelyStanceFromTorsoAnim(int torsoAnim,demoType_t demoType, byte* probability) {
+
+	torsoAnim &= ~ANIM_TOGGLEBIT;
+
 	constexpr int countDm15AnimMappings = sizeof(animStanceMappings15) / sizeof(animStanceMapping_t);
 	constexpr int countDm16AnimMappings = sizeof(animStanceMappings16) / sizeof(animStanceMapping_t);
 

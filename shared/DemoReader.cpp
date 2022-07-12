@@ -394,6 +394,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
 	memset(&lastSnap, 0, sizeof(lastSnap));
+	memset(basePlayerStates, 0, sizeof(basePlayerStates));
 
 	readGamestate = 0;
 
@@ -410,6 +411,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastGottenEventsTime = 0;
 
 	snapshotInfos.clear();
+
 
 	//while (oldSize > 0) ReadMessage();
 
@@ -509,7 +511,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboo
 
 		entityState_t* thisEntity = &snap->entities[clientNum];
 		// Need to convert the entity.
-		CG_EntityStateToPlayerState(thisEntity, &retVal,qtrue,baseSnap != -1 ? &snapshotInfos[baseSnap].playerState : NULL);
+		CG_EntityStateToPlayerState(thisEntity, &retVal,demoType,qtrue,baseSnap != -1 ? &snapshotInfos[baseSnap].playerState : &basePlayerStates[clientNum]);
 
 		if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
 			retVal.commandTime = thisEntity->pos.trTime;
@@ -1038,6 +1040,17 @@ const char* DemoReader::GetConfigString(int configStringNum, int* maxLength) {
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
 
+void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-relevant by also reading tinfo and filling health and armor and such
+	int maxLength;
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		const char* playerCS = GetPlayerConfigString(i,&maxLength);
+		int team = atoi(Info_ValueForKey(playerCS, maxLength, "t"));
+		basePlayerStates[i].persistant[PERS_TEAM] = team;
+		basePlayerStates[i].stats[STAT_HEALTH] = 100;
+		basePlayerStates[i].stats[STAT_MAX_HEALTH] = 100;
+	}
+}
+
 qboolean DemoReader::ReadMessage() {
 	if (endReached) return qfalse;
 	if (!ReadMessageReal()) {
@@ -1120,6 +1133,7 @@ readNext:
 			if (!ParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
 				return qfalse;
 			}
+			generateBasePlayerStates();
 			//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 			//newHandle = FS_FOpenFileWrite(newName);
 			//if (!newHandle) {
@@ -1301,6 +1315,7 @@ readNext:
 		}
 	}
 	int firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
+	qboolean hadConfigStringChanges = qfalse;
 	// process any new server commands
 	for (; thisDemo.cut.Clc.lastExecutedServerCommand <= thisDemo.cut.Clc.serverCommandSequence; thisDemo.cut.Clc.lastExecutedServerCommand++) {
 		char* command = thisDemo.cut.Clc.serverCommands[thisDemo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
@@ -1317,6 +1332,7 @@ readNext:
 			if (!ConfigstringModified(&thisDemo.cut.Cl)) {
 				return qfalse;
 			}
+			hadConfigStringChanges = qtrue;
 		}
 		if (!strcmp(cmd, "print")) {
 			//Looking for 
@@ -1383,6 +1399,10 @@ readNext:
 
 
 		}
+	}
+
+	if (hadConfigStringChanges) {
+		generateBasePlayerStates();
 	}
 
 /*#if DEBUG
