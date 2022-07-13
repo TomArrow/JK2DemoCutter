@@ -16,7 +16,11 @@ public:
 	std::string sourceName;
 	std::string demoPath;
 	std::vector<std::string> playersToCopy;
-	float delay;
+	float delay=0.0f; // Absolute delay of the demo time against the target demo time
+	float showStart = 0.0f; // In demo time
+	float showEnd = std::numeric_limits<float>::infinity(); // In demo time
+	float playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
+	float playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
 };
 
 class DemoReaderWrapper {
@@ -24,6 +28,7 @@ public:
 	DemoReader reader;
 	std::vector<int> playersToCopy;
 	DemoSource* sourceInfo;
+	int targetFramesRead;
 };
 
 
@@ -946,6 +951,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		demoReaders.emplace_back();
 		demoReaders.back().reader.LoadDemo((*inputFiles)[i].demoPath.c_str());
 		demoReaders.back().sourceInfo = &(*inputFiles)[i];
+		demoReaders.back().targetFramesRead = 0;
 	}
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
@@ -1052,9 +1058,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		qboolean allSourceDemosFinished = qtrue;
 		targetEntities.clear();
 
+		int thisFrameIndex = 0;
+
 		//copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].reader.SeekToTime(sourceTime-demoReaders[i].sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (sourceTime>= (demoReaders[i].sourceInfo->delay+ demoReaders[i].sourceInfo->showStart) && // Don't start showing stuff from this demo until it starts (controlled by delay & showStart)
+				sourceTime<= (demoReaders[i].sourceInfo->delay+ demoReaders[i].sourceInfo->showEnd) && // Don't show stuff from this demo if we're past showEnd
+				demoReaders[i].reader.SeekToTime(sourceTime-demoReaders[i].sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
@@ -1123,7 +1133,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					// self explanatory.
 					//if (copiedPlayerIndex == 0) {
-					if (targetClientNum == 0) {
+					//if (targetClientNum == 0) {
+					if (sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
+						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
+						thisFrameIndex++ == 0) {
 						mainPlayerPS = tmpPS;
 					}
 					else {
@@ -1279,6 +1292,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get new events and remember them.
+				if (demoReaders[i].sourceInfo->delay < 0 && demoReaders[i].targetFramesRead == 0) {
+					// For demos with a negative delay (part of start cut off), discard events that happened longer than 2 frames ago.
+					demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay - 2.0f * 1000.0f / fps);
+					// Just ignore the return value.
+				}
 				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
 				std::map<int, entityState_t> entitiesHere;
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
@@ -1403,12 +1421,22 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}*/
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
+
+				demoReaders[i].targetFramesRead++;
 			}
-			else {
+			/*else {
 				// We reached the end of this demo.
 				slotManager.freeSlots(i);
 			}
 			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)) {
+				allSourceDemosFinished = qfalse;
+			}*/
+			if (demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)
+					|| sourceTime > (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->showEnd)) {
+				// We reached the end of this demo.
+				slotManager.freeSlots(i);
+			}
+			else {
 				allSourceDemosFinished = qfalse;
 			}
 		}
@@ -1530,9 +1558,40 @@ int main(int argc, char** argv) {
 		std::cout << "[" << section << "]" << std::endl;
 		//std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
 		std::cout << "path: " << collection.get("path") << std::endl;
+
 		float delay = atof(collection.get("delay").c_str());
 		std::cout << "delay: " << delay <<" ms" << std::endl;
 		demoSource.delay = delay;
+
+		std::string showStart = collection.get("start");
+		if (showStart.size() > 0) {
+			float start = atof(showStart.c_str());
+			std::cout << "showStart: " << start << " ms" << std::endl;
+			demoSource.showStart = start;
+		}
+
+		std::string showEnd = collection.get("end");
+		if (showEnd.size() > 0) {
+			float end = atof(showEnd.c_str());
+			std::cout << "showEnd: " << end << " ms" << std::endl;
+			demoSource.showEnd = end;
+		}
+
+		std::string playerStateStart = collection.get("playerStateStart");
+		if (playerStateStart.size() > 0) {
+			float start = atof(playerStateStart.c_str());
+			std::cout << "playerStateStart: " << start << " ms" << std::endl;
+			demoSource.playerStateStart = start;
+		}
+
+		std::string playerStateEnd = collection.get("playerStateEnd");
+		if (playerStateEnd.size() > 0) {
+			float end = atof(playerStateEnd.c_str());
+			std::cout << "playerStateEnd: " << end << " ms" << std::endl;
+			demoSource.playerStateEnd = end;
+		}
+
+
 		demoSource.demoPath = collection.get("path");
 
 		std::vector<std::string> players = splitString(collection.get("players"),",");
