@@ -1715,3 +1715,79 @@ int getLikelyStanceFromTorsoAnim(int torsoAnim, demoType_t demoType, byte* proba
 
 
 float VectorDistance(vec3_t v1, vec3_t v2);
+
+
+
+typedef enum //# ammo_e
+{
+	AMMO_NONE,
+	AMMO_FORCE,		// AMMO_PHASER
+	AMMO_BLASTER,	// AMMO_STARFLEET,
+	AMMO_POWERCELL,	// AMMO_ALIEN,
+	AMMO_METAL_BOLTS,
+	AMMO_ROCKETS,
+	AMMO_EMPLACED,
+	AMMO_THERMAL,
+	AMMO_TRIPMINE,
+	AMMO_DETPACK,
+	AMMO_MAX
+} ammo_t;
+typedef enum {
+	HI_NONE,
+
+	HI_SEEKER,
+	HI_SHIELD,
+	HI_MEDPAC,
+	HI_DATAPAD,
+	HI_BINOCULARS,
+	HI_SENTRY_GUN,
+
+	HI_NUM_HOLDABLE
+} holdable_t;
+
+// gitem_t->type
+typedef enum {
+	IT_BAD,
+	IT_WEAPON,				// EFX: rotate + upscale + minlight
+	IT_AMMO,				// EFX: rotate
+	IT_ARMOR,				// EFX: rotate + minlight
+	IT_HEALTH,				// EFX: static external sphere + rotating internal
+	IT_POWERUP,				// instant on, timer based
+							// EFX: rotate + external ring that rotates
+							IT_HOLDABLE,			// single use, holdable item
+													// EFX: rotate + bob
+													IT_PERSISTANT_POWERUP,
+													IT_TEAM
+} itemType_t;
+
+#define MAX_ITEM_MODELS 4
+
+typedef struct gitem_s {
+	char* classname;	// spawning name
+	char* pickup_sound;
+	char* world_model[MAX_ITEM_MODELS];
+	char* view_model;
+
+	char* icon;
+	//	char		*pickup_name;	// for printing on pickup
+
+	int			quantity;		// for ammo how much, or duration of powerup
+	itemType_t  giType;			// IT_* flags
+
+	int			giTag;
+
+	char* precaches;		// string of all models and images this item will use
+	char* sounds;		// string of all sounds this item will use
+} gitem_t;
+
+extern	gitem_t	bg_itemlist[];
+extern	int		bg_numItems;
+
+typedef enum {
+	CTFMESSAGE_FRAGGED_FLAG_CARRIER,
+	CTFMESSAGE_FLAG_RETURNED,
+	CTFMESSAGE_PLAYER_RETURNED_FLAG,
+	CTFMESSAGE_PLAYER_CAPTURED_FLAG,
+	CTFMESSAGE_PLAYER_GOT_FLAG
+} ctfMsg_t;
+

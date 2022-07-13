@@ -36,6 +36,8 @@ use tinfo for health/armor if available.
 copy door entities. but only copy them from one demo otherwise its chaos. some way to control it...
 record speed at exact time of death (bc some attacks like ydfa stop u dead in tracks and the number ends up misleading)
 add option to extrapolate/predict using only gravity&velocity when demobot has cut away from kill. wont detect ground ofc, but could at least allow to salvage the scene.
+find highest amount of mines at same time
+
 
 DONE: 
 

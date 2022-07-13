@@ -1215,6 +1215,19 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 
 					}
+					// Flag
+					else if (it->second.eType == ET_ITEM && it->second.modelindex && bg_itemlist[it->second.modelindex].giType == IT_TEAM && bg_itemlist[it->second.modelindex].giTag >= PW_REDFLAG && bg_itemlist[it->second.modelindex].giTag <= PW_NEUTRALFLAG ) {
+						
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							entityState_t tmpEntity = it->second;
+							tmpEntity.number = targetEntitySlot;
+							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							targetEntities[targetEntitySlot] = tmpEntity;
+						}
+
+					}
 
 					
 					// Players are already handled otherwhere
@@ -1279,7 +1292,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					if (eventNumber == EV_OBITUARY) {
+					else if (eventNumber == EV_OBITUARY) {
 
 						//int				target = ent->otherEntityNum;
 						//int				attacker = ent->otherEntityNum2;
@@ -1294,11 +1307,24 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					if (eventNumber == EV_PLAY_EFFECT) {
+					else if (eventNumber == EV_CTFMESSAGE) {
+
+						//int				target = ent->otherEntityNum;
+						//int				attacker = ent->otherEntityNum2;
+
+						// Check if we are tracking these players.
+						int mappedPlayer = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex);
+						if (mappedPlayer) {
+							thisEvent->theEvent.trickedentindex = mappedPlayer;
+
+							addThisEvent = qtrue;
+						}
+					}
+					else if (eventNumber == EV_PLAY_EFFECT) {
 
 						addThisEvent = qtrue;
 					}
-					if (eventNumber == EV_GENERAL_SOUND && thisEvent->theEvent.eType > ET_EVENTS) { // Only copy event entities. Not players with the event or sth.
+					else if (eventNumber == EV_GENERAL_SOUND && thisEvent->theEvent.eType > ET_EVENTS) { // Only copy event entities. Not players with the event or sth.
 
 						// Are we tracking the entity that generated this sound? Actually: This doesnt work bc it only remembers that information if it was a player.
 						if (thisEvent->theEvent.eFlags == EF_SOUNDTRACKER) {
@@ -1318,7 +1344,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					if (eventNumber == EV_SHIELD_HIT) {
+					else if (eventNumber == EV_SHIELD_HIT) {
 
 						// Check if we are tracking this player.
 						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
@@ -1328,7 +1354,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					if (eventNumber == EV_SABER_HIT || eventNumber == EV_SABER_BLOCK) { // How to get rid of hits with no corresponding player copied? Check distance?
+					else if (eventNumber == EV_SABER_HIT || eventNumber == EV_SABER_BLOCK) { // How to get rid of hits with no corresponding player copied? Check distance?
 
 						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i].reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue);
 
