@@ -16,6 +16,7 @@ public:
 	std::string sourceName;
 	std::string demoPath;
 	std::vector<std::string> playersToCopy;
+	float delay;
 };
 
 class DemoReaderWrapper {
@@ -1053,7 +1054,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 		//copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].reader.SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (demoReaders[i].reader.SeekToTime(sourceTime-demoReaders[i].sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
@@ -1063,10 +1064,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
-					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime);
+					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime+demoReaders[i].sourceInfo->delay);
 					SnapshotInfo* oldSnap = NULL;
 					SnapshotInfo* newSnap = NULL;
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
 
@@ -1137,7 +1138,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				// Get various related entities
 				int maxLengthTmp;
 				float thisTimeInServerTime;
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime,&thisTimeInServerTime);
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay,&thisTimeInServerTime);
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					
 					// EFFECT_EXPLOSION_TRIPMINE (EV_PLAY_EFFECT)
@@ -1255,7 +1256,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime);
+				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime - demoReaders[i].sourceInfo->delay);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
@@ -1278,7 +1279,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get new events and remember them.
-				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime);
+				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
 				std::map<int, entityState_t> entitiesHere;
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
 				for (int c = 0; c < newEventsHere.size(); c++) {
@@ -1407,7 +1408,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				// We reached the end of this demo.
 				slotManager.freeSlots(i);
 			}
-			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime)) {
+			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)) {
 				allSourceDemosFinished = qfalse;
 			}
 		}
@@ -1529,6 +1530,9 @@ int main(int argc, char** argv) {
 		std::cout << "[" << section << "]" << std::endl;
 		//std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
 		std::cout << "path: " << collection.get("path") << std::endl;
+		float delay = atof(collection.get("delay").c_str());
+		std::cout << "delay: " << delay <<" ms" << std::endl;
+		demoSource.delay = delay;
 		demoSource.demoPath = collection.get("path");
 
 		std::vector<std::string> players = splitString(collection.get("players"),",");
