@@ -47,7 +47,7 @@ class SlotManager {
 	std::map<int, sourceDemoMapping> mappings;
 	typedef std::map<int, sourceDemoMapping>::iterator mappingIterator;
 public:
-	int getPlayerSlot(int demoIndex, int clientNum) {
+	int getPlayerSlot(int demoIndex, int clientNum,qboolean* wasNewPlayer) {
 		// Check if mapping already exists
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
 			if (it->second.demoIndex == demoIndex && it->second.entityNum == clientNum) {
@@ -59,6 +59,9 @@ public:
 			if (mappings.find(i) == mappings.end()) {
 				// Free slot!
 				mappings[i] = { demoIndex,clientNum };
+				if (wasNewPlayer) {
+					*wasNewPlayer = qtrue;
+				}
 				return i;
 			}
 		}
@@ -92,17 +95,19 @@ public:
 		}
 		return -1;
 	}
-	int freeSlots(int demoIndex) {
+	std::vector<int> freeSlots(int demoIndex) { // Returns the erased slots
+		std::vector<int> erasedSlots;
 		int countErased = 0;
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
 			mappingIterator iteratorHere = it;
 			it++;
 			if (iteratorHere->second.demoIndex == demoIndex) {
+				erasedSlots.push_back(iteratorHere->first);
 				mappings.erase(iteratorHere);
 				countErased++;
 			}
 		}
-		return countErased;
+		return erasedSlots;
 	}
 	int freeSlot(int demoIndex, int entityNum) {
 		int countErased = 0;
@@ -1004,13 +1009,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				if (clientNumHere != -1) {
 					std::cout << " [median ping:"<< medianPingsHere[clientNumHere] <<"]" << std::endl;
 					demoReaders[i].playersToCopy.push_back({ clientNumHere,medianPingsHere[clientNumHere] });
-					int targetClientNum = slotManager.getPlayerSlot(i,clientNumHere);
-					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere,&tmpConfigStringMaxLength);
-
-					if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
-						//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
-						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + targetClientNum, tmpConfigString);
-					}
+					
 				}
 				else {
 					std::cout << std::endl;
@@ -1094,7 +1093,18 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
 					int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
 
-					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
+					qboolean isNewPlayer = qfalse;
+					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere, &isNewPlayer);
+					if (isNewPlayer) {
+
+						tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+
+						if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
+							//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
+							commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + targetClientNum, tmpConfigString));
+							demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + targetClientNum, tmpConfigString);
+						}
+					}
 
 					bool thisClientIsTargetPlayerState = sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
 						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
@@ -1472,7 +1482,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			if (demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)
 					|| sourceTime > (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->showEnd)) {
 				// We reached the end of this demo.
-				slotManager.freeSlots(i);
+				std::vector<int> erasedSlots = slotManager.freeSlots(i);
+				for (int sl = 0; sl < erasedSlots.size(); sl++) {
+					int erasedSlot = erasedSlots[sl];
+					if (erasedSlot >= 0 && erasedSlot < MAX_CLIENTS) {
+						commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + erasedSlot, ""));
+						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + erasedSlot, "");
+					}
+				}
 			}
 			else {
 				allSourceDemosFinished = qfalse;
