@@ -524,7 +524,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboo
 	}
 }
 
-playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS) {
+playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS, float* translatedTime) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 
@@ -536,6 +536,11 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, Snaps
 
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
+
+	if (translatedTime) {
+		*translatedTime = time;
+	}
+
 	SeekToPlayerCommandOrServerTime(clientNum,time);
 
 	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.

@@ -1072,12 +1072,18 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
 
+					bool thisClientIsTargetPlayerState = sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
+						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
+						thisFrameIndex++ == 0;
+
 					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime+demoReaders[i].sourceInfo->delay);
 					SnapshotInfo* oldSnap = NULL;
 					SnapshotInfo* newSnap = NULL;
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
+					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
+					float translatedTime = 0.0f;
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
 
@@ -1089,6 +1095,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					// However TODO: This might still be a problem with many clients/bodies? Actually maybe we should just handle this stuff manually or sth?
 					// Idk.
 					if (oldSnap) {
+
+						// Translate translated server time into actual server time (instead of commandtime)
+						float realTranslatedTime = translatedTime - oldSnap->playerCommandOrServerTimes[clientNumHere] + oldSnap->serverTime;
+
 						for (auto it = oldSnap->entities.begin(); it != oldSnap->entities.end(); it++) {
 							// Players are already handled otherwhere
 							if (it->first >= MAX_CLIENTS) {
@@ -1101,7 +1111,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 											entityState_t tmpEntity = it->second;
 											tmpEntity.clientNum = targetClientNum;
 											tmpEntity.number = targetEntitySlot;
-											tmpEntity.pos.trTime = time;
+											retimeEntity(&tmpEntity, realTranslatedTime, time);
+											//tmpEntity.pos.trTime = time;
 											if (EV_BODY_QUEUE_COPY == (tmpEntity.event & ~EV_EVENT_BITS)) {
 												tmpEntity.eventParm = targetClientNum;
 											}
@@ -1134,9 +1145,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					// self explanatory.
 					//if (copiedPlayerIndex == 0) {
 					//if (targetClientNum == 0) {
-					if (sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
-						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
-						thisFrameIndex++ == 0) {
+					if (thisClientIsTargetPlayerState) {
 						mainPlayerPS = tmpPS;
 					}
 					else {

@@ -38,6 +38,7 @@ record speed at exact time of death (bc some attacks like ydfa stop u dead in tr
 add option to extrapolate/predict using only gravity&velocity when demobot has cut away from kill. wont detect ground ofc, but could at least allow to salvage the scene.
 find highest amount of mines at same time
 MAYBE do something about the command time-normal time delay issue? Idk what. Fixed offset? Determine from ping one time and then apply fixed value?
+MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures
 
 DONE: 
 
