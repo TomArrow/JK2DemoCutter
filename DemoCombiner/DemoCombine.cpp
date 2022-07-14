@@ -839,7 +839,7 @@ public:
 	int clientNum;
 };
 
-int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
+int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean printEndLine = qfalse) {
 	const char* tmpConfigString;
 	int tmpConfigStringMaxLength;
 	int clientNumHere = -1;
@@ -850,7 +850,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 		clientNumHere = atoi(thisPlayer->c_str());
 		tmpConfigString = reader->GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
 		std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
-		std::cout << *thisPlayer << " (interpreted as clientNum) matches '" << nameHere << "' (" << clientNumHere << ")" << std::endl;
+		std::cout << *thisPlayer << " (interpreted as clientNum) matches '" << nameHere << "' (" << clientNumHere << ")";
 	}
 	else {
 		std::string thisPlayerLower = *thisPlayer;
@@ -885,11 +885,11 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 			for (int c = 0; c < matches.size(); c++) {
 				std::cout << matches[c].matchedName << "(" << matches[c].clientNum << ")" << std::endl;
 			}
-			std::cout << "Picking first match '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")" << std::endl;
+			std::cout << "Picking first match '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")";
 			clientNumHere = matches[0].clientNum;
 		}
 		else if (matches.size() == 1) {
-			std::cout <<"'" << *thisPlayer << "' matches '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")" << std::endl;
+			std::cout <<"'" << *thisPlayer << "' matches '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")";
 			clientNumHere = matches[0].clientNum;
 		}
 		else {
@@ -899,18 +899,21 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader) {
 				for (int c = 0; c < caseInsensitiveMatches.size(); c++) {
 					std::cout << caseInsensitiveMatches[c].matchedName << "(" << caseInsensitiveMatches[c].clientNum << ")" << std::endl;
 				}
-				std::cout << "Picking first match '" << caseInsensitiveMatches[0].matchedName << "' ("<<caseInsensitiveMatches[0].clientNum<<")" << std::endl;
+				std::cout << "Picking first match '" << caseInsensitiveMatches[0].matchedName << "' ("<<caseInsensitiveMatches[0].clientNum<<")";
 				clientNumHere = caseInsensitiveMatches[0].clientNum;
 			}
 			else if (caseInsensitiveMatches.size() == 1) {
-				std::cout << "'" << *thisPlayer << "' matches '" << caseInsensitiveMatches[0].matchedName << "' (" << caseInsensitiveMatches[0].clientNum << ")" << std::endl;
+				std::cout << "'" << *thisPlayer << "' matches '" << caseInsensitiveMatches[0].matchedName << "' (" << caseInsensitiveMatches[0].clientNum << ")";
 				clientNumHere = caseInsensitiveMatches[0].clientNum;
 			}
 			else {
-				std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding." << std::endl;
+				std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
 				// No match. Try case insensitive
 			}
 		}
+	}
+	if (printEndLine) {
+		std::cout << std::endl;
 	}
 	return clientNumHere;
 }
@@ -999,6 +1002,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
 				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
 				if (clientNumHere != -1) {
+					std::cout << " [median ping:"<< medianPingsHere[clientNumHere] <<"]" << std::endl;
 					demoReaders[i].playersToCopy.push_back({ clientNumHere,medianPingsHere[clientNumHere] });
 					int targetClientNum = slotManager.getPlayerSlot(i,clientNumHere);
 					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere,&tmpConfigStringMaxLength);
@@ -1007,6 +1011,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
 						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + targetClientNum, tmpConfigString);
 					}
+				}
+				else {
+					std::cout << std::endl;
 				}
 			}
 			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
