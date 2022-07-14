@@ -1285,6 +1285,21 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 
 					}
+					// Force shield
+					else if (it->second.eType == ET_SPECIAL && it->second.modelindex == HI_SHIELD) {
+						
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							entityState_t tmpEntity = it->second;
+							tmpEntity.number = targetEntitySlot;
+							int mappedOwner = slotManager.getSlotIfExists(i, it->second.owner);
+							tmpEntity.owner = mappedOwner == -1 ? 0 : mappedOwner; // We want force shields always no matter who made them. For now.
+							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							targetEntities[targetEntitySlot] = tmpEntity;
+						}
+
+					}
 
 					
 					// Players are already handled otherwhere
