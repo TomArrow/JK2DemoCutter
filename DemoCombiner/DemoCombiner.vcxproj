@@ -24,6 +24,7 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp" />
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
+    <ClCompile Include="..\shared\DemoReaderLight.cpp" />
     <ClCompile Include="DemoCombine.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -31,6 +32,7 @@
     <ClInclude Include="..\DemoCutter\animsStanceMappings.h" />
     <ClInclude Include="..\DemoCutter\demoCut.h" />
     <ClInclude Include="..\shared\DemoReader.h" />
+    <ClInclude Include="..\shared\DemoReaderLight.h" />
     <ClInclude Include="..\shared\include\ini.h" />
     <ClInclude Include="..\shared\include\jpcre2.hpp" />
     <ClInclude Include="..\shared\include\pcre2.h" />

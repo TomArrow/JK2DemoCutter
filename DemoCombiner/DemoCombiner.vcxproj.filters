@@ -17,6 +17,9 @@
     <ClCompile Include="..\shared\DemoReader.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\DemoReaderLight.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -46,6 +49,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\DemoCutter\animsStanceMappings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\DemoReaderLight.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,5 +1,6 @@
 #include "demoCut.h"
 #include "DemoReader.h"
+#include "DemoReaderLight.h"
 #include "ini.h"
 #include <vector>
 #include <sstream>
@@ -23,10 +24,15 @@ public:
 	float playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
 };
 
+struct SourcePlayerInfo {
+	int clientNum;
+	int medianPing;
+};
+
 class DemoReaderWrapper {
 public:
 	DemoReader reader;
-	std::vector<int> playersToCopy;
+	std::vector<SourcePlayerInfo> playersToCopy;
 	DemoSource* sourceInfo;
 	int targetFramesRead;
 };
@@ -946,12 +952,15 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	memset(&demo, 0, sizeof(demo));
 
+	std::vector<DemoReaderLight> pingDemoReaders;
 	std::vector<DemoReaderWrapper> demoReaders;
 	for (int i = 0; i < inputFiles->size(); i++) {
 		demoReaders.emplace_back();
+		pingDemoReaders.emplace_back();
 		demoReaders.back().reader.LoadDemo((*inputFiles)[i].demoPath.c_str());
 		demoReaders.back().sourceInfo = &(*inputFiles)[i];
 		demoReaders.back().targetFramesRead = 0;
+		pingDemoReaders.back().LoadDemo((*inputFiles)[i].demoPath.c_str());
 	}
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
@@ -979,12 +988,18 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, just for whatever's sake. Maybe not necessary? Could help with stuff like DARK Homebase demos, since player configstrings are sent a bit later?
 			
+			// Get ping info by preparsing entire demo in the lighter demo reader
+			int	medianPingsHere[MAX_CLIENTS];
+			pingDemoReaders[i].ReadToEnd();
+			pingDemoReaders[i].GetMedianPingData(medianPingsHere);
+			pingDemoReaders[i].FreePingData();
+
 			for (int p = 0; p < demoReaders[i].sourceInfo->playersToCopy.size(); p++) {
 
 				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
 				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
 				if (clientNumHere != -1) {
-					demoReaders[i].playersToCopy.push_back(clientNumHere);
+					demoReaders[i].playersToCopy.push_back({ clientNumHere,medianPingsHere[clientNumHere] });
 					int targetClientNum = slotManager.getPlayerSlot(i,clientNumHere);
 					tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere,&tmpConfigStringMaxLength);
 
@@ -998,6 +1013,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			lastSpectatedClientNums[i] = spectatedClient;
 		}
 	}
+	pingDemoReaders.clear();
 	
 	
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000");
@@ -1068,7 +1084,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
-					int clientNumHere = demoReaders[i].playersToCopy[c];
+					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
+					int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
 
 					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere);
 
@@ -1083,7 +1100,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					SnapshotInfo* newSnap = NULL;
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
 					float translatedTime = 0.0f;
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- medianPlayerPingHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
 
@@ -1315,8 +1332,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					qboolean addThisEvent = qfalse;
 					if (eventNumber == EV_PLAYER_TELEPORT_IN || eventNumber == EV_PLAYER_TELEPORT_OUT) {
 						//if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
-						if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(), thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
-							thisEvent->theEvent.clientNum = i;
+						//if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(), thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
+						//	thisEvent->theEvent.clientNum = i;
+						//	addThisEvent = qtrue;
+						//}
+						int mappedClientNum = slotManager.getSlotIfExists(i, thisEvent->theEvent.clientNum);
+						if (mappedClientNum != -1) {
+							thisEvent->theEvent.clientNum = mappedClientNum;
 							addThisEvent = qtrue;
 						}
 					}
