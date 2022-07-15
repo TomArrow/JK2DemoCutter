@@ -29,14 +29,27 @@ struct LastSaberMoveInfo {
 	int lastSaberMoveChange;
 	float speed;
 };
+struct TeamInfo {
+	int playerCount;
+	int score;
+};
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS];
 int playerFirstVisible[MAX_CLIENTS];
 int playerFirstFollowed[MAX_CLIENTS];
 int playerFirstFollowedOrVisible[MAX_CLIENTS];
+int recentFlagHoldTimes[MAX_CLIENTS];
+int playerTeams[MAX_CLIENTS];
+TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
+
+
+struct cgs{
+	int redflag, blueflag, yellowflag;
+	int redFlagLastChange, blueFlagLastChange, yellowflagLastChange;
+} cgs;
 
 
 #ifdef DEBUGSTATSDB
@@ -46,6 +59,7 @@ std::map< animStanceKey, int> animStanceCounts;
 
 
 #define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
+#define SQLBIND_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
 #define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
 
 #define NEARBY_PLAYER_MAX_DISTANCE 1000.0f
@@ -625,6 +639,24 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 }
 
 
+void setPlayerAndTeamData(clientActive_t* clCut) {
+	int stringOffset;
+	memset(teamInfo,0,sizeof(teamInfo));
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+
+		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS + i];
+		const char* playerInfo = clCut->gameState.stringData + stringOffset;
+		int team = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "t"));
+		playerTeams[i] = team;
+		teamInfo[team].playerCount++;
+	}
+	stringOffset = clCut->gameState.stringOffsets[CS_SCORES1];
+	teamInfo[TEAM_RED].score = atoi(clCut->gameState.stringData + stringOffset);
+	stringOffset = clCut->gameState.stringOffsets[CS_SCORES2];
+	teamInfo[TEAM_BLUE].score = atoi(clCut->gameState.stringData + stringOffset);
+}
+
+
 void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* insertPlayerModelStatement,sqlite3_stmt* updatePlayerModelCountStatement) {
 
 
@@ -863,6 +895,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
 	Com_Memset(lastEvent,0,sizeof(lastEvent));
 	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
+	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
+	Com_Memset(playerTeams,0,sizeof(playerTeams));
+	Com_Memset(teamInfo,0,sizeof(teamInfo));
+	Com_Memset(&cgs,0,sizeof(cgs));
 
 
 	sqlite3* killDb;
@@ -879,7 +915,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"isDoomKill	BOOLEAN NOT NULL,"
 		"isExplosion	BOOLEAN NOT NULL,"
 		"isSuicide	BOOLEAN NOT NULL,"
-		"isVisible	BOOLEAN NOT NULL,"
+		"targetIsVisible	BOOLEAN NOT NULL,"
 		"attackerIsVisible	BOOLEAN NOT NULL,"
 		"isFollowed	BOOLEAN NOT NULL,"
 		"meansOfDeath	INTEGER NOT NULL,"
@@ -905,6 +941,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"serverName	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
 		"victimName	TEXT NOT NULL,"
+		"killerTeam	INTEGER NOT NULL,"
+		"victimTeam	INTEGER NOT NULL,"
+		"redScore INTEGER,"
+		"blueScore INTEGER,"
+		"otherFlagStatus INTEGER,"
+		"redPlayerCount INTEGER,"
+		"bluePlayerCount INTEGER,"
 		"killerClientNum	INTEGER NOT NULL,"
 		"victimClientNum	INTEGER NOT NULL,"
 		"isDoomKill	BOOLEAN NOT NULL,"
@@ -923,10 +966,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"shorthash	TEXT,"
 		"map	TEXT NOT NULL,"
 		"isReturn	BOOLEAN NOT NULL,"
-		"isVisible	BOOLEAN NOT NULL,"
+		"flagHoldTime	INTEGER,"
+		"targetIsVisible	BOOLEAN NOT NULL,"
+		"targetIsFollowed	BOOLEAN NOT NULL,"
+		"targetIsFollowedOrVisible	BOOLEAN NOT NULL,"
 		"isSuicide	BOOLEAN NOT NULL,"
 		"attackerIsVisible	BOOLEAN NOT NULL,"
-		"isFollowed	BOOLEAN NOT NULL,"
+		"attackerIsFollowed	BOOLEAN NOT NULL,"
 		"attackerIsFollowedOrVisible	BOOLEAN NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
@@ -985,23 +1031,23 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		NULL,NULL,NULL);
 	
 	/*char* preparedStatementText = "INSERT INTO kills"
-		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, isVisible,attackerIsVisible,"
+		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, targetIsVisible,attackerIsVisible,"
 		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
 		"positionY, positionZ,demoName,demoTime, serverTime, demoDateTime)"
 		"VALUES "
-		"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @isVisible,@attackerIsVisible,"
+		"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @targetIsVisible,@attackerIsVisible,"
 		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 		"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
 	char* preparedStatementText = "INSERT INTO kills"
-		"(hash,shorthash,map,serverName,killerName,victimName,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
+		"(hash,shorthash,map,serverName,killerName,victimName,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
 		"VALUES "
-		"(@hash,@shorthash,@map,@serverName,@killerName,@victimName,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
+		"(@hash,@shorthash,@map,@serverName,@killerName,@victimName,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,isVisible,attackerIsVisible,isFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,isReturn,flagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@isVisible,@attackerIsVisible,@isFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@isReturn,@flagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
@@ -1172,6 +1218,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				}
 
 				CheckForNameChanges(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement);
+				setPlayerAndTeamData(&demo.cut.Cl);
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
 				//if (!newHandle) {
@@ -1254,8 +1301,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							bool			isSuicide;
 							bool			isDoomKill;
 							bool			isWorldKill = false;
-							bool			isVisible = false;
+							bool			targetIsVisible = false;
 							bool			attackerIsVisibleOrFollowed = false;
+							bool			targetIsVisibleOrFollowed = false;
 							bool			attackerIsVisible = false;
 							if (target < 0 || target >= MAX_CLIENTS) {
 								std::cout << "CG_Obituary: target out of range. This should never happen really.";
@@ -1267,7 +1315,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							}
 							entityState_t* targetEntity = findEntity(target);
 							if (targetEntity) {
-								isVisible = true;
+								targetIsVisible = true;
 								/*if (targetEntity->powerups & (1 << PW_REDFLAG) || targetEntity->powerups & (1 << PW_BLUEFLAG)) {
 									// If the victim isn't visible, his entity won't be available, thus this won't be set
 									// But we're trying to find interesting moments, so stuff that's not even visible is not that interesting to us
@@ -1282,10 +1330,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							isSuicide = target == attacker;
 							isDoomKill = mod == MOD_FALLING;
+							bool targetIsFollowed = demo.cut.Cl.snap.ps.clientNum == target;
 							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
 							attackerIsVisibleOrFollowed = attackerIsFollowed || attackerIsVisible;
+							targetIsVisibleOrFollowed = targetIsFollowed || targetIsVisible;
 
-							//isVisible = isVisible && attackerIsVisibleOrFollowed; // Make sure both attacker and victim are visible. Some servers send info
+							//targetIsVisible = targetIsVisible && attackerIsVisibleOrFollowed; // Make sure both attacker and victim are visible. Some servers send info
 
 							float maxSpeedTargetFloat = getMaxSpeedForClientinTimeFrame(target, demoCurrentTime - 1000, demoCurrentTime);
 							int maxSpeedTarget = maxSpeedTargetFloat;
@@ -1307,7 +1357,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.mod = (meansOfDeath_t)mod;
 							thisKill.targetClientNum = target;
 							thisKill.time = demoCurrentTime;
-							thisKill.isVisible = isVisible;
+							//thisKill.isVisible = targetIsVisible;
+							thisKill.isVisible = targetIsVisibleOrFollowed;
 							thisKill.isFollowed = attackerIsFollowed;
 							thisKill.victimMaxSpeedPastSecond = maxSpeedTargetFloat;
 							thisKill.timeSinceSaberMoveChange = isWorldKill ? -1 : (demoCurrentTime-playerLastSaberMove[attacker].lastSaberMoveChange);
@@ -1552,6 +1603,23 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND_TEXT(insertStatement, "@serverName", serverName.c_str());
 							SQLBIND_TEXT(insertStatement, "@killerName", playername.c_str());
 							SQLBIND_TEXT(insertStatement, "@victimName", victimname.c_str());
+							if (isWorldKill) {
+								SQLBIND_NULL(insertStatement, "@killerTeam");
+							}
+							else {
+								SQLBIND(insertStatement, int, "@killerTeam", playerTeams[attacker]);
+							}
+							SQLBIND(insertStatement, int, "@victimTeam", playerTeams[target]);
+							SQLBIND(insertStatement, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND(insertStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							if (victimIsFlagCarrier) {
+								SQLBIND(insertStatement, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.redflag : cgs.blueflag);
+							}
+							else {
+								SQLBIND_NULL(insertStatement, "@otherFlagStatus");
+							}
+							SQLBIND(insertStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND(insertStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
 							SQLBIND(insertStatement, int, "@killerClientNum", attacker);
 							SQLBIND(insertStatement, int, "@victimClientNum", target);
 							SQLBIND(insertStatement, int, "@isDoomKill", isDoomKill);
@@ -1573,10 +1641,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND_TEXT(insertAngleStatement, "@shorthash", shorthash.c_str());
 							SQLBIND_TEXT(insertAngleStatement, "@map", mapname.c_str());
 							SQLBIND(insertAngleStatement, int, "@isReturn", victimIsFlagCarrier);
-							SQLBIND(insertAngleStatement, int, "@isVisible", isVisible);
+							if (victimIsFlagCarrier) {
+								SQLBIND(insertAngleStatement, int, "@flagHoldTime", recentFlagHoldTimes[target]);
+							}
+							else {
+								SQLBIND_NULL(insertAngleStatement, "@flagHoldTime");
+							}
+							SQLBIND(insertAngleStatement, int, "@targetIsVisible", targetIsVisible);
+							SQLBIND(insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
+							SQLBIND(insertAngleStatement, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
 							SQLBIND(insertAngleStatement, int, "@isSuicide", isSuicide);
 							SQLBIND(insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
-							SQLBIND(insertAngleStatement, int, "@isFollowed", attackerIsFollowed);
+							SQLBIND(insertAngleStatement, int, "@attackerIsFollowed", attackerIsFollowed);
 							SQLBIND(insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
 							SQLBIND(insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
@@ -1610,7 +1686,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 
-							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
+							//if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisible) continue; // Not that interesting.
+							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisibleOrFollowed) continue; // Not that interesting.
 							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
 							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
 							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
@@ -1751,9 +1828,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
 								lastKnownRedFlagCarrier = thisEntity->number;
+								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChange;
 							}
 							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
 								lastKnownBlueFlagCarrier = thisEntity->number;
+								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChange;
 							}
 						}
 					}
@@ -1817,6 +1896,53 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				if (!demoCutConfigstringModified(&demo.cut.Cl)) {
 					goto cuterror;
 				}
+
+				int index = atoi(Cmd_Argv(1));
+				if (index == CS_FLAGSTATUS) {
+					char* str = Cmd_Argv(2);
+
+					int redflagTmp, blueflagTmp, yellowflagTmp;
+					// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
+					if (strlen(str) >= 2) {
+						redflagTmp = str[0] - '0';
+						blueflagTmp = str[1] - '0';
+					}
+					else { // This is some weird bug/imperfection in the code. Sometimes it just sends cs 23 0 for whatever reason. Seems to happen at end of games.
+						redflagTmp = 0;
+						blueflagTmp = 0;
+					}
+					if (strlen(str) >= 3) { // Too lazy to do other way lol.
+						yellowflagTmp = str[2] - '0';
+					}
+					else {
+						yellowflagTmp = 0;
+					}
+
+					if (cgs.redflag != redflagTmp) {
+						/* // Actually, we can't do this here bc lastknownredflagcarrier might not be actually known.
+						if (redflagTmp == 1) { // Was just picked up. Set flag hold time to 0.
+							recentFlagHoldTimes[lastKnownRedFlagCarrier] = 0;
+						}
+						if (cgs.redflag == 1) { // Was taken before. So just count the flag hold time.
+							recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime-cgs.redFlagLastChange;
+						}*/
+						cgs.redFlagLastChange = demoCurrentTime;
+					}
+					if (cgs.blueflag != blueflagTmp) {
+						cgs.blueFlagLastChange = demoCurrentTime;
+					}
+					if (cgs.yellowflag != yellowflagTmp) {
+						cgs.yellowflagLastChange = demoCurrentTime;
+					}
+					cgs.redflag = redflagTmp;
+					cgs.blueflag = blueflagTmp;
+					cgs.yellowflag = yellowflagTmp;
+					/*if (cgs.isCTFMod && cgs.CTF3ModeActive)
+						demo.cgs.yellowflag = str[2] - '0';
+					else
+						demo.cgs.yellowflag = 0;*/
+				}
+
 				hadConfigStringCommands = true;
 			}
 			if (!strcmp(cmd, "print")) {
@@ -1917,6 +2043,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 		if (hadConfigStringCommands) {
 			CheckForNameChanges(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement);
+			setPlayerAndTeamData(&demo.cut.Cl);
 		}
 
 #if DEBUG

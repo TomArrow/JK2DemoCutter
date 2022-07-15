@@ -37,11 +37,19 @@ copy door entities. but only copy them from one demo otherwise its chaos. some w
 record speed at exact time of death (bc some attacks like ydfa stop u dead in tracks and the number ends up misleading)
 add option to extrapolate/predict using only gravity&velocity when demobot has cut away from kill. wont detect ground ofc, but could at least allow to salvage the scene.
 find highest amount of mines at same time
-MAYBE do something about the command time-normal time delay issue? Idk what. Fixed offset? Determine from ping one time and then apply fixed value?
 MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures
+MAYBE current stance of victim? not important tho.
 
 DONE: 
 
+MAYBE do something about the command time-normal time delay issue? Idk what. Fixed offset? Determine from ping one time and then apply fixed value?
+save whether the flag carrier was blue or red. relevant bc locations and directions
+also save whether other flag was taken or on pad
+maybe save current score too?
+also save how long the flag hold time was at time of ret
+attacker and victim teams.
+IMPORTANT save kills where victim is followed!
+also save whether victim was followed and make also variable "victimvisibleorfollowed"
 record speed at when dbs (or other kind of attack) was initiated.
 detect speed at which dbs was triggered (first frame of dbs)
 in killsprees, show MODs and also main MOD (one with most kills) and also show distance between each kill

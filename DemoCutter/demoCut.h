@@ -32,6 +32,8 @@ typedef struct _iobuf
 
 #define MAX_CLIENTS			32
 
+#define MAX_TEAMS 64 // This is some bs from ui_local.h lol. I don't think it's valid but it's best I got
+
 #define	MAX_QPATH			64		// max length of a quake game pathname
 #define	MAX_OSPATH			256
 #define	PATH_SEP '\\'
@@ -211,6 +213,17 @@ typedef enum {
 	STAT_JUMPTIME,
 	STAT_WJTIME
 } statIndex_t;
+
+
+typedef enum {
+	TEAM_FREE,
+	TEAM_RED,
+	TEAM_BLUE,
+	TEAM_SPECTATOR,
+
+	TEAM_NUM_TEAMS
+} team_t;
+
 
 #define	GIB_HEALTH			-40
 
