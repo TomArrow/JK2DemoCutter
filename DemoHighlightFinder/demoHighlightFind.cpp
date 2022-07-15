@@ -1042,6 +1042,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"wasVisible	BOOLEAN NOT NULL,"
 		"wasFollowed	BOOLEAN NOT NULL,"
 		"wasFollowedOrVisible	BOOLEAN NOT NULL,"
+		"runnerClientNum	INTEGER NOT NULL,"
+		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
 		"demoTime INTEGER NOT NULL,"
@@ -1113,9 +1115,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,readableTime,totalMilliseconds,playerName,isTop10,isNumber1,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,readableTime,totalMilliseconds,playerName,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@readableTime,@totalMilliseconds,@playerName,@isTop10,@isNumber1,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@readableTime,@totalMilliseconds,@playerName,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
@@ -2288,7 +2290,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SQLBIND(insertDefragRunStatement, int, "@wasVisible", wasVisible);
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
-					
+					SQLBIND(insertDefragRunStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+					SQLBIND(insertDefragRunStatement, int, "@runnerClientnum", playerNumber);
+
 					int queryResult = sqlite3_step(insertDefragRunStatement);
 					if (queryResult != SQLITE_DONE) {
 						std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(killDb) << "\n";
