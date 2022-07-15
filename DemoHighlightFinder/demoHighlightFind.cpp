@@ -49,6 +49,7 @@ int lastKnownBlueFlagCarrier = -1;
 struct cgs{
 	int redflag, blueflag, yellowflag;
 	int redFlagLastChange, blueFlagLastChange, yellowflagLastChange;
+	int redFlagLastChangeToTaken, blueFlagLastChangeToTaken, yellowflagLastChangeToTaken;
 } cgs;
 
 
@@ -977,6 +978,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTarget	REAL,"
+		"currentSpeedAttacker	REAL,"
+		"currentSpeedTarget	REAL,"
 		"lastSaberMoveChangeSpeed	REAL,"
 		"timeSinceLastSaberMoveChange INTEGER,"
 		"meansOfDeathString	TEXT NOT NULL,"
@@ -986,6 +989,38 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"directionX	REAL,"
 		"directionY	REAL,"
 		"directionZ	REAL,"
+		"demoName TEXT NOT NULL,"
+		"demoPath TEXT NOT NULL,"
+		"demoTime INTEGER NOT NULL,"
+		"serverTime INTEGER NOT NULL,"
+		"demoDateTime TIMESTAMP NOT NULL"
+		"); ",
+		NULL, NULL, NULL);
+	sqlite3_exec(killDb, "CREATE TABLE captures ("
+		"map	TEXT NOT NULL,"
+		"serverName	TEXT NOT NULL,"
+		"flagHoldTime	INTEGER,"
+		"capperName	TEXT NOT NULL,"
+		"capperClientNum INTEGER NOT NULL,"
+		"capperIsVisible	BOOLEAN NOT NULL,"
+		"capperIsFollowed	BOOLEAN NOT NULL,"
+		"capperIsFollowedOrVisible	BOOLEAN NOT NULL,"
+		"capperWasVisible	BOOLEAN NOT NULL,"
+		"capperWasFollowed	BOOLEAN NOT NULL,"
+		"capperWasFollowedOrVisible	BOOLEAN NOT NULL,"
+		"demoRecorderClientnum	INTEGER NOT NULL,"
+		"flagTeam	INTEGER NOT NULL,"
+		"maxSpeedCapper	REAL,"
+		"nearbyPlayers	TEXT,"
+		"nearbyPlayerCount	INTEGER NOT NULL,"
+		"nearbyEnemies	TEXT,"
+		"nearbyEnemyCount	INTEGER NOT NULL,"
+		"directionX	REAL,"
+		"directionY	REAL,"
+		"directionZ	REAL,"
+		"positionX	REAL,"
+		"positionY	REAL,"
+		"positionZ	REAL,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
 		"demoTime INTEGER NOT NULL,"
@@ -1045,11 +1080,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,flagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,isReturn,flagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@flagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@isReturn,@flagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
+	preparedStatementText = "INSERT INTO captures"
+		"(map,serverName,flagHoldTime,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"VALUES "
+		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+	sqlite3_stmt* insertCaptureStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash, map,killerName, victimNames ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
@@ -1667,11 +1708,27 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								SQLBIND(insertAngleStatement, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
 								SQLBIND(insertAngleStatement, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);
 								SQLBIND(insertAngleStatement, double, "@directionZ", demo.cut.Cl.snap.ps.velocity[2]);
-							}else{
-								SQLBIND(insertAngleStatement, double, "@directionX", attackerEntity? attackerEntity->pos.trDelta[0]:NULL);
-								SQLBIND(insertAngleStatement, double, "@directionY", attackerEntity ? attackerEntity->pos.trDelta[1] : NULL);
-								SQLBIND(insertAngleStatement, double, "@directionZ", attackerEntity ? attackerEntity->pos.trDelta[2] : NULL);
-							} 
+								SQLBIND(insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(demo.cut.Cl.snap.ps.velocity));
+							} else if(attackerEntity){
+								SQLBIND(insertAngleStatement, double, "@directionX", attackerEntity->pos.trDelta[0]);
+								SQLBIND(insertAngleStatement, double, "@directionY", attackerEntity->pos.trDelta[1]);
+								SQLBIND(insertAngleStatement, double, "@directionZ", attackerEntity->pos.trDelta[2]);
+								SQLBIND(insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(attackerEntity->pos.trDelta));
+							} else {
+								SQLBIND_NULL(insertAngleStatement,  "@directionX");
+								SQLBIND_NULL(insertAngleStatement,  "@directionY");
+								SQLBIND_NULL(insertAngleStatement,  "@directionZ");
+								SQLBIND_NULL(insertAngleStatement,  "@currentSpeedAttacker");
+							}
+							if (targetIsFollowed) {
+								SQLBIND(insertAngleStatement, double, "@currentSpeedTarget", VectorLength(demo.cut.Cl.snap.ps.velocity));
+							}
+							else if (targetEntity) {
+								SQLBIND(insertAngleStatement, double, "@currentSpeedTarget", VectorLength(targetEntity->pos.trDelta));
+							}
+							else {
+								SQLBIND_NULL(insertAngleStatement, "@currentSpeedTarget");
+							}
 							SQLBIND_TEXT(insertAngleStatement, "@demoName", oldBasename.c_str());
 							SQLBIND_TEXT(insertAngleStatement, "@demoPath", oldPath.c_str());
 							SQLBIND(insertAngleStatement, int, "@demoTime", demoCurrentTime);
@@ -1706,6 +1763,160 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
 							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
+
+						}
+					
+						else if (eventNumber == EV_CTFMESSAGE && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
+							int playerNum = thisEs->trickedentindex;
+							int flagTeam = thisEs->trickedentindex2;
+							if (flagTeam == TEAM_RED) {
+								lastKnownRedFlagCarrier = playerNum;
+							}else if (flagTeam == TEAM_BLUE) {
+								lastKnownBlueFlagCarrier = playerNum;
+							}
+						}
+						else if (eventNumber == EV_CTFMESSAGE && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
+							//Capture.
+							int playerNum = thisEs->trickedentindex;
+							int flagTeam = thisEs->trickedentindex2;
+
+							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+							const char* info = demo.cut.Cl.gameState.stringData + offset;
+							std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "mapname");
+							std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "sv_hostname");
+							std::string playername = "WEIRDONAME";
+							const char* playerInfo;
+							if (playerNum >= 0 && playerNum < MAX_CLIENTS) {
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
+								playerInfo = demo.cut.Cl.gameState.stringData + offset;
+								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
+							}
+
+							bool playerIsVisible = false;
+							entityState_t* playerEntity = findEntity(playerNum);
+							if (playerEntity) {
+								playerIsVisible = true;
+							}
+							bool playerIsFollowed = demo.cut.Cl.snap.ps.clientNum == playerNum;
+							bool playerIsVisibleOrFollowed = playerIsFollowed || playerIsVisible;
+
+							int flagHoldTime = recentFlagHoldTimes[playerNum];
+
+							bool wasFollowed = false;
+							bool wasVisible = false;
+							bool wasVisibleOrFollowed = false;
+							if (playerNum != -1) {
+
+								if (playerFirstFollowed[playerNum] != -1 && playerFirstFollowed[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime)) {
+									wasFollowed = true;
+								}
+								if (playerFirstVisible[playerNum] != -1 && playerFirstVisible[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime)) {
+									wasVisible = true;
+								}
+								if (playerFirstFollowedOrVisible[playerNum] != -1 && playerFirstFollowedOrVisible[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime)) {
+									wasVisibleOrFollowed = true;
+								}
+							}
+
+							float maxSpeedCapperFloat = getMaxSpeedForClientinTimeFrame(playerNum, demoCurrentTime - 1000, demoCurrentTime);
+
+
+							vec3_t currentPos;
+							vec3_t currentDir;
+
+							// Find nearby players.
+							std::stringstream nearbyPlayersSS;
+							std::vector<int> nearbyPlayers;
+							std::vector<int> nearbyPlayersDistances;
+							int nearbyPlayersCount = 0;
+							if (playerIsVisibleOrFollowed) {
+								if (playerEntity) {
+									VectorCopy(playerEntity->pos.trBase,currentPos); // This is also useful in general.
+									VectorCopy(playerEntity->pos.trDelta, currentDir); // This is also useful in general.
+								}
+								else {
+									VectorCopy(demo.cut.Cl.snap.ps.origin, currentPos);
+									VectorCopy(demo.cut.Cl.snap.ps.velocity, currentDir);
+								}
+								for (int subPe = demo.cut.Cl.snap.parseEntitiesNum; subPe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; subPe++) {
+									entityState_t* thisEntitySub = &demo.cut.Cl.parseEntities[subPe & (MAX_PARSE_ENTITIES - 1)];
+									if (thisEntitySub->number >= 0 && thisEntitySub->number < MAX_CLIENTS && thisEntitySub->number != playerNum) {
+										float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, currentPos);
+										if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+											nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " (" << (int)nearbyPlayerDistance << ")";
+											nearbyPlayers.push_back(thisEntitySub->number);
+											nearbyPlayersDistances.push_back(nearbyPlayerDistance);
+										}
+									}
+								}
+								if (demo.cut.Cl.snap.ps.clientNum != playerNum) {
+									float nearbyPlayerDistance = VectorDistance(demo.cut.Cl.snap.ps.origin, currentPos);
+									if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+										nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << demo.cut.Cl.snap.ps.clientNum << " (" << (int)nearbyPlayerDistance << ")";
+										nearbyPlayers.push_back(demo.cut.Cl.snap.ps.clientNum);
+										nearbyPlayersDistances.push_back(nearbyPlayerDistance);
+									}
+								}
+							}
+							std::string nearbyPlayersString = nearbyPlayersSS.str();
+
+							// Find nearby enemies
+							std::stringstream nearbyEnemiesSS;
+							int nearbyEnemiescount = 0;
+							for (int near = 0; near < nearbyPlayers.size(); near++) {
+								int nearbyPlayerHere = nearbyPlayers[near];
+								if (playerTeams[nearbyPlayerHere] != playerTeams[playerNum]) {
+									nearbyEnemiesSS << (nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[near] << ")";
+								}
+							}
+							std::string nearbyEnemiesString = nearbyEnemiesSS.str();
+
+
+							SQLBIND_TEXT(insertCaptureStatement, "@map", mapname.c_str());
+							SQLBIND_TEXT(insertCaptureStatement, "@serverName", serverName.c_str());
+							SQLBIND(insertCaptureStatement, int, "@flagHoldTime", flagHoldTime);
+							SQLBIND_TEXT(insertCaptureStatement, "@capperName", playername.c_str());
+							SQLBIND(insertCaptureStatement, int, "@capperClientNum", playerNum);
+							SQLBIND(insertCaptureStatement, int, "@capperIsVisible", playerIsVisible);
+							SQLBIND(insertCaptureStatement, int, "@capperIsFollowed", playerIsFollowed);
+							SQLBIND(insertCaptureStatement, int, "@capperIsFollowedOrVisible", playerIsVisibleOrFollowed);
+							SQLBIND(insertCaptureStatement, int, "@capperWasVisible", wasVisible);
+							SQLBIND(insertCaptureStatement, int, "@capperWasFollowed", wasFollowed);
+							SQLBIND(insertCaptureStatement, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
+							SQLBIND(insertCaptureStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND(insertCaptureStatement, int, "@flagTeam", flagTeam);
+							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapperFloat);
+							SQLBIND_TEXT(insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
+							SQLBIND(insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
+							SQLBIND_TEXT(insertCaptureStatement, "@nearbyEnemies", nearbyEnemiesString.c_str());
+							SQLBIND(insertCaptureStatement, int, "@nearbyEnemyCount", nearbyEnemiescount);
+							if (playerIsVisibleOrFollowed) {
+								SQLBIND(insertCaptureStatement, double, "@positionX", currentPos[0]);
+								SQLBIND(insertCaptureStatement, double, "@positionY", currentPos[1]);
+								SQLBIND(insertCaptureStatement, double, "@positionZ", currentPos[2]);
+								SQLBIND(insertCaptureStatement, double, "@directionX", currentDir[0]);
+								SQLBIND(insertCaptureStatement, double, "@directionY", currentDir[1]);
+								SQLBIND(insertCaptureStatement, double, "@directionZ", currentDir[2]);
+							}
+							else {
+								SQLBIND_NULL(insertCaptureStatement,  "@positionX");
+								SQLBIND_NULL(insertCaptureStatement,  "@positionY");
+								SQLBIND_NULL(insertCaptureStatement,  "@positionZ");
+								SQLBIND_NULL(insertCaptureStatement,  "@directionX");
+								SQLBIND_NULL(insertCaptureStatement,  "@directionY");
+								SQLBIND_NULL(insertCaptureStatement,  "@directionZ");
+							}
+							SQLBIND_TEXT(insertCaptureStatement, "@demoName", oldBasename.c_str());
+							SQLBIND_TEXT(insertCaptureStatement, "@demoPath", oldPath.c_str());
+							SQLBIND(insertCaptureStatement, int, "@demoTime", demoCurrentTime);
+							SQLBIND(insertCaptureStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND(insertCaptureStatement, int, "@demoDateTime", oldDemoDateModified);
+
+							int queryResult = sqlite3_step(insertCaptureStatement);
+							if (queryResult != SQLITE_DONE) {
+								std::cout << "Error inserting capture into database: " << sqlite3_errmsg(killDb) << "\n";
+							}
+							sqlite3_reset(insertCaptureStatement);
 
 						}
 					}
@@ -1821,6 +2032,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					// Go through parseenttities of last snap to see if client is in it
 					bool clientIsInSnapshot = false;
 					bool clientVisibleOrFollowed = false;
+					// TODO This is kind of messy uuuh... fix it?!
 					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum+demo.cut.Cl.snap.numEntities; pe++) {
 						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 						if (thisEntity->number == p) {
@@ -1828,13 +2040,22 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
 								lastKnownRedFlagCarrier = thisEntity->number;
-								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChange;
+								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken;
 							}
 							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
 								lastKnownBlueFlagCarrier = thisEntity->number;
-								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChange;
+								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 							}
 						}
+					}
+					if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG]) {
+
+						lastKnownRedFlagCarrier = demo.cut.Cl.snap.ps.clientNum;
+						recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken;
+					}else if (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG]) {
+
+						lastKnownBlueFlagCarrier = demo.cut.Cl.snap.ps.clientNum;
+						recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 					}
 					if (clientIsInSnapshot) {
 						clientVisibleOrFollowed = true;
@@ -1927,12 +2148,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime-cgs.redFlagLastChange;
 						}*/
 						cgs.redFlagLastChange = demoCurrentTime;
+						if (redflagTmp == 1) {
+							cgs.redFlagLastChangeToTaken = demoCurrentTime;
+						}
 					}
 					if (cgs.blueflag != blueflagTmp) {
 						cgs.blueFlagLastChange = demoCurrentTime;
+						if (blueflagTmp == 1) {
+							cgs.blueFlagLastChangeToTaken = demoCurrentTime;
+						}
 					}
 					if (cgs.yellowflag != yellowflagTmp) {
 						cgs.yellowflagLastChange = demoCurrentTime;
+						if (yellowflagTmp == 1) {
+							cgs.yellowflagLastChangeToTaken = demoCurrentTime;
+						}
 					}
 					cgs.redflag = redflagTmp;
 					cgs.blueflag = blueflagTmp;
@@ -2147,6 +2377,7 @@ cuterror:
 
 
 	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
+	sqlite3_finalize(insertCaptureStatement);
 	sqlite3_finalize(insertSpreeStatement);
 	sqlite3_finalize(insertStatement);
 	sqlite3_finalize(insertAngleStatement);
