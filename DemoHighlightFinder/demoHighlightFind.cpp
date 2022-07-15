@@ -945,7 +945,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"serverName	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
 		"victimName	TEXT NOT NULL,"
-		"killerTeam	INTEGER NOT NULL,"
+		"killerTeam	INTEGER,"
 		"victimTeam	INTEGER NOT NULL,"
 		"redScore INTEGER,"
 		"blueScore INTEGER,"
