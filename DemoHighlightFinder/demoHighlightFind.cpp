@@ -1073,7 +1073,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"demoTime INTEGER NOT NULL,"
 		"duration INTEGER NOT NULL,"
 		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL,"
+		"demoDateTime TIMESTAMP NOT NULL"//,"
 		//"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);
