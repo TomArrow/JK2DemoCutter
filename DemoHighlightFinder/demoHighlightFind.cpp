@@ -852,6 +852,7 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 		sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
 
+		(*outputBatHandle) << "\nrem hash: " << hash_hex_string;
 		(*outputBatHandle) << "\nrem demoCurrentTime: " << demoCurrentTime;
 		(*outputBatHandle) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 		delete[] targetFilenameFiltered;
@@ -863,7 +864,7 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 
 }
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileDefrag, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -887,8 +888,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int				lastValidSnap = -1;
 
 	std::ofstream outputBatHandle;
+	std::ofstream outputBatHandleDefrag;
 
 	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
+	outputBatHandleDefrag.open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
 
 
 	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
@@ -1028,6 +1031,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"demoDateTime TIMESTAMP NOT NULL"
 		"); ",
 		NULL, NULL, NULL);
+	sqlite3_exec(killDb, "CREATE TABLE defragRuns ("
+		"map	TEXT NOT NULL,"
+		"serverName	TEXT NOT NULL,"
+		"readableTime TEXT NOT NULL,"
+		"totalMilliseconds	INTEGER,"
+		"playerName	TEXT NOT NULL,"
+		"isTop10	BOOLEAN NOT NULL,"
+		"isNumber1	BOOLEAN NOT NULL,"
+		"wasVisible	BOOLEAN NOT NULL,"
+		"wasFollowed	BOOLEAN NOT NULL,"
+		"wasFollowedOrVisible	BOOLEAN NOT NULL,"
+		"demoName TEXT NOT NULL,"
+		"demoPath TEXT NOT NULL,"
+		"demoTime INTEGER NOT NULL,"
+		"serverTime INTEGER NOT NULL,"
+		"demoDateTime TIMESTAMP NOT NULL"
+		"); ",
+		NULL, NULL, NULL);
 	sqlite3_exec(killDb, "CREATE TABLE killSprees ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
@@ -1091,6 +1112,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
+	preparedStatementText = "INSERT INTO defragRuns"
+		"(map,serverName,readableTime,totalMilliseconds,playerName,isTop10,isNumber1,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"VALUES "
+		"(@map,@serverName,@readableTime,@totalMilliseconds,@playerName,@isTop10,@isNumber1,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+	sqlite3_stmt* insertDefragRunStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash, map,killerName, victimNames ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
@@ -1760,6 +1787,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
+							outputBatHandle << "\nrem hash: " << hash_hex_string;
 							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
 							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
@@ -2181,13 +2209,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
 				
-				if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 
 				jp::VecNum vec_num;
 				jp::RegexMatch rm;
 				std::string printText = Cmd_Argv(1);
 #if DEBUG
-				std::cout << printText << "\n";
+				//std::cout << printText << "\n";
 #endif
 
 				size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
@@ -2199,6 +2226,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char * info = demo.cut.Cl.gameState.stringData + stringOffset;
 					std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
+					std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
 					std::string playername = vec_num[matchNum][1];
 					int minutes = atoi(vec_num[matchNum][2].c_str());
 					std::string secondString = vec_num[matchNum][3];
@@ -2210,11 +2238,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					bool isLogged = vec_num[matchNum][4].length() > 0;
 					bool isNumberOne = vec_num[matchNum][6].length() > 0;
 
-					if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-
 					//int totalSeconds = minutes * 60 + seconds;
 					int totalMilliSeconds = minutes * 60000 + milliSeconds;
-
+					
 					// Find player
 					int playerNumber = -1;
 					for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
@@ -2242,6 +2268,38 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 					}
 					int runStart = demoCurrentTime - totalMilliSeconds;
+
+					std::stringstream formattedTime;
+					formattedTime << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
+					std::string formattedTimeString = formattedTime.str();
+
+					SQLBIND_TEXT(insertDefragRunStatement, "@map", mapname.c_str());
+					SQLBIND_TEXT(insertDefragRunStatement, "@serverName", serverName.c_str());
+					SQLBIND_TEXT(insertDefragRunStatement, "@readableTime", formattedTimeString.c_str());
+					SQLBIND(insertDefragRunStatement, int, "@totalMilliseconds", totalMilliSeconds);
+					SQLBIND_TEXT(insertDefragRunStatement, "@playerName", playername.c_str());
+					SQLBIND(insertDefragRunStatement, int, "@isTop10", isLogged);
+					SQLBIND(insertDefragRunStatement, int, "@isNumber1", isNumberOne);
+					SQLBIND_TEXT(insertDefragRunStatement, "@demoName", oldBasename.c_str());
+					SQLBIND_TEXT(insertDefragRunStatement, "@demoPath", oldPath.c_str());
+					SQLBIND(insertDefragRunStatement, int, "@demoTime", demoCurrentTime);
+					SQLBIND(insertDefragRunStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+					SQLBIND(insertDefragRunStatement, int, "@demoDateTime", oldDemoDateModified);
+					SQLBIND(insertDefragRunStatement, int, "@wasVisible", wasVisible);
+					SQLBIND(insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
+					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
+					
+					int queryResult = sqlite3_step(insertDefragRunStatement);
+					if (queryResult != SQLITE_DONE) {
+						std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(killDb) << "\n";
+					}
+					sqlite3_reset(insertDefragRunStatement);
+
+					//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
+					//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+					if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+					
+
 					int startTime = runStart - bufferTime;
 					int endTime = demoCurrentTime + bufferTime;
 					int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
@@ -2260,8 +2318,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
 					sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-					outputBatHandle << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					outputBatHandle << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+					outputBatHandleDefrag << "\nrem demoCurrentTime: "<< demoCurrentTime;
+					outputBatHandleDefrag << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 					delete[] targetFilenameFiltered;
 					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 				}
@@ -2377,6 +2435,7 @@ cuterror:
 
 
 	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
+	sqlite3_finalize(insertDefragRunStatement);
 	sqlite3_finalize(insertCaptureStatement);
 	sqlite3_finalize(insertSpreeStatement);
 	sqlite3_finalize(insertStatement);
@@ -2448,7 +2507,7 @@ int main(int argc, char** argv) {
 	}
 
 	Com_Printf("Looking at %s.\n", demoName);
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat", searchMode)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptDefrag.bat", searchMode)) {
 		Com_Printf("Highlights successfully found.\n");
 	}
 	else {
