@@ -1074,7 +1074,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"duration INTEGER NOT NULL,"
 		"serverTime INTEGER NOT NULL,"
 		"demoDateTime TIMESTAMP NOT NULL,"
-		"PRIMARY KEY(hash)"
+		//"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);
 	sqlite3_exec(killDb, "CREATE TABLE playerModels (" 

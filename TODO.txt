@@ -39,10 +39,10 @@ add option to extrapolate/predict using only gravity&velocity when demobot has c
 find highest amount of mines at same time
 MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures
 MAYBE current stance of victim? not important tho.
-Also put defrag runs into database. And make them their own file. And maybe make thirdpersons their own file.
 
 DONE: 
 
+Also put defrag runs into database. And make them their own file. And maybe make thirdpersons their own file.
 Save current speed too.
 MAYBE do something about the command time-normal time delay issue? Idk what. Fixed offset? Determine from ping one time and then apply fixed value?
 save whether the flag carrier was blue or red. relevant bc locations and directions
