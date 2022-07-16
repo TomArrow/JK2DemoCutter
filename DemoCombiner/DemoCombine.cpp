@@ -4,6 +4,7 @@
 #include "ini.h"
 #include <vector>
 #include <sstream>
+#include <set>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -22,11 +23,13 @@ public:
 	float showEnd = std::numeric_limits<float>::infinity(); // In demo time
 	float playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
 	float playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
+	qboolean copyRemainingPlayersAsG2AnimEnts = qfalse;
 };
 
 struct SourcePlayerInfo {
 	int clientNum;
 	int medianPing;
+	qboolean asG2AnimEnt;
 };
 
 class DemoReaderWrapper {
@@ -84,6 +87,16 @@ public:
 			}
 		}
 		// Error: No free slot found
+		return -1;
+	}
+	int getNormalPlayerSlotIfExists(int demoIndex, int entityNum) { // Since we're also copying some players as g2 anim ents. Don't wanna end up with a CG_OBITUARY with an attacker num of 50 lol.
+		// Check if mapping already exists
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
+			if (it->first >= MAX_CLIENTS) break;
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
+				return it->first;
+			}
+		}
 		return -1;
 	}
 	int getSlotIfExists(int demoIndex, int entityNum) {
@@ -998,21 +1011,43 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			
 			// Get ping info by preparsing entire demo in the lighter demo reader
 			int	medianPingsHere[MAX_CLIENTS];
+			qboolean	playerExistsAsEntity[MAX_CLIENTS];
 			pingDemoReaders[i].ReadToEnd();
 			pingDemoReaders[i].GetMedianPingData(medianPingsHere);
+			pingDemoReaders[i].GetPlayersSeen(playerExistsAsEntity);
 			pingDemoReaders[i].FreePingData();
 
+			std::set<int> clientNumsUsedHere;
 			for (int p = 0; p < demoReaders[i].sourceInfo->playersToCopy.size(); p++) {
 
 				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
 				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
 				if (clientNumHere != -1) {
 					std::cout << " [median ping:"<< medianPingsHere[clientNumHere] <<"]" << std::endl;
-					demoReaders[i].playersToCopy.push_back({ clientNumHere,medianPingsHere[clientNumHere] });
-					
+					demoReaders[i].playersToCopy.push_back({ clientNumHere,medianPingsHere[clientNumHere],qfalse });
+					clientNumsUsedHere.insert(clientNumHere);
 				}
 				else {
 					std::cout << std::endl;
+				}
+			}
+			if (demoReaders[i].sourceInfo->copyRemainingPlayersAsG2AnimEnts) {
+				// We'll also be copying over all other players, however only as G2 Anim Ents
+				// they won't have clientinfo etc.
+				for (int p = 0; p < MAX_CLIENTS; p++) {
+					int maxLength;
+					const char* playerCS = demoReaders[i].reader.GetPlayerConfigString(p,&maxLength);
+					const char* playerTeam = Info_ValueForKey(playerCS,maxLength,"t");
+					const char* playerName = Info_ValueForKey(playerCS,maxLength,"name");
+					if (strlen(playerTeam) && atoi(playerTeam) < TEAM_SPECTATOR) { // Don't copy non-existent players and don't copy spectators
+						if (playerExistsAsEntity[p]) {
+							demoReaders[i].playersToCopy.push_back({ p,medianPingsHere[p],qtrue });
+							std::cout << "Copying " << playerName << " (" << p << ") as G2AnimEnt" << " [median ping:" << medianPingsHere[p] << "]" << std::endl;
+						}
+						else {
+							std::cout << "Skipping copying " << playerName << " (" << p << ") as G2AnimEnt since it never appears in the source demo" << " [median ping:" << medianPingsHere[p] << "]" << std::endl;
+						}
+					}
 				}
 			}
 			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
@@ -1092,21 +1127,29 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
 					int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
+					qboolean asG2AnimEnt = demoReaders[i].playersToCopy[c].asG2AnimEnt;
 
-					qboolean isNewPlayer = qfalse;
-					int targetClientNum = slotManager.getPlayerSlot(i, clientNumHere, &isNewPlayer);
-					if (isNewPlayer) {
+					int targetClientNum = -1;
+					if (asG2AnimEnt) {
+						targetClientNum = slotManager.getEntitySlot(i, clientNumHere);
+					}
+					else {
 
-						tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+						qboolean isNewPlayer = qfalse;
+						targetClientNum = slotManager.getPlayerSlot(i, clientNumHere, &isNewPlayer);
+						if (isNewPlayer) {
 
-						if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
-							//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
-							commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + targetClientNum, tmpConfigString));
-							demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + targetClientNum, tmpConfigString);
+							tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+
+							if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
+								//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
+								commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + targetClientNum, tmpConfigString));
+								demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + targetClientNum, tmpConfigString);
+							}
 						}
 					}
 
-					bool thisClientIsTargetPlayerState = sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
+					bool thisClientIsTargetPlayerState = !asG2AnimEnt && sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
 						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
 						thisFrameIndex++ == 0;
 
@@ -1128,7 +1171,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					// Hence, there would be a desync normally.
 					// However TODO: This might still be a problem with many clients/bodies? Actually maybe we should just handle this stuff manually or sth?
 					// Idk.
-					if (oldSnap) {
+					if (oldSnap && !asG2AnimEnt) {
 
 						// Translate translated server time into actual server time (instead of commandtime)
 						float realTranslatedTime = translatedTime - oldSnap->playerCommandOrServerTimes[clientNumHere] + oldSnap->serverTime;
@@ -1185,6 +1228,39 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					else {
 						Com_Memset(&tmpES, 0, sizeof(tmpES));
 						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+						if (asG2AnimEnt) {
+							// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
+							tmpES.eType = ET_GRAPPLE;
+							// We don't have a player model. So instead get a ModelIndex for this playermodel
+							{	// TODO It's kinda wasteful to do this on every frame. Maybe figure out way to do it only when the model changes.
+								int maxLength;
+								const char* playerInfo = demoReaders[i].reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
+								std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
+
+								std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
+								size_t firstSlash = thisModel.find_first_of("/");
+
+								bool variantExists = false;
+								std::string baseModel = "";
+								std::string variant = "";
+								if (firstSlash == std::string::npos) {
+									// No variant. Just the model name
+									baseModel = thisModel;
+									//baseModelCString = thisModel->c_str();
+								}
+								else {
+									baseModel = thisModel.substr(0, firstSlash);
+									//baseModelCString = thisModel->c_str();
+									if (firstSlash < (thisModel.size() - 1)) {
+										variantExists = true;
+										variant = thisModel.substr(firstSlash + 1, thisModel.size() - firstSlash - 1);
+										//variantCString = variant.c_str();
+									}
+								}
+
+								tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd);
+							}
+						}
 						//playerEntities[copiedPlayerIndex] = tmpES;
 						targetEntities[targetClientNum] = tmpES;
 					}
@@ -1212,7 +1288,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						// e->s.modelGhoul2 = 0; //assume not
 						// This is all it does
 
-						int ownerSlot = slotManager.getSlotIfExists(i, it->second.genericenemyindex - 1024);
+						int ownerSlot = slotManager.getSlotIfExists(i, it->second.genericenemyindex - 1024); // TODO Should we copy this for g2animents?
 						if (it->second.pos.trType == TR_GRAVITY) {
 							// It's flying/in the air.
 							// Only for entities we are tracking, otherwise
@@ -1232,7 +1308,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 							if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 								entityState_t tmpEntity = it->second;
-								tmpEntity.genericenemyindex = ownerSlot + 1024;
+								tmpEntity.genericenemyindex = ownerSlot >= MAX_CLIENTS? 0: ownerSlot + 1024;
 								tmpEntity.number = targetEntitySlot;
 								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse);
 								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
@@ -1250,7 +1326,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						// It's a sentry
 
 
-						int ownerSlot = slotManager.getSlotIfExists(i, it->second.owner);
+						int ownerSlot = slotManager.getNormalPlayerSlotIfExists(i, it->second.owner);
 						if (ownerSlot == -1) {
 							ownerSlot = 0; 
 							// It's a sentry. We want it either way. For now.
@@ -1292,7 +1368,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							entityState_t tmpEntity = it->second;
 							tmpEntity.number = targetEntitySlot;
-							int mappedOwner = slotManager.getSlotIfExists(i, it->second.owner);
+							int mappedOwner = slotManager.getNormalPlayerSlotIfExists(i, it->second.owner);
 							tmpEntity.owner = mappedOwner == -1 ? 0 : mappedOwner; // We want force shields always no matter who made them. For now.
 							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
@@ -1370,7 +1446,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						//}
 						int mappedClientNum = slotManager.getSlotIfExists(i, thisEvent->theEvent.clientNum);
 						if (mappedClientNum != -1) {
-							thisEvent->theEvent.clientNum = mappedClientNum;
+							thisEvent->theEvent.clientNum = mappedClientNum>=MAX_CLIENTS? 0: mappedClientNum; // We wanna show it for even g2animents, but we can't use the proper clientnum to not confuse the game.
 							addThisEvent = qtrue;
 						}
 					}
@@ -1380,8 +1456,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						//int				attacker = ent->otherEntityNum2;
 
 						// Check if we are tracking these players.
-						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
-						int attacker = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum2);
+						int target = slotManager.getNormalPlayerSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
+						int attacker = slotManager.getNormalPlayerSlotIfExists(i, thisEvent->theEvent.otherEntityNum2); // This will not track kills of g2 anim ents. Intended?
 						if (target != -1 && attacker != -1) {
 							thisEvent->theEvent.otherEntityNum = target;
 							thisEvent->theEvent.otherEntityNum2 = attacker;
@@ -1395,7 +1471,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						//int				attacker = ent->otherEntityNum2;
 
 						// Check if we are tracking these players.
-						int mappedPlayer = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex);
+						int mappedPlayer = slotManager.getNormalPlayerSlotIfExists(i, thisEvent->theEvent.trickedentindex);
 						if (mappedPlayer) {
 							thisEvent->theEvent.trickedentindex = mappedPlayer;
 
@@ -1412,7 +1488,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						if (thisEvent->theEvent.eFlags == EF_SOUNDTRACKER) {
 							// This was a player, so we know which player
 							// So only copy this if we are tracking this player.
-							int soundSourceEntity = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex);
+							int soundSourceEntity = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex); // TODO Siwtch to getNormalPlayerSlotIfExists?
 							if (soundSourceEntity != -1) {
 								thisEvent->theEvent.trickedentindex = soundSourceEntity;
 								remapConfigStrings(&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse);
@@ -1431,7 +1507,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						// Check if we are tracking this player.
 						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
 						if (target != -1) {
-							thisEvent->theEvent.otherEntityNum = target;
+							thisEvent->theEvent.otherEntityNum = target >= MAX_CLIENTS ? 0 : target; // We want the shield hit even if its a g2 anim ent but we prolly can't use it as target?
 
 							addThisEvent = qtrue;
 						}
@@ -1503,6 +1579,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					if (erasedSlot >= 0 && erasedSlot < MAX_CLIENTS) {
 						commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + erasedSlot, ""));
 						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + erasedSlot, "");
+						commandsToAdd.push_back(va("kg2 %d", erasedSlot)); // Send kg2 for every erased slot.
 					}
 				}
 			}
@@ -1628,6 +1705,9 @@ int main(int argc, char** argv) {
 		std::cout << "[" << section << "]" << std::endl;
 		//std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
 		std::cout << "path: " << collection.get("path") << std::endl;
+
+		demoSource.copyRemainingPlayersAsG2AnimEnts = (qboolean)atoi(collection.get("restAsAnimEnts").c_str());
+		std::cout << "restAsAnimEnts: " << demoSource.copyRemainingPlayersAsG2AnimEnts << std::endl;
 
 		float delay = atof(collection.get("delay").c_str());
 		std::cout << "delay: " << delay <<" ms" << std::endl;

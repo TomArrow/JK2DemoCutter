@@ -388,6 +388,7 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
 	memset(&lastSnap, 0, sizeof(lastSnap));
+	memset(&playerSeen, 0, sizeof(playerSeen));
 
 	readGamestate = 0;
 
@@ -467,6 +468,9 @@ playerState_t DemoReaderLight::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
 }
 
+void DemoReaderLight::GetPlayersSeen(qboolean* playersSeenA) { // Requires pointer to array with 32 qbooleans
+	Com_Memcpy(playersSeenA, playerSeen, sizeof(playerSeen));
+}
 void DemoReaderLight::GetMedianPingData(int* playerPingData) { // Requires pointer to array with 32 ints
 
 	for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -632,11 +636,18 @@ readNext:
 			demoCurrentTime = demoBaseTime + thisDemo.cut.Cl.snap.serverTime - demoStartTime;
 			lastKnownTime = thisDemo.cut.Cl.snap.serverTime;
 
+			playerSeen[thisDemo.cut.Cl.snap.ps.clientNum] = qtrue;
 
 			// Fire events
 			for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 
 				entityState_t* thisEs = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+
+				// Document which players we've seen.
+				if (thisEs->number <= 0 && thisEs->number < MAX_CLIENTS) {
+					playerSeen[thisEs->number] = qtrue;
+				}
+
 				int eventNumber = GetEvent(thisEs);
 
 				if (eventNumber) {

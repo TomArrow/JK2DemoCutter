@@ -2287,7 +2287,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int runStart = demoCurrentTime - totalMilliSeconds;
 
 					std::stringstream formattedTime;
-					formattedTime << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
+					formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
 					std::string formattedTimeString = formattedTime.str();
 
 					SQLBIND_TEXT(insertDefragRunStatement, "@map", mapname.c_str());

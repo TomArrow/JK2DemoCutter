@@ -11,6 +11,7 @@ class DemoReaderLight {
 	std::map<int, int> lastEvent;
 
 	std::vector<int> pingValues[MAX_CLIENTS];
+	qboolean		playerSeen[MAX_CLIENTS];
 
 	int lastKnownRedFlagCarrier = -1;
 	int lastKnownBlueFlagCarrier = -1;
@@ -79,5 +80,6 @@ public:
 
 	void ReadToEnd();
 	void GetMedianPingData(int* playerPingData); // Requires pointer to array with 32 ints
+	void GetPlayersSeen(qboolean* playersSeenA); // Requires pointer to array with 32 qbooleans
 	void FreePingData();
 };
