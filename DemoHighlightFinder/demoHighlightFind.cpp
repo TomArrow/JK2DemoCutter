@@ -952,6 +952,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"otherFlagStatus INTEGER,"
 		"redPlayerCount INTEGER,"
 		"bluePlayerCount INTEGER,"
+		"sumPlayerCount INTEGER,"
 		"killerClientNum	INTEGER NOT NULL,"
 		"victimClientNum	INTEGER NOT NULL,"
 		"isDoomKill	BOOLEAN NOT NULL,"
@@ -1017,6 +1018,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"blueScore INTEGER,"
 		"redPlayerCount INTEGER,"
 		"bluePlayerCount INTEGER,"
+		"sumPlayerCount INTEGER,"
 		"maxSpeedCapper	REAL,"
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
@@ -1101,9 +1103,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 		"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
 	char* preparedStatementText = "INSERT INTO kills"
-		"(hash,shorthash,map,serverName,killerName,victimName,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
+		"(hash,shorthash,map,serverName,killerName,victimName,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
 		"VALUES "
-		"(@hash,@shorthash,@map,@serverName,@killerName,@victimName,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
+		"(@hash,@shorthash,@map,@serverName,@killerName,@victimName,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
@@ -1113,9 +1115,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,flagHoldTime,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,redScore,blueScore,redPlayerCount,bluePlayerCount,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,flagHoldTime,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
@@ -1694,6 +1696,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							}
 							SQLBIND(insertStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
 							SQLBIND(insertStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND(insertStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount +  teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
 							SQLBIND(insertStatement, int, "@killerClientNum", attacker);
 							SQLBIND(insertStatement, int, "@victimClientNum", target);
 							SQLBIND(insertStatement, int, "@isDoomKill", isDoomKill);
@@ -1923,6 +1926,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertCaptureStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
 							SQLBIND(insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
 							SQLBIND(insertCaptureStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND(insertCaptureStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
 							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapperFloat);
 							SQLBIND_TEXT(insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
 							SQLBIND(insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
