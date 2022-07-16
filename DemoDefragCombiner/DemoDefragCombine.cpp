@@ -46,7 +46,7 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 		}
 		len = strlen(dup);
 		if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-			Com_Printf("MAX_GAMESTATE_CHARS exceeded");
+			Com_Printf("MAX_GAMESTATE_CHARS exceeded on %d:%s", configStringNum,value);
 			return qfalse;
 		}
 		// append it to the gameState string buffer
@@ -91,7 +91,7 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut) {
 		}
 		len = strlen(dup);
 		if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-			Com_Printf("MAX_GAMESTATE_CHARS exceeded");
+			Com_Printf("MAX_GAMESTATE_CHARS exceeded on %d:%s", index, s);
 			return qfalse;
 		}
 		// append it to the gameState string buffer
@@ -617,10 +617,68 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
 	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
+
+
+std::string makeConfigStringCommand(int index, std::string value) {
+	std::stringstream ss;
+	ss << "cs " << index << " " << value;
+	return ss.str();
+}
+
+/*
+================
+G_FindConfigstringIndex
+
+================
+*/
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+	int		i;
+	//char	s[MAX_STRING_CHARS];
+	char* s;
+
+	if (!name || !name[0]) {
+		return 0;
+	}
+
+	for (i = 1; i < max; i++) {
+		//trap_GetConfigstring(start + i, s, sizeof(s));
+		int stringOffset = clCut->gameState.stringOffsets[start + i];
+		s = clCut->gameState.stringData + stringOffset;//sizeof(demo.cut.Cl.gameState.stringData) - stringOffset
+
+		if (!s[0]) {
+			break;
+		}
+		if (!strcmp(s, name)) {
+			return i;
+		}
+	}
+
+	if (!create) {
+		return 0;
+	}
+
+	if (i == max) {
+		Com_Printf("G_FindConfigstringIndex: overflow");
+		return 0;
+		//G_Error("G_FindConfigstringIndex: overflow");
+	}
+
+	//trap_SetConfigstring(start + i, name);
+	demoCutConfigstringModifiedManual(clCut, start + i, name);
+	commandsToAdd->push_back(makeConfigStringCommand(start + i, name));
+
+	return i;
+}
+
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+	return G_FindConfigstringIndex(name, CS_SOUNDS, MAX_SOUNDS, qtrue, clCut, commandsToAdd);
+}
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+	return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue, clCut, commandsToAdd);
+}
 #ifdef RELDEBUG
 //#pragma optimize("", off)
 #endif
-
 
 qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
 	fileHandle_t	newHandle = 0;
@@ -659,10 +717,13 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	memset(&demo, 0, sizeof(demo));
 
 	std::vector<DemoReader> demoReaders;
+	std::cout << "loading up demos...";
 	for (int i = 0; i < inputFiles->size(); i++) {
+		std::cout << i<<"...";
 		demoReaders.emplace_back();
 		demoReaders.back().LoadDemo((*inputFiles)[i].c_str());
 	}
+	std::cout << "done.";
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
 
@@ -684,11 +745,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
+			lastSpectatedClientNums[i] = spectatedClient;			
+			if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
 			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
 			if (strlen(tmpConfigString)) {
 				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			}
-			lastSpectatedClientNums[i] = spectatedClient;
 		}
 	}
 	
@@ -754,7 +816,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				tmpPS.commandTime = time;
 
 				// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
-				if (lastSpectatedClientNums[i] != originalPlayerstateClientNum) {
+				if (lastSpectatedClientNums[i] != originalPlayerstateClientNum && i<MAX_CLIENTS) {
 					tmpConfigString = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum, &tmpConfigStringMaxLength);
 					if (strlen(tmpConfigString)) {
 						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
@@ -772,6 +834,42 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 				else {
 					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+					if (i >= MAX_CLIENTS) {
+						// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
+						tmpES.eType = ET_GRAPPLE;
+						// We don't have a player model. So instead get a ModelIndex for this playermodel
+						{
+							int maxLength;
+							const char* playerInfo = demoReaders[i].GetConfigString(CS_PLAYERS+ originalPlayerstateClientNum,&maxLength);
+							std::string thisModel = Info_ValueForKey(playerInfo,maxLength,"model");
+
+							std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
+							size_t firstSlash = thisModel.find_first_of("/");
+
+							bool variantExists = false;
+							std::string baseModel = "";
+							std::string variant = "";
+							if (firstSlash == std::string::npos) {
+								// No variant. Just the model name
+								baseModel = thisModel;
+								//baseModelCString = thisModel->c_str();
+							}
+							else {
+								baseModel = thisModel.substr(0, firstSlash);
+								//baseModelCString = thisModel->c_str();
+								if (firstSlash < (thisModel.size() - 1)) {
+									variantExists = true;
+									variant = thisModel.substr(firstSlash + 1, thisModel.size() - firstSlash - 1);
+									//variantCString = variant.c_str();
+								}
+							}
+
+							tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd);
+						}
+						/*tmpES.number += 32; // This was just for debugging.
+						tmpES.clientNum += 32;
+						playerEntities[i+32]= tmpES;*/
+					}
 					playerEntities[i]= tmpES;
 				}
 

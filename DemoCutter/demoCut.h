@@ -38,7 +38,8 @@ typedef struct _iobuf
 #define	MAX_OSPATH			256
 #define	PATH_SEP '\\'
 
-#define	MAX_FILE_HANDLES	64
+//#define	MAX_FILE_HANDLES	64
+#define	MAX_FILE_HANDLES	1024
 
 #define	MAX_MSGLEN				16384		// max length of a message, which may
 // be fragmented into multiple packets

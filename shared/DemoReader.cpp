@@ -1183,7 +1183,7 @@ readNext:
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
 					readEvents.push_back(thisEvent);
-
+					/*
 					// Handle kills
 					if (eventNumber == EV_OBITUARY) {
 						int				target = thisEs->otherEntityNum;
@@ -1205,11 +1205,11 @@ readNext:
 						entityState_t* targetEntity = findEntity(target);
 						if (targetEntity) {
 							isVisible = true;
-							/*if (targetEntity->powerups & (1 << PW_REDFLAG) || targetEntity->powerups & (1 << PW_BLUEFLAG)) {
-								// If the victim isn't visible, his entity won't be available, thus this won't be set
-								// But we're trying to find interesting moments, so stuff that's not even visible is not that interesting to us
-								victimIsFlagCarrier = true;
-							}*/
+							//if (targetEntity->powerups & (1 << PW_REDFLAG) || targetEntity->powerups & (1 << PW_BLUEFLAG)) {
+							//	// If the victim isn't visible, his entity won't be available, thus this won't be set
+							//	// But we're trying to find interesting moments, so stuff that's not even visible is not that interesting to us
+							//	victimIsFlagCarrier = true;
+							//}
 						}
 						victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
 
@@ -1249,14 +1249,14 @@ readNext:
 						stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
 						playerInfo = thisDemo.cut.Cl.gameState.stringData + stringOffset;
 						std::string victimname = Info_ValueForKey(playerInfo, sizeof(thisDemo.cut.Cl.gameState.stringData) - stringOffset, "n");
-					}
+					}*/
 				}
 			}
 
 
 			// Find out which players are visible / followed
 			// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
-			lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
+			/*lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
 			for (int p = 0; p < MAX_CLIENTS; p++) {
 				// Go through parseenttities of last snap to see if client is in it
 				bool clientIsInSnapshot = false;
@@ -1300,7 +1300,7 @@ readNext:
 				else {
 					playerFirstFollowedOrVisible[p] = -1;
 				}
-			}
+			}*/
 
 			break;
 		case svc_download:

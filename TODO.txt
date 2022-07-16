@@ -39,6 +39,10 @@ add option to extrapolate/predict using only gravity&velocity when demobot has c
 find highest amount of mines at same time
 MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures
 MAYBE current stance of victim? not important tho.
+captureS: save kills/rets during run. overall fastest speed during run. kills in last 5 seconds.
+also: get longer-span killstreaks with spans longer than 3s, but mark them as such. or rather: maybe make separate detections or sth? 3,5,7,9 seconds span. hmm. or: 3 second main but allow a bit in between?
+captures: whether it was picked up from base or from taken (bc that matters in terms of flaghold time)
+for everything: save highest amount of consecutive lost packets?
 
 DONE: 
 
