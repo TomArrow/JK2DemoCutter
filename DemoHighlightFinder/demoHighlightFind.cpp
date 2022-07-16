@@ -647,9 +647,12 @@ void setPlayerAndTeamData(clientActive_t* clCut) {
 
 		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS + i];
 		const char* playerInfo = clCut->gameState.stringData + stringOffset;
-		int team = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "t"));
-		playerTeams[i] = team;
-		teamInfo[team].playerCount++;
+		const char* playerTeam = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "t");
+		if (strlen(playerTeam)) {
+			int team = atoi(playerTeam);
+			playerTeams[i] = team;
+			teamInfo[team].playerCount++;
+		}
 	}
 	stringOffset = clCut->gameState.stringOffsets[CS_SCORES1];
 	teamInfo[TEAM_RED].score = atoi(clCut->gameState.stringData + stringOffset);
