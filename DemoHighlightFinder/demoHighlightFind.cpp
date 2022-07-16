@@ -1013,6 +1013,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"capperWasFollowedOrVisible	BOOLEAN NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"flagTeam	INTEGER NOT NULL,"
+		"redScore INTEGER,"
+		"blueScore INTEGER,"
+		"redPlayerCount INTEGER,"
+		"bluePlayerCount INTEGER,"
 		"maxSpeedCapper	REAL,"
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
@@ -1109,9 +1113,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,flagHoldTime,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,flagHoldTime,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,redScore,blueScore,redPlayerCount,bluePlayerCount,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
@@ -1915,6 +1919,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertCaptureStatement, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
 							SQLBIND(insertCaptureStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 							SQLBIND(insertCaptureStatement, int, "@flagTeam", flagTeam);
+							SQLBIND(insertCaptureStatement, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND(insertCaptureStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							SQLBIND(insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND(insertCaptureStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
 							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapperFloat);
 							SQLBIND_TEXT(insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
 							SQLBIND(insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
@@ -2291,7 +2299,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
 					SQLBIND(insertDefragRunStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-					SQLBIND(insertDefragRunStatement, int, "@runnerClientnum", playerNumber);
+					SQLBIND(insertDefragRunStatement, int, "@runnerClientNum", playerNumber);
 
 					int queryResult = sqlite3_step(insertDefragRunStatement);
 					if (queryResult != SQLITE_DONE) {
