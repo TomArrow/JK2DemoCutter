@@ -23,6 +23,7 @@ public:
 	float showEnd = std::numeric_limits<float>::infinity(); // In demo time
 	float playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
 	float playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
+	qboolean copyAllPlayers = qfalse;
 	qboolean copyRemainingPlayersAsG2AnimEnts = qfalse;
 };
 
@@ -1031,21 +1032,24 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					std::cout << std::endl;
 				}
 			}
-			if (demoReaders[i].sourceInfo->copyRemainingPlayersAsG2AnimEnts) {
-				// We'll also be copying over all other players, however only as G2 Anim Ents
+			if (demoReaders[i].sourceInfo->copyAllPlayers || demoReaders[i].sourceInfo->copyRemainingPlayersAsG2AnimEnts) {
+				qboolean asAnimEnts = (qboolean)!demoReaders[i].sourceInfo->copyAllPlayers;
+				std::cout << "Copying remaining players"<< (asAnimEnts ? " as G2AnimEnts" : "") << std::endl;
+				// We'll also be copying over all other players, either as full players or only as G2 Anim Ents
 				// they won't have clientinfo etc.
 				for (int p = 0; p < MAX_CLIENTS; p++) {
+					if (clientNumsUsedHere.find(p) != clientNumsUsedHere.end()) continue; // Don't add players twice that are already added.
 					int maxLength;
 					const char* playerCS = demoReaders[i].reader.GetPlayerConfigString(p,&maxLength);
 					const char* playerTeam = Info_ValueForKey(playerCS,maxLength,"t");
-					const char* playerName = Info_ValueForKey(playerCS,maxLength,"name");
+					const char* playerName = Info_ValueForKey(playerCS,maxLength,"n");
 					if (strlen(playerTeam) && atoi(playerTeam) < TEAM_SPECTATOR) { // Don't copy non-existent players and don't copy spectators
 						if (playerExistsAsEntity[p]) {
-							demoReaders[i].playersToCopy.push_back({ p,medianPingsHere[p],qtrue });
-							std::cout << "Copying " << playerName << " (" << p << ") as G2AnimEnt" << " [median ping:" << medianPingsHere[p] << "]" << std::endl;
+							demoReaders[i].playersToCopy.push_back({ p,medianPingsHere[p],asAnimEnts });
+							std::cout << "Copying " << playerName << " (" << p << ") "<< (asAnimEnts?"as G2AnimEnt ":"") << "[median ping:" << medianPingsHere[p] << "]" << std::endl;
 						}
 						else {
-							std::cout << "Skipping copying " << playerName << " (" << p << ") as G2AnimEnt since it never appears in the source demo" << " [median ping:" << medianPingsHere[p] << "]" << std::endl;
+							std::cout << "Skipping copying " << playerName << " (" << p << ") "<< (asAnimEnts ? "as G2AnimEnt " : "") <<"since it never appears in the source demo" << " [median ping:" << medianPingsHere[p] << "]" << std::endl;
 						}
 					}
 				}
@@ -1446,7 +1450,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						//}
 						int mappedClientNum = slotManager.getSlotIfExists(i, thisEvent->theEvent.clientNum);
 						if (mappedClientNum != -1) {
-							thisEvent->theEvent.clientNum = mappedClientNum>=MAX_CLIENTS? 0: mappedClientNum; // We wanna show it for even g2animents, but we can't use the proper clientnum to not confuse the game.
+							thisEvent->theEvent.clientNum = mappedClientNum; // We wanna show it for even g2animents. The clientnum isnt really used for anything anyway so we just preserve it and give it the g2animent number
 							addThisEvent = qtrue;
 						}
 					}
@@ -1507,7 +1511,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						// Check if we are tracking this player.
 						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
 						if (target != -1) {
-							thisEvent->theEvent.otherEntityNum = target >= MAX_CLIENTS ? 0 : target; // We want the shield hit even if its a g2 anim ent but we prolly can't use it as target?
+							// This will not work on g2 anim ents BUT it doesnt throw an error. And we can't just put it on another entity.
+							// But some demo player (jomme?) could possibly unlock this for g2 anim ents, so we preserve it.
+							thisEvent->theEvent.otherEntityNum = target; 
 
 							addThisEvent = qtrue;
 						}
@@ -1570,8 +1576,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)) {
 				allSourceDemosFinished = qfalse;
 			}*/
-			if (demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)
-					|| sourceTime > (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->showEnd)) {
+			qboolean endReached, showEndReached;
+			if ((endReached= demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay))
+					|| (showEndReached = (qboolean)(sourceTime > (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->showEnd)))) {
+				std::cout << "Demo " << i << " has ended at "<< sourceTime<<" ("<< demoReaders[i].reader.getCurrentDemoTime()<<"). Demo had a delay of "<< demoReaders[i].sourceInfo->delay << ". endReached: " << endReached << ", showEndReached: " << showEndReached << std::endl;
 				// We reached the end of this demo.
 				std::vector<int> erasedSlots = slotManager.freeSlots(i);
 				for (int sl = 0; sl < erasedSlots.size(); sl++) {
@@ -1708,6 +1716,9 @@ int main(int argc, char** argv) {
 
 		demoSource.copyRemainingPlayersAsG2AnimEnts = (qboolean)atoi(collection.get("restAsAnimEnts").c_str());
 		std::cout << "restAsAnimEnts: " << demoSource.copyRemainingPlayersAsG2AnimEnts << std::endl;
+		
+		demoSource.copyAllPlayers = (qboolean)atoi(collection.get("allPlayers").c_str());
+		std::cout << "allPlayers: " << demoSource.copyAllPlayers << std::endl;
 
 		float delay = atof(collection.get("delay").c_str());
 		std::cout << "delay: " << delay <<" ms" << std::endl;

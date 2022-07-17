@@ -644,7 +644,7 @@ readNext:
 				entityState_t* thisEs = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
 				// Document which players we've seen.
-				if (thisEs->number <= 0 && thisEs->number < MAX_CLIENTS) {
+				if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
 					playerSeen[thisEs->number] = qtrue;
 				}
 

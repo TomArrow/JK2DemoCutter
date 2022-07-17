@@ -112,6 +112,7 @@ class DemoReader {
 	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS = qfalse);
 	qboolean SeekToServerTime(int serverTime);
 
+
 	void generateBasePlayerStates();
 
 public:
@@ -140,4 +141,5 @@ public:
 	qboolean AnySnapshotParsed();
 	qboolean EndReached();
 	qboolean EndReachedAtTime(float time);
+	int getCurrentDemoTime();
 };

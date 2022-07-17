@@ -409,6 +409,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
 	lastGottenEventsTime = 0;
+	endReached = qfalse;
 
 	snapshotInfos.clear();
 
@@ -434,6 +435,9 @@ qboolean DemoReader::EndReached() {
 qboolean DemoReader::EndReachedAtTime(float time) {
 	SeekToTime(time);
 	return (qboolean)(demoCurrentTime < time);
+}
+int DemoReader::getCurrentDemoTime() {
+	return demoCurrentTime;
 }
 
 qboolean DemoReader::SeekToTime(int time) {
@@ -1073,23 +1077,33 @@ readNext:
 
 	MSG_Init(&oldMsg, oldData, sizeof(oldData));
 	/* Read the sequence number */
-	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
+	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4) {
+		Com_Printf("[NOTE] Demo cutter, reading sequence number failed.\n");
 		return qfalse;
+	}
 	thisDemo.cut.Clc.serverMessageSequence = LittleLong(thisDemo.cut.Clc.serverMessageSequence);
 	oldSize -= 4;
 	/* Read the message size */
-	if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
+	if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4) {
+		Com_Printf("[NOTE] Demo cutter, reading message size failed.\n");
 		return qfalse;
+	}
 	oldMsg.cursize = LittleLong(oldMsg.cursize);
 	oldSize -= 4;
 	/* Negative size signals end of demo */
-	if (oldMsg.cursize < 0)
+	if (oldMsg.cursize < 0) {
+		Com_Printf("[NOTE] Demo cutter, message cursize < 0.\n");
 		return qfalse;
-	if (oldMsg.cursize > oldMsg.maxsize)
+	}
+	if (oldMsg.cursize > oldMsg.maxsize) {
+		Com_Printf("[NOTE] Demo cutter, message size above maxsize.\n");
 		return qfalse;
+	}
 	/* Read the actual message */
-	if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
+	if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize) {
+		Com_Printf("[NOTE] Demo cutter, reading actual message failed.\n");
 		return qfalse;
+	}
 	oldSize -= oldMsg.cursize;
 	// init the bitstream
 	MSG_BeginReading(&oldMsg);
@@ -1136,6 +1150,7 @@ readNext:
 			//	goto cutcomplete;
 			//}
 			if (!ParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
+				Com_Printf("[NOTE] Demo cutter, parsing gamestate failed.\n");
 				return qfalse;
 			}
 			generateBasePlayerStates();
@@ -1149,6 +1164,7 @@ readNext:
 			break;
 		case svc_snapshot:
 			if (!ParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
+				Com_Printf("[NOTE] Demo cutter, parsing snapshot failed.\n");
 				return qfalse;
 			}
 
@@ -1335,6 +1351,7 @@ readNext:
 		}
 		if (!strcmp(cmd, "cs")) {
 			if (!ConfigstringModified(&thisDemo.cut.Cl)) {
+				Com_Printf("[NOTE] Demo cutter, configstring parsing failed.\n");
 				return qfalse;
 			}
 			hadConfigStringChanges = qtrue;
@@ -1415,7 +1432,7 @@ readNext:
 		goto cutcomplete;
 	}
 #endif*/
-
+	return qtrue;
 	
 }
 
