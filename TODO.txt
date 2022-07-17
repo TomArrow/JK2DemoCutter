@@ -39,21 +39,23 @@ add option to extrapolate/predict using only gravity&velocity when demobot has c
 find highest amount of mines at same time
 MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures
 MAYBE current stance of victim? not important tho.
-captureS: save kills/rets during run. overall fastest speed during run. kills in last 5 seconds.
+captureS: save kills/rets during run. overall fastest speed during run. kills in last 5 seconds. PARTIALLY DONE
 also: get longer-span killstreaks with spans longer than 3s, but mark them as such. or rather: maybe make separate detections or sth? 3,5,7,9 seconds span. hmm. or: 3 second main but allow a bit in between?
-captures: whether it was picked up from base or from taken (bc that matters in terms of flaghold time)
+
 for everything: save highest amount of consecutive lost packets?
 close/very close enemies throughout cap. very close (within hitting distance?). or make it a number of "danger ratio" or sth idk
 some more info about mine kills? to recognize cool ones?
-For rets, save whether flag carrier was visible throughout his hold time.
 For g2 ents, maybe dont copy events?
-Let the light demo analyzer check whether a player is ever present in the demo. If not, dont even copy as G2 ent.
-Do KG2 for g2animents when demo ends.
+Do KG2 for g2animents when demo ends. KINDA DONE BUT DOESNT REALLY WORK
 What about dead bodies of ET_GRAPPLE?
 log highest count of sentries ever
 
 DONE: 
 
+captures: whether it was picked up from base or from taken (bc that matters in terms of flaghold time)
+For rets, save whether flag carrier was visible throughout his hold time.
+Let the light demo analyzer check whether a player is ever present in the demo. If not, dont even copy as G2 ent.
+attacker is flag carrier? Also for killsprees? Or nah
 Also put defrag runs into database. And make them their own file. And maybe make thirdpersons their own file.
 Save current speed too.
 MAYBE do something about the command time-normal time delay issue? Idk what. Fixed offset? Determine from ping one time and then apply fixed value?

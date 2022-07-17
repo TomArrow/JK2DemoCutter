@@ -29,15 +29,23 @@ struct LastSaberMoveInfo {
 	int lastSaberMoveChange;
 	float speed;
 };
+
 struct TeamInfo {
 	int playerCount;
 	int score;
+	//int flagHoldOrigin; // Did the current flag holder pick up the flag from base or from a dropped place? This will simply be the old flag status.
+};
+struct CapperKillsInfo {
+	int lastKillDemoTime; // Will reset if the last kill time is before the flag hold.
+	int kills;
+	int rets;
 };
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS];
 int playerFirstVisible[MAX_CLIENTS];
 int playerFirstFollowed[MAX_CLIENTS];
 int playerFirstFollowedOrVisible[MAX_CLIENTS];
 int recentFlagHoldTimes[MAX_CLIENTS];
+CapperKillsInfo recentKillsDuringFlagHold[MAX_CLIENTS];
 int playerTeams[MAX_CLIENTS];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
@@ -49,6 +57,7 @@ int lastKnownBlueFlagCarrier = -1;
 struct cgs{
 	int redflag, blueflag, yellowflag;
 	int redFlagLastChange, blueFlagLastChange, yellowflagLastChange;
+	int redFlagLastPickupOrigin, blueFlagLastPickupOrigin, yellowflagLastPickupOrigin;
 	int redFlagLastChangeToTaken, blueFlagLastChangeToTaken, yellowflagLastChangeToTaken;
 } cgs;
 
@@ -903,6 +912,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(lastEvent,0,sizeof(lastEvent));
 	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
 	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
+	Com_Memset(recentKillsDuringFlagHold,0,sizeof(recentKillsDuringFlagHold));
 	Com_Memset(playerTeams,0,sizeof(playerTeams));
 	Com_Memset(teamInfo,0,sizeof(teamInfo));
 	Com_Memset(&cgs,0,sizeof(cgs));
@@ -973,8 +983,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"hash	TEXT,"
 		"shorthash	TEXT,"
 		"map	TEXT NOT NULL,"
+		"killerIsFlagCarrier	BOOLEAN NOT NULL,"
 		"isReturn	BOOLEAN NOT NULL,"
-		"flagHoldTime	INTEGER,"
+		"victimCapperKills INTEGER,"
+		"victimCapperRets INTEGER,"
+		"victimCapperWasFollowedOrVisible	BOOLEAN,"
+		"victimFlagPickupSource	INTEGER,"
+		"victimFlagHoldTime	INTEGER,"
 		"targetIsVisible	BOOLEAN NOT NULL,"
 		"targetIsFollowed	BOOLEAN NOT NULL,"
 		"targetIsFollowedOrVisible	BOOLEAN NOT NULL,"
@@ -1006,7 +1021,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_exec(killDb, "CREATE TABLE captures ("
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
-		"flagHoldTime	INTEGER,"
+		"flagHoldTime	INTEGER NOT NULL,"
+		"flagPickupSource	INTEGER NOT NULL,"
 		"capperName	TEXT NOT NULL,"
 		"capperClientNum INTEGER NOT NULL,"
 		"capperIsVisible	BOOLEAN NOT NULL,"
@@ -1017,6 +1033,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"capperWasFollowedOrVisible	BOOLEAN NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"flagTeam	INTEGER NOT NULL,"
+		"capperKills INTEGER NOT NULL,"
+		"capperRets INTEGER NOT NULL,"
 		"redScore INTEGER,"
 		"blueScore INTEGER,"
 		"redPlayerCount INTEGER,"
@@ -1112,15 +1130,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,isReturn,flagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@isReturn,@flagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,flagHoldTime,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,flagHoldTime,flagPickupSource,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@flagHoldTime,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@flagHoldTime,@flagPickupSource,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
@@ -1377,6 +1395,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int				attacker = thisEs->otherEntityNum2;
 							int				mod = thisEs->eventParm;
 							bool			victimIsFlagCarrier = false;
+							bool			attackerIsFlagCarrier = false;
 							bool			isSuicide;
 							bool			isDoomKill;
 							bool			isWorldKill = false;
@@ -1406,6 +1425,57 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								attackerIsVisible = true;
 							}
 							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
+							attackerIsFlagCarrier = attacker == lastKnownBlueFlagCarrier || attacker == lastKnownRedFlagCarrier;
+
+							int victimFlagTeam = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? TEAM_BLUE:TEAM_RED) : -1;
+							int attackerFlagTeam = attackerIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? TEAM_BLUE:TEAM_RED) : -1;
+
+							int victimCarrierLastPickupOrigin = victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+
+							// Track how many people a flag carrier kills during his hold.
+							if (!isWorldKill && attackerIsFlagCarrier) {
+								if (recentKillsDuringFlagHold[attacker].lastKillDemoTime < demoCurrentTime-recentFlagHoldTimes[attacker]) {
+									// If the last capping related kill of this capper was before he even got the flag, reset before adding to the count
+									Com_Memset(&recentKillsDuringFlagHold[attacker],0,sizeof(CapperKillsInfo));
+								}
+								if (victimIsFlagCarrier) {
+									recentKillsDuringFlagHold[attacker].rets++;
+								}
+								recentKillsDuringFlagHold[attacker].kills++;
+								recentKillsDuringFlagHold[attacker].lastKillDemoTime = demoCurrentTime;
+							}
+							int victimFlagCarrierKillCount = -1;
+							int victimFlagCarrierRetCount = -1;
+							if (victimIsFlagCarrier) {
+								// See if he had any kills/rets as carrier. (did he fight valiantly before he died?)
+								if (recentKillsDuringFlagHold[target].lastKillDemoTime < demoCurrentTime - recentFlagHoldTimes[target]) {
+									// If the last capping related kill of this capper was before he even got the flag, reset before adding to the count
+									Com_Memset(&recentKillsDuringFlagHold[target], 0, sizeof(CapperKillsInfo));
+								}
+								victimFlagCarrierKillCount = recentKillsDuringFlagHold[target].kills;
+								victimFlagCarrierRetCount = recentKillsDuringFlagHold[target].rets;
+							}
+							// TODO What if lastKnownBlueFlagCarrier or lastKnownRedFlagCarrier is remembered and another kill is counted wrongly as ret even though he is no longer holding a flag?
+
+
+							// If victim was capper, see if his entire run from start to unfortunate end was captured.
+							bool capperWasFollowed = false;
+							bool capperWasVisible = false;
+							bool capperWasVisibleOrFollowed = false;
+							if (victimIsFlagCarrier) {
+
+								int victimFlagHoldTime = recentFlagHoldTimes[target];
+								if (playerFirstFollowed[target] != -1 && playerFirstFollowed[target] < (demo.cut.Cl.snap.serverTime - victimFlagHoldTime)) {
+									capperWasFollowed = true;
+								}
+								if (playerFirstVisible[target] != -1 && playerFirstVisible[target] < (demo.cut.Cl.snap.serverTime - victimFlagHoldTime)) {
+									capperWasVisible = true;
+								}
+								if (playerFirstFollowedOrVisible[target] != -1 && playerFirstFollowedOrVisible[target] < (demo.cut.Cl.snap.serverTime - victimFlagHoldTime)) {
+									capperWasVisibleOrFollowed = true;
+								}
+							}
+
 
 							isSuicide = target == attacker;
 							isDoomKill = mod == MOD_FALLING;
@@ -1721,11 +1791,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND_TEXT(insertAngleStatement, "@shorthash", shorthash.c_str());
 							SQLBIND_TEXT(insertAngleStatement, "@map", mapname.c_str());
 							SQLBIND(insertAngleStatement, int, "@isReturn", victimIsFlagCarrier);
+							SQLBIND(insertAngleStatement, int, "@killerIsFlagCarrier", attackerIsFlagCarrier);
 							if (victimIsFlagCarrier) {
-								SQLBIND(insertAngleStatement, int, "@flagHoldTime", recentFlagHoldTimes[target]);
+								SQLBIND(insertAngleStatement, int, "@victimFlagHoldTime", recentFlagHoldTimes[target]);
+								//SQLBIND(insertAngleStatement, int, "@flagPickupSource", teamInfo[victimFlagTeam].flagHoldOrigin);
+								SQLBIND(insertAngleStatement, int, "@victimFlagPickupSource", victimCarrierLastPickupOrigin);
+								SQLBIND(insertAngleStatement, int, "@victimCapperKills", victimFlagCarrierKillCount);
+								SQLBIND(insertAngleStatement, int, "@victimCapperRets", victimFlagCarrierRetCount);
+								SQLBIND(insertAngleStatement, int, "@victimCapperWasFollowedOrVisible", capperWasVisibleOrFollowed);
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@flagHoldTime");
+								SQLBIND_NULL(insertAngleStatement, "@victimFlagHoldTime");
+								SQLBIND_NULL(insertAngleStatement, "@victimFlagPickupSource");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperKills");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperRets");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperWasFollowedOrVisible");
 							}
 							SQLBIND(insertAngleStatement, int, "@targetIsVisible", targetIsVisible);
 							SQLBIND(insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
@@ -1809,6 +1889,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						else if (eventNumber == EV_CTFMESSAGE && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
 							int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
+							// A bit pointless tbh because we reset it to -1 anyway before checking entities. 
+							// Let me rethink this some day TODO
 							if (flagTeam == TEAM_RED) {
 								lastKnownRedFlagCarrier = playerNum;
 							}else if (flagTeam == TEAM_BLUE) {
@@ -1860,6 +1942,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							float maxSpeedCapperFloat = getMaxSpeedForClientinTimeFrame(playerNum, demoCurrentTime - 1000, demoCurrentTime);
 
+							// See if he had any kills/rets as carrier. (did he fight valiantly before he died?)
+							if (recentKillsDuringFlagHold[playerNum].lastKillDemoTime < demoCurrentTime - recentFlagHoldTimes[playerNum]) {
+								// If the last capping related kill of this capper was before he even got the flag, reset before adding to the count
+								Com_Memset(&recentKillsDuringFlagHold[playerNum], 0, sizeof(CapperKillsInfo));
+							}
+							int flagCarrierKillCount = recentKillsDuringFlagHold[playerNum].kills;
+							int flagCarrierRetCount = recentKillsDuringFlagHold[playerNum].rets;
 
 							vec3_t currentPos;
 							vec3_t currentDir;
@@ -1911,10 +2000,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							}
 							std::string nearbyEnemiesString = nearbyEnemiesSS.str();
 
+							int victimCarrierLastPickupOrigin = -1;// victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+							switch (flagTeam) {
+								case TEAM_FREE: // Is this correct?
+									victimCarrierLastPickupOrigin = cgs.yellowflagLastPickupOrigin;
+									break;
+								case TEAM_RED:
+									victimCarrierLastPickupOrigin = cgs.redFlagLastPickupOrigin;
+									break;
+								case TEAM_BLUE:
+									victimCarrierLastPickupOrigin = cgs.blueFlagLastPickupOrigin;
+									break;
+							}
 
 							SQLBIND_TEXT(insertCaptureStatement, "@map", mapname.c_str());
 							SQLBIND_TEXT(insertCaptureStatement, "@serverName", serverName.c_str());
 							SQLBIND(insertCaptureStatement, int, "@flagHoldTime", flagHoldTime);
+							//SQLBIND(insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
+							SQLBIND(insertCaptureStatement, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
 							SQLBIND_TEXT(insertCaptureStatement, "@capperName", playername.c_str());
 							SQLBIND(insertCaptureStatement, int, "@capperClientNum", playerNum);
 							SQLBIND(insertCaptureStatement, int, "@capperIsVisible", playerIsVisible);
@@ -1925,6 +2028,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertCaptureStatement, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
 							SQLBIND(insertCaptureStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 							SQLBIND(insertCaptureStatement, int, "@flagTeam", flagTeam);
+							SQLBIND(insertCaptureStatement, int, "@capperKills", flagCarrierKillCount);
+							SQLBIND(insertCaptureStatement, int, "@capperRets", flagCarrierRetCount);
 							SQLBIND(insertCaptureStatement, int, "@redScore", teamInfo[TEAM_RED].score);
 							SQLBIND(insertCaptureStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
 							SQLBIND(insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
@@ -2195,18 +2300,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						cgs.redFlagLastChange = demoCurrentTime;
 						if (redflagTmp == 1) {
 							cgs.redFlagLastChangeToTaken = demoCurrentTime;
+							//teamInfo[TEAM_RED].flagHoldOrigin = cgs.redflag;
+							cgs.redFlagLastPickupOrigin = cgs.redflag;
 						}
 					}
 					if (cgs.blueflag != blueflagTmp) {
 						cgs.blueFlagLastChange = demoCurrentTime;
 						if (blueflagTmp == 1) {
 							cgs.blueFlagLastChangeToTaken = demoCurrentTime;
+							//teamInfo[TEAM_BLUE].flagHoldOrigin = cgs.blueflag;
+							cgs.blueFlagLastPickupOrigin = cgs.blueflag;
 						}
 					}
 					if (cgs.yellowflag != yellowflagTmp) {
 						cgs.yellowflagLastChange = demoCurrentTime;
 						if (yellowflagTmp == 1) {
 							cgs.yellowflagLastChangeToTaken = demoCurrentTime;
+							//teamInfo[TEAM_FREE].flagHoldOrigin = cgs.yellowflag; // Not sure if this is correct?
+							cgs.yellowflagLastPickupOrigin = cgs.yellowflag; // Not sure if this is correct?
 						}
 					}
 					cgs.redflag = redflagTmp;
