@@ -875,6 +875,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 		std::string thisPlayerLower = *thisPlayer;
 		std::transform(thisPlayerLower.begin(), thisPlayerLower.end(), thisPlayerLower.begin(), tolowerSignSafe);
 
+		std::vector<NameMatch> colorStrippedMatches;
 		std::vector<NameMatch> caseInsensitiveMatches;
 		std::vector<NameMatch> matches;
 
@@ -884,6 +885,14 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
 			std::string nameHereLower = nameHere;
 			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
+
+			// Make color stripped version
+			const char* sourceCStringName = nameHereLower.c_str();
+			int stringLen = strlen(sourceCStringName);
+			char* cStringName = new char[stringLen + 1];
+			strcpy_s(cStringName, stringLen + 1, sourceCStringName);
+			Q_StripColorAll(cStringName);
+			std::string nameHereLowerColorStripped = cStringName;
 
 			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {
 				NameMatch nm;
@@ -896,6 +905,12 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 				nm.clientNum = c;
 				nm.matchedName = nameHere;
 				caseInsensitiveMatches.push_back(nm);
+			}
+			if (strstr(nameHereLowerColorStripped.c_str(), thisPlayerLower.c_str())) {
+				NameMatch nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				colorStrippedMatches.push_back(nm);
 			}
 		}
 
@@ -926,8 +941,25 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 				clientNumHere = caseInsensitiveMatches[0].clientNum;
 			}
 			else {
-				std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
-				// No match. Try case insensitive
+				//std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
+				// No match. Try stripped colors 
+				if (colorStrippedMatches.size() > 1) {
+					std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+					for (int c = 0; c < colorStrippedMatches.size(); c++) {
+						std::cout << colorStrippedMatches[c].matchedName << "(" << colorStrippedMatches[c].clientNum << ")" << std::endl;
+					}
+					std::cout << "Picking first match '" << colorStrippedMatches[0].matchedName << "' (" << colorStrippedMatches[0].clientNum << ")";
+					clientNumHere = colorStrippedMatches[0].clientNum;
+				}
+				else if (colorStrippedMatches.size() == 1) {
+					std::cout << "'" << *thisPlayer << "' matches '" << colorStrippedMatches[0].matchedName << "' (" << colorStrippedMatches[0].clientNum << ")";
+					clientNumHere = colorStrippedMatches[0].clientNum;
+				}
+				else {
+					std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
+					// Done.
+
+				}
 			}
 		}
 	}

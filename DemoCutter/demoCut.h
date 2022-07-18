@@ -1805,3 +1805,5 @@ typedef enum {
 	CTFMESSAGE_PLAYER_GOT_FLAG
 } ctfMsg_t;
 
+
+void Q_StripColorAll(char* text);

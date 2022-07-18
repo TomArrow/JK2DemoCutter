@@ -55,6 +55,7 @@ class DemoReader {
 	std::map<int, int> playerFirstVisible;
 	std::map<int, int> playerFirstFollowed;
 	std::map<int, int> playerFirstFollowedOrVisible;
+	std::map<int, int> lastEventTime;
 	std::map<int, int> lastEvent;
 
 	std::map<int, SnapshotInfo> snapshotInfos;

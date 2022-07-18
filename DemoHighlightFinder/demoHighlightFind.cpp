@@ -49,6 +49,7 @@ CapperKillsInfo recentKillsDuringFlagHold[MAX_CLIENTS];
 int playerTeams[MAX_CLIENTS];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
+int lastEventTime[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
@@ -580,7 +581,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 //#pragma optimize("", off)
 #endif
 
-int demoCutGetEvent(entityState_t* es) {
+int demoCutGetEvent(entityState_t* es,int demoCurrentTime) {
 	//if (lastEvent.find(es->number) == lastEvent.end()) {
 	//	lastEvent[es->number] = 0;
 	//} // Not really necessary is it? That's what it will be by default?
@@ -610,9 +611,15 @@ int demoCutGetEvent(entityState_t* es) {
 		}
 	}*/
 
+	// if ( cent->snapShotTime < cg.time - EVENT_VALID_MSEC ) {
+	if (lastEventTime[es->number] < demoCurrentTime - EVENT_VALID_MSEC) {
+		lastEvent[es->number] = 0;
+	}
+
 	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
 	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
 
+	lastEventTime[es->number] = demoCurrentTime;
 	if (eventNumberRaw == lastEvent[es->number]) {
 		return 0;
 	}
@@ -910,6 +917,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
 	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
 	Com_Memset(lastEvent,0,sizeof(lastEvent));
+	Com_Memset(lastEventTime,0,sizeof(lastEventTime));
 	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
 	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
 	Com_Memset(recentKillsDuringFlagHold,0,sizeof(recentKillsDuringFlagHold));
@@ -1385,7 +1393,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-					int eventNumber = demoCutGetEvent(thisEs);
+					int eventNumber = demoCutGetEvent(thisEs,demoCurrentTime);
 					if (eventNumber) {
 						
 

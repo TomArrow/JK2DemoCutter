@@ -311,9 +311,9 @@ void DemoReader::ParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 #endif
 
 int DemoReader::GetEvent(entityState_t* es) {
-	if (lastEvent.find(es->number) == lastEvent.end()) {
-		lastEvent[es->number] = 0;
-	}
+	//if (lastEvent.find(es->number) == lastEvent.end()) { // this might not be necessary because its auto-initialized to 0 anyway (std::map behavior)
+	//	lastEvent[es->number] = 0;
+	//}
 
 	// check for event-only entities
 	/*if (es->eType > ET_EVENTS) {
@@ -340,9 +340,14 @@ int DemoReader::GetEvent(entityState_t* es) {
 		}
 	}*/
 
+	if (lastEventTime[es->number] < demoCurrentTime - EVENT_VALID_MSEC) {
+		lastEvent[es->number] = 0;
+	}
+
 	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
 	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
 
+	lastEventTime[es->number] = demoCurrentTime;
 	if (eventNumberRaw == lastEvent[es->number]) {
 		return 0;
 	}

@@ -43,7 +43,6 @@ class DemoReaderLight {
 	int messageOffset = 0;
 
 	qboolean ConfigstringModified(clientActive_t* clCut);
-	int GetEvent(entityState_t* es);
 	void ParseCommandString(msg_t* msg, clientConnection_t* clcCut);
 	qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);

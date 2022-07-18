@@ -304,47 +304,6 @@ void DemoReaderLight::ParseCommandString(msg_t* msg, clientConnection_t* clcCut)
 //#pragma optimize("", off)
 #endif
 
-int DemoReaderLight::GetEvent(entityState_t* es) {
-	if (lastEvent.find(es->number) == lastEvent.end()) {
-		lastEvent[es->number] = 0;
-	}
-
-	// check for event-only entities
-	/*if (es->eType > ET_EVENTS) {
-		if (cent->previousEvent) {
-			return;	// already fired
-		}
-		// if this is a player event set the entity number of the client entity number
-		if (es->eFlags & EF_PLAYER_EVENT) {
-			es->number = es->otherEntityNum;
-		}
-
-		cent->previousEvent = 1;
-
-		es->event = es->eType - ET_EVENTS;
-	}
-	else {
-		// check for events riding with another entity
-		if (es->event == cent->previousEvent) {
-			return;
-		}
-		cent->previousEvent = es->event;
-		if ((es->event & ~EV_EVENT_BITS) == 0) {
-			return;
-		}
-	}*/
-
-	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
-	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
-
-	if (eventNumberRaw == lastEvent[es->number]) {
-		return 0;
-	}
-
-	lastEvent[es->number] = eventNumberRaw;
-	return eventNumber;
-
-}
 
 entityState_t* DemoReaderLight::findEntity(int number) {
 	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
@@ -648,7 +607,7 @@ readNext:
 					playerSeen[thisEs->number] = qtrue;
 				}
 
-				int eventNumber = GetEvent(thisEs);
+				int eventNumber = 0;// GetEvent(thisEs);
 
 				if (eventNumber) {
 					/*

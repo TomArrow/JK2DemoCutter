@@ -1313,6 +1313,142 @@ float VectorDistance(vec3_t v1, vec3_t v2)
 } 
 
 
+
+#define Q_COLOR_ESCAPE	'^'
+// you MUST have the last bit on here about colour strings being less than 7 or taiwanese strings register as colour!!!!
+//#define Q_IsColorString(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE && *((p)+1) <= '7' && *((p)+1) >= '0' )
+// Correct version of the above for Q_StripColor
+#define Q_IsColorStringExt(p)	((p) && *(p) == Q_COLOR_ESCAPE && *((p)+1) && isdigit(*((p)+1))) // ^[0-9]
+
+// from eternaljk2mv:
+#define Q_IsColorString(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) <= '7' && *((p)+1) >= '0' )
+#define Q_IsColorString_1_02(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE ) // 1.02 ColorStrings
+#define Q_IsColorString_Extended(p) Q_IsColorString_1_02(p)
+
+#define Q_IsColorStringNT(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE && *((p)+1) <= 0x7F && *((p)+1) >= 0x00 )
+#define ColorIndexNT(c)			( (c) & 127 )
+
+#define Q_IsColorStringHex(p) (Q_IsColorStringHexY((p))) || (Q_IsColorStringHexy((p))) || (Q_IsColorStringHexX((p))) || (Q_IsColorStringHexx((p)) )
+#define Q_IsColorStringHexY(p) ((p)+8) && (p) && *(p)=='Y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6)) && Q_IsHex((p+7)) && Q_IsHex((p+8))
+#define Q_IsColorStringHexy(p) ((p)+4) && (p) && *(p)=='y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4))
+#define Q_IsColorStringHexX(p) ((p)+6) && (p) && *(p)=='X' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6))
+#define Q_IsColorStringHexx(p) ((p)+3) && (p) && *(p)=='x' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3))
+
+#define Q_IsHex(p) ((p) && ((*(p) >= '0' && *(p) <= '9') || (*(p) >= 'a' && *(p) <= 'f') || (*(p) >= 'A' && *(p) <= 'F')))
+
+
+qboolean Q_parseColorHex(const char* p, float* color, int* skipCount) {
+	char c = *p++;
+	int i;
+	int val;
+
+	qboolean doWrite = qtrue;
+	if (!color || !(color + 3)) {
+		doWrite = qfalse;
+	}
+
+	*skipCount = 0; // We update it only if successful. If not successful, we want the string to be parsed normally.
+
+	int countToParse = 8;
+	qboolean halfPrecision = qfalse;
+	if (c == 'Y') {
+		countToParse = 8;
+	}
+	else if (c == 'y') {
+		countToParse = 4;
+		halfPrecision = qtrue;
+	}
+	else if (c == 'X') {
+		countToParse = 6;
+		if (doWrite) color[3] = 1.0f; // Z and z don't contain alpha.
+	}
+	else if (c == 'x') {
+		countToParse = 3;
+		if (doWrite) color[3] = 1.0f;
+		halfPrecision = qtrue;
+	}
+
+	int presumableSkipCount = countToParse + 1; // skip count will be set to this if successful.
+
+	for (i = 0; i < countToParse; i++) {
+		int readHex;
+		c = p[i];
+		if (c >= '0' && c <= '9') {
+			readHex = c - '0';
+		}
+		else if (c >= 'a' && c <= 'f') {
+			readHex = 0xa + c - 'a';
+		}
+		else if (c >= 'A' && c <= 'F') {
+			readHex = 0xa + c - 'A';
+		}
+		else {
+			if (color) {
+				color[0] = color[1] = color[2] = color[3] = 1.0f;
+			}
+			return qfalse;
+		}
+		if (doWrite) {
+
+			if (halfPrecision) { // Single digit per value.
+				val = readHex;
+				color[i] = val * (1 / 15.0f);
+			}
+			else {
+				if (i & 1) {
+					val |= readHex;
+					color[i >> 1] = val * (1 / 255.0f);
+				}
+				else {
+					val = readHex << 4;
+				}
+			}
+		}
+
+	}
+
+	*skipCount = presumableSkipCount;
+	return qtrue;
+
+}
+
+
+void Q_StripColorAll(char* text) {
+	char* read;
+	char* write;
+
+	read = write = text;
+	while (*read) {
+		if (Q_IsColorStringHex(read + 1)) {
+			int skipCount = 0;
+			Q_parseColorHex(read + 1, 0, &skipCount);
+			read += 1 + skipCount;
+		}
+		else if (Q_IsColorStringExt(read)) {
+			read += 2;
+		}
+		else if (Q_IsColorStringNT(read)) {
+			read += 2;
+		}
+		else {
+			// Avoid writing the same data over itself
+			if (write != read) {
+				*write = *read;
+			}
+			write++;
+			read++;
+		}
+	}
+	if (write < read) {
+		// Add trailing NUL byte if string has shortened
+		*write = '\0';
+	}
+}
+
+
+
+
+
 /*QUAKED item_***** ( 0 0 0 ) (-16 -16 -16) (16 16 16) suspended
 DO NOT USE THIS CLASS, IT JUST HOLDS GENERAL INFORMATION.
 The suspended flag will allow items to hang in the air, otherwise they are dropped to the next surface.
@@ -2101,3 +2237,4 @@ Only in One Flag CTF games
 };
 
 int		bg_numItems = sizeof(bg_itemlist) / sizeof(bg_itemlist[0]) - 1;
+
