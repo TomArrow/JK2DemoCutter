@@ -1807,3 +1807,9 @@ typedef enum {
 
 
 void Q_StripColorAll(char* text);
+
+
+typedef struct {
+	double sum;
+	double divisor;
+} averageHelper_t;
