@@ -133,6 +133,8 @@ std::map<int, int> timeCheckedForKillStreaks;
 
 #define KILLSTREAK_MIN_KILLS 3
 #define KILLSTREAK_MAX_INTERVAL 3000
+#define SLOW_KILLSTREAK_MAX_INTERVAL 5000
+#define VERYSLOW_KILLSTREAK_MAX_INTERVAL 7000
 #define OLDER_SPEEDS_STORE_LIMIT 2000 // Any speeds older than 2000ms are removed.
 #define MAX_ASSUMED_SERVER_FPS 200
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
@@ -757,7 +759,7 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 }
 
 
-void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandle, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified) {
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -826,10 +828,10 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 		int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(clientNumAttacker, spreeInfo->lastKillTime - spreeInfo->totalTime - 1000, spreeInfo->lastKillTime);
 		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
 
-
 		// Log the kill.
 		SQLBIND_TEXT(insertSpreeStatement, "@hash", hash_hex_string.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@shorthash", shorthash.c_str());
+		SQLBIND(insertSpreeStatement, int, "@maxDelay", maxDelay);
 		SQLBIND_TEXT(insertSpreeStatement, "@map", mapname.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@killerName", playername.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@victimNames", victimsString.c_str());
@@ -874,7 +876,7 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 
 
 		std::stringstream ss;
-		ss << mapname << std::setfill('0') << "___KILLSPREE" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << "___" << playername << "__";
+		ss << mapname << std::setfill('0') << "___KILLSPREE" <<maxDelay<<"_"<< spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << "___" << playername << "__";
 		for (int i = 0; i < victims->size(); i++) {
 			ss << "_" << (*victims)[i];
 		}
@@ -885,9 +887,9 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 		sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
 
-		(*outputBatHandle) << "\nrem hash: " << hash_hex_string;
-		(*outputBatHandle) << "\nrem demoCurrentTime: " << demoCurrentTime;
-		(*outputBatHandle) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+		(*outputBatHandleKillSprees) << "\nrem hash: " << hash_hex_string;
+		(*outputBatHandleKillSprees) << "\nrem demoCurrentTime: " << demoCurrentTime;
+		(*outputBatHandleKillSprees) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 		delete[] targetFilenameFiltered;
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
 		std::cout << ss.str() << "\n";
@@ -897,7 +899,7 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 
 }
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileDefrag,const char* outputBatFileCaptures, highlightSearchMode_t searchMode) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -923,10 +925,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int				lastValidSnap = -1;
 
 	std::ofstream outputBatHandle;
+	std::ofstream outputBatHandleKillSprees;
 	std::ofstream outputBatHandleDefrag;
 	std::ofstream outputBatHandleCaptures;
 
 	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
+	outputBatHandleKillSprees.open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
 	outputBatHandleDefrag.open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
 	outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 
@@ -1118,6 +1122,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_exec(killDb, "CREATE TABLE killSprees ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
+		"maxDelay	INTEGER NOT NULL,"
 		"map	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
 		"victimNames	TEXT NOT NULL,"
@@ -1185,10 +1190,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
-		"( hash, shorthash, map,killerName, victimNames ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
+		"( hash, shorthash,maxDelay, map,killerName, victimNames ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
-		"( @hash, @shorthash, @map, @killerName, @victimNames ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
+		"( @hash, @shorthash, @maxDelay,@map, @killerName, @victimNames ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
@@ -2233,70 +2238,89 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
-					static std::vector<Kill> killsOfThisSpree;
-					static std::vector<int> victims;
-					static std::vector<std::string> hashes;
-					victims.reserve(10);
-					hashes.reserve(10);
-					killsOfThisSpree.reserve(10);
-					victims.clear();
-					hashes.clear();
-					killsOfThisSpree.clear();
+
+					static const int killStreakSpeedTypes[] = { KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL };
+					constexpr int spCount = sizeof(killStreakSpeedTypes) / sizeof(int);
 
 					int clientNumAttacker = clientIt->first;
-					SpreeInfo spreeInfo;
-					Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
-					std::stringstream allKillsHashSS;
 
-					if (clientIt->second.size() == 0 || (clientIt->second.back().time + KILLSTREAK_MAX_INTERVAL) >= demoCurrentTime) continue; // Might still have an unfinished one here!
-
-					int lastKillTime = 0;
-
-					std::string* lastKillHash = NULL;
-
-					for (int i = 0; i < clientIt->second.size(); i++) {
-						Kill* thisKill = &clientIt->second[i];
-
-						// Whether it was or wasn't a killstreak, there are no killstreaks up to this point, so earlier than current kill time can be safely cleaned up.
-						timeCheckedForKillStreaks[clientNumAttacker] = thisKill->time - 1;
-
-						if (thisKill->time <= timeCheckedForKillStreaks[clientNumAttacker]) continue; // This one's already been registered.
-						if (thisKill->isSuicide || !thisKill->isVisible) continue; // Uninteresting.
+					if (clientIt->second.size() == 0 || (clientIt->second.back().time + killStreakSpeedTypes[spCount-1]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
 
 
-						// Starting or continuing kill spree?
-						if (spreeInfo.countKills == 0 || thisKill->time <= (spreeInfo.lastKillTime + KILLSTREAK_MAX_INTERVAL)) {
+					for (int sp = 0; sp < spCount; sp++) { // We do this twice, for every killstreak duration type.
+
+						int maxTimeHere = killStreakSpeedTypes[sp];
+						int maxTimeLast = sp == 0 ? -1 : killStreakSpeedTypes[sp-1];
+						int countFittingInLastBracket = 0;
+
+						static std::vector<Kill> killsOfThisSpree;
+						static std::vector<int> victims;
+						static std::vector<std::string> hashes;
+						victims.reserve(10);
+						hashes.reserve(10);
+						killsOfThisSpree.reserve(10);
+						victims.clear();
+						hashes.clear();
+						killsOfThisSpree.clear();
+
+						SpreeInfo spreeInfo;
+						Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
+						std::stringstream allKillsHashSS;
+
+						int lastKillTime = 0;
+
+						std::string* lastKillHash = NULL;
+
+						for (int i = 0; i < clientIt->second.size(); i++) {
+							Kill* thisKill = &clientIt->second[i];
+
+							// Whether it was or wasn't a killstreak, there are no killstreaks up to this point, so earlier than current kill time can be safely cleaned up.
+							timeCheckedForKillStreaks[clientNumAttacker] = thisKill->time - 1;
+
+							if (thisKill->time <= timeCheckedForKillStreaks[clientNumAttacker]) continue; // This one's already been registered.
+							if (thisKill->isSuicide || !thisKill->isVisible) continue; // Uninteresting.
+
+
+							// Starting or continuing kill spree?
+							if (spreeInfo.countKills == 0 || thisKill->time <= (spreeInfo.lastKillTime + maxTimeHere)) {
 							
-							if (lastKillHash && *lastKillHash == thisKill->hashSourceString) continue; // Weird duplicated kill from lost packets likely, identical hash to last one.
-							victims.push_back(thisKill->targetClientNum);
-							hashes.push_back(thisKill->hash);
-							killsOfThisSpree.push_back(*thisKill);
-							if (thisKill->isDoom) spreeInfo.countDooms++;
-							if (thisKill->isRet) spreeInfo.countRets++;
-							if (thisKill->isExplosion) spreeInfo.countExplosions++;
-							if (!thisKill->isFollowed) spreeInfo.countThirdPersons++;
-							spreeInfo.totalTime += spreeInfo.countKills == 0? 0: (thisKill->time - spreeInfo.lastKillTime);
-							spreeInfo.countKills++;
-							spreeInfo.lastKillTime = thisKill->time;
-							spreeInfo.maxVictimSpeed = std::max(spreeInfo.maxVictimSpeed,thisKill->victimMaxSpeedPastSecond);
-							allKillsHashSS << thisKill->hashSourceString;
-							lastKillHash = &thisKill->hashSourceString;
-						}
-						else {
-							// This kill is not part of a killspree. Reset.
-							// But first, check if this concludes an existing killspree that we can now save.
-							CheckSaveKillstreak(&spreeInfo, clientNumAttacker,&killsOfThisSpree,&victims, &hashes, allKillsHashSS.str(),demoCurrentTime,&outputBatHandle,bufferTime,lastGameStateChangeInDemoTime,sourceDemoFile, insertSpreeStatement, killDb, oldBasename,oldPath, oldDemoDateModified);
+								if (lastKillHash && *lastKillHash == thisKill->hashSourceString) continue; // Weird duplicated kill from lost packets likely, identical hash to last one.
+								if (sp > 0  && (spreeInfo.countKills ==0 || thisKill->time <= (spreeInfo.lastKillTime + maxTimeLast))) countFittingInLastBracket++; // Measure how many of the kills would have fit in a faster bracket. If ALL of them would have, we discard this and just count it the faster bracket variant.
+								victims.push_back(thisKill->targetClientNum);
+								hashes.push_back(thisKill->hash);
+								killsOfThisSpree.push_back(*thisKill);
+								if (thisKill->isDoom) spreeInfo.countDooms++;
+								if (thisKill->isRet) spreeInfo.countRets++;
+								if (thisKill->isExplosion) spreeInfo.countExplosions++;
+								if (!thisKill->isFollowed) spreeInfo.countThirdPersons++;
+								spreeInfo.totalTime += spreeInfo.countKills == 0? 0: (thisKill->time - spreeInfo.lastKillTime);
+								spreeInfo.countKills++;
+								spreeInfo.lastKillTime = thisKill->time;
+								spreeInfo.maxVictimSpeed = std::max(spreeInfo.maxVictimSpeed,thisKill->victimMaxSpeedPastSecond);
+								allKillsHashSS << thisKill->hashSourceString;
+								lastKillHash = &thisKill->hashSourceString;
+							}
+							else {
+								// This kill is not part of a killspree. Reset.
+								// But first, check if this concludes an existing killspree that we can now save.
+								if (countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
+									CheckSaveKillstreak(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified);
+								}
 
-							// Reset.
-							Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
-							victims.clear();
-							hashes.clear();
-							killsOfThisSpree.clear();
-							allKillsHashSS.str(std::string());
+								// Reset.
+								Com_Memset(&spreeInfo, 0, sizeof(SpreeInfo));
+								victims.clear();
+								hashes.clear();
+								killsOfThisSpree.clear();
+								allKillsHashSS.str(std::string());
+								countFittingInLastBracket = 0;
+							}
 						}
+						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
+							CheckSaveKillstreak(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified);
+						}
+
 					}
-					CheckSaveKillstreak(&spreeInfo, clientNumAttacker,&killsOfThisSpree,&victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandle, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement,killDb, oldBasename,oldPath, oldDemoDateModified);
-				
 					// Clean up old kills that no longer have to be stored
 					// We can clear the entire thing since earlier we made sure that we aren't in the middle of an ongoing killstreak
 					// So anything that's in there now was already checked for being part of a killstreak.
@@ -2824,6 +2848,7 @@ cuterror:
 	//FS_FCloseFile(newHandle);
 
 	outputBatHandle.close();
+	outputBatHandleKillSprees.close();
 	outputBatHandleDefrag.close();
 	outputBatHandleCaptures.close();
 
@@ -2888,7 +2913,7 @@ int main(int argc, char** argv) {
 	}
 
 	Com_Printf("Looking at %s.\n", demoName);
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat", searchMode)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat", searchMode)) {
 		Com_Printf("Highlights successfully found.\n");
 	}
 	else {

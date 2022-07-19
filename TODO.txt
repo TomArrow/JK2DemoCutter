@@ -53,6 +53,7 @@ Make the G2 entity part optional. Aka. If there is still a free player spot, put
 Likewise, if a player absolutely cannot fit in, make him a g2ent and throw a warning.
 track percentage visible as capper?
 save player counts for sprees
+allow killing sprees that simply count without time by the amount of kills without dying. might be a bit lame tho.
 
 DONE: 
 
