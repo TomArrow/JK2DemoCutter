@@ -51,6 +51,7 @@ log highest count of sentries/mines ever
 detect mine boosts/backflip before kills?
 Make the G2 entity part optional. Aka. If there is still a free player spot, put the player in normal. Otherwise force him into g2. But how to predict that? How to make sure the next demo that loads won't then be missing player spots? I guess we start deleting the potential g2 ones if that happens. "moving them over" if you will?
 Likewise, if a player absolutely cannot fit in, make him a g2ent and throw a warning.
+track percentage visible as capper?
 
 DONE: 
 

@@ -45,6 +45,12 @@ struct EnemyNearbyInfo {
 	int enemyNearbyTimes[MAX_CLIENTS + 1]; // There can be 31 nearby enemies (one oneself cant be an enemy) max. Also 0. 32 means: unknown. Index 32 (+1) is for unknown, if flag carrier wasnt visible.
 	int enemyVeryCloseTimes[MAX_CLIENTS + 1];
 };
+struct VariousCappingInfo {
+	int lastUpdateTime;
+	float maxSpeedThisRun;
+	double sumSpeeds;
+	double divisorSpeeds;
+};
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS];
 int playerFirstVisible[MAX_CLIENTS];
 int playerFirstFollowed[MAX_CLIENTS];
@@ -52,6 +58,7 @@ int playerFirstFollowedOrVisible[MAX_CLIENTS];
 int recentFlagHoldTimes[MAX_CLIENTS];
 CapperKillsInfo recentKillsDuringFlagHold[MAX_CLIENTS];
 EnemyNearbyInfo recentFlagHoldEnemyNearbyTimes[MAX_CLIENTS]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
+VariousCappingInfo recentFlagHoldVariousInfo[MAX_CLIENTS]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
 int playerTeams[MAX_CLIENTS];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
@@ -890,7 +897,7 @@ void CheckSaveKillstreak(SpreeInfo* spreeInfo,int clientNumAttacker, std::vector
 
 }
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileDefrag, highlightSearchMode_t searchMode) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileDefrag,const char* outputBatFileCaptures, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -917,10 +924,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleDefrag;
+	std::ofstream outputBatHandleCaptures;
 
 	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
 	outputBatHandleDefrag.open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
-
+	outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 
 	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
 	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
@@ -931,6 +939,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
 	Com_Memset(recentKillsDuringFlagHold,0,sizeof(recentKillsDuringFlagHold));
 	Com_Memset(recentFlagHoldEnemyNearbyTimes,0,sizeof(recentFlagHoldEnemyNearbyTimes));
+	Com_Memset(recentFlagHoldVariousInfo,0,sizeof(recentFlagHoldVariousInfo));
 	Com_Memset(playerTeams,0,sizeof(playerTeams));
 	Com_Memset(teamInfo,0,sizeof(teamInfo));
 	Com_Memset(&cgs,0,sizeof(cgs));
@@ -1037,6 +1046,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"); ",
 		NULL, NULL, NULL);
 	sqlite3_exec(killDb, "CREATE TABLE captures ("
+		"id	INTEGER PRIMARY KEY,"
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
 		"flagHoldTime	INTEGER NOT NULL,"
@@ -1058,7 +1068,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"redPlayerCount INTEGER,"
 		"bluePlayerCount INTEGER,"
 		"sumPlayerCount INTEGER,"
+		"maxSpeedCapperLastSecond	REAL,"
 		"maxSpeedCapper	REAL,"
+		"averageSpeedCapper	REAL,"
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"nearbyEnemies	TEXT,"
@@ -1161,9 +1173,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,flagHoldTime,flagPickupSource,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,flagHoldTime,flagPickupSource,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@flagHoldTime,@flagPickupSource,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@flagHoldTime,@flagPickupSource,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
@@ -1186,6 +1198,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
 	sqlite3_stmt* updatePlayerModelCountStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&updatePlayerModelCountStatement,NULL);
+	preparedStatementText = "SELECT last_insert_rowid();";
+	sqlite3_stmt* selectLastInsertRowIdStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
 
 	sqlite3_exec(killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
@@ -1967,7 +1982,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								}
 							}
 
-							float maxSpeedCapperFloat = getMaxSpeedForClientinTimeFrame(playerNum, demoCurrentTime - 1000, demoCurrentTime);
+							float maxSpeedCapperLastSecond = getMaxSpeedForClientinTimeFrame(playerNum, demoCurrentTime - 1000, demoCurrentTime);
 
 							// See if he had any kills/rets as carrier. (did he fight valiantly before he died?)
 							if (recentKillsDuringFlagHold[playerNum].lastKillDemoTime < demoCurrentTime - recentFlagHoldTimes[playerNum]) {
@@ -2015,6 +2030,16 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								}
 							}
 							std::string nearbyPlayersString = nearbyPlayersSS.str();
+
+							// Stats about speed
+							if (recentFlagHoldVariousInfo[playerNum].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[playerNum]) {
+								// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
+								Com_Memset(&recentFlagHoldVariousInfo[playerNum], 0, sizeof(VariousCappingInfo));
+								recentFlagHoldVariousInfo[playerNum].lastUpdateTime = demoCurrentTime;
+							}
+							float maxSpeedCapper = recentFlagHoldVariousInfo[playerNum].maxSpeedThisRun;
+							float averageSpeedCapper = recentFlagHoldVariousInfo[playerNum].divisorSpeeds == 0 ? 0 : recentFlagHoldVariousInfo[playerNum].sumSpeeds/recentFlagHoldVariousInfo[playerNum].divisorSpeeds;
+
 
 							// Find nearby enemies
 							std::stringstream nearbyEnemiesSS;
@@ -2104,7 +2129,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
 							SQLBIND(insertCaptureStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
 							SQLBIND(insertCaptureStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
-							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapperFloat);
+							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
+							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapper);
+							SQLBIND(insertCaptureStatement, double, "@averageSpeedCapper", averageSpeedCapper);
 							SQLBIND_TEXT(insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
 							SQLBIND(insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
 							SQLBIND_TEXT(insertCaptureStatement, "@nearbyEnemies", nearbyEnemiesString.c_str());
@@ -2141,10 +2168,55 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertCaptureStatement, int, "@demoDateTime", oldDemoDateModified);
 
 							int queryResult = sqlite3_step(insertCaptureStatement);
+							uint64_t insertedId = -1;
 							if (queryResult != SQLITE_DONE) {
 								std::cout << "Error inserting capture into database: " << sqlite3_errmsg(killDb) << "\n";
 							}
+							else {
+								queryResult = sqlite3_step(selectLastInsertRowIdStatement);
+								if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
+									std::cout << "Error retrieving inserted capture id from database: " << sqlite3_errmsg(killDb) << "\n";
+								}
+								else {
+									insertedId = sqlite3_column_int64(selectLastInsertRowIdStatement,0);
+								}
+								sqlite3_reset(selectLastInsertRowIdStatement);
+							}
 							sqlite3_reset(insertCaptureStatement);
+
+							if (!playerIsVisibleOrFollowed && !wasVisibleOrFollowed) continue; // No need to cut out those who were not visible at all in any way.
+							if (searchMode == SEARCH_MY_CTF_RETURNS && playerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
+
+							int runStart = demoCurrentTime - flagHoldTime;
+							int startTime = runStart - bufferTime;
+							int endTime = demoCurrentTime + bufferTime;
+							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+							bool isTruncated = false;
+							if (earliestPossibleStart > startTime) {
+								startTime = earliestPossibleStart;
+								isTruncated = true;
+							}
+							//startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
+
+							int milliSeconds = flagHoldTime;
+							int pureMilliseconds = milliSeconds % 1000;
+							int seconds = milliSeconds / 1000;
+							int pureSeconds = seconds % 60;
+							int minutes = seconds / 60;
+
+							std::stringstream ss;
+							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");
+
+							std::string targetFilename = ss.str();
+							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+
+							outputBatHandleCaptures << "\nrem demoCurrentTime: " << demoCurrentTime;
+							outputBatHandleCaptures << "\nrem insertid" << insertedId;
+							outputBatHandleCaptures << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							delete[] targetFilenameFiltered;
+							std::cout << targetFilename << "\n";
+
 
 						}
 					}
@@ -2257,6 +2329,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
 				lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
 				vec3_t lastKnownBlueFlagCarrierPosition, lastKnownRedFlagCarrierPosition;
+				vec3_t lastKnownBlueFlagCarrierVelocity, lastKnownRedFlagCarrierVelocity;
 				for (int p = 0; p < MAX_CLIENTS; p++) {
 					// Go through parseenttities of last snap to see if client is in it
 					bool clientIsInSnapshot = false;
@@ -2269,12 +2342,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
 								lastKnownRedFlagCarrier = thisEntity->number;
-								VectorCopy(thisEntity->pos.trBase,lastKnownBlueFlagCarrierPosition);
+								VectorCopy(thisEntity->pos.trBase,lastKnownRedFlagCarrierPosition);
+								VectorCopy(thisEntity->pos.trDelta,lastKnownRedFlagCarrierVelocity);
 								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken;
 							}
 							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
 								lastKnownBlueFlagCarrier = thisEntity->number;
-								VectorCopy(thisEntity->pos.trBase, lastKnownRedFlagCarrierPosition);
+								VectorCopy(thisEntity->pos.trBase, lastKnownBlueFlagCarrierPosition);
+								VectorCopy(thisEntity->pos.trDelta, lastKnownBlueFlagCarrierVelocity);
 								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 							}
 						}
@@ -2282,12 +2357,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG]) {
 
 						lastKnownRedFlagCarrier = demo.cut.Cl.snap.ps.clientNum;
-						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownBlueFlagCarrierPosition);
+						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownRedFlagCarrierPosition);
+						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownRedFlagCarrierVelocity);
 						recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken;
 					}else if (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG]) {
 
 						lastKnownBlueFlagCarrier = demo.cut.Cl.snap.ps.clientNum;
-						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownRedFlagCarrierPosition);
+						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownBlueFlagCarrierPosition);
+						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownBlueFlagCarrierVelocity);
 						recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 					}
 					if (clientIsInSnapshot) {
@@ -2318,6 +2395,35 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					}
 				}
 
+				// save maxspeed of flag hold
+				if (lastKnownRedFlagCarrier != -1) {
+					if (recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownRedFlagCarrier]) {
+						// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
+						Com_Memset(&recentFlagHoldVariousInfo[lastKnownRedFlagCarrier], 0, sizeof(VariousCappingInfo));
+					}
+					float speedHere = VectorLength(lastKnownRedFlagCarrierVelocity);
+					if (recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].maxSpeedThisRun < speedHere) {
+						recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].maxSpeedThisRun = speedHere;
+					}
+					recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].sumSpeeds += speedHere* deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].divisorSpeeds += deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].lastUpdateTime = demoCurrentTime;
+				}
+				if (lastKnownBlueFlagCarrier != -1) {
+					if (recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownBlueFlagCarrier]) {
+						// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
+						Com_Memset(&recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier], 0, sizeof(VariousCappingInfo));
+					}
+					float speedHere = VectorLength(lastKnownBlueFlagCarrierVelocity);
+					if (recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].maxSpeedThisRun < speedHere) {
+						recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].maxSpeedThisRun = speedHere;
+					}
+					recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].sumSpeeds += speedHere * deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].divisorSpeeds += deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].lastUpdateTime = demoCurrentTime;
+				}
+
+
 				// Check amount of enemies nearby cappers and log it in case we need it later.
 				if (lastKnownBlueFlagCarrier!=-1 || lastKnownRedFlagCarrier!=-1) { // Don't bother if no flag carrier is visible at all
 					int enemiesNearRedCarrier =0, enemiesNearBlueCarrier = 0;
@@ -2327,7 +2433,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 						if (thisEntity->number < 0 || thisEntity->number >= MAX_CLIENTS || playerTeams[thisEntity->number]==TEAM_SPECTATOR) continue; 
-						if (lastKnownBlueFlagCarrier != -1 && playerTeams[thisEntity->number] != TEAM_BLUE) {
+						if (lastKnownBlueFlagCarrier != -1 && playerTeams[thisEntity->number] == TEAM_BLUE) {
 							float distance = VectorDistance(lastKnownBlueFlagCarrierPosition,thisEntity->pos.trBase);
 							if (distance <= NEARBY_PLAYER_MAX_DISTANCE) {
 								enemiesNearBlueCarrier++;
@@ -2336,7 +2442,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								enemiesVeryCloseBlueCarrier++;
 							}
 						}
-						if (lastKnownRedFlagCarrier != -1 && playerTeams[thisEntity->number] != TEAM_RED){
+						if (lastKnownRedFlagCarrier != -1 && playerTeams[thisEntity->number] == TEAM_RED){
 							float distance = VectorDistance(lastKnownRedFlagCarrierPosition, thisEntity->pos.trBase);
 							if (distance <= NEARBY_PLAYER_MAX_DISTANCE) {
 								enemiesNearRedCarrier++;
@@ -2707,10 +2813,16 @@ cuterror:
 	sqlite3_finalize(insertAngleStatement);
 	sqlite3_finalize(insertPlayerModelStatement);
 	sqlite3_finalize(updatePlayerModelCountStatement);
+	sqlite3_finalize(selectLastInsertRowIdStatement);
 	sqlite3_close(killDb);
 
 	FS_FCloseFile(oldHandle);
 	//FS_FCloseFile(newHandle);
+
+	outputBatHandle.close();
+	outputBatHandleDefrag.close();
+	outputBatHandleCaptures.close();
+
 
 	std::cout << "\ndone." << "\n\n";
 
@@ -2772,7 +2884,7 @@ int main(int argc, char** argv) {
 	}
 
 	Com_Printf("Looking at %s.\n", demoName);
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptDefrag.bat", searchMode)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat", searchMode)) {
 		Com_Printf("Highlights successfully found.\n");
 	}
 	else {
