@@ -2252,6 +2252,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					int lastKillTime = 0;
 
+					std::string* lastKillHash = NULL;
+
 					for (int i = 0; i < clientIt->second.size(); i++) {
 						Kill* thisKill = &clientIt->second[i];
 
@@ -2265,6 +2267,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						// Starting or continuing kill spree?
 						if (spreeInfo.countKills == 0 || thisKill->time <= (spreeInfo.lastKillTime + KILLSTREAK_MAX_INTERVAL)) {
 							
+							if (lastKillHash && *lastKillHash == thisKill->hashSourceString) continue; // Weird duplicated kill from lost packets likely, identical hash to last one.
 							victims.push_back(thisKill->targetClientNum);
 							hashes.push_back(thisKill->hash);
 							killsOfThisSpree.push_back(*thisKill);
@@ -2277,6 +2280,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							spreeInfo.lastKillTime = thisKill->time;
 							spreeInfo.maxVictimSpeed = std::max(spreeInfo.maxVictimSpeed,thisKill->victimMaxSpeedPastSecond);
 							allKillsHashSS << thisKill->hashSourceString;
+							lastKillHash = &thisKill->hashSourceString;
 						}
 						else {
 							// This kill is not part of a killspree. Reset.
