@@ -17,6 +17,57 @@
     <ClCompile Include="..\shared\DemoReader.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\zlib\adler32.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\compress.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\crc32.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\deflate.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzclose.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzlib.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzread.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzwrite.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\infback.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\inffast.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\inflate.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\inftrees.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\ioapi.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\trees.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\uncompr.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\zutil.c">
+      <Filter>Common\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\animMappingTable.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -24,6 +75,9 @@
     </Filter>
     <Filter Include="Common">
       <UniqueIdentifier>{b00e22a2-6233-4e35-9f63-a0b232a33782}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\zlib">
+      <UniqueIdentifier>{43c98156-c52f-43df-afc8-d37c9b9add99}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -38,6 +92,42 @@
     </ClInclude>
     <ClInclude Include="..\shared\DemoReader.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\crc32.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\deflate.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\gzguts.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inffast.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inffixed.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inflate.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inftrees.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\ioapi.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\trees.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\zconf.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\zlib.h">
+      <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\zutil.h">
+      <Filter>Common\zlib</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

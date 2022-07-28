@@ -1,6 +1,7 @@
 // Lifted basically 1:1 from jomme. Should be pretty close to what the original Jedi Knight source code releases contained, save for a few smaller changes
 //
 #include "demoCut.h"
+#include "jkaStuff.h"
 
 #ifdef _DONETPROFILE_
 #include "INetProfile.h"
@@ -1218,7 +1219,7 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 	// the "number" field is not part of the field list
 	// if this assert fails, someone added a field to the entityState_t
 	// struct without updating the message fields
-	assert( numFields + 1 == sizeof( *from )/4 );
+	//assert( numFields + 1 == sizeof( *from )/4 ); // This assert isn't helping us anymore because we made the whole thing compatible with JKA so it's never really gonna be right.
 
 	// a NULL to is a delta remove message
 	if ( to == NULL ) {
@@ -1325,7 +1326,7 @@ Can go from either a baseline or a previous packet_entity
 //#pragma optimize("", off)
 #endif
 void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to, 
-						 int number,qboolean demo15detected) {
+						 int number,demoType_t demoType) {
 	int			i, lc;
 	int			numFields;
 	netField_t	*field;
@@ -1361,10 +1362,25 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 		return;
 	}
 
-	if (demo15detected)
+	netField_t* esFields = NULL;
+	/*if (demo15detected)
 		numFields = sizeof(entityStateFields15)/sizeof(entityStateFields15[0]);
 	else
-		numFields = sizeof(entityStateFields)/sizeof(entityStateFields[0]);
+		numFields = sizeof(entityStateFields)/sizeof(entityStateFields[0]);*/
+	switch (demoType) {
+	case DM_15:
+		numFields = sizeof(entityStateFields15) / sizeof(entityStateFields15[0]);
+		esFields = entityStateFields15;
+		break;
+	case DM_16:
+		numFields = sizeof(entityStateFields) / sizeof(entityStateFields[0]);
+		esFields = entityStateFields;
+		break;
+	case DM_26:
+		numFields = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+		esFields = entityStateFieldsJKA;
+		break;
+	}
 	lc = MSG_ReadByte(msg);
 
 	// shownet 2/3 will interleave with other printed info, -1 will
@@ -1382,7 +1398,8 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 	int startBytes,endBytes;
 #endif
 
-	for ( i = 0, field = demo15detected ? entityStateFields15 : entityStateFields ; i < lc ; i++, field++ ) {
+	//for ( i = 0, field = demo15detected ? entityStateFields15 : entityStateFields ; i < lc ; i++, field++ ) {
+	for ( i = 0, field = esFields; i < lc ; i++, field++ ) {
 		//if (i >= numFields) {
 		//	continue; // hardening against corrupted demos. likely won't recover anyway but oh well. Actualy, strike that, didnt help anyway
 		//}
@@ -1436,7 +1453,8 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 		ClReadProf().AddField(field->name,endBytes-startBytes);
 #endif
 	}
-	for ( i = lc, field = demo15detected ? &entityStateFields15[lc] : &entityStateFields[lc] ; i < numFields ; i++, field++ ) {
+	//for ( i = lc, field = demo15detected ? &entityStateFields15[lc] : &entityStateFields[lc] ; i < numFields ; i++, field++ ) {
+	for ( i = lc, field =  &esFields[lc] ; i < numFields ; i++, field++ ) {
 		if (i >= 0) { // some corrupted (?) messages have negative lc
 			fromF = (int*)((byte*)from + field->offset);
 			toF = (int*)((byte*)to + field->offset);
@@ -1879,7 +1897,8 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 MSG_ReadDeltaPlayerstate
 ===================
 */
-void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, qboolean demo15detected ) {
+//void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, qboolean demo15detected ) {
+void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, demoType_t demoType, qboolean isVehiclePS) { // vehicle ps stuff is for JKA
 	int			i, lc;
 	int			bits;
 	netField_t	*field;
@@ -1911,17 +1930,56 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 		print = 0;
 	}
 
-	if (demo15detected)
+	netField_t* psFields = NULL;
+	/*if (demo15detected)
 		numFields = sizeof( playerStateFields15 ) / sizeof( playerStateFields15[0] );
 	else
-		numFields = sizeof( playerStateFields ) / sizeof( playerStateFields[0] );
+		numFields = sizeof( playerStateFields ) / sizeof( playerStateFields[0] );*/
+	switch (demoType) {
+	case DM_15:
+		numFields = sizeof(playerStateFields15) / sizeof(playerStateFields15[0]);
+		psFields = playerStateFields15;
+		break;
+	case DM_16:
+		numFields = sizeof(playerStateFields) / sizeof(playerStateFields[0]);
+		psFields = playerStateFields;
+		break;
+	case DM_26:
+		psFields = playerStateFieldsJKA;
+		//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
+#ifdef _OPTIMIZED_VEHICLE_NETWORKING
+		if (isVehiclePS)
+		{//a vehicle playerstate
+			numFields = sizeof(vehPlayerStateFieldsJKA) / sizeof(vehPlayerStateFieldsJKA[0]);
+			psFields = vehPlayerStateFieldsJKA;
+		}
+		else
+		{
+			int isPilot = MSG_ReadBits(msg, 1);
+			if (isPilot)
+			{//pilot riding *inside* a vehicle!
+				numFields = sizeof(pilotPlayerStateFieldsJKA) / sizeof(pilotPlayerStateFieldsJKA[0]) - 82;
+				psFields = pilotPlayerStateFieldsJKA;
+			}
+			else
+			{//normal client
+				numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+			}
+		}
+		//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
+#else//_OPTIMIZED_VEHICLE_NETWORKING
+		numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+#endif//_OPTIMIZED_VEHICLE_NETWORKING
+		break;
+	}
 	lc = MSG_ReadByte(msg);
 
 #ifdef _DONETPROFILE_
 	int startBytes,endBytes;
 #endif
 
-	for ( i = 0, field = demo15detected ? playerStateFields15 : playerStateFields ; i < lc ; i++, field++ ) {
+	//for ( i = 0, field = demo15detected ? playerStateFields15 : playerStateFields ; i < lc ; i++, field++ ) {
+	for ( i = 0, field = psFields ; i < lc ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 
@@ -1963,7 +2021,8 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 		ClReadProf().AddField(field->name,endBytes-startBytes);
 #endif
 	}
-	for ( i=lc,field = demo15detected ? &playerStateFields15[lc] : &playerStateFields[lc];i<numFields; i++, field++) {
+	//for ( i=lc,field = demo15detected ? &playerStateFields15[lc] : &playerStateFields[lc];i<numFields; i++, field++) {
+	for ( i=lc,field = &psFields[lc];i<numFields; i++, field++) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 		// no change

@@ -2609,7 +2609,13 @@ typedef enum //# animNumber_e
 	MAX_TOTALANIMATIONS_15
 } animNumber15_t;
 
-// Attempt of DM16 to DM15 mappings
+extern animNumber15_t animMappingTable_1_04_to_1_02[MAX_TOTALANIMATIONS];
+
+extern animNumber_t animMappingTable_1_02_to_1_04[MAX_TOTALANIMATIONS_15];
+
+/* Macros */
+#define MV_MapAnimation104(anim) (animMappingTable_1_02_to_1_04[(anim)&~ANIM_TOGGLEBIT] | ((anim)&ANIM_TOGGLEBIT))
+#define MV_MapAnimation102(anim) (animMappingTable_1_04_to_1_02[(anim)&~ANIM_TOGGLEBIT] | ((anim)&ANIM_TOGGLEBIT))
 
 
 #endif// #ifndef __ANIMS_H__

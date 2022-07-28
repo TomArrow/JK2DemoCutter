@@ -17,6 +17,16 @@
 #include "animsStanceMappings.h"
 
 
+
+
+enum demoType_t {
+	DM_15,
+	DM_16,
+	DM_26
+};
+
+
+
 #define NULL 0
 
 #ifndef _FILE_DEFINED
@@ -690,6 +700,7 @@ typedef struct {
 
 	int				cmdNum;			// the next cmdNum the server is expecting
 	playerState_t	ps;						// complete information about the current player at this time
+	playerState_t	vps; //vehicle I'm riding's playerstate (if applicable) -rww
 
 	int				numEntities;			// all of the entities that need to be presented
 	int				parseEntitiesNum;		// at the time of this snapshot
@@ -1006,6 +1017,19 @@ typedef struct {
 	byte		unsentBuffer[MAX_MSGLEN];
 } netchan_t;
 
+
+#define MAX_HEIGHTMAP_SIZE	16000
+
+typedef struct
+{
+	int			mType;
+	int			mSide;
+	vec3_t		mOrigin;
+
+} rmAutomapSymbol_t;
+
+#define	MAX_AUTOMAP_SYMBOLS	512
+
 typedef struct {
 
 	int			clientNum;
@@ -1062,6 +1086,14 @@ typedef struct {
 	int			timeDemoFrames;		// counter of rendered frames
 	int			timeDemoStart;		// cls.realtime before first frame
 	int			timeDemoBaseTime;	// each frame will be at this time + frameNum * 50
+
+	//rwwRMG - added: (JKA specific)
+	int					rmgSeed;
+	int					rmgHeightMapSize;
+	unsigned char		rmgHeightMap[MAX_HEIGHTMAP_SIZE];
+	unsigned char		rmgFlattenMap[MAX_HEIGHTMAP_SIZE];
+	rmAutomapSymbol_t	rmgAutomapSymbols[MAX_AUTOMAP_SYMBOLS];
+	int					rmgAutomapSymbolCount;
 
 	// big stuff at end of structure so most offsets are 15 bits or less
 	netchan_t	netchan;
@@ -1129,10 +1161,10 @@ void MSG_ReadDeltaUsercmdKey(msg_t* msg, int key, usercmd_t* from, usercmd_t* to
 void MSG_WriteDeltaEntity(msg_t* msg, struct entityState_s* from, struct entityState_s* to
 	, qboolean force, qboolean demo15detected);
 void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
-	int number, qboolean demo15detected);
+	int number, demoType_t demoType);
 
 void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean demo15detected);
-void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean demo15detected);
+void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS);
 
 
 void MSG_ReportChangeVectors_f(void);
@@ -1746,11 +1778,6 @@ extern std::map <int, std::string>  saberMoveNames;
 extern std::map <int, std::string>  saberStyleNames;
 
 
-
-enum demoType_t {
-	DM_15,
-	DM_16
-};
 
 
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap);

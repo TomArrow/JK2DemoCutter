@@ -47,6 +47,9 @@ class DemoReaderLight {
 	qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 	qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
+	void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut);
+
+
 	qboolean PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap);
 	entityState_t* findEntity(int number);
 
@@ -54,6 +57,8 @@ class DemoReaderLight {
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
 
 	qboolean ReadMessage();
+
+	template <demoType_t D>
 	qboolean ReadMessageReal();
 	qboolean SeekToServerTime(int serverTime);
 

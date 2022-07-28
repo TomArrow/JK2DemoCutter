@@ -1,4 +1,6 @@
 #include "demoCut.h"
+#include "anims.h"
+#include "jkaStuff.h"
 #include "DemoReader.h"
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
@@ -22,7 +24,8 @@ qboolean DemoReader::ConfigstringModified(clientActive_t* clCut) {
 	gameState_t	oldGs;
 	int			len;
 	index = atoi(Cmd_Argv(1));
-	if (index < 0 || index >= MAX_CONFIGSTRINGS) {
+	int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	if (index < 0 || index >= maxAllowedConfigString) {
 		Com_Printf("demoCutConfigstringModified: bad index %i", index);
 		return qtrue;
 	}
@@ -37,7 +40,7 @@ qboolean DemoReader::ConfigstringModified(clientActive_t* clCut) {
 	Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
 	// leave the first 0 for uninitialized strings
 	clCut->gameState.dataCount = 1;
-	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
+	for (i = 0; i < maxAllowedConfigString; i++) {
 		if (i == index) {
 			dup = s;
 		}
@@ -91,11 +94,11 @@ void DemoReader::ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapsh
 		}
 		else if (oldnum == newnum) {
 			oldindex++;
-			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType);
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		else if (oldnum > newnum) {
-			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType);
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		if (newstate->number == MAX_GENTITIES - 1)
@@ -173,7 +176,13 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	//}
 	MSG_ReadData(msg, &newSnap.areamask, len);
 	// read playerinfo
-	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, (qboolean)(demoType == DM_15));
+	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps,demoType,qfalse);
+
+	// JKA-specific
+	if (demoType == DM_26 && newSnap.ps.m_iVehicleNum)
+		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps,demoType, qtrue);
+
+
 	// read packet entities
 	ParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
 	// if not valid, dump the entire thing now that it has
@@ -240,6 +249,62 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	return qtrue;
 }
 
+#include "zlib/zlib.h"
+void DemoReader::ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut) {
+	int i;
+	clcCut->rmgHeightMapSize = (unsigned short)MSG_ReadShort(msg);
+	if (clcCut->rmgHeightMapSize == 0) {
+		return;
+	}
+	z_stream zdata;
+	int flatDataSize;
+	unsigned char heightmap1[15000];
+	// height map
+	if (MSG_ReadBits(msg, 1)) {
+		memset(&zdata, 0, sizeof(z_stream));
+		inflateInit(&zdata/*, Z_SYNC_FLUSH*/);
+		MSG_ReadData(msg, heightmap1, clcCut->rmgHeightMapSize);
+		zdata.next_in = heightmap1;
+		zdata.avail_in = clcCut->rmgHeightMapSize;
+		zdata.next_out = (unsigned char*)clcCut->rmgHeightMap;
+		zdata.avail_out = MAX_HEIGHTMAP_SIZE;
+		inflate(&zdata, Z_SYNC_FLUSH);
+		clcCut->rmgHeightMapSize = zdata.total_out;
+		inflateEnd(&zdata);
+	}
+	else {
+		MSG_ReadData(msg, (unsigned char*)clcCut->rmgHeightMap, clcCut->rmgHeightMapSize);
+	}
+	// Flatten map
+	flatDataSize = MSG_ReadShort(msg);
+	if (MSG_ReadBits(msg, 1)) {
+		// Read the flatten map
+		memset(&zdata, 0, sizeof(z_stream));
+		inflateInit(&zdata/*, Z_SYNC_FLUSH*/);
+		MSG_ReadData(msg, heightmap1, flatDataSize);
+		zdata.next_in = heightmap1;
+		zdata.avail_in = clcCut->rmgHeightMapSize;
+		zdata.next_out = (unsigned char*)clcCut->rmgFlattenMap;
+		zdata.avail_out = MAX_HEIGHTMAP_SIZE;
+		inflate(&zdata, Z_SYNC_FLUSH);
+		inflateEnd(&zdata);
+	}
+	else {
+		MSG_ReadData(msg, (unsigned char*)clcCut->rmgFlattenMap, flatDataSize);
+	}
+	// Seed
+	clcCut->rmgSeed = MSG_ReadLong(msg);
+	// Automap symbols
+	clcCut->rmgAutomapSymbolCount = (unsigned short)MSG_ReadShort(msg);
+	for (i = 0; i < clcCut->rmgAutomapSymbolCount; i++) {
+		clcCut->rmgAutomapSymbols[i].mType = (int)MSG_ReadByte(msg);
+		clcCut->rmgAutomapSymbols[i].mSide = (int)MSG_ReadByte(msg);
+		clcCut->rmgAutomapSymbols[i].mOrigin[0] = (float)MSG_ReadLong(msg);
+		clcCut->rmgAutomapSymbols[i].mOrigin[1] = (float)MSG_ReadLong(msg);
+	}
+}
+
+
 qboolean DemoReader::ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
 	int				i;
 	entityState_t* es;
@@ -247,20 +312,25 @@ qboolean DemoReader::ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clie
 	entityState_t	nullstate;
 	int				cmd;
 	char* s;
+
+	int svc_EOF_realCMD = demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
+	int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+
 	clcCut->connectPacketCount = 0;
 	Com_Memset(clCut, 0, sizeof(*clCut));
 	clcCut->serverCommandSequence = MSG_ReadLong(msg);
 	clCut->gameState.dataCount = 1;
 	while (1) {
 		cmd = MSG_ReadByte(msg);
-		if (cmd == svc_EOF) {
+		//if (cmd == svc_EOF) {
+		if (cmd == svc_EOF_realCMD) {
 			break;
 		}
 		if (cmd == svc_configstring) {
 			int len, start;
 			start = msg->readcount;
 			i = MSG_ReadShort(msg);
-			if (i < 0 || i >= MAX_CONFIGSTRINGS) {
+			if (i < 0 || i >= maxAllowedConfigString) {
 				Com_Printf("configstring > MAX_CONFIGSTRINGS");
 				return qfalse;
 			}
@@ -283,7 +353,7 @@ qboolean DemoReader::ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clie
 			}
 			Com_Memset(&nullstate, 0, sizeof(nullstate));
 			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, demoType);
 		}
 		else {
 			Com_Printf("demoCutParseGameState: bad command byte");
@@ -292,6 +362,12 @@ qboolean DemoReader::ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clie
 	}
 	clcCut->clientNum = MSG_ReadLong(msg);
 	clcCut->checksumFeed = MSG_ReadLong(msg);
+
+	// RMG stuff (JKA specific)
+	if (demoType == DM_26) {
+		ParseRMG(msg, clcCut, clCut);
+	}
+
 	return qtrue;
 }
 
@@ -390,6 +466,11 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 
 		demoType = DM_16;
 		ext = ".dm_16";
+	}
+	else if (!_stricmp(ext, ".dm_26")) {
+
+		demoType = DM_26;
+		ext = ".dm_26";
 	}
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
 	if (!oldHandle) {
@@ -639,6 +720,24 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, Snaps
 	
 }
 
+void DemoReader::mapAnimsToDM15(playerState_t* ps) {
+	if (demoType == DM_26) {
+
+		ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
+		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT;
+		ps->legsAnim = jkaAnimMapping[ps->legsAnim];
+		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;
+		ps->weapon = jkaWeaponMap[ps->weapon];
+	}
+	if (demoType == DM_16 || demoType == DM_26) {
+
+		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
+		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
+		ps->torsoAnim = MV_MapAnimation102(ps->torsoAnim);
+		ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
+	}
+}
+
 playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
@@ -665,7 +764,9 @@ playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
 	}
 
 	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have.
-		return snapshotInfos.begin()->second.playerState;
+		retVal = snapshotInfos.begin()->second.playerState;
+		mapAnimsToDM15(&retVal);
+		return retVal;
 	}
 
 	// Ok now we wanna make sure we have at least one snap after the last one before "time" that has a different commandTime so we have something to interpolate.
@@ -675,7 +776,9 @@ playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
 
 	// already at end, nothing we can interpolate.
 	if (lastPastSnapCommandTime >= lastKnownCommandTime && endReached) {
-		return thisDemo.cut.Cl.snap.ps;
+		retVal = thisDemo.cut.Cl.snap.ps;
+		mapAnimsToDM15(&retVal);
+		return retVal;
 	}
 
 	// Okay now we want to locate the first snap with a different commandtime than lastPastSnap and then interpolate between the two.
@@ -690,6 +793,7 @@ playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
 	InterpolatePlayerState(time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
 
+	mapAnimsToDM15(&retVal);
 	return retVal;
 }
 
@@ -1044,7 +1148,20 @@ clSnapshot_t DemoReader::GetCurrentSnap() {
 }
 
 const char* DemoReader::GetPlayerConfigString(int playerNum,int* maxLength) {
-	int offset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
+	int configStringBaseIndex = demoType == DM_26 ? CS_PLAYERS_JKA : CS_PLAYERS;
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + playerNum];
+	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	return thisDemo.cut.Cl.gameState.stringData + offset;
+}
+const char* DemoReader::GetSoundConfigString(int soundNum,int* maxLength) {
+	int configStringBaseIndex = demoType == DM_26 ? CS_SOUNDS_JKA : CS_SOUNDS;
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + soundNum];
+	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	return thisDemo.cut.Cl.gameState.stringData + offset;
+}
+const char* DemoReader::GetModelConfigString(int modelNum,int* maxLength) {
+	int configStringBaseIndex = demoType == DM_26 ? CS_MODELS_JKA : CS_MODELS;
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + modelNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
@@ -1067,13 +1184,27 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 
 qboolean DemoReader::ReadMessage() {
 	if (endReached) return qfalse;
-	if (!ReadMessageReal()) {
+	qboolean realReadResult = qfalse;
+	if (demoType == DM_26) {
+		realReadResult = ReadMessageReal<DM_26>();
+	}
+	else {
+		realReadResult = ReadMessageReal<DM_15>();
+	}
+	if (!realReadResult) {
 		endReached = qtrue;
 		return qfalse;
 	}
 	return qtrue;
 }
+
+template <demoType_t D>
 qboolean DemoReader::ReadMessageReal() {
+
+	constexpr int svc_mapchange_realCMD = D == DM_26 ? svc_mapchange+1: svc_mapchange;
+	constexpr int svc_EOF_realCMD = D == DM_26 ? svc_EOF+1 : svc_EOF;
+	constexpr int svc_setgame_realCMD = D == DM_26 ? 8 : 100; // A non-JKA demo won't have this, let's just set something ridiculously high
+
 
 readNext:
 	int				buf;
@@ -1124,7 +1255,7 @@ readNext:
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
-		if (cmd == svc_EOF) {
+		if (cmd == svc_EOF_realCMD) {
 			break;
 		}
 		//I'm not sure what this does or why it does it...
@@ -1335,7 +1466,25 @@ readNext:
 			for (; buf > 0; buf--)
 				MSG_ReadByte(&oldMsg);
 			break;
-		case svc_mapchange:
+		case svc_setgame_realCMD:
+			{
+				static char	newGameDir[MAX_QPATH];
+				int i = 0;
+				while (i < MAX_QPATH) {
+					int next = MSG_ReadByte(&oldMsg);
+					if (next) {
+						newGameDir[i] = next;
+					}
+					else {
+						break;
+					}
+					i++;
+				}
+				newGameDir[i] = 0;
+				// But here we stop, and don't do more. If this goes horribly wrong sometime, you might have to go and actually do something with this.
+			}
+			break;
+		case svc_mapchange_realCMD:
 			// nothing to parse.
 			break;
 		}

@@ -12,6 +12,39 @@
 
 #define _OPTIMIZED_VEHICLE_NETWORKING
 
+static weapon_t jkaWeaponMap[] {
+	WP_NONE,
+
+	WP_STUN_BATON,
+	WP_NONE,//WP_MELEE,
+	WP_SABER,
+	WP_BRYAR_PISTOL,
+	WP_BLASTER,
+	WP_DISRUPTOR,
+	WP_BOWCASTER,
+	WP_REPEATER,
+	WP_DEMP2,
+	WP_FLECHETTE,
+	WP_ROCKET_LAUNCHER,
+	WP_THERMAL,
+	WP_TRIP_MINE,
+	WP_DET_PACK,
+	WP_NONE,//WP_CONCUSSION,
+	WP_NONE,//WP_BRYAR_OLD,
+	WP_EMPLACED_GUN,
+	WP_TURRET,
+
+	//	WP_GAUNTLET,
+	//	WP_MACHINEGUN,			// Bryar
+	//	WP_SHOTGUN,				// Blaster
+	//	WP_GRENADE_LAUNCHER,	// Thermal
+	//	WP_LIGHTNING,			// 
+	//	WP_RAILGUN,				// 
+	//	WP_GRAPPLING_HOOK,
+
+	WP_NUM_WEAPONS
+};
+
 
 // Turned from enum to array, thus reusing the Jedi Outcast animations where they exist. EZ PZ. (idk if this actually works)
 static animNumber_t jkaAnimMapping[] = //# animNumber_e
@@ -1960,7 +1993,7 @@ Ghoul2 Insert End
 //fields from the normal playerState -mcg
 //=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
 
-netField_t	playerStateFieldsJKA[] =
+static netField_t	playerStateFieldsJKA[] =
 {
 { PSF(commandTime), 32 },
 { PSF(origin[1]), 0 },
@@ -2118,7 +2151,7 @@ netField_t	playerStateFieldsJKA[] =
 { PSF(userVec2[2]), 1 }
 };
 
-netField_t	pilotPlayerStateFieldsJKA[] =
+static  netField_t	pilotPlayerStateFieldsJKA[] =
 {
 { PSF(commandTime), 32 },
 { PSF(origin[1]), 0 },
@@ -2282,7 +2315,7 @@ netField_t	pilotPlayerStateFieldsJKA[] =
 { PSF(userVec2[2]), 1 }
 };
 
-netField_t	vehPlayerStateFieldsJKA[] =
+static netField_t	vehPlayerStateFieldsJKA[] =
 {
 { PSF(commandTime), 32 },
 { PSF(origin[1]), 0 },
@@ -2373,7 +2406,7 @@ netField_t	vehPlayerStateFieldsJKA[] =
 //The unoptimized way, throw *all* the vehicle stuff into the playerState along with everything else... :(
 //=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
 
-netField_t	playerStateFieldsJKA[] =
+static  netField_t	playerStateFieldsJKA[] =
 {
 { PSF(commandTime), 32 },
 { PSF(origin[1]), 0 },
@@ -2538,7 +2571,7 @@ netField_t	playerStateFieldsJKA[] =
 
 
 
-netField_t	entityStateFieldsJKA[] =
+static  netField_t	entityStateFieldsJKA[] =
 {
 { NETF(pos.trTime), 32 },
 { NETF(pos.trBase[1]), 0 },

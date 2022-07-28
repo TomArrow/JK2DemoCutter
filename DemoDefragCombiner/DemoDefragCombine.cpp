@@ -1,5 +1,6 @@
 #include "demoCut.h"
 #include "DemoReader.h"
+#include "anims.h"
 #include <vector>
 #include <sstream>
 
@@ -438,11 +439,11 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 		}
 		else if (oldnum == newnum) {
 			oldindex++;
-			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType);
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		else if (oldnum > newnum) {
-			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType);
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		if (newstate->number == MAX_GENTITIES - 1)
@@ -499,7 +500,13 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	//}
 	MSG_ReadData(msg, &newSnap.areamask, len);
 	// read playerinfo
-	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, (qboolean)(demoType == DM_15));
+	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType,qfalse);
+
+	// JKA-specific
+	if (demoType == DM_26 && newSnap.ps.m_iVehicleNum)
+		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
+
+
 	// read packet entities
 	demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
 	// if not valid, dump the entire thing now that it has
@@ -579,7 +586,7 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 			}
 			Com_Memset(&nullstate, 0, sizeof(nullstate));
 			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, demoType);
 		}
 		else {
 			Com_Printf("demoCutParseGameState: bad command byte");
@@ -840,7 +847,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 						// We don't have a player model. So instead get a ModelIndex for this playermodel
 						{
 							int maxLength;
-							const char* playerInfo = demoReaders[i].GetConfigString(CS_PLAYERS+ originalPlayerstateClientNum,&maxLength);
+							//const char* playerInfo = demoReaders[i].GetConfigString(CS_PLAYERS+ originalPlayerstateClientNum,&maxLength);
+							const char* playerInfo = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum,&maxLength);
 							std::string thisModel = Info_ValueForKey(playerInfo,maxLength,"model");
 
 							std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);

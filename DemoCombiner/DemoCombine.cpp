@@ -573,11 +573,11 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 		}
 		else if (oldnum == newnum) {
 			oldindex++;
-			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType);
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		else if (oldnum > newnum) {
-			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType);
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		if (newstate->number == MAX_GENTITIES - 1)
@@ -634,7 +634,12 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	//}
 	MSG_ReadData(msg, &newSnap.areamask, len);
 	// read playerinfo
-	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, (qboolean)(demoType == DM_15));
+	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType,qfalse);
+
+	// JKA-specific
+	if (demoType == DM_26 && newSnap.ps.m_iVehicleNum)
+		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
+
 	// read packet entities
 	demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
 	// if not valid, dump the entire thing now that it has
@@ -714,7 +719,7 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 			}
 			Com_Memset(&nullstate, 0, sizeof(nullstate));
 			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, (qboolean)(demoType == DM_15));
+			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, demoType);
 		}
 		else {
 			Com_Printf("demoCutParseGameState: bad command byte");
@@ -835,17 +840,17 @@ void remapConfigStrings(entityState_t * tmpEntity, clientActive_t* clCut, DemoRe
 	int maxLength = 0;
 	if (eventHere == EV_GENERAL_SOUND) {
 		int soundIndex = tmpEntity->eventParm;
-		const char* soundName = reader->GetConfigString(CS_SOUNDS + soundIndex,&maxLength);
+		const char* soundName = reader->GetSoundConfigString(soundIndex,&maxLength);
 		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd);
 		tmpEntity->eventParm = newSoundIndex;
 	}
 	if (doModelIndex && tmpEntity->modelindex) {
-		const char* modelName = reader->GetConfigString(CS_MODELS + tmpEntity->modelindex, &maxLength);
+		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex, &maxLength);
 		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
 		tmpEntity->modelindex = newModelIndex;
 	}
 	if (doModelIndex2 && tmpEntity->modelindex2) {
-		const char* modelName = reader->GetConfigString(CS_MODELS + tmpEntity->modelindex2, &maxLength);
+		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex2, &maxLength);
 		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
 		tmpEntity->modelindex2 = newModelIndex;
 	}
@@ -1270,7 +1275,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							// We don't have a player model. So instead get a ModelIndex for this playermodel
 							{	// TODO It's kinda wasteful to do this on every frame. Maybe figure out way to do it only when the model changes.
 								int maxLength;
-								const char* playerInfo = demoReaders[i].reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
+								//const char* playerInfo = demoReaders[i].reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
+								const char* playerInfo = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &maxLength);
 								std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
 
 								std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
@@ -1358,7 +1364,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					
 					// Sentry
-					else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetConfigString(CS_MODELS+ it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
+					//else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetConfigString(CS_MODELS+ it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
+					else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetModelConfigString(it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
 						// It's a sentry
 
 
