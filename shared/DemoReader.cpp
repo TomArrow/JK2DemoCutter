@@ -1334,6 +1334,15 @@ readNext:
 					thisEvent.demoTime = demoCurrentTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
+					if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
+						if (thisEvent.theEvent.eType > ET_EVENTS_JKA) {
+							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS_JKA;
+						}
+						else {
+							thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
+						}
+					}
 					readEvents.push_back(thisEvent);
 					/*
 					// Handle kills

@@ -11,6 +11,7 @@
 
 
 #define _OPTIMIZED_VEHICLE_NETWORKING
+#define BASE_COMPAT
 
 static weapon_t jkaWeaponMap[] {
 	WP_NONE,
@@ -45,6 +46,283 @@ static weapon_t jkaWeaponMap[] {
 	WP_NUM_WEAPONS
 };
 
+
+static entity_event_t jkaEventToJk2Map [] ={
+	EV_NONE,
+
+	EV_CLIENTJOIN,
+
+	EV_FOOTSTEP,
+	EV_FOOTSTEP_METAL,
+	EV_FOOTSPLASH,
+	EV_FOOTWADE,
+	EV_SWIM,
+
+	EV_STEP_4,
+	EV_STEP_8,
+	EV_STEP_12,
+	EV_STEP_16,
+
+	EV_FALL,
+
+	EV_JUMP_PAD,			// boing sound at origin, jump sound on player
+
+	EV_NONE,//EV_GHOUL2_MARK,			//create a projectile impact mark on something with a client-side g2 instance.
+
+	EV_NONE,//EV_GLOBAL_DUEL,
+	EV_PRIVATE_DUEL,
+
+	EV_JUMP,
+	EV_ROLL,
+	EV_WATER_TOUCH,	// foot touches
+	EV_WATER_LEAVE,	// foot leaves
+	EV_WATER_UNDER,	// head touches
+	EV_WATER_CLEAR,	// head leaves
+
+	EV_ITEM_PICKUP,			// normal item pickups are predictable
+	EV_GLOBAL_ITEM_PICKUP,	// powerup / team sounds are broadcast to everyone
+
+	EV_NONE,//EV_VEH_FIRE,
+
+	EV_NOAMMO,
+	EV_CHANGE_WEAPON,
+	EV_FIRE_WEAPON,
+	EV_ALT_FIRE,
+	EV_SABER_ATTACK,
+	EV_SABER_HIT,
+	EV_SABER_BLOCK,
+	EV_NONE,//EV_SABER_CLASHFLARE,
+	EV_SABER_UNHOLSTER,
+	EV_BECOME_JEDIMASTER,
+	EV_DISRUPTOR_MAIN_SHOT,
+	EV_DISRUPTOR_SNIPER_SHOT,
+	EV_DISRUPTOR_SNIPER_MISS,
+	EV_DISRUPTOR_HIT,
+	EV_DISRUPTOR_ZOOMSOUND,
+
+	EV_PREDEFSOUND,
+
+	EV_TEAM_POWER,
+
+	EV_SCREENSHAKE,
+
+	EV_NONE,//EV_LOCALTIMER,
+
+	EV_USE,			// +Use key
+
+	EV_USE_ITEM0,
+	EV_USE_ITEM1,
+	EV_USE_ITEM2,
+	EV_USE_ITEM3,
+	EV_USE_ITEM4,
+	EV_USE_ITEM5,
+	EV_USE_ITEM6,
+	EV_USE_ITEM7,
+	EV_USE_ITEM8,
+	EV_USE_ITEM9,
+	EV_USE_ITEM10,
+	EV_USE_ITEM11,
+	EV_USE_ITEM12,
+	EV_USE_ITEM13,
+	EV_USE_ITEM14,
+	EV_USE_ITEM15,
+
+	EV_ITEMUSEFAIL,
+
+	EV_ITEM_RESPAWN,
+	EV_ITEM_POP,
+	EV_PLAYER_TELEPORT_IN,
+	EV_PLAYER_TELEPORT_OUT,
+
+	EV_GRENADE_BOUNCE,		// eventParm will be the soundindex
+	EV_MISSILE_STICK,		// eventParm will be the soundindex
+
+	EV_PLAY_EFFECT,
+	EV_PLAY_EFFECT_ID,
+	EV_NONE,//EV_PLAY_PORTAL_EFFECT_ID,
+
+	EV_NONE,//EV_PLAYDOORSOUND,
+	EV_NONE,//EV_PLAYDOORLOOPSOUND,
+	EV_NONE,//EV_BMODEL_SOUND,
+
+	EV_MUTE_SOUND,
+	EV_NONE,//EV_VOICECMD_SOUND,
+	EV_GENERAL_SOUND,
+	EV_GLOBAL_SOUND,		// no attenuation
+	EV_GLOBAL_TEAM_SOUND,
+	EV_ENTITY_SOUND,
+
+	EV_PLAY_ROFF,
+
+	EV_GLASS_SHATTER,
+	EV_DEBRIS,
+		EV_NONE,//EV_MISC_MODEL_EXP,
+
+		EV_NONE,//EV_CONC_ALT_IMPACT,
+
+	EV_MISSILE_HIT,
+	EV_MISSILE_MISS,
+	EV_MISSILE_MISS_METAL,
+	EV_BULLET,				// otherEntity is the shooter
+
+	EV_PAIN,
+	EV_DEATH1,
+	EV_DEATH2,
+	EV_DEATH3,
+	EV_OBITUARY,
+
+#ifdef BASE_COMPAT
+	EV_POWERUP_QUAD,
+	EV_POWERUP_BATTLESUIT,
+#endif // BASE_COMPAT
+
+	EV_FORCE_DRAINED,
+
+	EV_GIB_PLAYER,			// gib a previously living player
+	EV_SCOREPLUM,			// score plum
+
+	EV_CTFMESSAGE,
+
+		EV_NONE,//EV_BODYFADE,
+
+		EV_NONE,//EV_SIEGE_ROUNDOVER,
+		EV_NONE,//EV_SIEGE_OBJECTIVECOMPLETE,
+
+	EV_DESTROY_GHOUL2_INSTANCE,
+
+	EV_DESTROY_WEAPON_MODEL,
+
+	EV_GIVE_NEW_RANK,
+	EV_SET_FREE_SABER,
+	EV_SET_FORCE_DISABLE,
+
+	EV_WEAPON_CHARGE,
+	EV_WEAPON_CHARGE_ALT,
+
+	EV_SHIELD_HIT,
+
+	EV_DEBUG_LINE,
+	EV_TESTLINE,
+	EV_STOPLOOPINGSOUND,
+	EV_STARTLOOPINGSOUND,
+	EV_TAUNT,
+
+	//rww - Begin NPC sound events
+		EV_NONE,//EV_ANGER1,	//Say when acquire an enemy when didn't have one before
+		EV_NONE,//EV_ANGER2,
+		EV_NONE,//EV_ANGER3,
+
+		EV_NONE,//EV_VICTORY1,	//Say when killed an enemy
+		EV_NONE,//EV_VICTORY2,
+		EV_NONE,//EV_VICTORY3,
+
+		EV_NONE,//EV_CONFUSE1,	//Say when confused
+		EV_NONE,//EV_CONFUSE2,
+		EV_NONE,//EV_CONFUSE3,
+
+		EV_NONE,//EV_PUSHED1,		//Say when pushed
+		EV_NONE,//EV_PUSHED2,
+		EV_NONE,//EV_PUSHED3,
+
+		EV_NONE,//EV_CHOKE1,		//Say when choking
+		EV_NONE,//EV_CHOKE2,
+		EV_NONE,//EV_CHOKE3,
+
+		EV_NONE,//EV_FFWARN,		//ffire founds
+		EV_NONE,//EV_FFTURN,
+	//extra sounds for ST
+		EV_NONE,//EV_CHASE1,
+		EV_NONE,//EV_CHASE2,
+		EV_NONE,//EV_CHASE3,
+		EV_NONE,//EV_COVER1,
+		EV_NONE,//EV_COVER2,
+		EV_NONE,//EV_COVER3,
+		EV_NONE,//EV_COVER4,
+		EV_NONE,//EV_COVER5,
+		EV_NONE,//EV_DETECTED1,
+		EV_NONE,//EV_DETECTED2,
+		EV_NONE,//EV_DETECTED3,
+		EV_NONE,//EV_DETECTED4,
+		EV_NONE,//EV_DETECTED5,
+		EV_NONE,//EV_LOST1,
+		EV_NONE,//EV_OUTFLANK1,
+		EV_NONE,//EV_OUTFLANK2,
+		EV_NONE,//EV_ESCAPING1,
+		EV_NONE,//EV_ESCAPING2,
+		EV_NONE,//EV_ESCAPING3,
+		EV_NONE,//EV_GIVEUP1,
+		EV_NONE,//EV_GIVEUP2,
+		EV_NONE,//EV_GIVEUP3,
+		EV_NONE,//EV_GIVEUP4,
+		EV_NONE,//EV_LOOK1,
+		EV_NONE,//EV_LOOK2,
+			EV_NONE,//EV_SIGHT1,
+			EV_NONE,//EV_SIGHT2,
+			EV_NONE,//EV_SIGHT3,
+		EV_NONE,//EV_SOUND1,
+		EV_NONE,//EV_SOUND2,
+		EV_NONE,//EV_SOUND3,
+		EV_NONE,//EV_SUSPICIOUS1,
+		EV_NONE,//EV_SUSPICIOUS2,
+		EV_NONE,//EV_SUSPICIOUS3,
+		EV_NONE,//EV_SUSPICIOUS4,
+		EV_NONE,//EV_SUSPICIOUS5,
+	//extra sounds for Jedi
+		EV_NONE,//EV_COMBAT1,
+		EV_NONE,//EV_COMBAT2,
+		EV_NONE,//EV_COMBAT3,
+		EV_NONE,//EV_JDETECTED1,
+		EV_NONE,//EV_JDETECTED2,
+		EV_NONE,//EV_JDETECTED3,
+		EV_NONE,//EV_TAUNT1,
+		EV_NONE,//EV_TAUNT2,
+		EV_NONE,//EV_TAUNT3,
+		EV_NONE,//EV_JCHASE1,
+		EV_NONE,//EV_JCHASE2,
+		EV_NONE,//EV_JCHASE3,
+		EV_NONE,//EV_JLOST1,
+		EV_NONE,//EV_JLOST2,
+			EV_NONE,//EV_JLOST3,
+			EV_NONE,//EV_DEFLECT1,
+			EV_NONE,//EV_DEFLECT2,
+			EV_NONE,//EV_DEFLECT3,
+			EV_NONE,//EV_GLOAT1,
+		EV_NONE,//EV_GLOAT2,
+		EV_NONE,//EV_GLOAT3,
+		EV_NONE,//EV_PUSHFAIL,
+
+		EV_NONE,//EV_SIEGESPEC,
+
+};
+
+
+#define MapJKAEventJK2(ev) (jkaEventToJk2Map[(ev)&~EV_EVENT_BITS] | ((ev)&EV_EVENT_BITS))
+
+
+typedef enum {
+	ET_GENERAL_JKA,
+	ET_PLAYER_JKA,
+	ET_ITEM_JKA,
+	ET_MISSILE_JKA,
+	ET_SPECIAL_JKA,				// rww - force fields
+	ET_HOLOCRON_JKA,			// rww - holocron icon displays
+	ET_MOVER_JKA,
+	ET_BEAM_JKA,
+	ET_PORTAL_JKA,
+	ET_SPEAKER_JKA,
+	ET_PUSH_TRIGGER_JKA,
+	ET_TELEPORT_TRIGGER_JKA,
+	ET_INVISIBLE_JKA,
+	ET_NPC_JKA,					// ghoul2 player-like entity
+	ET_TEAM_JKA,
+	ET_BODY_JKA,
+	ET_TERRAIN_JKA,
+	ET_FX_JKA,
+
+	ET_EVENTS_JKA				// any of the EV_* events can be added freestanding
+							// by setting eType to ET_EVENTS + eventNum
+							// this avoids having to set eFlags and eventNum
+} entityTypeJKA_t;
 
 // Turned from enum to array, thus reusing the Jedi Outcast animations where they exist. EZ PZ. (idk if this actually works)
 static animNumber_t jkaAnimMapping[] = //# animNumber_e
