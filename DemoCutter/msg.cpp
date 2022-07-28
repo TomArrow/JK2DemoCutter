@@ -1026,14 +1026,6 @@ void MSG_ReportChangeVectors_f( void ) {
 	}
 }
 
-typedef struct {
-	char	*name;
-	int		offset;
-	int		bits;		// 0 = float
-} netField_t;
-
-// using the stringizing operator to save typing...
-#define	NETF(x) #x,(int)&((entityState_t*)0)->x
 
 netField_t	entityStateFields[] = 
 {
@@ -1474,8 +1466,6 @@ plyer_state_t communication
 ============================================================================
 */
 
-// using the stringizing operator to save typing...
-#define	PSF(x) #x,(int)&((playerState_t*)0)->x
 
 netField_t	playerStateFields[] = 
 {

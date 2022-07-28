@@ -611,6 +611,70 @@ typedef struct playerState_s {
 	qboolean	dualBlade;
 
 	vec3_t		lastHitLoc;
+
+
+
+	// JKA Specific:
+	vec3_t		moveDir; //NOT sent over the net - nor should it be.
+	float		speedJKA;
+	int			slopeRecalcTime; //this is NOT sent across the net and is maintained seperately on game and cgame in pmove code.
+	qboolean	legsFlip; //set to opposite when the same anim needs restarting, sent over in only 1 bit. Cleaner and makes porting easier than having that god forsaken ANIM_TOGGLEBIT.
+	qboolean	torsoFlip;
+	int			eFlags2;		// copied to entityState_t->eFlags2, EF2_??? used much less frequently
+	int			saberLockHitCheckTime; //so we don't allow more than 1 push per server frame
+	int			saberLockHitIncrementTime; //so we don't add a hit per attack button press more than once per server frame
+	int			saberHolsteredJKA;
+	int			heldByClient; //can only be a client index - this client should be holding onto my arm using IK stuff.
+	int			ragAttach; //attach to ent while ragging
+	int			iModelScale;
+	int			brokenLimbs;
+	//for looking at an entity's origin (NPCs and players)
+	qboolean	hasLookTarget;
+	int			lookTarget;
+	int			customRGBA[4];
+	int			standheight;
+	int			crouchheight;
+	//If non-0, this is the index of the vehicle a player/NPC is riding.
+	int			m_iVehicleNum;
+	//lovely hack for keeping vehicle orientation in sync with prediction
+	vec3_t		vehOrientation;
+	qboolean	vehBoarding;
+	int			vehSurfaces;
+	//vehicle turnaround stuff (need this in ps so it doesn't jerk too much in prediction)
+	int			vehTurnaroundIndex;
+	int			vehTurnaroundTime;
+	//vehicle has weapons linked
+	qboolean	vehWeaponsLinked;
+	//when hyperspacing, you just go forward really fast for HYPERSPACE_TIME
+	int			hyperSpaceTime;
+	vec3_t		hyperSpaceAngles;
+	//hacking when > time
+	int			hackingTime;
+	//actual hack amount - only for the proper percentage display when
+	//drawing progress bar (is there a less bandwidth-eating way to do
+	//this without a lot of hassle?)
+	int			hackingBaseTime;
+	//keeps track of jetpack fuel
+	int			jetpackFuel;
+	//keeps track of cloak fuel
+	int			cloakFuel;
+	//rww - spare values specifically for use by mod authors.
+	//See psf_overrides.txt if you want to increase the send
+	//amount of any of these above 1 bit.
+	int			userInt1;
+	int			userInt2;
+	int			userInt3;
+	float		userFloat1;
+	float		userFloat2;
+	float		userFloat3;
+	vec3_t		userVec1;
+	vec3_t		userVec2;
+#ifdef _ONEBIT_COMBO
+	int			deltaOneBits;
+	int			deltaNumBits;
+#endif
+
+
 } playerState_t;
 
 typedef struct {
@@ -741,6 +805,73 @@ typedef struct entityState_s {
 	int		forceFrame;		//if non-zero, force the anim frame
 
 	int		generic1;
+
+
+	// JKA-specific:
+	int		eFlags2;		// EF2_??? used much less frequently
+	qboolean	loopIsSoundset; //qtrue if the loopSound index is actually a soundset index
+	int		soundSetIndex;
+	int			saberHolstered;//sent in only only 2 bits - should be 0, 1 or 2
+	qboolean	isPortalEnt; //this needs to be seperate for all entities I guess, which is why I couldn't reuse another value.
+	qboolean	legsFlip; //set to opposite when the same anim needs restarting, sent over in only 1 bit. Cleaner and makes porting easier than having that god forsaken ANIM_TOGGLEBIT.
+	qboolean	torsoFlip;
+	int		heldByClient; //can only be a client index - this client should be holding onto my arm using IK stuff.
+	int		ragAttach; //attach to ent while ragging
+	int		iModelScale; //rww - transfer a percentage of the normal scale in a single int instead of 3 x-y-z scale values
+	int		brokenLimbs;
+	int		boltToPlayer; //set to index of a real client+1 to bolt the ent to that client. Must be a real client, NOT an NPC.
+	//for looking at an entity's origin (NPCs and players)
+	qboolean	hasLookTarget;
+	int			lookTarget;
+	int			customRGBA[4];
+	//I didn't want to do this, but I.. have no choice. However, we aren't setting this for all ents or anything,
+	//only ones we want health knowledge about on cgame (like siege objective breakables) -rww
+	int			health;
+	int			maxhealth; //so I know how to draw the stupid health bar
+	//NPC-SPECIFIC FIELDS
+	//------------------------------------------------------------
+	int		npcSaber1;
+	int		npcSaber2;
+	//index values for each type of sound, gets the folder the sounds
+	//are in. I wish there were a better way to do this,
+	int		csSounds_Std;
+	int		csSounds_Combat;
+	int		csSounds_Extra;
+	int		csSounds_Jedi;
+	int		surfacesOn; //a bitflag of corresponding surfaces from a lookup table. These surfaces will be forced on.
+	int		surfacesOff; //same as above, but forced off instead.
+	//Allow up to 4 PCJ lookup values to be stored here.
+	//The resolve to configstrings which contain the name of the
+	//desired bone.
+	int		boneIndex1;
+	int		boneIndex2;
+	int		boneIndex3;
+	int		boneIndex4;
+	//packed with x, y, z orientations for bone angles
+	int		boneOrient;
+	//I.. feel bad for doing this, but NPCs really just need to
+	//be able to control this sort of thing from the server sometimes.
+	//At least it's at the end so this stuff is never going to get sent
+	//over for anything that isn't an NPC.
+	vec3_t	boneAngles1; //angles of boneIndex1
+	vec3_t	boneAngles2; //angles of boneIndex2
+	vec3_t	boneAngles3; //angles of boneIndex3
+	vec3_t	boneAngles4; //angles of boneIndex4
+	int		NPC_class; //we need to see what it is on the client for a few effects.
+	//If non-0, this is the index of the vehicle a player/NPC is riding.
+	int		m_iVehicleNum;
+	//rww - spare values specifically for use by mod authors.
+	//See netf_overrides.txt if you want to increase the send
+	//amount of any of these above 1 bit.
+	int			userInt1;
+	int			userInt2;
+	int			userInt3;
+	float		userFloat1;
+	float		userFloat2;
+	float		userFloat3;
+	vec3_t		userVec1;
+	vec3_t		userVec2;
+
 } entityState_t;
 
 typedef struct {
@@ -1813,3 +1944,22 @@ typedef struct {
 	double sum;
 	double divisor;
 } averageHelper_t;
+
+
+
+
+
+
+
+
+typedef struct {
+	char* name;
+	int		offset;
+	int		bits;		// 0 = float
+} netField_t;
+
+// using the stringizing operator to save typing...
+#define	NETF(x) #x,(int)&((entityState_t*)0)->x
+
+// using the stringizing operator to save typing...
+#define	PSF(x) #x,(int)&((playerState_t*)0)->x

@@ -20,6 +20,9 @@
     <ClCompile Include="..\shared\DemoReaderLight.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\animMappingTable.c">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -52,6 +55,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\shared\DemoReaderLight.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DemoCutter\jkaStuff.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2609,6 +2609,8 @@ typedef enum //# animNumber_e
 	MAX_TOTALANIMATIONS_15
 } animNumber15_t;
 
+// Attempt of DM16 to DM15 mappings
+
 
 #endif// #ifndef __ANIMS_H__
 

@@ -23,6 +23,7 @@
     <ClCompile Include="..\DemoCutter\files.cpp" />
     <ClCompile Include="..\DemoCutter\huffman.cpp" />
     <ClCompile Include="..\DemoCutter\msg.cpp" />
+    <ClCompile Include="..\shared\animMappingTable.c" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
     <ClCompile Include="..\shared\DemoReaderLight.cpp" />
     <ClCompile Include="DemoCombine.cpp" />
@@ -31,6 +32,7 @@
     <ClInclude Include="..\DemoCutter\anims.h" />
     <ClInclude Include="..\DemoCutter\animsStanceMappings.h" />
     <ClInclude Include="..\DemoCutter\demoCut.h" />
+    <ClInclude Include="..\DemoCutter\jkaStuff.h" />
     <ClInclude Include="..\shared\DemoReader.h" />
     <ClInclude Include="..\shared\DemoReaderLight.h" />
     <ClInclude Include="..\shared\include\ini.h" />
