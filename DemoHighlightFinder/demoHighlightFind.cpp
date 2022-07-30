@@ -1814,7 +1814,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertStatement, int, "@redScore", teamInfo[TEAM_RED].score);
 							SQLBIND(insertStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
 							if (victimIsFlagCarrier) {
-								SQLBIND(insertStatement, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.redflag : cgs.blueflag);
+								SQLBIND(insertStatement, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.blueflag: cgs.redflag);
 							}
 							else {
 								SQLBIND_NULL(insertStatement, "@otherFlagStatus");
