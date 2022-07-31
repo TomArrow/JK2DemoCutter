@@ -54,6 +54,7 @@ Likewise, if a player absolutely cannot fit in, make him a g2ent and throw a war
 track percentage visible as capper?
 save player counts for sprees
 allow killing sprees that simply count without time by the amount of kills without dying. might be a bit lame tho.
+track airtime before kill/cap?
 
 DONE: 
 

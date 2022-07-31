@@ -1024,6 +1024,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"victimCapperKills INTEGER,"
 		"victimCapperRets INTEGER,"
 		"victimCapperWasFollowedOrVisible	BOOLEAN,"
+
+		"victimCapperMaxNearbyEnemyCount	REAL,"
+		"victimCapperMoreThanOneNearbyEnemyTimePercent	REAL," // Percentage
+		"victimCapperAverageNearbyEnemyCount	REAL,"
+		"victimCapperMaxVeryCloseEnemyCount	REAL,"
+		"victimCapperAnyVeryCloseEnemyTimePercent	REAL," // Percentage
+		"victimCapperMoreThanOneVeryCloseEnemyTimePercent	REAL," // Percentage
+		"victimCapperAverageVeryCloseEnemyCount	REAL,"
+
 		"victimFlagPickupSource	INTEGER,"
 		"victimFlagHoldTime	INTEGER,"
 		"targetIsVisible	BOOLEAN NOT NULL,"
@@ -1177,9 +1186,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1792,6 +1801,51 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							kills[attacker].push_back(thisKill);
 
 
+
+							// Stats about nearby enemy count throughout run if victim was capper
+							float maxNearbyEnemyCount = 0, moreThanOneNearbyEnemyTimePercent = 0, averageNearbyEnemyCount = -1, maxVeryCloseEnemyCount = 0, anyVeryCloseEnemyTimePercent = 0, moreThanOneVeryCloseEnemyTimePercent = 0, averageVeryCloseEnemyCount = -1;
+							if (victimIsFlagCarrier) {
+								// Resets if necessary.
+								if (recentFlagHoldEnemyNearbyTimes[target].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[target]) {
+									// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
+									Com_Memset(&recentFlagHoldEnemyNearbyTimes[target], 0, sizeof(EnemyNearbyInfo));
+									recentFlagHoldEnemyNearbyTimes[target].lastUpdateTime = demoCurrentTime;
+								}
+								averageHelper_t nearbyHelper, veryCloseHelper;
+								Com_Memset(&nearbyHelper, 0, sizeof(nearbyHelper));
+								Com_Memset(&veryCloseHelper, 0, sizeof(veryCloseHelper));
+								for (int nearbyCount = 0; nearbyCount < MAX_CLIENTS; nearbyCount++) { // You'd think here it should be <= MAX_CLIENTS because 32 is a valid number, BUT with max of 32 players you can only have a max of 31 enemies. 32 is actually a valid index though, for "unknown", but we aren't currently tracking that. We just track for the time that the flag carrier WAS visible.
+									int nearbyTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[target].enemyNearbyTimes[nearbyCount];
+									int veryCloseTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[target].enemyVeryCloseTimes[nearbyCount];
+
+									// If this count happened even for the shortest amount of time, that was the max amount of near/very close enemies.
+									if (nearbyTimeOfThisCount && nearbyCount > maxNearbyEnemyCount) maxNearbyEnemyCount = nearbyCount;
+									if (veryCloseTimeOfThisCount && nearbyCount > maxVeryCloseEnemyCount) maxVeryCloseEnemyCount = nearbyCount;
+
+									nearbyHelper.sum += nearbyCount * nearbyTimeOfThisCount;
+									nearbyHelper.divisor += nearbyTimeOfThisCount;
+									veryCloseHelper.sum += nearbyCount * veryCloseTimeOfThisCount;
+									veryCloseHelper.divisor += veryCloseTimeOfThisCount;
+
+									if (nearbyCount > 0) {
+										anyVeryCloseEnemyTimePercent += veryCloseTimeOfThisCount;
+										if (nearbyCount > 1) {
+											moreThanOneNearbyEnemyTimePercent += nearbyTimeOfThisCount;
+											moreThanOneVeryCloseEnemyTimePercent += veryCloseTimeOfThisCount;
+										}
+									}
+								}
+								averageNearbyEnemyCount = nearbyHelper.divisor == 0 ? 0 : nearbyHelper.sum / nearbyHelper.divisor;
+								averageVeryCloseEnemyCount = veryCloseHelper.divisor == 0 ? 0 : veryCloseHelper.sum / veryCloseHelper.divisor;
+								moreThanOneNearbyEnemyTimePercent *= nearbyHelper.divisor == 0 ? 0 : 100.0f / nearbyHelper.divisor;
+								moreThanOneVeryCloseEnemyTimePercent *= veryCloseHelper.divisor == 0 ? 0 : 100.0f / veryCloseHelper.divisor;
+								anyVeryCloseEnemyTimePercent *= veryCloseHelper.divisor == 0 ? 0 : 100.0f / veryCloseHelper.divisor;
+							}
+							// END Stats about nearby enemy count throughout run
+
+
+
+
 							std::stringstream logModStringSS;
 							logModStringSS << (victimIsFlagCarrier ? "RET" : "MOD") << modInfo.str();
 							std::string logModString = logModStringSS.str();
@@ -1851,6 +1905,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								SQLBIND(insertAngleStatement, int, "@victimCapperKills", victimFlagCarrierKillCount);
 								SQLBIND(insertAngleStatement, int, "@victimCapperRets", victimFlagCarrierRetCount);
 								SQLBIND(insertAngleStatement, int, "@victimCapperWasFollowedOrVisible", capperWasVisibleOrFollowed);
+
+								SQLBIND(insertAngleStatement, double, "@victimCapperMaxNearbyEnemyCount", maxNearbyEnemyCount);
+								SQLBIND(insertAngleStatement, double, "@victimCapperMoreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
+								SQLBIND(insertAngleStatement, double, "@victimCapperAverageNearbyEnemyCount", averageNearbyEnemyCount);
+								SQLBIND(insertAngleStatement, double, "@victimCapperMaxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
+								SQLBIND(insertAngleStatement, double, "@victimCapperAnyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
+								SQLBIND(insertAngleStatement, double, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
+								SQLBIND(insertAngleStatement, double, "@victimCapperAverageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
 							}
 							else {
 								SQLBIND_NULL(insertAngleStatement, "@victimFlagHoldTime");
@@ -1858,6 +1920,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								SQLBIND_NULL(insertAngleStatement, "@victimCapperKills");
 								SQLBIND_NULL(insertAngleStatement, "@victimCapperRets");
 								SQLBIND_NULL(insertAngleStatement, "@victimCapperWasFollowedOrVisible");
+
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperMaxNearbyEnemyCount");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperMoreThanOneNearbyEnemyTimePercent");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperAverageNearbyEnemyCount");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperMaxVeryCloseEnemyCount");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperAnyVeryCloseEnemyTimePercent");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent");
+								SQLBIND_NULL(insertAngleStatement, "@victimCapperAverageVeryCloseEnemyCount");
 							}
 							SQLBIND(insertAngleStatement, int, "@targetIsVisible", targetIsVisible);
 							SQLBIND(insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
