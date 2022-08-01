@@ -217,6 +217,10 @@ qboolean DemoReader::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clien
 	clCut->snapshots[clCut->snap.messageNum & PACKET_MASK] = clCut->snap;
 	clCut->newSnapshots = qtrue;
 
+	if (firstSnapServerTime == -1) {
+		firstSnapServerTime = clCut->snap.serverTime;
+	}
+
 	SnapshotInfo snapshotInfo;
 	snapshotInfo.serverTime = clCut->snap.serverTime;
 	for (int pe = clCut->snap.parseEntitiesNum; pe < clCut->snap.parseEntitiesNum + clCut->snap.numEntities; pe++) {
@@ -491,9 +495,11 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastGameStateChangeInDemoTime = 0;
 	lastKnownTime = 0;
 	lastKnownCommandTime = 0;
+	firstSnapServerTime = -1;
 	lastKnownCommandOrServerTimes.clear();
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
+	lastGottenCommandsServerTime = 0;
 	lastGottenEventsTime = 0;
 	endReached = qfalse;
 
@@ -539,6 +545,29 @@ qboolean DemoReader::SeekToServerTime(int serverTime) {
 	}
 	if (lastKnownTime < serverTime && endReached) return qfalse;
 	return qtrue;
+}
+int DemoReader::GetFirstServerTimeAfterServerTime(int serverTime) {
+	while (lastKnownTime <= serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownTime <= serverTime && endReached) return -1;
+
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		if (it->second.serverTime > serverTime) return it->second.serverTime;
+	}
+	return -1; // Shouldn't happen really but whatever
+}
+SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
+	if (SeekToServerTime(serverTime)) {
+		for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+			if (it->second.serverTime == serverTime) return &it->second;
+		}
+		return NULL; // Can happen if that particular time's snapshot is missing from the demo.
+	}
+	else {
+		return NULL;
+	}
+
 }
 qboolean DemoReader::SeekToCommandTime(int serverTime) {
 	while (lastKnownCommandTime < serverTime && !endReached) {
@@ -1128,6 +1157,18 @@ std::vector<std::string> DemoReader::GetNewCommands(float time) {
 	lastGottenCommandsTime = time;
 	return retVal;
 }
+// Don't combine this with GetNewCommands, they keep track in different ways. Pick one or the other.
+std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime) {
+	std::vector<std::string> retVal;
+	SeekToServerTime(serverTime);
+	for (int i = 0; i < readCommands.size(); i++) {
+		if (readCommands[i].serverTime <= serverTime && readCommands[i].serverTime > lastGottenCommandsServerTime) {
+			retVal.push_back(readCommands[i].command);
+		}
+	}
+	lastGottenCommandsServerTime = serverTime;
+	return retVal;
+}
 std::vector<Event> DemoReader::GetNewEvents(float time) {
 	std::vector<Event> retVal;
 	SeekToTime(time);
@@ -1141,6 +1182,11 @@ std::vector<Event> DemoReader::GetNewEvents(float time) {
 	}
 	lastGottenEventsTime = time;
 	return retVal;
+}
+
+int DemoReader::GetFirstSnapServerTime() {
+	SeekToAnySnapshotIfNotYet();
+	return firstSnapServerTime;
 }
 
 clSnapshot_t DemoReader::GetCurrentSnap() {
@@ -1506,6 +1552,7 @@ readNext:
 		Command readCommand;
 		readCommand.command = command;
 		readCommand.demoTime = demoCurrentTime;
+		readCommand.serverTime = thisDemo.cut.Cl.snap.serverTime;
 		readCommands.push_back(readCommand);
 		Cmd_TokenizeString(command);
 		char* cmd = Cmd_Argv(0);

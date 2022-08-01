@@ -29,6 +29,7 @@ public:
 class Command {
 public:
 	int demoTime;
+	int serverTime;
 	std::string command;
 };
 
@@ -83,7 +84,10 @@ class DemoReader {
 	std::map<int,int>	lastMessageWithEntity; 
 
 	float			lastGottenCommandsTime = 0;
+	float			lastGottenCommandsServerTime = 0;
 	float			lastGottenEventsTime = 0;
+
+	int				firstSnapServerTime = -1;
 
 	qboolean		anySnapshotParsed = qfalse;
 	qboolean		endReached = qfalse;
@@ -115,7 +119,6 @@ class DemoReader {
 	template <demoType_t D>
 	qboolean ReadMessageReal();
 	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS = qfalse);
-	qboolean SeekToServerTime(int serverTime);
 
 	void mapAnimsToDM15(playerState_t* ps);
 
@@ -127,7 +130,11 @@ public:
 	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
 	};
 
+	int GetFirstSnapServerTime();
 	qboolean SeekToTime(int time);
+	int GetFirstServerTimeAfterServerTime(int serverTime);
+	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
+	qboolean SeekToServerTime(int serverTime);
 	qboolean SeekToCommandTime(int serverTime);
 	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
 	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
@@ -141,6 +148,7 @@ public:
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
+	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime);
 	std::vector<Event> DemoReader::GetNewEvents(float time);
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum, int* maxLength);
