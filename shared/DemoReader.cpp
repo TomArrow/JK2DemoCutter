@@ -557,6 +557,17 @@ int DemoReader::GetFirstServerTimeAfterServerTime(int serverTime) {
 	}
 	return -1; // Shouldn't happen really but whatever
 }
+int DemoReader::GetLastServerTimeBeforeServerTime(int serverTime) {
+
+	if (!SeekToServerTime(serverTime)) return -1;
+
+	int lastServerTime = -1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		if (it->second.serverTime >= serverTime) return lastServerTime;
+		lastServerTime = it->second.serverTime;
+	}
+	return -1; // Shouldn't happen really but whatever
+}
 SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
 	if (SeekToServerTime(serverTime)) {
 		for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {

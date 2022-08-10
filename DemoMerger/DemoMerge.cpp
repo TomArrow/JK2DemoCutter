@@ -812,11 +812,22 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		int nonSkippedDemoIndex = 0;
+		static qboolean entityIsInterpolated[MAX_GENTITIES];
+		Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
 				SnapshotInfo* snapInfoHere = demoReaders[i].GetSnapshotInfoAtServerTime(time);
-				if (!snapInfoHere) continue;
+				qboolean snapIsInterpolated = qfalse;
+				if (!snapInfoHere) {
+					int thisDemoLastServerTime = demoReaders[i].GetLastServerTimeBeforeServerTime(time);
+					int thisDemoNextServerTime = demoReaders[i].GetFirstServerTimeAfterServerTime(time);
+					if (thisDemoLastServerTime == -1 || thisDemoNextServerTime == -1)continue;
+
+					snapInfoHere = demoReaders[i].GetSnapshotInfoAtServerTime(thisDemoLastServerTime);
+					// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
+					snapIsInterpolated = qtrue;
+				}
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS = snapInfoHere->playerState;
@@ -828,14 +839,20 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
 					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
-					playerEntities[tmpPS.clientNum]= tmpES;
+					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
+						playerEntities[tmpPS.clientNum] = tmpES;
+						entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;
+					}
 				}
 
 				// Copy all entities
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
 					if (it->first != mainPlayerPS.clientNum) {
-						playerEntities[it->first] = it->second;
+						if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
+							playerEntities[it->first] = it->second;
+							entityIsInterpolated[it->first] = snapIsInterpolated;
+						}
 					}
 				}
 
