@@ -84,6 +84,8 @@ public:
 
 	void ReadToEnd();
 	void GetMedianPingData(int* playerPingData); // Requires pointer to array with 32 ints
+	void GetLowestPingData(int* playerPingData); // Requires pointer to array with 32 ints
+	void GetMedianOfLocalAveragesPingData(float* playerPingData); // Requires pointer to array with 32 ints
 	void GetPlayersSeen(qboolean* playersSeenA); // Requires pointer to array with 32 qbooleans
 	void FreePingData();
 };

@@ -529,6 +529,66 @@ void DemoReaderLight::GetMedianPingData(int* playerPingData) { // Requires point
 	}
 
 }
+void DemoReaderLight::GetLowestPingData(int* playerPingData) { // Requires pointer to array with 32 ints
+
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		int countHere = pingValues[i].size();
+		if (countHere > 0) {
+			int lowestPing = INT_MAX;
+			for (int b = 0; b < pingValues[i].size(); b++) {
+				if (pingValues[i][b] < lowestPing) lowestPing = pingValues[i][b];
+			}
+			playerPingData[i] = lowestPing;
+		}
+		else {
+			playerPingData[i] = 0;
+		}
+	}
+
+}
+#define LOCAL_AVERAGE_SAMPLE_COUNT 100
+void DemoReaderLight::GetMedianOfLocalAveragesPingData(float* playerPingData) { // Requires pointer to array with 32 ints
+
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+
+		static float localAverageData[LOCAL_AVERAGE_SAMPLE_COUNT];
+		std::vector<float> localAverages;
+		int s = 0;
+		for (; s < pingValues[i].size(); s++) {
+			localAverageData[s % LOCAL_AVERAGE_SAMPLE_COUNT] = pingValues[i][s]; // Add sample to pool
+			if (s >= LOCAL_AVERAGE_SAMPLE_COUNT) {
+				// Run the average. But only once the whole array is filled.
+				averageHelper_t averageHelper;
+				Com_Memset(&averageHelper, 0, sizeof(averageHelper));
+				for (int c = 0; c < LOCAL_AVERAGE_SAMPLE_COUNT; c++) {
+					averageHelper.sum += localAverageData[c];
+					averageHelper.divisor++;
+				}
+				localAverages.push_back(averageHelper.sum / averageHelper.divisor);
+			}
+		}
+
+
+		int countHere = localAverages.size();
+		if (countHere > 0) {
+			sort(localAverages.begin(), localAverages.end());
+			if (countHere % 2) {
+				// Median with averaged center values
+				playerPingData[i] = (localAverages[countHere / 2]+ localAverages[countHere / 2-1])/2;
+			}
+			else {
+				// True median
+				playerPingData[i] = localAverages[countHere / 2]; // Integer division always floors the value. So let's say, count 3: 3/2 = 1.5 => 1. Index 1 is used, which is correct.
+			}
+		}
+		else {
+			playerPingData[i] = 0;
+		}
+	}
+
+}
+
+
 
 void DemoReaderLight::FreePingData() {
 	for (int i = 0; i < MAX_CLIENTS; i++) {

@@ -29,7 +29,7 @@ public:
 
 struct SourcePlayerInfo {
 	int clientNum;
-	int medianPing;
+	float pingCompensation; // in ms
 	qboolean asG2AnimEnt;
 };
 
@@ -1048,10 +1048,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, just for whatever's sake. Maybe not necessary? Could help with stuff like DARK Homebase demos, since player configstrings are sent a bit later?
 			
 			// Get ping info by preparsing entire demo in the lighter demo reader
-			int	medianPingsHere[MAX_CLIENTS];
+			//float	medianPingsHere[MAX_CLIENTS];
+			//float	medianOfLocalAveragePingsHere[MAX_CLIENTS];
+			int	lowestPingsHere[MAX_CLIENTS];
 			qboolean	playerExistsAsEntity[MAX_CLIENTS];
 			pingDemoReaders[i].ReadToEnd();
-			pingDemoReaders[i].GetMedianPingData(medianPingsHere);
+			//pingDemoReaders[i].GetMedianPingData(medianPingsHere);
+			//pingDemoReaders[i].GetMedianOfLocalAveragesPingData(medianOfLocalAveragePingsHere);
+			pingDemoReaders[i].GetLowestPingData(lowestPingsHere);
 			pingDemoReaders[i].GetPlayersSeen(playerExistsAsEntity);
 			pingDemoReaders[i].FreePingData();
 
@@ -1061,8 +1065,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
 				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
 				if (clientNumHere != -1) {
-					std::cout << " [median ping:"<< medianPingsHere[clientNumHere] <<"]" << std::endl;
-					demoReaders[i].playersToCopy.push_back({ clientNumHere,medianPingsHere[clientNumHere],qfalse });
+					std::cout << " [median ping:"<< lowestPingsHere[clientNumHere] <<"]" << std::endl;
+					demoReaders[i].playersToCopy.push_back({ clientNumHere,(float)lowestPingsHere[clientNumHere],qfalse });
 					clientNumsUsedHere.insert(clientNumHere);
 				}
 				else {
@@ -1082,11 +1086,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					const char* playerName = Info_ValueForKey(playerCS,maxLength,"n");
 					if (strlen(playerTeam) && atoi(playerTeam) < TEAM_SPECTATOR) { // Don't copy non-existent players and don't copy spectators
 						if (playerExistsAsEntity[p]) {
-							demoReaders[i].playersToCopy.push_back({ p,medianPingsHere[p],asAnimEnts });
-							std::cout << "Copying " << playerName << " (" << p << ") "<< (asAnimEnts?"as G2AnimEnt ":"") << "[median ping:" << medianPingsHere[p] << "]" << std::endl;
+							demoReaders[i].playersToCopy.push_back({ p,(float)lowestPingsHere[p],asAnimEnts });
+							std::cout << "Copying " << playerName << " (" << p << ") "<< (asAnimEnts?"as G2AnimEnt ":"") << "[ping adjust:" << lowestPingsHere[p] << "]" << std::endl;
 						}
 						else {
-							std::cout << "Skipping copying " << playerName << " (" << p << ") "<< (asAnimEnts ? "as G2AnimEnt " : "") <<"since it never appears in the source demo" << " [median ping:" << medianPingsHere[p] << "]" << std::endl;
+							std::cout << "Skipping copying " << playerName << " (" << p << ") "<< (asAnimEnts ? "as G2AnimEnt " : "") <<"since it never appears in the source demo" << " [ping adjust:" << lowestPingsHere[p] << "]" << std::endl;
 						}
 					}
 				}
@@ -1167,7 +1171,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
-					int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
+					//int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
+					float pingCompensationHere = demoReaders[i].playersToCopy[c].pingCompensation;
 					qboolean asG2AnimEnt = demoReaders[i].playersToCopy[c].asG2AnimEnt;
 
 					int targetClientNum = -1;
@@ -1201,7 +1206,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					SnapshotInfo* newSnap = NULL;
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
 					float translatedTime = 0.0f;
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- medianPlayerPingHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
+					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 
 

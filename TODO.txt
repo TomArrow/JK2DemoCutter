@@ -56,6 +56,8 @@ save player counts for sprees
 allow killing sprees that simply count without time by the amount of kills without dying. might be a bit lame tho.
 track airtime before kill/cap?
 TODO: DON'T use GetCurrentEntities in DemoDefragCombiner. In fact probably make that stuff private. Interpolation/seekahead could interfere with it. Also don't let it use the normal EndReached(). Its working through sheer luck atm.
+for combiner, try average and median of local averages.
+
 
 DONE: 
 

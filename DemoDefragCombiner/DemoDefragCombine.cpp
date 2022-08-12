@@ -11,6 +11,12 @@
 
 demo_t			demo;
 
+struct SourcePlayerInfo {
+	int clientNum;
+	int medianPing;
+	qboolean asG2AnimEnt;
+};
+
 
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value) {
 	char* old;

@@ -131,7 +131,7 @@ public:
 	};
 
 	int GetFirstSnapServerTime();
-	qboolean SeekToTime(int time);
+	qboolean SeekToTime(float time);
 	int GetFirstServerTimeAfterServerTime(int serverTime);
 	int GetLastServerTimeBeforeServerTime(int serverTime);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);

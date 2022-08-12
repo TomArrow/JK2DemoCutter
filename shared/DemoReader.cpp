@@ -532,7 +532,7 @@ int DemoReader::getCurrentDemoTime() {
 	return demoCurrentTime;
 }
 
-qboolean DemoReader::SeekToTime(int time) {
+qboolean DemoReader::SeekToTime(float time) {
 	while (demoCurrentTime < time && !endReached) {
 		ReadMessage();
 	}
