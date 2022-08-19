@@ -54,10 +54,12 @@ typedef struct _iobuf
 #define	MAX_MSGLEN				16384		// max length of a message, which may
 // be fragmented into multiple packets
 
-#define	CMD_BACKUP			64	
+//#define	CMD_BACKUP			64	
+#define	CMD_BACKUP			4096	
 #define	CMD_MASK			(CMD_BACKUP - 1)
 
-#define	PACKET_BACKUP	32	// number of old messages that must be kept on client and
+//#define	PACKET_BACKUP	32	// number of old messages that must be kept on client and
+#define	PACKET_BACKUP	2048	// number of old messages that must be kept on client and
 							// server for delta comrpession and ping estimation
 #define	PACKET_MASK		(PACKET_BACKUP-1)
 
@@ -74,7 +76,8 @@ typedef struct _iobuf
 #define	ENTITYNUM_WORLD		(MAX_GENTITIES-2)
 #define	ENTITYNUM_MAX_NORMAL	(MAX_GENTITIES-2)
 
-#define	MAX_PARSE_ENTITIES	2048
+//#define	MAX_PARSE_ENTITIES	2048
+#define	MAX_PARSE_ENTITIES	131072
 
 #define	MAX_PS_EVENTS			2
 
