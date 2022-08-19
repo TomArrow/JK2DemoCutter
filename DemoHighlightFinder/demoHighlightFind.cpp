@@ -18,7 +18,68 @@
 
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
-jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
+jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\](?: which is his personal best time)?.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
+jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat the WORLD RECORD and )?(is now ranked) \^\d#(\d) \^7with)\s\^3(\d+):(\d+))raw", "mSi");
+
+class defragRunInfo_t {
+public:
+	int milliseconds = 0;
+	std::string playerName;
+	qboolean isNumber1 = qfalse;
+	qboolean isTop10 = qfalse;
+	qboolean isLogged = qfalse;
+};
+
+qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
+	jp::VecNum vec_num;
+	jp::RegexMatch rm;
+
+	size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+		info->playerName = vec_num[matchNum][1];
+		int minutes = atoi(vec_num[matchNum][2].c_str());
+		std::string secondString = vec_num[matchNum][3];
+		float seconds = atof(vec_num[matchNum][3].c_str());
+		int milliSeconds = (1000.0f * seconds) + 0.5f;
+		int pureMilliseconds = milliSeconds % 1000;
+		int pureSeconds = milliSeconds / 1000;
+
+		info->milliseconds = milliSeconds + minutes * 60 * 1000;
+		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
+		info->isNumber1 = (qboolean)(vec_num[matchNum][6].length() > 0);
+
+		return qtrue;
+	}
+	return qfalse;
+}
+
+qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
+	jp::VecNum vec_num;
+	jp::RegexMatch rm;
+
+	size_t count = rm.setRegexObject(&defragRazorFinishRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+		info->playerName = vec_num[matchNum][1];
+		int seconds = atoi(vec_num[matchNum][6].c_str());
+		int pureMilliseconds = atoi(vec_num[matchNum][7].c_str());
+
+		info->milliseconds = pureMilliseconds + seconds * 1000;
+		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
+		info->isNumber1 = (qboolean)(vec_num[matchNum][3].length() > 0);
+
+		return qtrue;
+	}
+	return qfalse;
+}
+
 
 //std::map<int,int> playerFirstVisible;
 //std::map<int,int> playerFirstFollowed;
@@ -873,7 +934,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		int endTime = spreeInfo->lastKillTime + bufferTime;
 		int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 		bool isTruncated = false;
+		int truncationOffset = 0;
 		if (earliestPossibleStart > startTime) {
+			truncationOffset = earliestPossibleStart - startTime;
 			startTime = earliestPossibleStart;
 			isTruncated = true;
 		}
@@ -885,7 +948,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		for (int i = 0; i < victims->size(); i++) {
 			ss << "_" << (*victims)[i];
 		}
-		ss << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "") << "_" << shorthash;
+		ss << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 		std::string targetFilename = ss.str();
 		char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -1751,7 +1814,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int endTime = demoCurrentTime + bufferTime;
 							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 							bool isTruncated = false;
+							int truncationOffset = 0;
 							if (earliestPossibleStart > startTime) {
+								truncationOffset = earliestPossibleStart - startTime;
 								startTime = earliestPossibleStart;
 								isTruncated = true;
 							}
@@ -1993,7 +2058,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "")<<"_"<<shorthash;
+							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") <<"_"<<shorthash;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -2272,7 +2337,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int endTime = demoCurrentTime + bufferTime;
 							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 							bool isTruncated = false;
+							int truncationOffset = 0;
 							if (earliestPossibleStart > startTime) {
+								truncationOffset = earliestPossibleStart - startTime;
 								startTime = earliestPossibleStart;
 								isTruncated = true;
 							}
@@ -2285,7 +2352,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int minutes = seconds / 60;
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? "_tr" : "");
+							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -2682,36 +2749,56 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
 				
 
-				jp::VecNum vec_num;
-				jp::RegexMatch rm;
+				//jp::VecNum vec_num;
+				//jp::RegexMatch rm;
+				qboolean runFound = qfalse;
+				defragRunInfo_t runInfo;
+
 				std::string printText = Cmd_Argv(1);
 #if DEBUG
 				//std::cout << printText << "\n";
 #endif
 
-				size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
+				/*size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
 					.setSubject(&printText)                         //set subject string
 					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
-					.match();
+					.match();*/
 				
-				for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+				if (findOCDefragRun(printText, &runInfo)) {
+					runFound = qtrue;
+				} else if (findRazorDefragRun(printText, &runInfo)) {
+					runFound = qtrue;
+				}
+
+
+				//for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+				if (runFound) { // really its just going to be 1 but whatever
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char * info = demo.cut.Cl.gameState.stringData + stringOffset;
 					std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
 					std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
-					std::string playername = vec_num[matchNum][1];
-					int minutes = atoi(vec_num[matchNum][2].c_str());
-					std::string secondString = vec_num[matchNum][3];
-					float seconds = atof(vec_num[matchNum][3].c_str());
-					int milliSeconds = (1000.0f* seconds)+0.5f;
-					int pureMilliseconds = milliSeconds % 1000;
-					int pureSeconds = milliSeconds / 1000;
+					//std::string playername = vec_num[matchNum][1];
+					std::string playername = runInfo.playerName;
+					//int minutes = atoi(vec_num[matchNum][2].c_str());
+					//std::string secondString = vec_num[matchNum][3];
+					//float seconds = atof(vec_num[matchNum][3].c_str());
+					//int milliSeconds = (1000.0f* seconds)+0.5f;
+					//int pureMilliseconds = milliSeconds % 1000;
+					//int pureSeconds = milliSeconds / 1000;
 
-					bool isLogged = vec_num[matchNum][4].length() > 0;
-					bool isNumberOne = vec_num[matchNum][6].length() > 0;
+					//bool isLogged = vec_num[matchNum][4].length() > 0;
+					//bool isNumberOne = vec_num[matchNum][6].length() > 0;
+					bool isLogged = runInfo.isLogged;
+					bool isNumberOne = runInfo.isNumber1;
 
 					//int totalSeconds = minutes * 60 + seconds;
-					int totalMilliSeconds = minutes * 60000 + milliSeconds;
+					//int totalMilliSeconds = minutes * 60000 + milliSeconds;
+					int totalMilliSeconds = runInfo.milliseconds;
+
+					int pureMilliseconds = totalMilliSeconds % 1000;
+					int tmpSeconds = totalMilliSeconds / 1000;
+					int pureSeconds = tmpSeconds % 60;
+					int minutes = tmpSeconds / 60;
 					
 					// Find player
 					int playerNumber = -1;
@@ -2778,7 +2865,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					int endTime = demoCurrentTime + bufferTime;
 					int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 					bool isTruncated = false;
+					int truncationOffset = 0;
 					if (earliestPossibleStart > startTime) {
+						truncationOffset = earliestPossibleStart - startTime;
 						startTime = earliestPossibleStart;
 						isTruncated = true;
 					}
@@ -2786,7 +2875,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					
 
 					std::stringstream ss;
-					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" <<  playerNumber << "_" <<  demo.cut.Clc.clientNum << (isTruncated?"_tr":"");
+					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" <<  playerNumber << "_" <<  demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
@@ -2795,7 +2884,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					outputBatHandleDefrag << "\nrem demoCurrentTime: "<< demoCurrentTime;
 					outputBatHandleDefrag << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 					delete[] targetFilenameFiltered;
-					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 				}
 
 				

@@ -61,6 +61,7 @@ for combiner, try median of local lows instead of global low?
 
 DONE: 
 
+For trimmed cuts, include offset
 close/very close enemies throughout cap. very close (within hitting distance?). or make it a number of "danger ratio" or sth idk
 captures: whether it was picked up from base or from taken (bc that matters in terms of flaghold time)
 For rets, save whether flag carrier was visible throughout his hold time.

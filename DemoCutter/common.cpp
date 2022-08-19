@@ -269,7 +269,8 @@ char* QDECL va(const char* format, ...) {
 void sanitizeFilename(const char* input, char* output) {
 
 	while (*input) {
-		if ((*input >= 32 && *input < 42)
+		if ((*input == 32) // Don't allow ! exclamation mark. Linux doesn't like that.
+			|| (*input >= 34 && *input < 42)
 			|| (*input >= 43 && *input < 46)
 			|| (*input >= 48 && *input < 58)
 			|| (*input >= 59 && *input < 60)
