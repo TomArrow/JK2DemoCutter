@@ -18,8 +18,12 @@
 
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
-jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\](?: which is his personal best time)?.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
+// OC Defrag
+jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\]( which is his personal best time)?.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
+
+// Razor Defrag (different server)
 jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat the WORLD RECORD and )?(is now ranked) \^\d#(\d) \^7with)\s\^3(\d+):(\d+))raw", "mSi");
+jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on this map!\s*\^\d\]:)raw", "mSi");
 
 class defragRunInfo_t {
 public:
@@ -28,11 +32,13 @@ public:
 	qboolean isNumber1 = qfalse;
 	qboolean isTop10 = qfalse;
 	qboolean isLogged = qfalse;
+	qboolean isPersonalBest = qfalse;
 };
 
 qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 	jp::VecNum vec_num;
 	jp::RegexMatch rm;
+
 
 	size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
 		.setSubject(&printText)                         //set subject string
@@ -49,17 +55,23 @@ qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 		int pureSeconds = milliSeconds / 1000;
 
 		info->milliseconds = milliSeconds + minutes * 60 * 1000;
-		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
-		info->isNumber1 = (qboolean)(vec_num[matchNum][6].length() > 0);
+		info->isLogged = (qboolean)(vec_num[matchNum][5].length() > 0);
+		info->isNumber1 = (qboolean)(vec_num[matchNum][7].length() > 0);
+		info->isPersonalBest = (qboolean)(vec_num[matchNum][4].length() > 0);
 
 		return qtrue;
 	}
 	return qfalse;
 }
 
+qboolean razorDefragLastCheckedPrintWasPersonalBest = qfalse;
+
 qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
-	jp::VecNum vec_num;
-	jp::RegexMatch rm;
+	jp::VecNum vec_num,vec_num2;
+	jp::RegexMatch rm,rm2;
+
+	qboolean lastWasPersonalBestMessage = razorDefragLastCheckedPrintWasPersonalBest;
+	razorDefragLastCheckedPrintWasPersonalBest = qfalse;
 
 	size_t count = rm.setRegexObject(&defragRazorFinishRegex)                          //set associated Regex object
 		.setSubject(&printText)                         //set subject string
@@ -74,8 +86,18 @@ qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
 		info->milliseconds = pureMilliseconds + seconds * 1000;
 		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
 		info->isNumber1 = (qboolean)(vec_num[matchNum][3].length() > 0);
+		info->isPersonalBest = lastWasPersonalBestMessage;
 
 		return qtrue;
+	}
+
+	size_t count2 = rm2.setRegexObject(&defragRazorPersonalBestRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num2)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num2.size(); matchNum++) { // really its just going to be 1 but whatever
+		razorDefragLastCheckedPrintWasPersonalBest = qtrue; // Razor defrag sends 2 print messages. First says "personal best", second says time and rank. So we gotta remember the last message saying "personal best".
 	}
 	return qfalse;
 }
@@ -1184,6 +1206,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"playerName	TEXT NOT NULL,"
 		"isTop10	BOOLEAN NOT NULL,"
 		"isNumber1	BOOLEAN NOT NULL,"
+		"isPersonalBest	BOOLEAN NOT NULL,"
 		"wasVisible	BOOLEAN NOT NULL,"
 		"wasFollowed	BOOLEAN NOT NULL,"
 		"wasFollowedOrVisible	BOOLEAN NOT NULL,"
@@ -1261,9 +1284,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,readableTime,totalMilliseconds,playerName,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,readableTime,totalMilliseconds,playerName,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@readableTime,@totalMilliseconds,@playerName,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@readableTime,@totalMilliseconds,@playerName,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
@@ -2790,6 +2813,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					//bool isNumberOne = vec_num[matchNum][6].length() > 0;
 					bool isLogged = runInfo.isLogged;
 					bool isNumberOne = runInfo.isNumber1;
+					bool isPersonalBest = runInfo.isPersonalBest;
 
 					//int totalSeconds = minutes * 60 + seconds;
 					//int totalMilliSeconds = minutes * 60000 + milliSeconds;
@@ -2839,6 +2863,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SQLBIND_TEXT(insertDefragRunStatement, "@playerName", playername.c_str());
 					SQLBIND(insertDefragRunStatement, int, "@isTop10", isLogged);
 					SQLBIND(insertDefragRunStatement, int, "@isNumber1", isNumberOne);
+					SQLBIND(insertDefragRunStatement, int, "@isPersonalBest", isPersonalBest);
 					SQLBIND_TEXT(insertDefragRunStatement, "@demoName", oldBasename.c_str());
 					SQLBIND_TEXT(insertDefragRunStatement, "@demoPath", oldPath.c_str());
 					SQLBIND(insertDefragRunStatement, int, "@demoTime", demoCurrentTime);
