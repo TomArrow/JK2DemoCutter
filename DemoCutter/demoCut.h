@@ -1967,6 +1967,7 @@ typedef enum {
 } ctfMsg_t;
 
 
+std::string Q_StripColorAll(std::string string);
 void Q_StripColorAll(char* text);
 
 

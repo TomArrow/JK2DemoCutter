@@ -864,6 +864,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		//std::string victimname = Info_ValueForKey(playerInfo, "n");
 
 		std::stringstream victimsSS;
+		std::stringstream victimsStrippedSS;
 		std::stringstream victimsNumsSS;
 		/*for (int i = 0; i < victims->size(); i++) {
 			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
@@ -877,6 +878,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
+			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
 			lastKillTime = (*killsOfThisSpree)[i].time;
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
 			for (int n = 0; n < (*killsOfThisSpree)[i].nearbyPlayers.size(); n++) {
@@ -884,6 +886,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			}
 		}
 		std::string victimsString = victimsSS.str();
+		std::string victimsStringStripped = victimsStrippedSS.str();
 		std::string victimsNumsString = victimsNumsSS.str();
 
 		// Remove any nearby players that are victims or that are the attacker. (they dont count as nearby players)
@@ -922,7 +925,10 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND(insertSpreeStatement, int, "@maxDelay", maxDelay);
 		SQLBIND_TEXT(insertSpreeStatement, "@map", mapname.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@killerName", playername.c_str());
+		std::string playernameStripped = Q_StripColorAll(playername);
+		SQLBIND_TEXT(insertSpreeStatement, "@killerNameStripped", playernameStripped.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@victimNames", victimsString.c_str());
+		SQLBIND_TEXT(insertSpreeStatement, "@victimNamesStripped", victimsStringStripped.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@killHashes", killHashesString.c_str());
 		SQLBIND(insertSpreeStatement, int, "@killerClientNum", clientNumAttacker);
 		SQLBIND_TEXT(insertSpreeStatement, "@victimClientNums", victimsNumsString.c_str());
@@ -1077,8 +1083,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"shorthash	TEXT,"
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
+		"serverNameStripped	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
+		"killerNameStripped	TEXT NOT NULL,"
 		"victimName	TEXT NOT NULL,"
+		"victimNameStripped	TEXT NOT NULL,"
 		"killerTeam	INTEGER,"
 		"victimTeam	INTEGER NOT NULL,"
 		"redScore INTEGER,"
@@ -1152,9 +1161,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"id	INTEGER PRIMARY KEY,"
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
+		"serverNameStripped	TEXT NOT NULL,"
 		"flagHoldTime	INTEGER NOT NULL,"
 		"flagPickupSource	INTEGER NOT NULL,"
 		"capperName	TEXT NOT NULL,"
+		"capperNameStripped	TEXT NOT NULL,"
 		"capperClientNum INTEGER NOT NULL,"
 		"capperIsVisible	BOOLEAN NOT NULL,"
 		"capperIsFollowed	BOOLEAN NOT NULL,"
@@ -1201,9 +1212,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_exec(killDb, "CREATE TABLE defragRuns ("
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
+		"serverNameStripped	TEXT NOT NULL,"
 		"readableTime TEXT NOT NULL,"
 		"totalMilliseconds	INTEGER,"
 		"playerName	TEXT NOT NULL,"
+		"playerNameStripped	TEXT NOT NULL,"
 		"isTop10	BOOLEAN NOT NULL,"
 		"isNumber1	BOOLEAN NOT NULL,"
 		"isPersonalBest	BOOLEAN NOT NULL,"
@@ -1225,7 +1238,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"maxDelay	INTEGER NOT NULL,"
 		"map	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
+		"killerNameStripped	TEXT NOT NULL,"
 		"victimNames	TEXT NOT NULL,"
+		"victimNamesStripped	TEXT NOT NULL,"
 		"killHashes	TEXT NOT NULL,"
 		"killerClientNum	INTEGER NOT NULL,"
 		"victimClientNums	TEXT NOT NULL,"
@@ -1266,9 +1281,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 		"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
 	char* preparedStatementText = "INSERT INTO kills"
-		"(hash,shorthash,map,serverName,killerName,victimName,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
+		"(hash,shorthash,map,serverName,serverNameStripped,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
 		"VALUES "
-		"(@hash,@shorthash,@map,@serverName,@killerName,@victimName,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
+		"(@hash,@shorthash,@map,@serverName,@serverNameStripped,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
@@ -1278,22 +1293,22 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,flagHoldTime,flagPickupSource,capperName,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@flagHoldTime,@flagPickupSource,@capperName,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,readableTime,totalMilliseconds,playerName,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@readableTime,@totalMilliseconds,@playerName,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
-		"( hash, shorthash,maxDelay, map,killerName, victimNames ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
+		"( hash, shorthash,maxDelay, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
-		"( @hash, @shorthash, @maxDelay,@map, @killerName, @victimNames ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
+		"( @hash, @shorthash, @maxDelay,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
@@ -1944,8 +1959,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND_TEXT(insertStatement, "@shorthash", shorthash.c_str());
 							SQLBIND_TEXT(insertStatement, "@map", mapname.c_str());
 							SQLBIND_TEXT(insertStatement, "@serverName", serverName.c_str());
+							std::string serverNameStripped = Q_StripColorAll(serverName);
+							SQLBIND_TEXT(insertStatement, "@serverNameStripped", serverNameStripped.c_str());
 							SQLBIND_TEXT(insertStatement, "@killerName", playername.c_str());
+							std::string playernameStripped = Q_StripColorAll(playername);
+							SQLBIND_TEXT(insertStatement, "@killerNameStripped", playernameStripped.c_str());
 							SQLBIND_TEXT(insertStatement, "@victimName", victimname.c_str());
+							std::string victimnameStripped = Q_StripColorAll(victimname);
+							SQLBIND_TEXT(insertStatement, "@victimNameStripped", victimnameStripped.c_str());
 							if (isWorldKill) {
 								SQLBIND_NULL(insertStatement, "@killerTeam");
 							}
@@ -2277,10 +2298,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							SQLBIND_TEXT(insertCaptureStatement, "@map", mapname.c_str());
 							SQLBIND_TEXT(insertCaptureStatement, "@serverName", serverName.c_str());
+							std::string serverNameStripped = Q_StripColorAll(serverName);
+							SQLBIND_TEXT(insertCaptureStatement, "@serverNameStripped", serverNameStripped.c_str());
 							SQLBIND(insertCaptureStatement, int, "@flagHoldTime", flagHoldTime);
 							//SQLBIND(insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
 							SQLBIND(insertCaptureStatement, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
 							SQLBIND_TEXT(insertCaptureStatement, "@capperName", playername.c_str());
+							std::string playernameStripped = Q_StripColorAll(playername);
+							SQLBIND_TEXT(insertCaptureStatement, "@capperNameStripped", playernameStripped.c_str());
 							SQLBIND(insertCaptureStatement, int, "@capperClientNum", playerNum);
 							SQLBIND(insertCaptureStatement, int, "@capperIsVisible", playerIsVisible);
 							SQLBIND(insertCaptureStatement, int, "@capperIsFollowed", playerIsFollowed);
@@ -2858,9 +2883,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					SQLBIND_TEXT(insertDefragRunStatement, "@map", mapname.c_str());
 					SQLBIND_TEXT(insertDefragRunStatement, "@serverName", serverName.c_str());
+					std::string serverNameStripped = Q_StripColorAll(serverName);
+					SQLBIND_TEXT(insertDefragRunStatement, "@serverNameStripped", serverNameStripped.c_str());
 					SQLBIND_TEXT(insertDefragRunStatement, "@readableTime", formattedTimeString.c_str());
 					SQLBIND(insertDefragRunStatement, int, "@totalMilliseconds", totalMilliSeconds);
 					SQLBIND_TEXT(insertDefragRunStatement, "@playerName", playername.c_str());
+					std::string playernameStripped = Q_StripColorAll(playername);
+					SQLBIND_TEXT(insertDefragRunStatement, "@playerNameStripped", playernameStripped.c_str());
 					SQLBIND(insertDefragRunStatement, int, "@isTop10", isLogged);
 					SQLBIND(insertDefragRunStatement, int, "@isNumber1", isNumberOne);
 					SQLBIND(insertDefragRunStatement, int, "@isPersonalBest", isPersonalBest);

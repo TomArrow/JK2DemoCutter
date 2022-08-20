@@ -1413,6 +1413,15 @@ qboolean Q_parseColorHex(const char* p, float* color, int* skipCount) {
 
 }
 
+std::string Q_StripColorAll(std::string string) {
+	const char* sourceCString = string.c_str();
+	int stringLen = strlen(sourceCString);
+	char* cString = new char[stringLen + 1];
+	strcpy_s(cString, stringLen + 1, sourceCString);
+	Q_StripColorAll(cString);
+	std::string colorStripped = cString;
+	return colorStripped;
+}
 
 void Q_StripColorAll(char* text) {
 	char* read;
