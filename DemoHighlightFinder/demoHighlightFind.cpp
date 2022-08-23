@@ -35,72 +35,6 @@ public:
 	qboolean isPersonalBest = qfalse;
 };
 
-qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
-	jp::VecNum vec_num;
-	jp::RegexMatch rm;
-
-
-	size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
-		.setSubject(&printText)                         //set subject string
-		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
-		.match();
-
-	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
-		info->playerName = vec_num[matchNum][1];
-		int minutes = atoi(vec_num[matchNum][2].c_str());
-		std::string secondString = vec_num[matchNum][3];
-		float seconds = atof(vec_num[matchNum][3].c_str());
-		int milliSeconds = (1000.0f * seconds) + 0.5f;
-		int pureMilliseconds = milliSeconds % 1000;
-		int pureSeconds = milliSeconds / 1000;
-
-		info->milliseconds = milliSeconds + minutes * 60 * 1000;
-		info->isLogged = (qboolean)(vec_num[matchNum][5].length() > 0);
-		info->isNumber1 = (qboolean)(vec_num[matchNum][7].length() > 0);
-		info->isPersonalBest = (qboolean)(vec_num[matchNum][4].length() > 0);
-
-		return qtrue;
-	}
-	return qfalse;
-}
-
-qboolean razorDefragLastCheckedPrintWasPersonalBest = qfalse;
-
-qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
-	jp::VecNum vec_num,vec_num2;
-	jp::RegexMatch rm,rm2;
-
-	qboolean lastWasPersonalBestMessage = razorDefragLastCheckedPrintWasPersonalBest;
-	razorDefragLastCheckedPrintWasPersonalBest = qfalse;
-
-	size_t count = rm.setRegexObject(&defragRazorFinishRegex)                          //set associated Regex object
-		.setSubject(&printText)                         //set subject string
-		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
-		.match();
-
-	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
-		info->playerName = vec_num[matchNum][1];
-		int seconds = atoi(vec_num[matchNum][6].c_str());
-		int pureMilliseconds = atoi(vec_num[matchNum][7].c_str());
-
-		info->milliseconds = pureMilliseconds + seconds * 1000;
-		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
-		info->isNumber1 = (qboolean)(vec_num[matchNum][3].length() > 0);
-		info->isPersonalBest = lastWasPersonalBestMessage;
-
-		return qtrue;
-	}
-
-	size_t count2 = rm2.setRegexObject(&defragRazorPersonalBestRegex)                          //set associated Regex object
-		.setSubject(&printText)                         //set subject string
-		.setNumberedSubstringVector(&vec_num2)         //pass pointer to VecNum vector
-		.match();
-
-	for (int matchNum = 0; matchNum < vec_num2.size(); matchNum++) { // really its just going to be 1 but whatever
-		razorDefragLastCheckedPrintWasPersonalBest = qtrue; // Razor defrag sends 2 print messages. First says "personal best", second says time and rank. So we gotta remember the last message saying "personal best".
-	}
-	return qfalse;
-}
 
 
 //std::map<int,int> playerFirstVisible;
@@ -149,6 +83,25 @@ int lastEventTime[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
+
+
+// Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
+jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
+#define MAX_LAUGH_DELAY 7000 // From first laugh to last laugh, max delay.
+#define LAUGHS_CUT_PRE_TIME 20000 // Upon first laugh, cut last 20 seconds so we see context.
+int firstLaugh = -1;
+int lastLaugh = -1;
+int laughCount = 0;
+std::stringstream laughs;
+std::stringstream laughsChatlog;
+
+void resetLaughs() {
+	firstLaugh = -1;
+	lastLaugh = -1;
+	laughCount = 0;
+	laughs.str(std::string());
+	laughsChatlog.str(std::string());
+}
 
 
 struct cgs{
@@ -250,6 +203,77 @@ enum highlightSearchMode_t {
 //
 
 demo_t			demo;
+
+
+
+
+qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
+	jp::VecNum vec_num;
+	jp::RegexMatch rm;
+
+
+	size_t count = rm.setRegexObject(&defragRecordFinishRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+		info->playerName = vec_num[matchNum][1];
+		int minutes = atoi(vec_num[matchNum][2].c_str());
+		std::string secondString = vec_num[matchNum][3];
+		float seconds = atof(vec_num[matchNum][3].c_str());
+		int milliSeconds = (1000.0f * seconds) + 0.5f;
+		int pureMilliseconds = milliSeconds % 1000;
+		int pureSeconds = milliSeconds / 1000;
+
+		info->milliseconds = milliSeconds + minutes * 60 * 1000;
+		info->isLogged = (qboolean)(vec_num[matchNum][5].length() > 0);
+		info->isNumber1 = (qboolean)(vec_num[matchNum][7].length() > 0);
+		info->isPersonalBest = (qboolean)(vec_num[matchNum][4].length() > 0);
+
+		return qtrue;
+	}
+	return qfalse;
+}
+
+qboolean razorDefragLastCheckedPrintWasPersonalBest = qfalse;
+
+qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
+	jp::VecNum vec_num, vec_num2;
+	jp::RegexMatch rm, rm2;
+
+	qboolean lastWasPersonalBestMessage = razorDefragLastCheckedPrintWasPersonalBest;
+	razorDefragLastCheckedPrintWasPersonalBest = qfalse;
+
+	size_t count = rm.setRegexObject(&defragRazorFinishRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+		info->playerName = vec_num[matchNum][1];
+		int seconds = atoi(vec_num[matchNum][6].c_str());
+		int pureMilliseconds = atoi(vec_num[matchNum][7].c_str());
+
+		info->milliseconds = pureMilliseconds + seconds * 1000;
+		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
+		info->isNumber1 = (qboolean)(vec_num[matchNum][3].length() > 0);
+		info->isPersonalBest = lastWasPersonalBestMessage;
+
+		return qtrue;
+	}
+
+	size_t count2 = rm2.setRegexObject(&defragRazorPersonalBestRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num2)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num2.size(); matchNum++) { // really its just going to be 1 but whatever
+		razorDefragLastCheckedPrintWasPersonalBest = qtrue; // Razor defrag sends 2 print messages. First says "personal best", second says time and rank. So we gotta remember the last message saying "personal best".
+	}
+	return qfalse;
+}
+
 
 
 qboolean demoCutConfigstringModified(clientActive_t* clCut) {
@@ -995,7 +1019,85 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 }
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures, highlightSearchMode_t searchMode) {
+void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChangeInDemoTime, std::ofstream* outputBatHandleLaughs, sqlite3* killDb, sqlite3_stmt* insertLaughsStatement, sqlite3_stmt* selectLastInsertRowIdStatement, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force) {
+	if (firstLaugh != -1  && (demoCurrentTime - firstLaugh > MAX_LAUGH_DELAY || force) && laughCount > 0) {
+		
+		if (laughCount > 1) { // Let's not bloat the database with single laughs. Could miss some stuff but oh well.
+
+			int duration = lastLaugh - firstLaugh;
+
+			// Aye, let's log it.
+			int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+			const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
+			std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+			std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
+			SQLBIND_TEXT(insertLaughsStatement, "@map", mapname.c_str());
+			SQLBIND_TEXT(insertLaughsStatement, "@serverName", serverName.c_str());
+			std::string serverNameStripped = Q_StripColorAll(serverName);
+			SQLBIND_TEXT(insertLaughsStatement, "@serverNameStripped", serverNameStripped.c_str());
+			std::string laughsString = laughs.str();
+			std::string laughsChatlogString = laughsChatlog.str();
+			SQLBIND_TEXT(insertLaughsStatement, "@laughs", laughsString.c_str());
+			SQLBIND_TEXT(insertLaughsStatement, "@chatlog", laughsChatlogString.c_str());
+			std::string laughsChatlogStringStripped = Q_StripColorAll(laughsChatlogString);
+			SQLBIND_TEXT(insertLaughsStatement, "@chatlogStripped", laughsChatlogStringStripped.c_str());
+			SQLBIND(insertLaughsStatement, int, "@laughCount", laughCount);
+			SQLBIND_TEXT(insertLaughsStatement, "@demoName", (*oldBasename).c_str());
+			SQLBIND_TEXT(insertLaughsStatement, "@demoPath", (*oldPath).c_str());
+			SQLBIND(insertLaughsStatement, int, "@duration", duration);
+			SQLBIND(insertLaughsStatement, int, "@demoTime", firstLaugh);
+			SQLBIND(insertLaughsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+			SQLBIND(insertLaughsStatement, int, "@demoDateTime", oldDemoDateModified);
+			SQLBIND(insertLaughsStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+
+			int queryResult = sqlite3_step(insertLaughsStatement);
+			uint64_t insertedId = -1;
+			if (queryResult != SQLITE_DONE) {
+				std::cout << "Error inserting laugh spree into database: " << sqlite3_errmsg(killDb) << "\n";
+			}
+			else {
+				queryResult = sqlite3_step(selectLastInsertRowIdStatement);
+				if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
+					std::cout << "Error retrieving inserted laughs id from database: " << sqlite3_errmsg(killDb) << "\n";
+				}
+				else {
+					insertedId = sqlite3_column_int64(selectLastInsertRowIdStatement, 0);
+				}
+				sqlite3_reset(selectLastInsertRowIdStatement);
+			}
+			sqlite3_reset(insertLaughsStatement);
+
+			int startTime = firstLaugh - LAUGHS_CUT_PRE_TIME - bufferTime;
+			int endTime = lastLaugh + bufferTime;
+			int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+			bool isTruncated = false;
+			int truncationOffset = 0;
+			if (earliestPossibleStart > startTime) {
+				truncationOffset = earliestPossibleStart - startTime;
+				startTime = earliestPossibleStart;
+				isTruncated = true;
+			}
+			
+
+			std::stringstream ss;
+			ss << mapname << std::setfill('0') << "___LAUGHS" << laughCount << "_" << duration << "_" << laughsString.substr(0,70) << (laughsString.size() > 70 ? "--" : "") << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+
+			std::string targetFilename = ss.str();
+			char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+			sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+
+			(*outputBatHandleLaughs) << "\nrem demoCurrentTime: " << demoCurrentTime;
+			(*outputBatHandleLaughs) << "\nrem insertid" << insertedId;
+			(*outputBatHandleLaughs) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+			delete[] targetFilenameFiltered;
+			std::cout << targetFilename << "\n";
+		}
+
+		resetLaughs(); // Reset again so we can track future laugh sequences.
+	}
+}
+
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -1024,11 +1126,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	std::ofstream outputBatHandleKillSprees;
 	std::ofstream outputBatHandleDefrag;
 	std::ofstream outputBatHandleCaptures;
+	std::ofstream outputBatHandleLaughs;
 
 	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
 	outputBatHandleKillSprees.open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
 	outputBatHandleDefrag.open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
 	outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
+	outputBatHandleLaughs.open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
 
 	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
 	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
@@ -1043,7 +1147,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(playerTeams,0,sizeof(playerTeams));
 	Com_Memset(teamInfo,0,sizeof(teamInfo));
 	Com_Memset(&cgs,0,sizeof(cgs));
-
+	resetLaughs();
 
 	sqlite3* killDb;
 	sqlite3_open("killDatabase.db",&killDb);
@@ -1232,6 +1336,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"demoDateTime TIMESTAMP NOT NULL"
 		"); ",
 		NULL, NULL, NULL);
+	sqlite3_exec(killDb, "CREATE TABLE laughs ("
+		"id	INTEGER PRIMARY KEY,"
+		"map	TEXT NOT NULL,"
+		"serverName	TEXT NOT NULL,"
+		"serverNameStripped	TEXT NOT NULL,"
+		"laughs	TEXT NOT NULL,"
+		"chatlog	TEXT NOT NULL,"
+		"chatlogStripped	TEXT NOT NULL,"
+		"laughCount	INTEGER NOT NULL,"
+		"demoRecorderClientnum	INTEGER NOT NULL,"
+		"demoName TEXT NOT NULL,"
+		"demoPath TEXT NOT NULL,"
+		"duration INTEGER NOT NULL,"
+		"demoTime INTEGER NOT NULL,"
+		"serverTime INTEGER NOT NULL,"
+		"demoDateTime TIMESTAMP NOT NULL"
+		"); ",
+		NULL, NULL, NULL);
 	sqlite3_exec(killDb, "CREATE TABLE killSprees ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
@@ -1304,6 +1426,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
+	preparedStatementText = "INSERT INTO laughs"
+		"(map,serverName,serverNameStripped,laughs,chatlog,chatlogStripped,laughCount,demoRecorderClientnum,demoName,demoPath,duration,demoTime,serverTime,demoDateTime)"
+		"VALUES "
+		"(@map,@serverName,@serverNameStripped,@laughs,@chatlog,@chatlogStripped,@laughCount,@demoRecorderClientnum,@demoName,@demoPath,@duration,@demoTime,@serverTime,@demoDateTime);";
+	sqlite3_stmt* insertLaughsStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertLaughsStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash,maxDelay, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
@@ -1997,7 +2125,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							int queryResult = sqlite3_step(insertStatement);
 							if (queryResult != SQLITE_DONE) {
-								std::cout << "Error inserting kill into database: " << sqlite3_errmsg(killDb) << "\n";
+								std::cout << "Error inserting kill into database: " << sqlite3_errmsg(killDb) << " (" << queryResult << ")" << "\n";
 							}
 							sqlite3_reset(insertStatement);
 
@@ -2711,6 +2839,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				break;
 			}
 		}
+
+		// Check for finished laugh sequences
+		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,&outputBatHandleLaughs,killDb,insertLaughsStatement,selectLastInsertRowIdStatement,&oldBasename,&oldPath,oldDemoDateModified,sourceDemoFile,qfalse);
+
+
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 
 		bool hadConfigStringCommands = false;
@@ -2722,7 +2855,38 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 			if (cmd[0]) {
 				firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 			}
-			if (!strcmp(cmd, "cs")) {
+
+			if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
+				std::string chatCommand = command;
+				chatCommand = Q_StripColorAll(chatCommand);
+
+				// Detect a laugh
+				jp::VecNum vec_num, vec_num2;
+				jp::RegexMatch rm, rm2;
+
+				size_t count = rm.setRegexObject(&regexLaugh)                          //set associated Regex object
+					.setSubject(&chatCommand)                         //set subject string
+					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+					.match();
+
+				for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+					std::string matchedText= vec_num[matchNum][1];
+					if (firstLaugh == -1) {
+						firstLaugh = demoCurrentTime; // This is the first laugh of this laugh spree.
+					}
+					if (demoCurrentTime - firstLaugh <= MAX_LAUGH_DELAY) {
+						laughs << (laughCount++ > 0 ? "," : "") << matchedText;
+
+					}
+					lastLaugh = demoCurrentTime;
+				}
+
+				// If we are in the middle of a laugh sequence, we temporarily log the entire chat no matter what.
+				if (firstLaugh != -1 && demoCurrentTime - firstLaugh <= MAX_LAUGH_DELAY) {
+					laughsChatlog << command << "\n";
+				}
+			}
+			else if (!strcmp(cmd, "cs")) {
 				if (!demoCutConfigstringModified(&demo.cut.Cl)) {
 					goto cuterror;
 				}
@@ -2999,6 +3163,9 @@ cuterror:
 			FS_FileErase(newName);
 	}*/
 
+	// One last check for unsaved laughs near end of demo
+	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, &outputBatHandleLaughs, killDb, insertLaughsStatement, selectLastInsertRowIdStatement, &oldBasename, &oldPath, oldDemoDateModified, sourceDemoFile, qtrue);
+
 
 #ifdef DEBUGSTATSDB
 	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
@@ -3053,6 +3220,7 @@ cuterror:
 
 
 	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
+	sqlite3_finalize(insertLaughsStatement);
 	sqlite3_finalize(insertDefragRunStatement);
 	sqlite3_finalize(insertCaptureStatement);
 	sqlite3_finalize(insertSpreeStatement);
@@ -3070,6 +3238,7 @@ cuterror:
 	outputBatHandleKillSprees.close();
 	outputBatHandleDefrag.close();
 	outputBatHandleCaptures.close();
+	outputBatHandleLaughs.close();
 
 
 	std::cout << "\ndone." << "\n\n";
@@ -3132,7 +3301,7 @@ int main(int argc, char** argv) {
 	}
 
 	Com_Printf("Looking at %s.\n", demoName);
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat", searchMode)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat", searchMode)) {
 		Com_Printf("Highlights successfully found.\n");
 	}
 	else {

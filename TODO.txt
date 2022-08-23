@@ -57,11 +57,12 @@ allow killing sprees that simply count without time by the amount of kills witho
 track airtime before kill/cap?
 TODO: DON'T use GetCurrentEntities in DemoDefragCombiner. In fact probably make that stuff private. Interpolation/seekahead could interfere with it. Also don't let it use the normal EndReached(). Its working through sheer luck atm.
 for combiner, try median of local lows instead of global low?
-include cleaned up name in name parts
 
 
 DONE: 
 
+include cleaned up name in name parts
+laugh detector: find moments with lots of laughter. or laughter sprees. where multiple people laugh a lot. or ppl say "rofl" etc in general. to find funny moments.
 For trimmed cuts, include offset
 close/very close enemies throughout cap. very close (within hitting distance?). or make it a number of "danger ratio" or sth idk
 captures: whether it was picked up from base or from taken (bc that matters in terms of flaghold time)
