@@ -846,7 +846,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 
 				// self explanatory.
-				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && !snapIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
 					// For reference, here's what gets snapped (rounded) in entities:
 					// SnapVector( s->pos.trBase );
 					// SnapVector( s->apos.trBase );
@@ -873,6 +873,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					else if(mainPlayerPSIsInterpolated && !snapIsInterpolated){
 						// Move some entity stuff over to playerState to improve its precision? Kind of experimental.
 						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
+						// This does not reset the isInterpolated status, since it's kind of a "meh" value from an entity. It's just a patchwork kinda.
 					}
 				}
 
