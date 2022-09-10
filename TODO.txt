@@ -57,7 +57,8 @@ allow killing sprees that simply count without time by the amount of kills witho
 track airtime before kill/cap?
 TODO: DON'T use GetCurrentEntities in DemoDefragCombiner. In fact probably make that stuff private. Interpolation/seekahead could interfere with it. Also don't let it use the normal EndReached(). Its working through sheer luck atm.
 for combiner, try median of local lows instead of global low?
-
+detect & remember last boost & speed gain
+fix yet another error with event not being copied in democombiner - that dadler kill between red pillars, flag return.
 
 DONE: 
 

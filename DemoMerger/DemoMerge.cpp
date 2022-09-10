@@ -12,6 +12,13 @@
 demo_t			demo;
 
 
+class DemoReaderTrackingWrapper {
+public:
+	DemoReader reader;
+	int packetsUsed = 0;
+};
+
+
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value) {
 	char* old;
 	const char* s;
@@ -723,14 +730,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	memset(&demo, 0, sizeof(demo));
 
-	std::vector<DemoReader> demoReaders;
+	std::vector<DemoReaderTrackingWrapper> demoReaders;
 	std::cout << "loading up demos...";
 	int startTime = INT_MAX;
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
 		demoReaders.emplace_back();
-		demoReaders.back().LoadDemo((*inputFiles)[i].c_str());
-		startTime = std::min(startTime, demoReaders.back().GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
+		demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
+		startTime = std::min(startTime, demoReaders.back().reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
 	}
 	std::cout << "done.";
 
@@ -741,7 +748,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	// Copy over configstrings from first demo.
 	// Later maybe we can do something more refined and clever.
 	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
-		tmpConfigString = demoReaders[0].GetConfigString(i,&tmpConfigStringMaxLength);
+		tmpConfigString = demoReaders[0].reader.GetConfigString(i,&tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
 		}
@@ -751,11 +758,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	// Copy over player config strings
 	for (int i = 0; i < demoReaders.size(); i++) {
-		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
-			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
+		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
 			lastSpectatedClientNums[i] = spectatedClient;			
 			if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
-			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
+			tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
 			if (strlen(tmpConfigString)) {
 				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			}
@@ -806,6 +813,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	// Start writing snapshots.
 	qboolean isFirstSnapshot = qtrue;
 	std::stringstream ss;
+	int framesWritten = 0;
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -814,19 +822,23 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		int nonSkippedDemoIndex = 0;
 		static qboolean entityIsInterpolated[MAX_GENTITIES];
 		Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
+		qboolean mainPlayerPSIsInterpolated = qfalse;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (demoReaders[i].reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
-				SnapshotInfo* snapInfoHere = demoReaders[i].GetSnapshotInfoAtServerTime(time);
+				SnapshotInfo* snapInfoHere = demoReaders[i].reader.GetSnapshotInfoAtServerTime(time);
 				qboolean snapIsInterpolated = qfalse;
 				if (!snapInfoHere) {
-					int thisDemoLastServerTime = demoReaders[i].GetLastServerTimeBeforeServerTime(time);
-					int thisDemoNextServerTime = demoReaders[i].GetFirstServerTimeAfterServerTime(time);
+					int thisDemoLastServerTime = demoReaders[i].reader.GetLastServerTimeBeforeServerTime(time);
+					int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(time);
 					if (thisDemoLastServerTime == -1 || thisDemoNextServerTime == -1)continue;
 
-					snapInfoHere = demoReaders[i].GetSnapshotInfoAtServerTime(thisDemoLastServerTime);
+					snapInfoHere = demoReaders[i].reader.GetSnapshotInfoAtServerTime(thisDemoLastServerTime);
 					// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
 					snapIsInterpolated = qtrue;
+				}
+				else {
+					demoReaders[i].packetsUsed++;
 				}
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
@@ -834,8 +846,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 
 				// self explanatory.
-				if (nonSkippedDemoIndex++ == 0) {
+				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+					// For reference, here's what gets snapped (rounded) in entities:
+					// SnapVector( s->pos.trBase );
+					// SnapVector( s->apos.trBase );
 					mainPlayerPS = tmpPS;
+					mainPlayerPSIsInterpolated = snapIsInterpolated;
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
 					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
@@ -854,11 +870,15 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 							entityIsInterpolated[it->first] = snapIsInterpolated;
 						}
 					}
+					else if(mainPlayerPSIsInterpolated && !snapIsInterpolated){
+						// Move some entity stuff over to playerState to improve its precision? Kind of experimental.
+						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
+					}
 				}
 
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].GetNewCommandsAtServerTime(time);
+				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					if (i == 0) { // This is the main reference demo. Just add this stuff.
@@ -881,7 +901,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 
 			}
-			if (!demoReaders[i].EndReached()) {
+			if (!demoReaders[i].reader.EndReached()) {
 				allSourceDemosFinished = qfalse;
 			}
 		}
@@ -890,7 +910,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		clSnapshot_t mainPlayerSnapshot = demoReaders[0].GetCurrentSnap();
+		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
 		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
 		if (isFirstSnapshot) {
@@ -901,10 +921,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld);
 		}
 
+		framesWritten++;
+
 		int oldTime = time;
 		time = INT_MAX;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			int nextTimeThisDemo = demoReaders[i].GetFirstServerTimeAfterServerTime(oldTime);
+			int nextTimeThisDemo = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
 			if (nextTimeThisDemo != -1) {
 				time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 			}
@@ -930,6 +952,12 @@ cutcomplete:
 	}
 cuterror:
 	FS_FCloseFile(newHandle);
+
+	std::cout << "Total frames written: " << framesWritten << "\n";
+	for (int i = 0; i < demoReaders.size(); i++) {
+		std::cout << "Frames from demo " << i << ": " << demoReaders[i].packetsUsed << " (" << (demoReaders[i].packetsUsed*100/framesWritten) << "%)\n";
+	}
+
 	return ret;
 }
 

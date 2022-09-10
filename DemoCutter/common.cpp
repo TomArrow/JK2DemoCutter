@@ -908,16 +908,26 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 }
 
 // baseState is my modification. It will use values from the base Snap that an entity just doesn't have. PERS_SPAWN_COUNT and precise health/armor
-void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues, playerState_t* baseState) {
+void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues, playerState_t* baseState, qboolean enhanceOnly) {
 	int		i;
 
-	ps->clientNum = s->number;
+	if (!enhanceOnly) {
+		ps->clientNum = s->number;
+	}
 
-	VectorCopy(s->pos.trBase, ps->origin);
+	if (s->pos.trType == TR_LINEAR_STOP) {
+		ps->commandTime = s->pos.trTime;
+	}
 
-	VectorCopy(s->pos.trDelta, ps->velocity);
+	if(!enhanceOnly || VectorDistance(s->pos.trBase, ps->origin) > 2.0f){ // If we are enhancing only: Entity values here are snapped (rounded) so they will reduce precision UNLESS we are moving sufficiently fast to justify using them anyway
+		VectorCopy(s->pos.trBase, ps->origin);
+	}
 
-	VectorCopy(s->apos.trBase, ps->viewangles);
+	VectorCopy(s->pos.trDelta, ps->velocity); // Velocity is not specially rounded for entities. (from what I can tell)
+
+	if (!enhanceOnly || VectorDistance(s->apos.trBase, ps->viewangles) > 2.0f) {  // If we are enhancing only: Entity values here are snapped (rounded) so they will reduce precision UNLESS we are moving sufficiently fast to justify using them anyway
+		VectorCopy(s->apos.trBase, ps->viewangles);
+	}
 
 	ps->fd.forceMindtrickTargetIndex = s->trickedentindex;
 	ps->fd.forceMindtrickTargetIndex2 = s->trickedentindex2;
@@ -975,51 +985,57 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		s->eFlags |= EF_SEEKERDRONE;
 	}
 	*/
-	ps->genericEnemyIndex = -1; //no real option for this
+	if(!enhanceOnly){
+		ps->genericEnemyIndex = -1; //no real option for this
 
-	//The client has no knowledge of health levels (except for the client entity)
-	if (s->eFlags & EF_DEAD)
-	{
-		ps->stats[STAT_HEALTH] = 0;
-	}
-	else
-	{
-		ps->stats[STAT_HEALTH] = 100;
-	}
-
-	// TODO fix this. For example we want the EV_SABER_ATTACK event to work.
-	// Dirty quick try: Just set it as "externalEvent"
-	ps->externalEvent = s->event;
-	ps->externalEventParm = s->eventParm;
-	/*
-	if ( ps->externalEvent ) {
-		s->event = ps->externalEvent;
-		s->eventParm = ps->externalEventParm;
-	} else if ( ps->entityEventSequence < ps->eventSequence ) {
-		int		seq;
-
-		if ( ps->entityEventSequence < ps->eventSequence - MAX_PS_EVENTS) {
-			ps->entityEventSequence = ps->eventSequence - MAX_PS_EVENTS;
+		//The client has no knowledge of health levels (except for the client entity)
+		if (s->eFlags & EF_DEAD)
+		{
+			ps->stats[STAT_HEALTH] = 0;
 		}
-		seq = ps->entityEventSequence & (MAX_PS_EVENTS-1);
-		s->event = ps->events[ seq ] | ( ( ps->entityEventSequence & 3 ) << 8 );
-		s->eventParm = ps->eventParms[ seq ];
-		ps->entityEventSequence++;
+		else
+		{
+			ps->stats[STAT_HEALTH] = 100;
+		}
+
+		// TODO fix this. For example we want the EV_SABER_ATTACK event to work.
+		// Dirty quick try: Just set it as "externalEvent"
+		ps->externalEvent = s->event;
+		ps->externalEventParm = s->eventParm;
+		/*
+		if ( ps->externalEvent ) {
+			s->event = ps->externalEvent;
+			s->eventParm = ps->externalEventParm;
+		} else if ( ps->entityEventSequence < ps->eventSequence ) {
+			int		seq;
+
+			if ( ps->entityEventSequence < ps->eventSequence - MAX_PS_EVENTS) {
+				ps->entityEventSequence = ps->eventSequence - MAX_PS_EVENTS;
+			}
+			seq = ps->entityEventSequence & (MAX_PS_EVENTS-1);
+			s->event = ps->events[ seq ] | ( ( ps->entityEventSequence & 3 ) << 8 );
+			s->eventParm = ps->eventParms[ seq ];
+			ps->entityEventSequence++;
+		}
+		*/
+		//Eh.
+
 	}
-	*/
-	//Eh.
 
 	ps->weapon = s->weapon;
 	ps->groundEntityNum = s->groundEntityNum;
 
-	for (i = 0; i < MAX_POWERUPS; i++) {
-		if (s->powerups & (1 << i))
-		{
-			ps->powerups[i] = 30;
-		}
-		else
-		{
-			ps->powerups[i] = 0;
+	if (!enhanceOnly) { // Quick explainer: If we are enhancing a playerState, we don't want to ever reduce the precision of any of its values, so we only copy over stuff that is actually precisely known from the entityState.
+
+		for (i = 0; i < MAX_POWERUPS; i++) {
+			if (s->powerups & (1 << i))
+			{
+				ps->powerups[i] = 30;
+			}
+			else
+			{
+				ps->powerups[i] = 0;
+			}
 		}
 	}
 
@@ -1036,33 +1052,35 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 
 		ps->holocronBits = s->time2;
 
-		if (s->weapon < WP_NUM_WEAPONS) {
+		if (!enhanceOnly) { // This stuff is kinda guesswork so... eh. Not use that if we are enhancing
+			if (s->weapon < WP_NUM_WEAPONS) {
 
-			ps->stats[STAT_WEAPONS] |= 1 << s->weapon; // To make weapon select wheel look correct
-		}
+				ps->stats[STAT_WEAPONS] |= 1 << s->weapon; // To make weapon select wheel look correct
+			}
 
-		if (s->weapon == WP_SABER && s->fireflag == 0) {
-			// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
-			byte probability;
-			ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType,&probability);
-		}
-		else {
-			ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = s->fireflag;
-		}
+			if (s->weapon == WP_SABER && s->fireflag == 0) {
+				// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
+				byte probability;
+				ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType, &probability);
+			}
+			else {
+				ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = s->fireflag;
+			}
 
-		// This is my own stuff: (restoring viewheight)
-		if (s->eFlags & EF_DEAD) {
-			ps->viewheight = DEAD_VIEWHEIGHT;
-		}
-		else if (
-			(s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE || (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
-			|| (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK || (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK
+			// This is my own stuff: (restoring viewheight)
+			if (s->eFlags & EF_DEAD) {
+				ps->viewheight = DEAD_VIEWHEIGHT;
+			}
+			else if (
+				(s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE || (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
+				|| (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK || (s->legsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK
 			
-			) {
-			ps->viewheight = CROUCH_VIEWHEIGHT;
-		}
-		else {
-			ps->viewheight = DEFAULT_VIEWHEIGHT;
+				) {
+				ps->viewheight = CROUCH_VIEWHEIGHT;
+			}
+			else {
+				ps->viewheight = DEFAULT_VIEWHEIGHT;
+			}
 		}
 
 	}
