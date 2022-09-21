@@ -196,6 +196,7 @@ enum highlightSearchMode_t {
 	SEARCH_MY_CTF_RETURNS,
 	SEARCH_CTF_RETURNS,
 	SEARCH_TOP10_DEFRAG, // Top10 Defrags, even if not number 1.
+	SEARCH_ALL_DEFRAG, // All defrags, even if not top 10
 };
 
 
@@ -3076,7 +3077,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 					//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-					if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+					if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged) && searchMode != SEARCH_ALL_DEFRAG) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
 					
 
 					int startTime = runStart - bufferTime;
@@ -3297,6 +3298,8 @@ int main(int argc, char** argv) {
 			searchMode = SEARCH_CTF_RETURNS;
 		}else if (!_stricmp(searchModeText, "top10defrag")) {
 			searchMode = SEARCH_TOP10_DEFRAG;
+		}else if (!_stricmp(searchModeText, "alldefrag")) {
+			searchMode = SEARCH_ALL_DEFRAG;
 		}
 	}
 
