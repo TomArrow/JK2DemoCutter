@@ -761,11 +761,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
 			lastSpectatedClientNums[i] = spectatedClient;			
-			if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
-			tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
-			if (strlen(tmpConfigString)) {
-				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
-			}
+			//if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
+			//tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
+			//if (strlen(tmpConfigString)) {
+				//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
+			//}
 		}
 	}
 	
