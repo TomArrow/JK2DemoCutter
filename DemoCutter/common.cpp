@@ -773,7 +773,7 @@ std::map <int, std::string>  saberStyleNames
 };
 
 
-void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap) {
+void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap,qboolean writeCommandTime) {
 	int		i;
 
 	if (ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR) {
@@ -788,8 +788,16 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 
 	s->number = ps->clientNum;
 
-	s->pos.trType = TR_INTERPOLATE;
+	if (writeCommandTime) {
+		s->pos.trType = TR_LINEAR_STOP;
+		s->pos.trTime = ps->commandTime;
+	}
+	else {
+		s->pos.trType = TR_INTERPOLATE;
+	}
+
 	VectorCopy(ps->origin, s->pos.trBase);
+
 	if (snap) {
 		SnapVector(s->pos.trBase);
 	}

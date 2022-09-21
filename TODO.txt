@@ -59,6 +59,7 @@ TODO: DON'T use GetCurrentEntities in DemoDefragCombiner. In fact probably make 
 for combiner, try median of local lows instead of global low?
 detect & remember last boost & speed gain
 fix yet another error with event not being copied in democombiner - that dadler kill between red pillars, flag return.
+uhm ... shots from turrets? copy over
 
 DONE: 
 
