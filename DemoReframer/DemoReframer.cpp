@@ -776,7 +776,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy);
 
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially merged using JK2DemoCutter tools.");
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially reframed using JK2DemoCutter tools.");
 
 	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
 	// Note: We will simply use a null state as entity baselines. Not memory efficient but it should do for starters. Don't hav to do anything for that, since we already nulled the whole demo_t struct
@@ -1010,7 +1010,7 @@ int main(int argc, char** argv) {
 		Com_Printf("Demo %s got successfully reframed\n", demoName);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
+		Com_Printf("Demo %s has failed to get reframed or reframed with errors\n", demoName);
 	}
 	delete[] filteredOutputName;
 #ifdef DEBUG
