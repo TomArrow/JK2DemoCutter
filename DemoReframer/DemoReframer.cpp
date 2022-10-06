@@ -694,7 +694,8 @@ int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* co
 //#pragma optimize("", off)
 #endif
 
-qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
+
+qboolean demoReframe( const char* demoName,const char* outputName, const char* playerSearchString) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -730,15 +731,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	memset(&demo, 0, sizeof(demo));
 
-	std::vector<DemoReaderTrackingWrapper> demoReaders;
-	std::cout << "loading up demos...";
+	//std::vector<DemoReaderTrackingWrapper> demoReaders;
+	std::cout << "loading up demo...";
+	DemoReaderTrackingWrapper* demoReader = new DemoReaderTrackingWrapper();
 	int startTime = INT_MAX;
-	for (int i = 0; i < inputFiles->size(); i++) {
-		std::cout << i<<"...";
-		demoReaders.emplace_back();
-		demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
-		startTime = std::min(startTime, demoReaders.back().reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
-	}
+	demoReader->reader.LoadDemo(demoName);
+	startTime = std::min(startTime, demoReader->reader.GetFirstSnapServerTime()); // Find start time.
 	std::cout << "done.";
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
@@ -748,16 +746,16 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	// Copy over configstrings from first demo.
 	// Later maybe we can do something more refined and clever.
 	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
-		tmpConfigString = demoReaders[0].reader.GetConfigString(i,&tmpConfigStringMaxLength);
+		tmpConfigString = demoReader->reader.GetConfigString(i,&tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
 		}
 	}
 
-	std::map<int, int> lastSpectatedClientNums; // Need this for later.
+	//std::map<int, int> lastSpectatedClientNums; // Need this for later.
 
 	// Copy over player config strings
-	for (int i = 0; i < demoReaders.size(); i++) {
+	/*for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
 			lastSpectatedClientNums[i] = spectatedClient;			
@@ -767,7 +765,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			//}
 		}
-	}
+	}*/
 	
 	//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000");
 
@@ -802,12 +800,16 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;
 
+	std::string playerSearchStdString = playerSearchString;
+	int reframeClientNum = demoReader->reader.getClientNumForDemo(&playerSearchStdString);
+
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
+	mainPlayerPS.clientNum = -1;
 	entityState_t tmpES;
 	int currentCommand = 1;
 	// Start writing snapshots.
@@ -820,71 +822,70 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		int nonSkippedDemoIndex = 0;
-		static qboolean entityIsInterpolated[MAX_GENTITIES];
-		Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
-		qboolean mainPlayerPSIsInterpolated = qfalse;
-		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+		//static qboolean entityIsInterpolated[MAX_GENTITIES];
+		//Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
+		//qboolean mainPlayerPSIsInterpolated = qfalse;
+		//for (int i = 0; i < demoReaders.size(); i++) {
+			if (demoReader->reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
-				SnapshotInfo* snapInfoHere = demoReaders[i].reader.GetSnapshotInfoAtServerTime(time);
-				qboolean snapIsInterpolated = qfalse;
-				if (!snapInfoHere) {
-					int thisDemoLastServerTime = demoReaders[i].reader.GetLastServerTimeBeforeServerTime(time);
-					int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(time);
-					if (thisDemoLastServerTime == -1 || thisDemoNextServerTime == -1)continue;
+				SnapshotInfo* snapInfoHere = demoReader->reader.GetSnapshotInfoAtServerTime(time);
+				//qboolean snapIsInterpolated = qfalse;
+				//if (!snapInfoHere) {
+				//	int thisDemoLastServerTime = demoReader.reader.GetLastServerTimeBeforeServerTime(time);
+				//	int thisDemoNextServerTime = demoReader.reader.GetFirstServerTimeAfterServerTime(time);
+				//	if (thisDemoLastServerTime == -1 || thisDemoNextServerTime == -1)continue;
 
-					snapInfoHere = demoReaders[i].reader.GetSnapshotInfoAtServerTime(thisDemoLastServerTime);
+				//	snapInfoHere = demoReader.reader.GetSnapshotInfoAtServerTime(thisDemoLastServerTime);
 					// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
-					snapIsInterpolated = qtrue;
-				}
-				else {
-					demoReaders[i].packetsUsed++;
-				}
+				//	snapIsInterpolated = qtrue;
+				//}
+				//else {
+					demoReader->packetsUsed++;
+				//}
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS = snapInfoHere->playerState;
 
 
 				// self explanatory.
-				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && !snapIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+				//if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && !snapIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+				if (tmpPS.clientNum == reframeClientNum) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
 					// For reference, here's what gets snapped (rounded) in entities:
 					// SnapVector( s->pos.trBase );
 					// SnapVector( s->apos.trBase );
 					mainPlayerPS = tmpPS;
-					mainPlayerPSIsInterpolated = snapIsInterpolated;
+					//mainPlayerPSIsInterpolated = snapIsInterpolated;
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, NULL, NULL, qtrue);
+					/*BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;
 						entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;
-					}
+					}*/
 				}
+
+
 
 				// Copy all entities
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
 					if (it->first != mainPlayerPS.clientNum) {
-						if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
+						//if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
 							playerEntities[it->first] = it->second;
-							entityIsInterpolated[it->first] = snapIsInterpolated;
-						}
-					}
-					else if(mainPlayerPSIsInterpolated && !snapIsInterpolated){
-						// Move some entity stuff over to playerState to improve its precision? Kind of experimental.
-						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
-						// This does not reset the isInterpolated status, since it's kind of a "meh" value from an entity. It's just a patchwork kinda.
+						//	entityIsInterpolated[it->first] = snapIsInterpolated;
+						//}
 					}
 				}
 
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommandsAtServerTime(time);
+				std::vector<std::string> newCommandsHere = demoReader->reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
-					if (i == 0) { // This is the main reference demo. Just add this stuff.
+					//if (i == 0) { // This is the main reference demo. Just add this stuff.
 						commandsToAdd.push_back(newCommandsHere[c]);
-					}
+					/* }
 					else {
 						// Check if it's a dupe. Not a perfect solution as it won't properly deal with duplicated chat messages that only exist in a latter demo,
 						// but it's best I can come up with.
@@ -898,20 +899,20 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 						if (!isDupe) {
 							commandsToAdd.push_back(newCommandsHere[c]);
 						}
-					}
+					}*/
 				}
 
 			}
-			if (!demoReaders[i].reader.EndReached()) {
+			if (!demoReader->reader.EndReachedAtServerTime(time)) {
 				allSourceDemosFinished = qfalse;
 			}
-		}
+		//}
 
 
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
+		clSnapshot_t mainPlayerSnapshot = demoReader->reader.GetCurrentSnap();
 		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
 		if (isFirstSnapshot) {
@@ -926,11 +927,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 		int oldTime = time;
 		time = INT_MAX;
-		for (int i = 0; i < demoReaders.size(); i++) {
-			int nextTimeThisDemo = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
-			if (nextTimeThisDemo != -1) {
-				time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
-			}
+		int nextTimeThisDemo = demoReader->reader.GetFirstServerTimeAfterServerTime(oldTime);
+		if (nextTimeThisDemo != -1) {
+			time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 		}
 		demo.cut.Clc.reliableSequence++;
 		demo.cut.Clc.serverMessageSequence++;
@@ -955,9 +954,7 @@ cuterror:
 	FS_FCloseFile(newHandle);
 
 	std::cout << "Total frames written: " << framesWritten << "\n";
-	for (int i = 0; i < demoReaders.size(); i++) {
-		std::cout << "Frames from demo " << i << ": " << demoReaders[i].packetsUsed << " (" << (demoReaders[i].packetsUsed*100/framesWritten) << "%)\n";
-	}
+	std::cout << "Frames from demo " << ": " << demoReader->packetsUsed << " (" << (demoReader->packetsUsed*100/framesWritten) << "%)\n";
 
 	return ret;
 }
@@ -993,30 +990,29 @@ cuterror:
 
 
 int main(int argc, char** argv) {
-	if (argc <3) {
-		std::cout << "need 2 arguments at least: outputname, demoname1, [demoname2, demoname3,...]";
+	if (argc <4) {
+		std::cout << "need 3 arguments at least: demoname, outputname, player to follow (search string or clientnum)...]";
 		return 1;
 	}
 	char* demoName = NULL;
 	char* outputName = NULL;
+	char* playerNameSearchString = NULL;
 
-	outputName = argv[1];
+	demoName = argv[1];
+	outputName = argv[2];
+	playerNameSearchString = argv[3];
 	char* filteredOutputName = new char[strlen(outputName) + 1];
 	sanitizeFilename(outputName, filteredOutputName);
-	//strcpy(outputName, filteredOutputName);
-	//delete[] filteredOutputName;
 
-	std::vector<std::string> inputFiles;
-	for (int i = 2; i < argc; i++) {
-		inputFiles.emplace_back(argv[i]);
-	}
+	std::cout << sizeof(DemoReaderTrackingWrapper);
 
-	if (demoCut(filteredOutputName,&inputFiles)) {
-		Com_Printf("Demo %s got successfully cut\n", demoName);
+	if (demoReframe(demoName, filteredOutputName, playerNameSearchString)) {
+		Com_Printf("Demo %s got successfully reframed\n", demoName);
 	}
 	else {
 		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
 	}
+	delete[] filteredOutputName;
 #ifdef DEBUG
 	std::cin.get();
 #endif

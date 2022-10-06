@@ -857,7 +857,7 @@ void remapConfigStrings(entityState_t * tmpEntity, clientActive_t* clCut, DemoRe
 }
 
 
-class NameMatch {
+/*class NameMatch {
 public:
 	std::string matchedName;
 	int clientNum;
@@ -972,7 +972,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 		std::cout << std::endl;
 	}
 	return clientNumHere;
-}
+}*/
 
 
 qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
@@ -1063,7 +1063,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			for (int p = 0; p < demoReaders[i].sourceInfo->playersToCopy.size(); p++) {
 
 				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
-				int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
+				//int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
+				int clientNumHere = demoReaders[i].reader.getClientNumForDemo(thisPlayer);
 				if (clientNumHere != -1) {
 					std::cout << " [median ping:"<< lowestPingsHere[clientNumHere] <<"]" << std::endl;
 					demoReaders[i].playersToCopy.push_back({ clientNumHere,(float)lowestPingsHere[clientNumHere],qfalse });

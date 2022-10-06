@@ -43,6 +43,12 @@ public:
 	int eventNumber;
 };
 
+class NameMatch {
+public:
+	std::string matchedName;
+	int clientNum;
+};
+
 
 
 class DemoReader {
@@ -130,6 +136,7 @@ public:
 	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
 	};
 
+	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();
 	qboolean SeekToTime(float time);
 	int GetFirstServerTimeAfterServerTime(int serverTime);
@@ -144,6 +151,7 @@ public:
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(float time);
+	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse);
 	playerState_t GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time, float* translatedTime=NULL);
@@ -159,5 +167,6 @@ public:
 	qboolean AnySnapshotParsed();
 	qboolean EndReached();
 	qboolean EndReachedAtTime(float time);
+	qboolean EndReachedAtServerTime(int serverTime);
 	int getCurrentDemoTime();
 };

@@ -16,6 +16,120 @@
 //
 
 
+int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine) {
+	std::string* thisPlayer = playerSearchString;
+	DemoReader* reader = this;
+	const char* tmpConfigString;
+	int tmpConfigStringMaxLength;
+	int clientNumHere = -1;
+	int pstrlen = thisPlayer->size();
+	if (!pstrlen) return clientNumHere;
+	if (pstrlen <= 2 && isdigit((*thisPlayer)[0]) && (pstrlen == 1 || isdigit((*thisPlayer)[1]))) {
+		// It's a number. ClientNum. Just parse it.
+		clientNumHere = atoi(thisPlayer->c_str());
+		tmpConfigString = reader->GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+		std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
+		std::cout << *thisPlayer << " (interpreted as clientNum) matches '" << nameHere << "' (" << clientNumHere << ")";
+	}
+	else {
+		std::string thisPlayerLower = *thisPlayer;
+		std::transform(thisPlayerLower.begin(), thisPlayerLower.end(), thisPlayerLower.begin(), tolowerSignSafe);
+
+		std::vector<NameMatch> colorStrippedMatches;
+		std::vector<NameMatch> caseInsensitiveMatches;
+		std::vector<NameMatch> matches;
+
+		// Find matching player name
+		for (int c = 0; c < MAX_CLIENTS; c++) {
+			tmpConfigString = reader->GetPlayerConfigString(c, &tmpConfigStringMaxLength);
+			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
+			std::string nameHereLower = nameHere;
+			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
+
+			// Make color stripped version
+			const char* sourceCStringName = nameHereLower.c_str();
+			int stringLen = strlen(sourceCStringName);
+			char* cStringName = new char[stringLen + 1];
+			strcpy_s(cStringName, stringLen + 1, sourceCStringName);
+			Q_StripColorAll(cStringName);
+			std::string nameHereLowerColorStripped = cStringName;
+
+			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {
+				NameMatch nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				matches.push_back(nm);
+			}
+			if (strstr(nameHereLower.c_str(), thisPlayerLower.c_str())) {
+				NameMatch nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				caseInsensitiveMatches.push_back(nm);
+			}
+			if (strstr(nameHereLowerColorStripped.c_str(), thisPlayerLower.c_str())) {
+				NameMatch nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				colorStrippedMatches.push_back(nm);
+			}
+		}
+
+		if (matches.size() > 1) {
+			std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+			for (int c = 0; c < matches.size(); c++) {
+				std::cout << matches[c].matchedName << "(" << matches[c].clientNum << ")" << std::endl;
+			}
+			std::cout << "Picking first match '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")";
+			clientNumHere = matches[0].clientNum;
+		}
+		else if (matches.size() == 1) {
+			std::cout << "'" << *thisPlayer << "' matches '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")";
+			clientNumHere = matches[0].clientNum;
+		}
+		else {
+			// No match. Try case insensitive
+			if (caseInsensitiveMatches.size() > 1) {
+				std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+				for (int c = 0; c < caseInsensitiveMatches.size(); c++) {
+					std::cout << caseInsensitiveMatches[c].matchedName << "(" << caseInsensitiveMatches[c].clientNum << ")" << std::endl;
+				}
+				std::cout << "Picking first match '" << caseInsensitiveMatches[0].matchedName << "' (" << caseInsensitiveMatches[0].clientNum << ")";
+				clientNumHere = caseInsensitiveMatches[0].clientNum;
+			}
+			else if (caseInsensitiveMatches.size() == 1) {
+				std::cout << "'" << *thisPlayer << "' matches '" << caseInsensitiveMatches[0].matchedName << "' (" << caseInsensitiveMatches[0].clientNum << ")";
+				clientNumHere = caseInsensitiveMatches[0].clientNum;
+			}
+			else {
+				//std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
+				// No match. Try stripped colors 
+				if (colorStrippedMatches.size() > 1) {
+					std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+					for (int c = 0; c < colorStrippedMatches.size(); c++) {
+						std::cout << colorStrippedMatches[c].matchedName << "(" << colorStrippedMatches[c].clientNum << ")" << std::endl;
+					}
+					std::cout << "Picking first match '" << colorStrippedMatches[0].matchedName << "' (" << colorStrippedMatches[0].clientNum << ")";
+					clientNumHere = colorStrippedMatches[0].clientNum;
+				}
+				else if (colorStrippedMatches.size() == 1) {
+					std::cout << "'" << *thisPlayer << "' matches '" << colorStrippedMatches[0].matchedName << "' (" << colorStrippedMatches[0].clientNum << ")";
+					clientNumHere = colorStrippedMatches[0].clientNum;
+				}
+				else {
+					std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
+					// Done.
+
+				}
+			}
+		}
+	}
+	if (printEndLine) {
+		std::cout << std::endl;
+	}
+	return clientNumHere;
+}
+
+
 
 qboolean DemoReader::ConfigstringModified(clientActive_t* clCut) {
 	char* old, * s;
@@ -528,6 +642,10 @@ qboolean DemoReader::EndReachedAtTime(float time) {
 	SeekToTime(time);
 	return (qboolean)(demoCurrentTime < time);
 }
+qboolean DemoReader::EndReachedAtServerTime(int serverTime) {
+	SeekToServerTime(serverTime);
+	return (qboolean)(lastKnownTime < serverTime);
+}
 int DemoReader::getCurrentDemoTime() {
 	return demoCurrentTime;
 }
@@ -757,6 +875,58 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, Snaps
 	InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal, detailedPS);
 
 	return retVal;
+	
+}
+
+// It's like a cheaper version of GetInterpolatedPlayer. We don't interpolate anything. We just return the last player state or the next one if no last one exists.
+// It ignores command times and is based purely on server time.
+// arguments oldSnap and newSnap do nothing atm.
+playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS) {
+	playerState_t retVal;
+	Com_Memset(&retVal, 0, sizeof(playerState_t));
+
+	if (oldSnap) *oldSnap = NULL;
+	if (newSnap) *newSnap = NULL;
+
+	SeekToAnySnapshotIfNotYet();
+	SeekToServerTime(serverTime);
+
+	SeekToPlayerInPacket(clientNum);
+
+	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
+
+	// Ok now we are sure we have at least one snapshot. Good.
+	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
+
+	int lastPastSnap = -1;
+	int lastPastSnapServerTime = -1;
+	int firstPacketWithPlayerInIt = -1;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		
+		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		
+		if (firstPacketWithPlayerInIt == -1) firstPacketWithPlayerInIt = it->first;
+		
+		if (it->second.serverTime <= serverTime) {
+			lastPastSnap = it->first;
+			lastPastSnapServerTime = it->second.serverTime;
+		}
+	}
+	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
+		if (firstPacketWithPlayerInIt == -1) {
+			// Uhm. Ok. Maybe handle this better at some later time but for now we just return that empty playerState.
+			// We should probably keep seeking then or sth.
+			return retVal;
+		}
+		else {
+			return GetPlayerFromSnapshot(clientNum,firstPacketWithPlayerInIt, detailedPS);
+			
+		}
+	}
+	else {
+		return GetPlayerFromSnapshot(clientNum, lastPastSnap, detailedPS);
+	}
+
 	
 }
 
