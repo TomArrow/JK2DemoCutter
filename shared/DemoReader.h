@@ -169,4 +169,5 @@ public:
 	qboolean EndReachedAtTime(float time);
 	qboolean EndReachedAtServerTime(int serverTime);
 	int getCurrentDemoTime();
+	int getDemoRecorderClientNum();
 };

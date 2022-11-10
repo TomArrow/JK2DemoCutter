@@ -60,6 +60,20 @@ for combiner, try median of local lows instead of global low?
 detect & remember last boost & speed gain
 fix yet another error with event not being copied in democombiner - that dadler kill between red pillars, flag return.
 uhm ... shots from turrets? copy over
+use std::lower_Bound and similar to speed up search through vectors/maps
+
+game finding:
+start with: just hashing final scoreboards (to dedupe) and recording final scores
+help: "hit the capturelimit" phrase and "Intermission" PMT. Pauses are "SinglePlayerIntermission"
+log players (including disconnected/renamed/reconnected ones)
+log final score and each player's score details
+try to resume score data of a player if he reconnects (unless impossible)
+try to guess each player's position in the game in perhaps 1-minute blocks. probably too complex but eh.
+try to hash each game in some way so that duplicates are found.
+log times during which each player played (in both millisecond and second precision) and total play time of each player and for each section of playing, the score of that player
+log pauses, their times and durations and total pause duration
+log a number of total player changes during a game.
+
 
 DONE: 
 

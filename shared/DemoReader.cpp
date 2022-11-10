@@ -1425,6 +1425,11 @@ qboolean DemoReader::ReadMessage() {
 	return qtrue;
 }
 
+int DemoReader::getDemoRecorderClientNum() {
+	SeekToAnySnapshotIfNotYet();
+	return demo.cut.Clc.clientNum;
+}
+
 template <demoType_t D>
 qboolean DemoReader::ReadMessageReal() {
 

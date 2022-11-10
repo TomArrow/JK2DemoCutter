@@ -849,7 +849,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 				// self explanatory.
 				//if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && !snapIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
-				if (tmpPS.clientNum == reframeClientNum) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+				// If intermission (basically scoreboard): Don't reframe. Just show scoreboard.
+				if (tmpPS.clientNum == reframeClientNum || (tmpPS.pm_type == PM_INTERMISSION/* && tmpPS.clientNum == demoReader->reader.getDemoRecorderClientNum()*/)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
 					// For reference, here's what gets snapped (rounded) in entities:
 					// SnapVector( s->pos.trBase );
 					// SnapVector( s->apos.trBase );
