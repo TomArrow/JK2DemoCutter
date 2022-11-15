@@ -879,6 +879,12 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 					}
 				}
 
+				if (tmpPS.clientNum != reframeClientNum) {
+					Com_Memset(&tmpES, 0, sizeof(tmpES));
+					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
+					playerEntities[tmpPS.clientNum] = tmpES;
+				}
+
 
 				// Get new commands
 				std::vector<std::string> newCommandsHere = demoReader->reader.GetNewCommandsAtServerTime(time);
