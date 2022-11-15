@@ -76,6 +76,8 @@ This is what the filename contains:
 2. Kill method. It's RET_ followed by the saber move/weapon/means of death. 
 	- **RET_RED** means the kill was a red slash. 
 	- **RET_DOOM_~_DBS** means it was a doom kill, and at the time of the actual death, the killer was in a DBS saber move. Since some time passes between boost and actual death to fall damage, consider this a best guess.
+	- **RET_WEIRD** means the cause of death can't be determined. For example if one player's sentry explodes and another player dies from it. It can come with a guess as well, like DOOM.
+	- **RET_TELE** is one of those "player crushed player 2 into another dimension" kind of things. If someone spawns right where you are for example.
 	- **RET_DBS_345u**: For special attacks like DBS, there is a suffix indicating the speed in UPS (units per second) that the killer had at the time of triggering the dbs (not at the time of the kill).
 	- Some of the possible saber moves are: 
 		- **RED** (red slash)
