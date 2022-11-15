@@ -88,6 +88,7 @@ This is what the filename contains:
 		- **DFA** (death from above)
 		- **YDFA** (yellow DFA)
 		- **BLUBS** (blue backstab)
+		- **IDLE** (death from touch or "burn" without actual swing)
 	- If there is a suffix like **_G99**, this means that the saber move was a guess along with a probability in percent. This is due to players that aren't followed missing saber move information, so it has to be guessed from the animation.
 3. Name of the killer.
 4. Name of the victim.
