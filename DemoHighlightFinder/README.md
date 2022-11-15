@@ -26,11 +26,12 @@ Here is a simple working example of how to find CTF returns in an imaginary demo
 1. Put the demo, *DemoCutter.exe* and *DemoHighlightFinder.exe* in a fresh folder.
 2. Create a new .txt text file and rename it to *randomScriptName.bat* (or any other filename with .bat ending). If you cannot see and change the file ending, [enable file extension display](#showFileExt).
 3. Open this .bat file in a text editor and type ```DemoHighlightFinder.exe gigaowned.dm_15 10000 ctfreturns``` in the first line.
-4. Replace ``10000`` with the amount of milliseconds you wish to have as buffer or "meat" before and after the kills. 10000 milliseconds means 10 seconds.
-5. If you want to only find CTF returns from the main perspective of the demo (either you or someone you followed), replace ``ctfreturns`` with ``myctfreturns``
-6. Type ```pause``` in the second line. *(This is optional and allows you to see the output instead of closing after it's done)*
-7. Save and double click your .bat file.  This will run the analysis of your demo.
-8. You should now have 6 new files in your folder:
+4. Replace ``gigaowned.dm_15`` with the actual name of your own demo.
+5. Replace ``10000`` with the amount of milliseconds you wish to have as buffer or "meat" before and after the kills. 10000 milliseconds means 10 seconds.
+6. If you want to only find CTF returns from the main perspective of the demo (either you or someone you followed), replace ``ctfreturns`` with ``myctfreturns``
+7. Type ```pause``` in the second line. *(This is optional and allows you to see the output instead of closing after it's done)*
+8. Save and double click your .bat file.  This will run the analysis of your demo.
+9. You should now have 6 new files in your folder:
 	- ``highlightExtractionScript.bat``: Contains commands to cut out CTF flag returns (flag carrier kills) that were found.
 	- ``highlightExtractionScriptCaptures.bat``: Contains commands to cut out CTF flag captures that were found.
 	- ``highlightExtractionScriptDefrag.bat``: Contains commands to cut out Defrag runs that were found.
@@ -38,9 +39,9 @@ Here is a simple working example of how to find CTF returns in an imaginary demo
 	- ``highlightExtractionScriptLaughs.bat``: Contains commands to cut out moments with a lot of laughter that were found.
 	- ``killDatabase.db``: SQLite database containing more detailed information about all found highlights and also containing information about all kills that were found in general.
 	- ``debugStatsDb.db``: SQLite database containing some statistics that are more for fun than of any real use typically.
-9. The new .bat files are likewise just text files. You can open them with a text editor and see that there is a *DemoCutter.exe* command in there for each highlight that was found. You can edit the .bat files to remove uninteresting highlights to only keep the ones you are interested in, if you wish.
-10. Execute the .bat file containing the highlights you are looking for. This will create cut demos in your folder containing the highlights.
-11. You are done. 
+10. The new .bat files are likewise just text files. You can open them with a text editor and see that there is a *DemoCutter.exe* command in there for each highlight that was found. You can edit the .bat files to remove uninteresting highlights to only keep the ones you are interested in, if you wish.
+11. Execute the .bat file containing the highlights you are looking for. This will create cut demos in your folder containing the highlights.
+12. You are done. 
 
 ### Example #2: Finding CTF Flag Captures
 
