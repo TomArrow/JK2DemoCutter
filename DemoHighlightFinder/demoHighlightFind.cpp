@@ -2529,7 +2529,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int minutes = seconds / 60;
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<(int)averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -3094,7 +3094,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					
 
 					std::stringstream ss;
-					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : "___unlogged") << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" <<  playerNumber << "_" <<  demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
