@@ -1863,6 +1863,8 @@ typedef struct {
 		clientConnection_t	Clc;
 		clientActive_t		Cl;
 	} cut;
+	int lastPMT;
+	int64_t lastPMTChange;
 } demo_t;
 
 

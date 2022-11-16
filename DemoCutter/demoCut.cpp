@@ -1,10 +1,18 @@
 #include "demoCut.h"
 
+#define PCRE2_STATIC
+#include "jpcre2.hpp"
+
 #ifdef _WIN32
 #include <windows.h>
 #include "fileapi.h"
 #include "Handleapi.h"
 #endif
+
+
+
+
+
 
 // TODO attach amount of dropped frames in filename.
 
@@ -12,6 +20,151 @@
 //
 
 demo_t			demo;
+
+
+
+
+typedef jpcre2::select<char> jp;
+
+enum demoTimeType_t {
+	DEMOTIME,
+	GAMETIME,
+	GAMETIME_PAUSE,
+	SERVERTIME
+};
+
+class demoTime_t {
+public:
+	qboolean success;
+	int64_t time; // In milliseconds
+	demoTimeType_t type;
+	/*int64_t compare(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration) { // >1 if this demoTime_t is bigger than the arguments. 0 if identical. >1 if smaller. 
+		int64_t referenceTime = 0;
+		switch (type) {
+			case DEMOTIME:
+				return time - demoTime;
+			case GAMETIME:
+				if(!isPause){
+					return time - (serverTime - levelStartTime);
+				}
+				else {
+					return time - (serverTime - levelStartTime - pauseDuration);
+				}
+			case GAMETIME_PAUSE: 
+				// This is a bit fucky and logically very bad tbh. But we know the cases in which it's gonna be used so we can try and make it work in that way. Ideally just don't use this, ever.
+				// Two pauses right after each other could have identical times in them. We have to kinda just ignore that here because what else can we really do?
+				if (isPause) {
+					return time - (serverTime - levelStartTime);
+				}
+				else {
+					// We can't really tell...
+					return -1;
+				}
+			case SERVERTIME:
+				return time - serverTime;
+		}
+		return NULL;
+	}*/
+	bool isReached(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration) {
+		int64_t referenceTime = 0;
+		switch (type) {
+			case DEMOTIME:
+				return time <= demoTime;
+			case GAMETIME:
+				if(!isPause){
+					return time <= (serverTime - levelStartTime);
+				}
+				else {
+					// We can't really know
+					return time <= (serverTime - levelStartTime - pauseDuration);
+				}
+			case GAMETIME_PAUSE: 
+				// This is a bit fucky and logically very bad tbh. But we know the cases in which it's gonna be used so we can try and make it work in that way. Ideally just don't use this, ever.
+				// Two pauses right after each other could have identical times in them. We have to kinda just ignore that here because what else can we really do?
+				if (isPause) {
+					return time <= (serverTime - levelStartTime);
+				}
+				else {
+					// We can't really tell...
+					return qfalse;
+				}
+			case SERVERTIME:
+				return time <= serverTime;
+		}
+		return NULL;
+	}
+	bool isSurpassed(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration) {
+		int64_t referenceTime = 0;
+		switch (type) {
+			case DEMOTIME:
+				return time < demoTime;
+			case GAMETIME:
+				if(!isPause){
+					return time < (serverTime - levelStartTime);
+				}
+				else {
+					// We can't really know
+					return time < (serverTime - levelStartTime - pauseDuration);
+				}
+			case GAMETIME_PAUSE: 
+				// This is a bit fucky and logically very bad tbh. But we know the cases in which it's gonna be used so we can try and make it work in that way. Ideally just don't use this, ever.
+				// Two pauses right after each other could have identical times in them. We have to kinda just ignore that here because what else can we really do?
+				if (isPause) {
+					return time < (serverTime - levelStartTime);
+				}
+				else {
+					// We can't really tell...
+					return qfalse;
+				}
+			case SERVERTIME:
+				return time < serverTime;
+		}
+		return NULL;
+	}
+};
+
+jp::Regex timeParser(R"raw(\s*(?<type>gp?|s|d)?(?<number1>\d+)\s*(?::(?<number2>\d+))?\s*(?:.(?<number3>\d+))?\s*)raw", "mSi");
+
+demoTime_t timeParse(std::string timeText) {
+	jp::VecNas vec_nas;
+	jp::RegexMatch rm;
+
+	demoTime_t parsedTime;
+	Com_Memset(&parsedTime, 0,sizeof(parsedTime));
+
+	size_t count = rm.setRegexObject(&timeParser)                          //set associated Regex object
+		.setSubject(&timeText)                         //set subject string
+		//.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.setNamedSubstringVector(&vec_nas)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_nas.size(); matchNum++) { // really its just going to be 1 but whatever
+		std::string type = vec_nas[matchNum]["type"];
+		std::string number1 = vec_nas[matchNum]["number1"];
+		std::string number2 = vec_nas[matchNum]["number2"];
+		std::string number3 = vec_nas[matchNum]["number3"];
+		
+		if (type == "d") parsedTime.type = DEMOTIME;
+		else if (type == "g") parsedTime.type = GAMETIME;
+		else if (type == "gp") parsedTime.type = GAMETIME_PAUSE;
+		else if (type == "s") parsedTime.type = SERVERTIME;
+		else parsedTime.type = DEMOTIME;
+
+		if (number1.size() != 0 && number2.size() == 0 && number3.size() == 0) { // Just a simple number
+			parsedTime.time = atoi(number1.c_str());
+			parsedTime.success = qtrue;
+		}
+		else if (number2.size() != 0) { // MM:SS.xxx format
+			parsedTime.time = atoi(number2.c_str())*1000;
+			if (number1.size() != 0) parsedTime.time += atoi(number1.c_str())*60*1000;
+			if (number3.size() != 0) parsedTime.time += atoi(number1.c_str());
+			parsedTime.success = qtrue;
+		}
+	}
+
+	return parsedTime;
+}
+
 
 
 qboolean demoCutConfigstringModified(clientActive_t* clCut) {
@@ -448,7 +601,7 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 #endif
 
 
-qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const char* outputName) {
+qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -572,7 +725,8 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
 				break;
 			case svc_gamestate:
-				if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
+				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
+				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange)) {
 					Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					goto cutcomplete;
 				}
@@ -626,6 +780,10 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
+				if (demo.lastPMT != demo.cut.Cl.snap.ps.pm_type) {
+					demo.lastPMTChange = demoCurrentTime;
+					demo.lastPMT = demo.cut.Cl.snap.ps.pm_type;
+				}
 				break;
 			case svc_download:
 				// read block number
@@ -658,7 +816,8 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 				}
 			}
 		}
-		if (demoCurrentTime > endTime) {
+		//if (demoCurrentTime > endTime) {
+		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange)) {
 			goto cutcomplete;
 		}
 		else if (framesSaved > 0) {
@@ -672,7 +831,8 @@ qboolean demoCut(const char* sourceDemoFile, int startTime, int endTime, const c
 			framesSaved++;
 		}
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
-		else if (demoCurrentTime >= startTime) {
+		//else if (demoCurrentTime >= startTime) {
+		else if (startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange)) {
 			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType);
 			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType);
 			// copy rest
@@ -764,12 +924,16 @@ int main(int argc, char** argv) {
 	}
 	char* demoName = NULL;
 	char* outputName = NULL;
-	float startTime = 0;
-	float endTime = 0;
+	//float startTime = 0;
+	//float endTime = 0;
+	demoTime_t startTime;
+	demoTime_t endTime;
 	if (argc == 4) {
 		demoName = argv[1];
-		startTime = atof(argv[2]);
-		endTime = atof(argv[3]);
+		//startTime = atof(argv[2]);
+		startTime = timeParse(argv[2]);
+		//endTime = atof(argv[3]);
+		endTime = timeParse(argv[3]);
 	}
 	else if(argc == 5) {
 		demoName = argv[1];
@@ -778,8 +942,10 @@ int main(int argc, char** argv) {
 		sanitizeFilename(outputName, filteredOutputName);
 		strcpy(outputName, filteredOutputName);
 		delete[] filteredOutputName;
-		startTime = atof(argv[3]);
-		endTime = atof(argv[4]);
+		//startTime = atof(argv[3]);
+		startTime = timeParse(argv[3]);
+		//endTime = atof(argv[4]);
+		endTime = timeParse(argv[4]);
 	}
 	if (demoCut(demoName, startTime, endTime, outputName)) {
 		Com_Printf("Demo %s got successfully cut\n", demoName);
