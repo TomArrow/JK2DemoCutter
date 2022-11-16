@@ -157,7 +157,20 @@ demoTime_t timeParse(std::string timeText) {
 		else if (number2.size() != 0) { // MM:SS.xxx format
 			parsedTime.time = atoi(number2.c_str())*1000;
 			if (number1.size() != 0) parsedTime.time += atoi(number1.c_str())*60*1000;
-			if (number3.size() != 0) parsedTime.time += atoi(number1.c_str());
+			if (number3.size() != 0) {
+				int64_t rawValue = atoi(number3.c_str());
+				int64_t decimalCompensate = 3-number3.size();
+				if (decimalCompensate > 0) {
+					for (int i = 0; i < decimalCompensate; i++) {
+						rawValue *= 10;
+					}
+				} else if (decimalCompensate < 0) {
+					for (int i = 0; i > decimalCompensate; i--) {
+						rawValue /= 10;
+					}
+				}
+				parsedTime.time += rawValue*pow((int64_t)10, decimalCompensate);
+			}
 			parsedTime.success = qtrue;
 		}
 	}
