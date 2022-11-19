@@ -846,7 +846,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					mainPlayerPS = tmpPS;
 				}
 				else {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
 					if (i >= MAX_CLIENTS) {
 						// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
 						tmpES.eType = ET_GRAPPLE;

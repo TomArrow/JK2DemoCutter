@@ -1274,7 +1274,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					else {
 						Com_Memset(&tmpES, 0, sizeof(tmpES));
-						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
 						if (asG2AnimEnt) {
 							// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
 							tmpES.eType = ET_GRAPPLE;

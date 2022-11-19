@@ -791,6 +791,8 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	if (writeCommandTime) {
 		s->pos.trType = TR_LINEAR_STOP;
 		s->pos.trTime = ps->commandTime;
+		// set maximum extra polation time
+		s->pos.trDuration = 50; // 1000 / sv_fps (default = 20) (dunno why its needed really but do this to be consistent with original implementation to avoid jumps in demo when using cg_smoothclients)
 	}
 	else {
 		s->pos.trType = TR_INTERPOLATE;

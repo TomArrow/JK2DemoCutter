@@ -1315,7 +1315,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 				std::map<int, entityState_t> retVal = it->second.entities;
 				entityState_t psEnt;
 				Com_Memset(&psEnt, 0, sizeof(psEnt));
-				BG_PlayerStateToEntityState(&it->second.playerState, &psEnt,qfalse);
+				BG_PlayerStateToEntityState(&it->second.playerState, &psEnt,qfalse,qtrue);
 				retVal[it->second.playerState.clientNum] = psEnt;
 				return retVal;
 			}

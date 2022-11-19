@@ -821,8 +821,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		playerEntities.clear();
 		int nonSkippedDemoIndex = 0;
 		static qboolean entityIsInterpolated[MAX_GENTITIES];
+		static int entityServerTime[MAX_GENTITIES];
 		Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
+		Com_Memset(entityServerTime, 0, sizeof(entityServerTime));
 		qboolean mainPlayerPSIsInterpolated = qfalse;
+		int mainPlayerServerTime = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
@@ -846,18 +849,20 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 
 				// self explanatory.
-				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && !snapIsInterpolated)) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime))) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
 					// For reference, here's what gets snapped (rounded) in entities:
 					// SnapVector( s->pos.trBase );
 					// SnapVector( s->apos.trBase );
 					mainPlayerPS = tmpPS;
 					mainPlayerPSIsInterpolated = snapIsInterpolated;
+					mainPlayerServerTime = snapInfoHere->serverTime;
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
-					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
+					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
+					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || (entityIsInterpolated[tmpPS.clientNum] && (!snapIsInterpolated || entityServerTime[tmpPS.clientNum] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;
 						entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;
+						entityServerTime[tmpPS.clientNum] = snapInfoHere->serverTime;
 					}
 				}
 
@@ -865,14 +870,16 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
 					if (it->first != mainPlayerPS.clientNum) {
-						if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
+						if (playerEntities.find(it->first) == playerEntities.end() || (entityIsInterpolated[it->first] && (!snapIsInterpolated || entityServerTime[it->first] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
 							playerEntities[it->first] = it->second;
 							entityIsInterpolated[it->first] = snapIsInterpolated;
+							entityServerTime[it->first] = snapInfoHere->serverTime;
 						}
 					}
-					else if(mainPlayerPSIsInterpolated && !snapIsInterpolated){
+					else if(mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime)){
 						// Move some entity stuff over to playerState to improve its precision? Kind of experimental.
 						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
+						mainPlayerServerTime = snapInfoHere->serverTime;
 						// This does not reset the isInterpolated status, since it's kind of a "meh" value from an entity. It's just a patchwork kinda.
 					}
 				}
