@@ -773,7 +773,7 @@ std::map <int, std::string>  saberStyleNames
 };
 
 
-void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap,qboolean writeCommandTime) {
+void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap,qboolean writeCommandTime, qboolean clientSideStyleEventConversion) {
 	int		i;
 
 	if (ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR) {
@@ -877,6 +877,17 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	if (ps->externalEvent) {
 		s->event = ps->externalEvent;
 		s->eventParm = ps->externalEventParm;
+	}
+	else if (clientSideStyleEventConversion) {
+		int		entityEventSequenceReal, seq;
+
+		entityEventSequenceReal = ps->entityEventSequence - 1;
+		if (entityEventSequenceReal < ps->eventSequence - MAX_PS_EVENTS) {
+			entityEventSequenceReal = ps->eventSequence - MAX_PS_EVENTS;
+		}
+		seq = entityEventSequenceReal & (MAX_PS_EVENTS - 1);
+		s->event = ps->events[seq] | ((entityEventSequenceReal & 3) << 8);
+		s->eventParm = ps->eventParms[seq];
 	}
 	else if (ps->entityEventSequence < ps->eventSequence) {
 		int		seq;

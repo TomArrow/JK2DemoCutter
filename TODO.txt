@@ -75,6 +75,10 @@ log pauses, their times and durations and total pause duration
 log a number of total player changes during a game.
 
 
+Important DemoReframer:
+PS can have 2 events. if so, make second an event entity.... but how to do it cleanly?
+
+
 DONE: 
 
 include cleaned up name in name parts
