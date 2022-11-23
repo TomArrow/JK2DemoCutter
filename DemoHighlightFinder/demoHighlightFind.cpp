@@ -175,6 +175,33 @@ std::map<int, int> timeCheckedForKillStreaks;
 #define MAX_ASSUMED_SERVER_FPS 200
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
 
+enum BoostDetectionType {
+	BOOST_PLAYERSTATE,
+	BOOST_ENTITYSTATE_GUESS
+};
+
+struct boost_t {
+	int demoTime;
+	int boostedClientNum;
+	int boosterClientNum;
+	BoostDetectionType detectType;
+	int isEnemyBoost; // -1 if unknown
+};
+
+std::vector<boost_t> boosts;
+
+#define BOOST_DETECT_MAX_AGE 5000
+
+struct frameInfo_t {
+	qboolean playerHadVelocity[MAX_CLIENTS];
+	vec3_t playerVelocities[MAX_CLIENTS];
+	int otherKillerValue[MAX_CLIENTS];
+	int otherKillerTime[MAX_CLIENTS];
+};
+
+frameInfo_t lastFrameInfo;
+frameInfo_t thisFrameInfo;
+
 
 // For calculating top/average speed of past second.
 // Top level key is clientNum
@@ -1536,6 +1563,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
+
+		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
+
 	cutcontinue:
 		MSG_Init(&oldMsg, oldData, sizeof(oldData));
 		/* Read the sequence number */
@@ -1640,6 +1670,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
 						float speed = VectorLength(thisEs->pos.trDelta);
 						speeds[thisEs->number].push_back({ demoCurrentTime,speed });
+						VectorCopy(thisEs->pos.trDelta,thisFrameInfo.playerVelocities[thisEs->number]);
+						thisFrameInfo.playerHadVelocity[thisEs->number] = qtrue;
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 						if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
@@ -1653,12 +1685,61 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
 					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
 					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
+					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
+					thisFrameInfo.playerHadVelocity[demo.cut.Cl.snap.ps.clientNum] = qtrue;
+					thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKillerTime;
+					thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
 
 					// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 					if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
 						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange = demoCurrentTime;
 						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove = demo.cut.Cl.snap.ps.saberMove;
 						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].speed = speed;
+					}
+				}
+
+
+				// Playerstate boost detection
+				// If otherKiller and otherKillerTime in PS has changed from last frame, this player is boosted. Add the boost to his list.
+				{
+					if (thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum]
+						|| thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum]
+						) {
+						boost_t newBoost;
+						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.otherKiller >= 0 && demo.cut.Cl.snap.ps.otherKiller < MAX_CLIENTS) ?demo.cut.Cl.snap.ps.otherKiller:-1;
+						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
+						newBoost.demoTime = demoCurrentTime;
+						newBoost.detectType = BOOST_PLAYERSTATE;
+
+						// Determine teams of both
+						if (newBoost.boosterClientNum != -1) {
+
+							int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boosterClientNum];
+							const char * playerInfo = demo.cut.Cl.gameState.stringData + offset;
+							int boosterTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
+							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boostedClientNum];
+							playerInfo = demo.cut.Cl.gameState.stringData + offset;
+							int boostedTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
+							newBoost.isEnemyBoost = boosterTeam == boostedTeam ? 1 : 0;
+						}
+						else {
+							newBoost.isEnemyBoost = -1;
+						}
+						boosts.push_back(newBoost);
+					}
+
+					// Remove detected boosts that are too old to matter
+					int lastIndexToRemove = -1;
+					for (int i = 0; i < boosts.size(); i++) {
+						if ((demoCurrentTime-boosts[i].demoTime)> BOOST_DETECT_MAX_AGE) {
+							lastIndexToRemove = i;
+						}
+						else {
+							break;
+						}
+					}
+					if (lastIndexToRemove != -1) {
+						boosts.erase(boosts.begin(), boosts.begin()+lastIndexToRemove+1);
 					}
 				}
 
@@ -3141,6 +3222,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 			// copy rest
 			framesSaved = 1;
 		}*/
+
+		Com_Memcpy(&lastFrameInfo, &thisFrameInfo, sizeof(lastFrameInfo));
+
+
+
 	}
 cutcomplete:
 	ret = qtrue;
