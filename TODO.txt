@@ -78,6 +78,11 @@ log a number of total player changes during a game.
 Important DemoReframer:
 PS can have 2 events. if so, make second an event entity.... but how to do it cleanly?
 
+Boosts:
+Maybe ignore boosts for anything but saber kills? What's the point really? Also maybe don't consider boosts that happen on the exact same frame or you end up with mine kills automatically becoming boost kills? But it's hard to tell bc of snaps limit.
+Or: Only count mine boost kills if the killing mine was fired after the boost.
+Also maybe ignore boosts that are super slow and/or if they don't raise the speed above anything that you could achieve by just walking.
+
 
 DONE: 
 

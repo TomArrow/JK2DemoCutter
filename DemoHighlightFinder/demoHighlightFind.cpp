@@ -200,8 +200,21 @@ std::vector<boost_t> boosts;
 #define BOOST_DETECT_MAX_AGE 5000
 #define BOOST_DETECT_MAX_AGE_WALKING 1000 // If we are just walking (our velocity doesn't exceeed maximum walk speed), what age of boosts do we allow for consideration?
 
+enum trackedEntityType_t {
+	TET_NONE,
+	TET_TRIPMINE
+};
+
+struct entityOwnerInfo_t {
+	int64_t firstSeen; // Demo time of time we started tracking this item
+	trackedEntityType_t type;
+	int owner;
+}; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
+
+
 struct frameInfo_t {
-	qboolean playerHadVelocity[MAX_CLIENTS];
+	qboolean entityExists[MAX_GENTITIES];
+	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
 	vec3_t playerVelocities[MAX_CLIENTS];
 	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
 	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
@@ -1694,40 +1707,63 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				demoOldTime = demoCurrentTime;
 
-				// Record speeds and check sabermove changes
+				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS && !(thisEs->eFlags & EF_DEAD)) { // Don't count speeds of dead bodies. They get boosts from dying.
-						//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
-						float speed = VectorLength(thisEs->pos.trDelta);
-						speeds[thisEs->number].push_back({ demoCurrentTime,speed });
-						VectorCopy(thisEs->pos.trDelta,thisFrameInfo.playerVelocities[thisEs->number]);
+
+					thisFrameInfo.entityExists[thisEs->number] = qtrue;
+
+					// Player related tracking
+					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
+
+						VectorCopy(thisEs->pos.trDelta, thisFrameInfo.playerVelocities[thisEs->number]);
 						//thisFrameInfo.playerGSpeeds[thisEs->number] = thisEs->speed;
 						//thisFrameInfo.playerMaxWalkSpeed[thisEs->number] = sqrtf(thisEs->speed* thisEs->speed*2);
-						thisFrameInfo.playerHadVelocity[thisEs->number] = qtrue;
-						// Is this client walking?
-						if (thisEs->groundEntityNum != ENTITYNUM_NONE && VectorLength(thisEs->pos.trDelta) < sqrtf(thisEs->speed * thisEs->speed * 2)) {
-							// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
-							walkDetectedTimes[thisEs->number].push_back(demoCurrentTime);
-						}
 
-						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
-						if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
-							playerLastSaberMove[thisEs->number].lastSaberMoveChange = demoCurrentTime;
-							playerLastSaberMove[thisEs->number].lastSaberMove= thisEs->saberMove;
-							playerLastSaberMove[thisEs->number].speed= speed;
+						if (!(thisEs->eFlags & EF_DEAD)) { // Don't count speeds of dead bodies. They get boosts from dying.
+							//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
+							float speed = VectorLength(thisEs->pos.trDelta);
+							speeds[thisEs->number].push_back({ demoCurrentTime,speed });
+
+							// Is this client walking?
+							if (thisEs->groundEntityNum != ENTITYNUM_NONE && VectorLength(thisEs->pos.trDelta) < sqrtf(thisEs->speed * thisEs->speed * 2)) {
+								// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
+								walkDetectedTimes[thisEs->number].push_back(demoCurrentTime);
+							}
+
+							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
+							if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
+								playerLastSaberMove[thisEs->number].lastSaberMoveChange = demoCurrentTime;
+								playerLastSaberMove[thisEs->number].lastSaberMove= thisEs->saberMove;
+								playerLastSaberMove[thisEs->number].speed= speed;
+							}
+						}
+					}
+					// Track trip mine owners and the first time they were seen.
+					// Careful: The current way it is handled is blocked if the mine is temporarily not visible. The detection will think it appeared later.
+					else if (thisEs->eType == ET_GENERAL && thisEs->weapon == WP_TRIP_MINE && (thisEs->eFlags & EF_MISSILE_STICK)) { // tripmine
+						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->genericenemyindex - 1024;
+						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_TRIPMINE;
+						if (lastFrameInfo.entityExists[thisEs->number] && 
+							thisFrameInfo.entityOwnerInfo[thisEs->number].type == lastFrameInfo.entityOwnerInfo[thisEs->number].type && 
+							thisFrameInfo.entityOwnerInfo[thisEs->number].owner == lastFrameInfo.entityOwnerInfo[thisEs->number].owner) {
+
+							thisFrameInfo.entityOwnerInfo[thisEs->number].firstSeen = lastFrameInfo.entityOwnerInfo[thisEs->number].firstSeen;
+						}
+						else {
+							thisFrameInfo.entityOwnerInfo[thisEs->number].firstSeen = demoCurrentTime;
 						}
 					}
 				}
+				VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
+				//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
+				//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
+				thisFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 				if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
 					//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
 					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
 					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
-					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
-					//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
-					//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
-					thisFrameInfo.playerHadVelocity[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 					// Is this client walking?
 					if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE && VectorLength(demo.cut.Cl.snap.ps.velocity) < sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)) {
 						// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
@@ -1787,37 +1823,41 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum]
 						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]- lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]))
 						) {
-						boost_t newBoost;
-						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
-						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
-						newBoost.demoTime = demoCurrentTime;
-						newBoost.detectType = BOOST_PLAYERSTATE_KNOCKBACK_FLAG;
 						
-						// 
-						// Estimated strength calculation:
-						// From JK2 game code: VectorScale (dir, g_knockback.value * (float)knockback / mass, kvel);
-						// pm_time is actually knockback * 2, mass is hardcoded to 200 and g_knockback default is 1000 so simplified:
-						// 1000 * knockback / 200 = 5*knockback = 5*(knockbacktime/2) = 2.5f*knockbacktime.
-						// 
-						// Note: Any pm_time value over 200 is limited to 200 and any value under 50 is limited to 50. So it is not possible to detect a boost strength over 2.5*200 = 500 or under 2.5*50 = 125.
-						//
-						newBoost.estimatedStrength = 2.5f*(float) thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]; // The knockback time is damage * 2, but capped to 200, so a maximum damage of 100 can be guessed. TODO: If it's enemy damage, just get it from health/armor info. However it could also be self-inflicted and have a multiplier, complicating things.
+						if (VectorLength(demo.cut.Cl.snap.ps.velocity) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)) { // If the boost didn't at least raise us above walking speed, just ignore it. Or we will be tracking completely useless micro boosts like getting hit by a turret in some corner.
 
-						if (newBoost.boosterClientNum != -1) {
+							boost_t newBoost;
+							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
+							newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
+							newBoost.demoTime = demoCurrentTime;
+							newBoost.detectType = BOOST_PLAYERSTATE_KNOCKBACK_FLAG;
 
-							int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boosterClientNum];
-							const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
-							int boosterTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
-							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boostedClientNum];
-							playerInfo = demo.cut.Cl.gameState.stringData + offset;
-							int boostedTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
-							newBoost.isEnemyBoost = boosterTeam != boostedTeam ? 1 : 0;
+							// 
+							// Estimated strength calculation:
+							// From JK2 game code: VectorScale (dir, g_knockback.value * (float)knockback / mass, kvel);
+							// pm_time is actually knockback * 2, mass is hardcoded to 200 and g_knockback default is 1000 so simplified:
+							// 1000 * knockback / 200 = 5*knockback = 5*(knockbacktime/2) = 2.5f*knockbacktime.
+							// 
+							// Note: Any pm_time value over 200 is limited to 200 and any value under 50 is limited to 50. So it is not possible to detect a boost strength over 2.5*200 = 500 or under 2.5*50 = 125.
+							//
+							newBoost.estimatedStrength = 2.5f * (float)thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]; // The knockback time is damage * 2, but capped to 200, so a maximum damage of 100 can be guessed. TODO: If it's enemy damage, just get it from health/armor info. However it could also be self-inflicted and have a multiplier, complicating things.
+
+							if (newBoost.boosterClientNum != -1) {
+
+								int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boosterClientNum];
+								const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+								int boosterTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boostedClientNum];
+								playerInfo = demo.cut.Cl.gameState.stringData + offset;
+								int boostedTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
+								newBoost.isEnemyBoost = boosterTeam != boostedTeam ? 1 : 0;
+							}
+							else {
+								newBoost.isEnemyBoost = -1;
+							}
+
+							boosts.push_back(newBoost);
 						}
-						else {
-							newBoost.isEnemyBoost = -1;
-						}
-
-						boosts.push_back(newBoost);
 					}
 #endif
 
@@ -2301,9 +2341,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::stringstream boostsStringStream;
 							int boostCountAttacker = 0;
 							int boostCountVictim = 0;
-							//if (mod != MOD_SUICIDE) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
+							if (/*mod != MOD_SUICIDE*/ true) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
+
+								int64_t excludeBoostsAfter = 0;
+
+								if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
+									// Find the mine that killed him
+									for (int i = 0; i < MAX_GENTITIES; i++) {
+										if (lastFrameInfo.entityOwnerInfo[i].type == TET_TRIPMINE && lastFrameInfo.entityOwnerInfo[i].owner == attacker && lastFrameInfo.entityExists[i] && !thisFrameInfo.entityExists[i]) {
+											// this is likely the tripmine that did the kill
+											excludeBoostsAfter = lastFrameInfo.entityOwnerInfo[i].firstSeen;
+											break;
+										}
+									}
+								}
 
 								for (int i = 0; i < boosts.size(); i++) {
+
+									if (boosts[i].demoTime > excludeBoostsAfter) continue;
 
 									qboolean doThis = qfalse;
 									// find out if we should even bother
@@ -2335,7 +2390,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									boostsStringStream << " (" << (boosts[i].demoTime- demoCurrentTime) << ", ~"<< boosts[i].estimatedStrength <<")";
 									boostsStringStream << "\n";
 								}
-							//}
+							}
 							std::string boostsString = boostsStringStream.str();
 
 
