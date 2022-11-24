@@ -205,10 +205,13 @@ enum trackedEntityType_t {
 	TET_TRIPMINE
 };
 
+#define TETFLAG_EXPLODED 1
+
 struct entityOwnerInfo_t {
 	int64_t firstSeen; // Demo time of time we started tracking this item
 	trackedEntityType_t type;
 	int owner;
+	int flags;
 }; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
 
 
@@ -1745,6 +1748,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					else if (thisEs->eType == ET_GENERAL && thisEs->weapon == WP_TRIP_MINE && (thisEs->eFlags & EF_MISSILE_STICK)) { // tripmine
 						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->genericenemyindex - 1024;
 						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_TRIPMINE;
+						if ((thisEs->event & ~EV_EVENT_BITS) == EV_MISSILE_MISS) {
+							// This mine is exploding right now
+							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_EXPLODED;
+						}
+						thisFrameInfo.entityOwnerInfo[thisEs->number].flags = TET_TRIPMINE;
 						if (lastFrameInfo.entityExists[thisEs->number] && 
 							thisFrameInfo.entityOwnerInfo[thisEs->number].type == lastFrameInfo.entityOwnerInfo[thisEs->number].type && 
 							thisFrameInfo.entityOwnerInfo[thisEs->number].owner == lastFrameInfo.entityOwnerInfo[thisEs->number].owner) {
@@ -1824,7 +1832,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]- lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]))
 						) {
 						
-						if (VectorLength(demo.cut.Cl.snap.ps.velocity) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)) { // If the boost didn't at least raise us above walking speed, just ignore it. Or we will be tracking completely useless micro boosts like getting hit by a turret in some corner.
+						if (VectorLength(demo.cut.Cl.snap.ps.velocity) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2) // If the boost didn't at least raise us above walking speed, just ignore it. Or we will be tracking completely useless micro boosts like getting hit by a turret in some corner.
+							/* && VectorLength(demo.cut.Cl.snap.ps.velocity) > VectorLength(lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum])*/ // If the boost didn't actually increase our effective speed, don't consider it a boost (it's more of a brake I suppose).
+							) { 
 
 							boost_t newBoost;
 							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
@@ -2348,7 +2358,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
 									// Find the mine that killed him
 									for (int i = 0; i < MAX_GENTITIES; i++) {
-										if (lastFrameInfo.entityOwnerInfo[i].type == TET_TRIPMINE && lastFrameInfo.entityOwnerInfo[i].owner == attacker && lastFrameInfo.entityExists[i] && !thisFrameInfo.entityExists[i]) {
+										if (lastFrameInfo.entityOwnerInfo[i].type == TET_TRIPMINE && lastFrameInfo.entityOwnerInfo[i].owner == attacker && lastFrameInfo.entityExists[i] && (!thisFrameInfo.entityExists[i] || (thisFrameInfo.entityOwnerInfo[i].flags & TETFLAG_EXPLODED))) { // Due to snaps dropping server frames, the mine could be either gone or on the exact frame of the explosion. Not a perfect solution, but good enough.
 											// this is likely the tripmine that did the kill
 											excludeBoostsAfter = lastFrameInfo.entityOwnerInfo[i].firstSeen;
 											break;
