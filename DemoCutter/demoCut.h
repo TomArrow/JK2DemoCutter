@@ -197,6 +197,26 @@ typedef struct _iobuf
 #define	ANIM_TOGGLEBIT		2048		// Maximum number of animation sequences is 2048 (0-2047).  12th bit is the toggle
 
 
+// pmove->pm_flags
+#define	PMF_DUCKED			1
+#define	PMF_JUMP_HELD		2
+#define PMF_ROLLING			4
+#define	PMF_BACKWARDS_JUMP	8		// go into backwards land
+#define	PMF_BACKWARDS_RUN	16		// coast down to backwards run
+#define	PMF_TIME_LAND		32		// pm_time is time before rejump
+#define	PMF_TIME_KNOCKBACK	64		// pm_time is an air-accelerate only time
+#define	PMF_TIME_WATERJUMP	256		// pm_time is waterjump
+#define	PMF_RESPAWNED		512		// clear after attack and jump buttons come up
+#define	PMF_USE_ITEM_HELD	1024
+#define PMF_UPDATE_ANIM		2048	// The server updated the animation, the pmove should set the ghoul2 anim to match.
+#define PMF_FOLLOW			4096	// spectate following another player
+#define PMF_SCOREBOARD		8192	// spectate as a scoreboard
+
+#define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
+
+#define	MAXTOUCH	32
+
+
 typedef enum {
 	PM_NORMAL,		// can accelerate and turn
 	PM_FLOAT,		// float with no gravity in general direction of velocity (intended for gripping)

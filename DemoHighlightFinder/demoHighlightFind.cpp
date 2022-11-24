@@ -16,6 +16,11 @@
 #define DEBUGSTATSDB
 
 
+
+#define PLAYERSTATEBOOSTDETECTION
+#undef PLAYERSTATEBOOSTDETECTION // I disabled this because while it theoretically could work, it won't work because the otherKiller value of the playerstate is not actually transmitted. So useless.
+
+
 typedef jpcre2::select<char> jp;
 //jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
 // OC Defrag
@@ -177,6 +182,7 @@ std::map<int, int> timeCheckedForKillStreaks;
 
 enum BoostDetectionType {
 	BOOST_PLAYERSTATE,
+	BOOST_PLAYERSTATE_KNOCKBACK_FLAG,
 	BOOST_ENTITYSTATE_GUESS
 };
 
@@ -195,8 +201,14 @@ std::vector<boost_t> boosts;
 struct frameInfo_t {
 	qboolean playerHadVelocity[MAX_CLIENTS];
 	vec3_t playerVelocities[MAX_CLIENTS];
+#ifdef PLAYERSTATEBOOSTDETECTION
 	int otherKillerValue[MAX_CLIENTS];
 	int otherKillerTime[MAX_CLIENTS];
+#endif
+	qboolean pmFlagKnockback[MAX_CLIENTS];
+	qboolean psTeleportBit[MAX_CLIENTS];
+	int pmFlagTime[MAX_CLIENTS];
+	int psCommandTime[MAX_CLIENTS];
 };
 
 frameInfo_t lastFrameInfo;
@@ -1687,8 +1699,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
 					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
 					thisFrameInfo.playerHadVelocity[demo.cut.Cl.snap.ps.clientNum] = qtrue;
+#ifdef PLAYERSTATEBOOSTDETECTION
 					thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKillerTime;
 					thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
+#endif
 
 					// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 					if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
@@ -1702,6 +1716,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				// Playerstate boost detection
 				// If otherKiller and otherKillerTime in PS has changed from last frame, this player is boosted. Add the boost to his list.
 				{
+					thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
+					thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_time;
+					thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
+					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT);
+
+#ifdef PLAYERSTATEBOOSTDETECTION
 					if (thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum]
 						|| thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum]
 						) {
@@ -1727,6 +1747,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 						boosts.push_back(newBoost);
 					}
+#else
+					if (thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] == lastFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] &&   // Respawn/teleport also creates knockback. But we're not looking for that.
+						thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum]
+						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]- lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]))
+						) {
+						boost_t newBoost;
+						newBoost.boosterClientNum = -1;
+						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
+						newBoost.demoTime = demoCurrentTime;
+						newBoost.detectType = BOOST_PLAYERSTATE_KNOCKBACK_FLAG;
+						newBoost.isEnemyBoost = -1;
+
+						boosts.push_back(newBoost);
+					}
+#endif
 
 					// Remove detected boosts that are too old to matter
 					int lastIndexToRemove = -1;
