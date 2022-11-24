@@ -2343,7 +2343,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int boostCountVictim = 0;
 							if (/*mod != MOD_SUICIDE*/ true) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
 
-								int64_t excludeBoostsAfter = 0;
+								int64_t excludeBoostsAfter = INT64_MAX;
 
 								if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
 									// Find the mine that killed him
