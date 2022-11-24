@@ -17,8 +17,8 @@
 
 
 
-#define PLAYERSTATEBOOSTDETECTION
-#undef PLAYERSTATEBOOSTDETECTION // I disabled this because while it theoretically could work, it won't work because the otherKiller value of the playerstate is not actually transmitted. So useless.
+#define PLAYERSTATEOTHERKILLERBOOSTDETECTION
+#undef PLAYERSTATEOTHERKILLERBOOSTDETECTION // I disabled this because while it theoretically could work, it won't work because the otherKiller value of the playerstate is not actually transmitted. So useless.
 
 
 typedef jpcre2::select<char> jp;
@@ -187,7 +187,8 @@ enum BoostDetectionType {
 };
 
 struct boost_t {
-	int demoTime;
+	int64_t demoTime;
+	int estimatedStrength;
 	int boostedClientNum;
 	int boosterClientNum;
 	BoostDetectionType detectType;
@@ -197,11 +198,14 @@ struct boost_t {
 std::vector<boost_t> boosts;
 
 #define BOOST_DETECT_MAX_AGE 5000
+#define BOOST_DETECT_MAX_AGE_WALKING 1000 // If we are just walking (our velocity doesn't exceeed maximum walk speed), what age of boosts do we allow for consideration?
 
 struct frameInfo_t {
 	qboolean playerHadVelocity[MAX_CLIENTS];
 	vec3_t playerVelocities[MAX_CLIENTS];
-#ifdef PLAYERSTATEBOOSTDETECTION
+	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
+	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
+#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
 	int otherKillerValue[MAX_CLIENTS];
 	int otherKillerTime[MAX_CLIENTS];
 #endif
@@ -210,6 +214,9 @@ struct frameInfo_t {
 	int pmFlagTime[MAX_CLIENTS];
 	int psCommandTime[MAX_CLIENTS];
 };
+
+//int64_t walkDetectedTime[MAX_CLIENTS];
+std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS];
 
 frameInfo_t lastFrameInfo;
 frameInfo_t thisFrameInfo;
@@ -1186,6 +1193,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(recentFlagHoldVariousInfo,0,sizeof(recentFlagHoldVariousInfo));
 	Com_Memset(playerTeams,0,sizeof(playerTeams));
 	Com_Memset(teamInfo,0,sizeof(teamInfo));
+	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
+	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
+	//for (int i = 0; i < MAX_CLIENTS; i++) {
+	//	walkDetectedTime[i] = -1;
+	//}
 	Com_Memset(&cgs,0,sizeof(cgs));
 	resetLaughs();
 
@@ -1245,6 +1257,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"isDoomKill	BOOLEAN NOT NULL,"
 		"isExplosion	BOOLEAN NOT NULL,"
 		"isSuicide	BOOLEAN NOT NULL,"
+		"isModSuicide	BOOLEAN NOT NULL,"
 		"meansOfDeath	INTEGER NOT NULL,"
 		"positionX	REAL,"
 		"positionY	REAL,"
@@ -1277,10 +1290,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"targetIsFollowed	BOOLEAN NOT NULL,"
 		"targetIsFollowedOrVisible	BOOLEAN NOT NULL,"
 		"isSuicide	BOOLEAN NOT NULL,"
+		"isModSuicide	BOOLEAN NOT NULL,"
 		"attackerIsVisible	BOOLEAN NOT NULL,"
 		"attackerIsFollowed	BOOLEAN NOT NULL,"
 		"attackerIsFollowedOrVisible	BOOLEAN NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
+
+		"boosts	TEXT,"
+		"boostCountTotal	INTEGER NOT NULL,"
+		"boostCountAttacker	INTEGER NOT NULL,"
+		"boostCountVictim	INTEGER NOT NULL,"
+
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTarget	REAL,"
 		"currentSpeedAttacker	REAL,"
@@ -1443,15 +1463,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 		"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
 	char* preparedStatementText = "INSERT INTO kills"
-		"(hash,shorthash,map,serverName,serverNameStripped,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,meansOfDeath,positionX,positionY,positionZ)"
+		"(hash,shorthash,map,serverName,serverNameStripped,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
 		"VALUES "
-		"(@hash,@shorthash,@map,@serverName,@serverNameStripped,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
+		"(@hash,@shorthash,@map,@serverName,@serverNameStripped,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1683,7 +1703,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						float speed = VectorLength(thisEs->pos.trDelta);
 						speeds[thisEs->number].push_back({ demoCurrentTime,speed });
 						VectorCopy(thisEs->pos.trDelta,thisFrameInfo.playerVelocities[thisEs->number]);
+						//thisFrameInfo.playerGSpeeds[thisEs->number] = thisEs->speed;
+						//thisFrameInfo.playerMaxWalkSpeed[thisEs->number] = sqrtf(thisEs->speed* thisEs->speed*2);
 						thisFrameInfo.playerHadVelocity[thisEs->number] = qtrue;
+						// Is this client walking?
+						if (thisEs->groundEntityNum != ENTITYNUM_NONE && VectorLength(thisEs->pos.trDelta) < sqrtf(thisEs->speed * thisEs->speed * 2)) {
+							// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
+							walkDetectedTimes[thisEs->number].push_back(demoCurrentTime);
+						}
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 						if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
@@ -1698,8 +1725,16 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
 					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
 					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
+					//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
+					//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
 					thisFrameInfo.playerHadVelocity[demo.cut.Cl.snap.ps.clientNum] = qtrue;
-#ifdef PLAYERSTATEBOOSTDETECTION
+					// Is this client walking?
+					if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE && VectorLength(demo.cut.Cl.snap.ps.velocity) < sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)) {
+						// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
+						walkDetectedTimes[demo.cut.Cl.snap.ps.clientNum].push_back(demoCurrentTime);
+					}
+
+#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
 					thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKillerTime;
 					thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
 #endif
@@ -1721,7 +1756,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
 					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT);
 
-#ifdef PLAYERSTATEBOOSTDETECTION
+#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
 					if (thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum]
 						|| thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum]
 						) {
@@ -1753,11 +1788,34 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]- lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]))
 						) {
 						boost_t newBoost;
-						newBoost.boosterClientNum = -1;
+						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
 						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 						newBoost.demoTime = demoCurrentTime;
 						newBoost.detectType = BOOST_PLAYERSTATE_KNOCKBACK_FLAG;
-						newBoost.isEnemyBoost = -1;
+						
+						// 
+						// Estimated strength calculation:
+						// From JK2 game code: VectorScale (dir, g_knockback.value * (float)knockback / mass, kvel);
+						// pm_time is actually knockback * 2, mass is hardcoded to 200 and g_knockback default is 1000 so simplified:
+						// 1000 * knockback / 200 = 5*knockback = 5*(knockbacktime/2) = 2.5f*knockbacktime.
+						// 
+						// Note: Any pm_time value over 200 is limited to 200 and any value under 50 is limited to 50. So it is not possible to detect a boost strength over 2.5*200 = 500 or under 2.5*50 = 125.
+						//
+						newBoost.estimatedStrength = 2.5f*(float) thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]; // The knockback time is damage * 2, but capped to 200, so a maximum damage of 100 can be guessed. TODO: If it's enemy damage, just get it from health/armor info. However it could also be self-inflicted and have a multiplier, complicating things.
+
+						if (newBoost.boosterClientNum != -1) {
+
+							int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boosterClientNum];
+							const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+							int boosterTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
+							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boostedClientNum];
+							playerInfo = demo.cut.Cl.gameState.stringData + offset;
+							int boostedTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
+							newBoost.isEnemyBoost = boosterTeam != boostedTeam ? 1 : 0;
+						}
+						else {
+							newBoost.isEnemyBoost = -1;
+						}
 
 						boosts.push_back(newBoost);
 					}
@@ -1775,6 +1833,53 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					}
 					if (lastIndexToRemove != -1) {
 						boosts.erase(boosts.begin(), boosts.begin()+lastIndexToRemove+1);
+					}
+					
+					// Remove boosts of players who are currently only walking if the age of the boost is higher than BOOST_DETECT_MAX_AGE_WALKING
+					// Example: A 5 second old boost that was interrupted by walking isn't really that interesting.
+					// NO: This logic is actually flawed. This would somehow have to be evaluated at the time of processing the kill itself. What matters is the time of the walking before the kill, not the time of the walking after the boost.
+					/*for (int i = boosts.size() - 1; i >= 0; i--) {
+						if (
+							thisFrameInfo.playerHadVelocity[boosts[i].boostedClientNum]
+							// TODO: Figure this out better. Currently I kinda naively assume that maximum theoretically possible walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed), but that's probably not entirely correct.
+							&& VectorLength(thisFrameInfo.playerVelocities[boosts[i].boostedClientNum]) < thisFrameInfo.playerMaxWalkSpeed[boosts[i].boostedClientNum]
+							&& (demoCurrentTime - boosts[i].demoTime) > BOOST_DETECT_MAX_AGE_WALKING
+							) {
+
+							boosts.erase(boosts.begin()+i);
+						}
+					}*/
+
+					// Do some preparation for removing boosts that happened before some walks that happened a while ago. If somebody was walking over a second ago then any boosts before that are irrelevant tbh.
+					// But if someone was walking half a second ago, then maybe he only landed, prepared an attack and executed, in which case the boost is still relevant.
+					// TLDR: If we can find a detected walk that is older than BOOST_DETECT_MAX_AGE_WALKING but newer than a boost, we remove that boost.
+					
+					// Some preparation. Find the relevant walk times that are older than BOOST_DETECT_MAX_AGE_WALKING, but out of those, find the newest one so we can use that info to remove any boosts that happened before that.
+					static int64_t newestRemoveWorthyWalks[MAX_CLIENTS];
+					Com_Memset(newestRemoveWorthyWalks, 0, sizeof(newestRemoveWorthyWalks));
+					for (int i = 0; i < MAX_CLIENTS; i++) {
+						size_t maxIndexToRemove = -1;
+						for (int w = 0; w < walkDetectedTimes[i].size(); w++) {
+							bool isRemoveWorthy = (demoCurrentTime - walkDetectedTimes[i][w]) > BOOST_DETECT_MAX_AGE_WALKING;
+							if (isRemoveWorthy) {
+								maxIndexToRemove = w;
+								newestRemoveWorthyWalks[i] = walkDetectedTimes[i][w];
+							}
+							else {
+								break;
+							}
+						}
+						if (maxIndexToRemove != -1) {
+							walkDetectedTimes[i].erase(walkDetectedTimes[i].begin(), walkDetectedTimes[i].begin() + maxIndexToRemove + 1);
+						}
+					}
+					// Do the removal.
+					for (int i = boosts.size() - 1; i >= 0; i--) {
+						if (newestRemoveWorthyWalks[boosts[i].boostedClientNum] >= boosts[i].demoTime
+							) {
+
+							boosts.erase(boosts.begin()+i);
+						}
 					}
 				}
 
@@ -2192,6 +2297,49 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							// END Stats about nearby enemy count throughout run
 
 
+							// Boosts that led to this kill
+							std::stringstream boostsStringStream;
+							int boostCountAttacker = 0;
+							int boostCountVictim = 0;
+							//if (mod != MOD_SUICIDE) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
+
+								for (int i = 0; i < boosts.size(); i++) {
+
+									qboolean doThis = qfalse;
+									// find out if we should even bother
+									if (boosts[i].boostedClientNum == attacker && boosts[i].boosterClientNum != target) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+										boostCountAttacker++;
+										doThis = qtrue;
+										boostsStringStream << "[KILLER by";
+									}
+									else if (boosts[i].boostedClientNum == target && boosts[i].boosterClientNum != attacker) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+										boostCountVictim++;
+										doThis = qtrue;
+										boostsStringStream << "[VICTIM by";
+									}
+									if (!doThis) continue;
+
+									// ok let's bother
+									std::string boosterName = "";
+									if (boosts[i].boosterClientNum != -1) {
+										int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + boosts[i].boosterClientNum];
+										const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+										boosterName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
+									}
+									if (boosts[i].isEnemyBoost != -1) {
+										boostsStringStream << (boosts[i].isEnemyBoost ? (target == boosts[i].boosterClientNum ? " VICTIM]":" ENEMY]") :(boosts[i].boosterClientNum == attacker ? " SELF]" : " TEAM]"));
+									}
+									if (boosterName.size() > 0) {
+										boostsStringStream << " " << boosterName;
+									}
+									boostsStringStream << " (" << (boosts[i].demoTime- demoCurrentTime) << ", ~"<< boosts[i].estimatedStrength <<")";
+									boostsStringStream << "\n";
+								}
+							//}
+							std::string boostsString = boostsStringStream.str();
+
+
+
 
 
 							std::stringstream logModStringSS;
@@ -2235,6 +2383,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertStatement, int, "@isDoomKill", isDoomKill);
 							SQLBIND(insertStatement, int, "@isExplosion", thisKill.isExplosion);
 							SQLBIND(insertStatement, int, "@isSuicide", isSuicide);
+							SQLBIND(insertStatement, int, "@isModSuicide", mod==MOD_SUICIDE);
 							SQLBIND(insertStatement, int, "@meansOfDeath", mod);
 							SQLBIND(insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
 							SQLBIND(insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
@@ -2287,10 +2436,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
 							SQLBIND(insertAngleStatement, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
 							SQLBIND(insertAngleStatement, int, "@isSuicide", isSuicide);
+							SQLBIND(insertAngleStatement, int, "@isModSuicide", mod == MOD_SUICIDE);
 							SQLBIND(insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
 							SQLBIND(insertAngleStatement, int, "@attackerIsFollowed", attackerIsFollowed);
 							SQLBIND(insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
 							SQLBIND(insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+
+							SQLBIND_TEXT(insertAngleStatement, "@boosts", (boostCountAttacker + boostCountVictim) > 0 ? boostsString.c_str() : NULL);
+							SQLBIND(insertAngleStatement, int, "@boostCountTotal", boostCountAttacker + boostCountVictim);
+							SQLBIND(insertAngleStatement, int, "@boostCountAttacker", boostCountAttacker);
+							SQLBIND(insertAngleStatement, int, "@boostCountVictim", boostCountVictim);
+
 							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
 							SQLBIND(insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
@@ -2347,7 +2503,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 							std::stringstream ss;
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << "___" << playername << "___" << victimname<<"___" << maxSpeedAttacker<<"_" << maxSpeedTarget <<"ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") <<"_"<<shorthash;
+							std::string boostString = ((boostCountAttacker + boostCountVictim) > 0 ? va("_BST%s%s", boostCountAttacker > 0 ? va("%dA", boostCountAttacker) : "", boostCountVictim > 0 ? va("%dV", boostCountVictim) : "") : "");
+							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -2358,7 +2515,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							outputBatHandle << "\nrem hash: " << hash_hex_string;
 							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
-							std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
+							std::cout << mapname << " " << modInfo.str() << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
 						}
 					
