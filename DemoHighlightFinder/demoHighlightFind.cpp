@@ -199,6 +199,7 @@ std::vector<boost_t> boosts;
 
 #define BOOST_DETECT_MAX_AGE 5000
 #define BOOST_DETECT_MAX_AGE_WALKING 1000 // If we are just walking (our velocity doesn't exceeed maximum walk speed), what age of boosts do we allow for consideration?
+#define BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD (JUMP_VELOCITY/2) // Vertical speed delta that must be detected for a boost (detected in playerstate) to be considered relevant (this isn't required if horizontal speed is above walking speed). Just set it to the minimum possible jump velocity/2. Just wanna avoid detecting micro-boosts that have no real impact on anything. 100-ish still won't be very meaningful usually but in some edge situations it might?
 
 enum trackedEntityType_t {
 	TET_NONE,
@@ -1833,16 +1834,24 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						boosts.push_back(newBoost);
 					}
 #else
+					int psCommandTimeDelta = thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum] - lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum];
 					if (thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] == lastFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] &&   // Respawn/teleport also creates knockback. But we're not looking for that.
 						thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum]
-						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]- lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum]))
+						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(psCommandTimeDelta))
 						) {
 						
-						if (VectorLength(demo.cut.Cl.snap.ps.velocity) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2) // If the boost didn't at least raise us above walking speed, just ignore it. Or we will be tracking completely useless micro boosts like getting hit by a turret in some corner.
+						qboolean horizontalSpeedAboveWalking = (qboolean)(VectorLength2(demo.cut.Cl.snap.ps.velocity) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2));
+						float verticalSpeedDelta = demo.cut.Cl.snap.ps.velocity[2] - lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum][2];
+
+						float maximumGravityCausedDelta = -demo.cut.Cl.snap.ps.gravity * (float)psCommandTimeDelta * 0.001f -10.0f; // I subtract 10 additionally to account for fps-based weirdness of gravity affecting velocity due to rounding. Hopefully 10 is enough. I guess rounding could cause maximum 0.9999 difference per frame. So 10 should account for up to 10 frames?
+
+
+						if (horizontalSpeedAboveWalking // If the boost didn't at least raise us above walking speed, just ignore it. Or we will be tracking completely useless micro boosts like getting hit by a turret in some corner.
+							|| verticalSpeedDelta > BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD // Something like this could also be caused by a jump so it can't necessarily be generalized but we do know knockback has occurred so it's "somewhat" safe or rather: low-ish but not perfect probability of misdetect.
+							|| verticalSpeedDelta < (maximumGravityCausedDelta- BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD)
 							// TODO: Separate handling for vertical and horizontal
 							// && VectorLength(demo.cut.Cl.snap.ps.velocity) > VectorLength(lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) // If the boost didn't actually increase our effective speed, don't consider it a boost (it's more of a brake I suppose).
 							) { 
-
 							boost_t newBoost;
 							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
 							newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
