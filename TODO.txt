@@ -82,6 +82,12 @@ Boosts:
 Maybe ignore boosts for anything but saber kills? What's the point really? Also maybe don't consider boosts that happen on the exact same frame or you end up with mine kills automatically becoming boost kills? But it's hard to tell bc of snaps limit.
 Or: Only count mine boost kills if the killing mine was fired after the boost.
 Also maybe ignore boosts that are super slow and/or if they don't raise the speed above anything that you could achieve by just walking.
+horizontal and vertical separate
+
+if player not visible or dead: immediate cancellation of boosts
+
+detect airborne mine kills as separate. also timed mines vs planted ones.
+detect teamkills
 
 
 DONE: 

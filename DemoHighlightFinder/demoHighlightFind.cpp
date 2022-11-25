@@ -206,6 +206,7 @@ enum trackedEntityType_t {
 };
 
 #define TETFLAG_EXPLODED 1
+#define TETFLAG_AIRBORNE 2
 
 struct entityOwnerInfo_t {
 	int64_t firstSeen; // Demo time of time we started tracking this item
@@ -1317,6 +1318,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"boostCountAttacker	INTEGER NOT NULL,"
 		"boostCountVictim	INTEGER NOT NULL,"
 
+		"projectileWasAirborne	BOOLEAN,"
+
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTarget	REAL,"
 		"currentSpeedAttacker	REAL,"
@@ -1485,9 +1488,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1752,7 +1755,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							// This mine is exploding right now
 							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_EXPLODED;
 						}
-						thisFrameInfo.entityOwnerInfo[thisEs->number].flags = TET_TRIPMINE;
+						if (thisEs->pos.trType == TR_GRAVITY) {
+							// This mine is airborne
+							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_AIRBORNE;
+						}
 						if (lastFrameInfo.entityExists[thisEs->number] && 
 							thisFrameInfo.entityOwnerInfo[thisEs->number].type == lastFrameInfo.entityOwnerInfo[thisEs->number].type && 
 							thisFrameInfo.entityOwnerInfo[thisEs->number].owner == lastFrameInfo.entityOwnerInfo[thisEs->number].owner) {
@@ -1833,7 +1839,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						) {
 						
 						if (VectorLength(demo.cut.Cl.snap.ps.velocity) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2) // If the boost didn't at least raise us above walking speed, just ignore it. Or we will be tracking completely useless micro boosts like getting hit by a turret in some corner.
-							/* && VectorLength(demo.cut.Cl.snap.ps.velocity) > VectorLength(lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum])*/ // If the boost didn't actually increase our effective speed, don't consider it a boost (it's more of a brake I suppose).
+							// TODO: Separate handling for vertical and horizontal
+							// && VectorLength(demo.cut.Cl.snap.ps.velocity) > VectorLength(lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) // If the boost didn't actually increase our effective speed, don't consider it a boost (it's more of a brake I suppose).
 							) { 
 
 							boost_t newBoost;
@@ -2230,6 +2237,31 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										break;
 								}
 							}
+
+							int killerProjectile = -1;
+							qboolean isProjectileBased = qfalse;
+							qboolean canBeAirborne = qfalse;
+							qboolean projectileWasAirborne = qfalse;
+							// TODO: Do this for other weapons too, not just mines
+							if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
+
+								isProjectileBased = qtrue;
+								canBeAirborne = qtrue;
+								// Find the mine that killed him
+								for (int i = 0; i < MAX_GENTITIES; i++) {
+									if (lastFrameInfo.entityOwnerInfo[i].type == TET_TRIPMINE && lastFrameInfo.entityOwnerInfo[i].owner == attacker && lastFrameInfo.entityExists[i] && (!thisFrameInfo.entityExists[i] || (thisFrameInfo.entityOwnerInfo[i].flags & TETFLAG_EXPLODED))) { // Due to snaps dropping server frames, the mine could be either gone or on the exact frame of the explosion. Not a perfect solution, but good enough.
+										// this is likely the tripmine that did the kill
+										killerProjectile = i;
+										if (thisFrameInfo.entityOwnerInfo[i].flags & TETFLAG_AIRBORNE || (!thisFrameInfo.entityExists[i] && lastFrameInfo.entityOwnerInfo[i].flags & TETFLAG_AIRBORNE)) {
+											projectileWasAirborne = qtrue;
+										}
+										break;
+									}
+								}
+							}
+							if (projectileWasAirborne) {
+								modInfo << "_AIR";
+							}
 							
 							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 							const char* info = demo.cut.Cl.gameState.stringData + offset;
@@ -2353,9 +2385,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int boostCountVictim = 0;
 							if (/*mod != MOD_SUICIDE*/ true) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
 
-								int64_t excludeBoostsAfter = INT64_MAX;
+								int64_t excludeAttackerBoostsAfter = INT64_MAX;
 
-								if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
+								/*if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
 									// Find the mine that killed him
 									for (int i = 0; i < MAX_GENTITIES; i++) {
 										if (lastFrameInfo.entityOwnerInfo[i].type == TET_TRIPMINE && lastFrameInfo.entityOwnerInfo[i].owner == attacker && lastFrameInfo.entityExists[i] && (!thisFrameInfo.entityExists[i] || (thisFrameInfo.entityOwnerInfo[i].flags & TETFLAG_EXPLODED))) { // Due to snaps dropping server frames, the mine could be either gone or on the exact frame of the explosion. Not a perfect solution, but good enough.
@@ -2364,11 +2396,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 											break;
 										}
 									}
+								}*/
+								if (isProjectileBased && killerProjectile != -1) {
+									excludeAttackerBoostsAfter = lastFrameInfo.entityOwnerInfo[killerProjectile].firstSeen;
 								}
 
 								for (int i = 0; i < boosts.size(); i++) {
-
-									if (boosts[i].demoTime > excludeBoostsAfter) continue;
 
 									qboolean doThis = qfalse;
 									// find out if we should even bother
@@ -2376,6 +2409,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										boostCountAttacker++;
 										doThis = qtrue;
 										boostsStringStream << "[KILLER by";
+										if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
 									}
 									else if (boosts[i].boostedClientNum == target && boosts[i].boosterClientNum != attacker) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
 										boostCountVictim++;
@@ -2511,6 +2545,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertAngleStatement, int, "@boostCountTotal", boostCountAttacker + boostCountVictim);
 							SQLBIND(insertAngleStatement, int, "@boostCountAttacker", boostCountAttacker);
 							SQLBIND(insertAngleStatement, int, "@boostCountVictim", boostCountVictim);
+
+							if (canBeAirborne) {
+								if (killerProjectile == -1) {
+									SQLBIND_NULL(insertAngleStatement, "@projectileWasAirborne");
+								}
+								else {
+									SQLBIND(insertAngleStatement, int, "@projectileWasAirborne", projectileWasAirborne);
+								}
+							}
+							else {
+								SQLBIND_NULL(insertAngleStatement, "@projectileWasAirborne");
+							}
 
 							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
 							SQLBIND(insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
