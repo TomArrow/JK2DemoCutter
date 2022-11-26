@@ -83,6 +83,7 @@ Maybe ignore boosts for anything but saber kills? What's the point really? Also 
 Or: Only count mine boost kills if the killing mine was fired after the boost.
 Also maybe ignore boosts that are super slow and/or if they don't raise the speed above anything that you could achieve by just walking.
 horizontal and vertical separate
+Make travelled distance check in direction of boost?
 
 if player not visible or dead: immediate cancellation of boosts
 

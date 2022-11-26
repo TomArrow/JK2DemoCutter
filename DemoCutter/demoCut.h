@@ -302,6 +302,7 @@ typedef vec_t vec5_t[5];
 
 vec_t VectorLength(const vec3_t v);
 vec_t VectorLength2(const vec2_t v);
+vec_t VectorNormalize(vec3_t v);
 
 
 typedef enum {

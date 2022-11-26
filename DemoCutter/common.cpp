@@ -20,7 +20,21 @@ vec_t VectorLength2(const vec2_t v) {
 	return (vec_t)sqrtf(v[0] * v[0] + v[1] * v[1]);
 }
 
+vec_t VectorNormalize(vec3_t v) {
+	float	length, ilength;
 
+	length = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+	length = sqrt(length);
+
+	if (length) {
+		ilength = 1 / length;
+		v[0] *= ilength;
+		v[1] *= ilength;
+		v[2] *= ilength;
+	}
+
+	return length;
+}
 
 
 int		Cmd_Argc(void) {

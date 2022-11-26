@@ -247,6 +247,7 @@ class boost_t {
 public:
 	int64_t demoTime = -1;
 	vec3_t startPosition{ 0,0,0 };
+	vec3_t velocityDeltaVector{ 0,0,0 }; // To make sure that the minimum travel distance was traveled in the direction of the boost?  Worth a try
 	qboolean confirmed = qfalse; // This is set to true the first time we touch ground after the boost. That is when we test whether we have actually travelled a meaningful distance. 
 	// Ok but what if we touch ground very briefly after the boost for strafe? Hmm idk. Do we go more permissive direction? Maybe check whether the distance travelled is in reasonable relationship to velocity? Hmm that doesnt really work either
 
@@ -316,6 +317,18 @@ public:
 			return facingTowards[clientNum]; 
 		}
 		throw std::logic_error("Internal coding error: checkFacingTowards() didn't cover detect type.");
+	}
+	
+	// Instead of just checking if the total traveled distance is above minimum travel distance to be considered a real boost,
+	// we check if that traveled distance happened *in the direction of the boost*.
+	// Hence the dot product of the travel vector against the normalized bosot speed delta vector
+	inline qboolean checkDistanceTraveled(vec3_t currentPosition) {
+		vec3_t positionDeltaVector,deltaVectorNormalized;
+		VectorCopy(velocityDeltaVector, deltaVectorNormalized);
+		VectorNormalize(deltaVectorNormalized);
+		VectorSubtract(currentPosition,startPosition,positionDeltaVector);
+		float dot = DotProduct(deltaVectorNormalized, positionDeltaVector);
+		return (qboolean)(dot > minimumTravelDistance);
 	}
 };
 
@@ -1978,6 +1991,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						) {
 						boost_t newBoost;
 						VectorCopy(demo.cut.Cl.snap.ps.origin, newBoost.startPosition);
+						VectorSubtract(demo.cut.Cl.snap.ps.velocity, lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum], newBoost.velocityDeltaVector);
 						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.otherKiller >= 0 && demo.cut.Cl.snap.ps.otherKiller < MAX_CLIENTS) ?demo.cut.Cl.snap.ps.otherKiller:-1;
 						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 						newBoost.demoTime = demoCurrentTime;
@@ -2022,6 +2036,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							) { 
 							boost_t newBoost;
 							VectorCopy(demo.cut.Cl.snap.ps.origin,newBoost.startPosition);
+							VectorSubtract(demo.cut.Cl.snap.ps.velocity, lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum],newBoost.velocityDeltaVector);
 							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
 							newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 							newBoost.demoTime = demoCurrentTime;
@@ -2080,6 +2095,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							float verticalDelta = thisFrameInfo.playerVelocities[i][2] - lastFrameInfo.playerVelocities[i][2];
 							float verticalDeltaNormalized = verticalDelta <= 0 ? verticalDelta : std::min(thisFrameInfo.playerVelocities[i][2], verticalDelta); // If positive, we wanna avoid overly high numbers resulting from bunny hopping (because the negative falling velocity transitioning to jump delta is much higher than the jump delta itself)
 							VectorCopy(thisFrameInfo.playerPositions[i], newBoost.startPosition);
+							VectorSubtract(thisFrameInfo.playerVelocities[i], lastFrameInfo.playerVelocities[i], newBoost.velocityDeltaVector);
 							
 							qboolean downMoreThanGravityAllows = qfalse;
 							// If we kno command time, we can check if the downward acceleration is more than gravity would allow
@@ -2237,10 +2253,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							if (thisFrameInfo.entityExists[boostedClient] && lastFrameInfo.entityExists[boostedClient]
 								&& thisFrameInfo.groundEntityNum[boostedClient] == ENTITYNUM_WORLD && lastFrameInfo.groundEntityNum[boostedClient] != ENTITYNUM_WORLD
 								) {
-								float distanceTraveled = VectorDistance(thisFrameInfo.playerPositions[boostedClient],boosts[i].startPosition);
+								
+								if(!boosts[i].checkDistanceTraveled(thisFrameInfo.playerPositions[boostedClient])){
+								/*float distanceTraveled = VectorDistance(thisFrameInfo.playerPositions[boostedClient], boosts[i].startPosition);
 
 								if (distanceTraveled < boosts[i].minimumTravelDistance) {
-
+									*/
 									boosts.erase(boosts.begin() + i);
 								}
 								else {
@@ -2725,7 +2743,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
 										
 										// Ignore mini boosts?
-										if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
+										//if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
+										if (!boosts[i].confirmed && !boosts[i].checkDistanceTraveled(thisFrameInfo.playerPositions[boosts[i].boostedClientNum])) continue;
 
 										if (!boosts[i].checkFacingTowards(target)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
 
@@ -2736,7 +2755,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									else if (boosts[i].boostedClientNum == target && boosts[i].boosterClientNum != attacker) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
 
 										// Ignore mini boosts?
-										if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
+										//if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
+										if (!boosts[i].confirmed && !boosts[i].checkDistanceTraveled(thisFrameInfo.playerPositions[boosts[i].boostedClientNum])) continue;
 										
 										if (!boosts[i].checkFacingTowards(attacker)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
 
