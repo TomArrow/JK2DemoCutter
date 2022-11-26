@@ -182,29 +182,55 @@ std::map<int, int> timeCheckedForKillStreaks;
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
 
 enum BoostDetectionType {
+	BOOST_NONE,
 	BOOST_PLAYERSTATE,
 	BOOST_PLAYERSTATE_KNOCKBACK_FLAG,
 	BOOST_ENTITYSTATE_GUESS_VERTICAL,
 	BOOST_ENTITYSTATE_GUESS_HORIZONTAL,
 };
 
-struct boost_t {
-	int64_t demoTime;
-	int estimatedStrength;
-	int boostedClientNum;
-	int boosterClientNum;
-	BoostDetectionType detectType;
-	int isEnemyBoost; // -1 if unknown
-};
 
-std::vector<boost_t> boosts;
 
 #define BOOST_DETECT_MAX_AGE 5000
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE 100 // If the boost didn't send us flying at least 100 units... just ignore it. We were probably either standing on the ground and just slightly pushed aside, or pushed against a wall or some other random irrelevant thing. Otherwise we just get way too many misdetects.
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW 50 // This is the distance we will check was travel if BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY is reached.
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY 600 // If the velocity after the boost exceeds this value, we ill check only against BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY_ABSOLUTE 800 // If the velocity after the boost exceeds this value, we will automatically confirm the boost and not need to check travel distance. Reason is: Might super fast boost but get ignored because of a quick ground touch for strafe. This is a decent compromise I think.
 #define BOOST_DETECT_MAX_AGE_WALKING 1000 // If we are just walking (our velocity doesn't exceeed maximum walk speed), what age of boosts do we allow for consideration?
 #define BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD (JUMP_VELOCITY/2) // Vertical speed delta that must be detected for a boost (detected in playerstate) to be considered relevant (this isn't required if horizontal speed is above walking speed). Just set it to the minimum possible jump velocity/2. Just wanna avoid detecting micro-boosts that have no real impact on anything. 100-ish still won't be very meaningful usually but in some edge situations it might?
 #define BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD 150 // There are honestly so many different things that can give you a horizontal boost it's almost impossible to account for them all. But from my experience playing around, it seems very few if any non-boost situations speed you up by more than 150 in a single frame.
 #define BACKFLIP_MAX_VELOCITY_DELTA (JUMP_VELOCITY+128)
 #define YELLOWDFA_MAX_VELOCITY_DELTA 400
+
+class boost_t {
+public:
+	int64_t demoTime = -1;
+	vec3_t startPosition{ 0,0,0 };
+	qboolean confirmed = qfalse; // This is set to true the first time we touch ground after the boost. That is when we test whether we have actually travelled a meaningful distance. 
+	// Ok but what if we touch ground very briefly after the boost for strafe? Hmm idk. Do we go more permissive direction? Maybe check whether the distance travelled is in reasonable relationship to velocity? Hmm that doesnt really work either
+
+	float minimumTravelDistance = BOOST_DETECT_MIN_TRAVEL_DISTANCE; // This is the default to check against.
+
+	int estimatedStrength = -1; // -1 if unknown
+	int boostedClientNum = -1;
+	int boosterClientNum = -1; // -1 if unknown
+	BoostDetectionType detectType = BOOST_NONE;
+	int isEnemyBoost = -1; // -1 if unknown
+
+	// The reason we put a higher requirement on the slow speed boost is simple: High speed boosts are simply more interesting and we don't wanna lose them by accident.
+	void autoSetMinimumTravelDistance(float boostSpeed) {
+		if (boostSpeed > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY_ABSOLUTE) {
+			confirmed = qtrue; // Nothing more to do.
+		} else if (boostSpeed > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY) {
+			minimumTravelDistance = BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW;
+		}
+		else {
+			minimumTravelDistance = BOOST_DETECT_MIN_TRAVEL_DISTANCE;
+		}
+	}
+};
+
+std::vector<boost_t> boosts;
 
 enum trackedEntityType_t {
 	TET_NONE,
@@ -226,6 +252,7 @@ struct frameInfo_t {
 	qboolean isAlive[MAX_CLIENTS];
 	qboolean entityExists[MAX_GENTITIES];
 	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
+	vec3_t playerPositions[MAX_CLIENTS];
 	vec3_t playerVelocities[MAX_CLIENTS];
 	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
 	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
@@ -238,6 +265,7 @@ struct frameInfo_t {
 	int pmFlagTime[MAX_CLIENTS];
 	int commandTime[MAX_CLIENTS];
 	int legsAnim[MAX_CLIENTS];
+	int groundEntityNum[MAX_CLIENTS];
 };
 
 int64_t lastBackflip[MAX_CLIENTS];
@@ -1791,6 +1819,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							lastBackflip[thisEs->number] = -1;
 						}
 
+						thisFrameInfo.groundEntityNum[thisEs->number] = thisEs->groundEntityNum;
+						VectorCopy(thisEs->pos.trBase, thisFrameInfo.playerPositions[thisEs->number]);
 						VectorCopy(thisEs->pos.trDelta, thisFrameInfo.playerVelocities[thisEs->number]);
 						//thisFrameInfo.playerGSpeeds[thisEs->number] = thisEs->speed;
 						//thisFrameInfo.playerMaxWalkSpeed[thisEs->number] = sqrtf(thisEs->speed* thisEs->speed*2);
@@ -1849,6 +1879,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE) {
 						lastBackflip[demo.cut.Cl.snap.ps.clientNum] = -1;
 					}
+					thisFrameInfo.groundEntityNum[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.groundEntityNum;
+					VectorCopy(demo.cut.Cl.snap.ps.origin, thisFrameInfo.playerPositions[demo.cut.Cl.snap.ps.clientNum]);
 					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
 					//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
 					//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
@@ -1891,10 +1923,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						|| thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum]
 						) {
 						boost_t newBoost;
+						VectorCopy(demo.cut.Cl.snap.ps.origin, newBoost.startPosition);
 						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.otherKiller >= 0 && demo.cut.Cl.snap.ps.otherKiller < MAX_CLIENTS) ?demo.cut.Cl.snap.ps.otherKiller:-1;
 						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 						newBoost.demoTime = demoCurrentTime;
 						newBoost.detectType = BOOST_PLAYERSTATE;
+						//newBoost.confirmed = (qboolean)(VectorLength(thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY);
+						newBoost.autoSetMinimumTravelDistance(VectorLength(thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]));
 
 						// Determine teams of both
 						if (newBoost.boosterClientNum != -1) {
@@ -1932,10 +1967,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							// && VectorLength(demo.cut.Cl.snap.ps.velocity) > VectorLength(lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) // If the boost didn't actually increase our effective speed, don't consider it a boost (it's more of a brake I suppose).
 							) { 
 							boost_t newBoost;
+							VectorCopy(demo.cut.Cl.snap.ps.origin,newBoost.startPosition);
 							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
 							newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 							newBoost.demoTime = demoCurrentTime;
 							newBoost.detectType = BOOST_PLAYERSTATE_KNOCKBACK_FLAG;
+							//newBoost.confirmed = (qboolean)(VectorLength(thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY);
+							newBoost.autoSetMinimumTravelDistance(VectorLength(thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]));
 
 							// 
 							// Estimated strength calculation:
@@ -1987,14 +2025,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							qboolean horizontalSpeedAboveWalking = (qboolean)(VectorLength2(thisFrameInfo.playerVelocities[i]) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)); // TODO: use entity speed here
 							float verticalDelta = thisFrameInfo.playerVelocities[i][2] - lastFrameInfo.playerVelocities[i][2];
 							float verticalDeltaNormalized = verticalDelta <= 0 ? verticalDelta : std::min(thisFrameInfo.playerVelocities[i][2], verticalDelta); // If positive, we wanna avoid overly high numbers resulting from bunny hopping (because the negative falling velocity transitioning to jump delta is much higher than the jump delta itself)
-							
+							VectorCopy(thisFrameInfo.playerPositions[i], newBoost.startPosition);
 							
 							qboolean downMoreThanGravityAllows = qfalse;
 							// If we kno command time, we can check if the downward acceleration is more than gravity would allow
 							if (thisFrameInfo.commandTime[i] != -1 && lastFrameInfo.commandTime[i] != -1) {
 								int entityCommandTimeDelta = thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i];
 								float maximumGravityCausedDelta = -demo.cut.Cl.snap.ps.gravity * (float)entityCommandTimeDelta * 0.001f - 10.0f; // TODO: Make it use gravity of this ent?
-								if (verticalDelta < (downMoreThanGravityAllows - BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD)) {
+								if (verticalDelta < (maximumGravityCausedDelta - BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD)
+									&& thisFrameInfo.playerVelocities[i][2] < maximumGravityCausedDelta // If we hit a wall above us, that would reduce our speed to 0 immediately. So make sure our vertical speed is more negative than that would indicate
+									) {
+									// TODO: This doesn't take into account any possible bounce when hitting a wall on top? Does it bounce us back down? I'm not sure...
 									downMoreThanGravityAllows = qtrue;
 								}
 							}
@@ -2024,6 +2065,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_VERTICAL;
 							}
 							else if (downMoreThanGravityAllows) {
+
+								// TODO: Ok but what if we hit a wall above us?
 								isBoost = qtrue;
 								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_VERTICAL;
 							}
@@ -2040,6 +2083,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								newBoost.boostedClientNum = i;
 								newBoost.demoTime = demoCurrentTime;
 								newBoost.isEnemyBoost = -1;
+								//newBoost.confirmed = (qboolean)(VectorLength(thisFrameInfo.playerVelocities[i]) > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY); 
+								newBoost.autoSetMinimumTravelDistance(VectorLength(thisFrameInfo.playerVelocities[i]));
 
 								vec3_t lastVelocityTmp;
 								vec3_t velocityChange;
@@ -2112,6 +2157,34 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							) {
 
 							boosts.erase(boosts.begin()+i);
+						}
+					}
+
+					// Remove unconfirmed boosts that didn't result in meaningful movement
+					for (int i = boosts.size() - 1; i >= 0; i--) {
+						if (!boosts[i].confirmed) {
+							int boostedClient = boosts[i].boostedClientNum;
+
+							// If the boost isn't already confirmed, we check whether we traveled a meaningful distance. If not, we ditch the boost. Just to get rid of tiny irrelevant crap.
+							// A boost can be confirmed in 2 ways:
+							// 1. By having traveled enough distance from boost time to hitting ground again
+							// 2. Initial speed after boost was fast enough (above BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY atm)
+
+							// Entity exists in this and in the last frame
+							// In the last frame we were airborne (or at least not touching the level ground) and in this frame we are touching the level ground.
+							if (thisFrameInfo.entityExists[boostedClient] && lastFrameInfo.entityExists[boostedClient]
+								&& thisFrameInfo.groundEntityNum[boostedClient] == ENTITYNUM_WORLD && lastFrameInfo.groundEntityNum[boostedClient] != ENTITYNUM_WORLD
+								) {
+								float distanceTraveled = VectorDistance(thisFrameInfo.playerPositions[boostedClient],boosts[i].startPosition);
+
+								if (distanceTraveled < boosts[i].minimumTravelDistance) {
+
+									boosts.erase(boosts.begin() + i);
+								}
+								else {
+									boosts[i].confirmed = qtrue;
+								}
+							}
 						}
 					}
 				}
@@ -2586,12 +2659,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									qboolean doThis = qfalse;
 									// find out if we should even bother
 									if (boosts[i].boostedClientNum == attacker && boosts[i].boosterClientNum != target) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+									
+										if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
+										
+										// Ignore mini boosts?
+										if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
+
 										boostCountAttacker++;
 										doThis = qtrue;
 										boostsStringStream << "[KILLER by";
-										if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
 									}
 									else if (boosts[i].boostedClientNum == target && boosts[i].boosterClientNum != attacker) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+
+										// Ignore mini boosts?
+										if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
+										
 										boostCountVictim++;
 										doThis = qtrue;
 										boostsStringStream << "[VICTIM by";
@@ -2607,6 +2689,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									}
 									if (boosts[i].isEnemyBoost != -1) {
 										boostsStringStream << (boosts[i].isEnemyBoost ? (target == boosts[i].boosterClientNum ? " VICTIM]":" ENEMY]") :(boosts[i].boosterClientNum == attacker ? " SELF]" : " TEAM]"));
+									}
+									else {
+										boostsStringStream << " UNKNOWN]";
 									}
 									if (boosterName.size() > 0) {
 										boostsStringStream << " " << boosterName;

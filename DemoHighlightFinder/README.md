@@ -76,10 +76,20 @@ This is what the filename contains:
 1. Map name.
 2. Kill method. It's RET_ followed by the saber move/weapon/means of death. 
 	- **RET_RED** means the kill was a red slash. 
+	- **RET_RED_BF** means the kill was a red slash preceded by a backflip. Any **_BF** suffix on saber kills means it was preceded by a backflip. 
+      - Specifically, the backflip must have happened less than 1000ms (1 second) ago and must not have been interrupted by touching the ground.
 	- **RET_DOOM_~_DBS** means it was a doom kill, and at the time of the actual death, the killer was in a DBS saber move. Since some time passes between boost and actual death to fall damage, consider this a best guess.
 	- **RET_WEIRD** means the cause of death can't be determined. For example if one player's sentry explodes and another player dies from it. It can come with a guess as well, like DOOM.
 	- **RET_TELE** is one of those "player crushed player 2 into another dimension" kind of things. If someone spawns right where you are for example.
 	- **RET_DBS_345u**: For special attacks like DBS, there is a suffix indicating the speed in UPS (units per second) that the killer had at the time of triggering the dbs (not at the time of the kill).
+	- **RET_YEL_BST1A**: A **_BST** suffix indicates a boost that preceded the kill:
+      - Boosts can be either boosts of the attacker or of the victim. For example
+        - **_BST1A** would indicate 1 boost of the attacker.
+        - **_BST2V** would indicate 2 boosts of the victim.
+      - The detection of boosts is experimental and it might detect things that you don't consider to be a boost. Someone might be thrown against a wall from a slash and immediately lose his speed, but it will be detected as a boost anyway.
+      - Boosts are counted if they happened less than 5000ms (5 seconds) before a kill.
+      - If walking (moving on the ground below highest possible walk speed) is detected, it will invalidate boosts before the walk ***if*** the detected walking happened 1000ms (1 second) or longer before the kill. This is because you could be boosted towards someone but walk for half a second then before doing your kill. IT's still a valid detection.
+	- **RET_MINE** or **RET_MINE_AIR**: Mine kill. If the **_AIR** suffix is present, the mine was in the air when it hit the target/exploded, as opposed to sticking to a floor/wall at the time of explosion.
 	- Some of the possible saber moves are: 
 		- **RED** (red slash)
 		- **YEL** (yellow slash)
