@@ -146,6 +146,7 @@ public:
 	bool isVisible;
 	bool isFollowed;
 	int timeSinceSaberMoveChange;
+	int timeSinceBackflip;
 	float speedatSaberMoveChange;
 	float victimMaxSpeedPastSecond;
 	std::string hashSourceString;
@@ -183,7 +184,8 @@ std::map<int, int> timeCheckedForKillStreaks;
 enum BoostDetectionType {
 	BOOST_PLAYERSTATE,
 	BOOST_PLAYERSTATE_KNOCKBACK_FLAG,
-	BOOST_ENTITYSTATE_GUESS
+	BOOST_ENTITYSTATE_GUESS_VERTICAL,
+	BOOST_ENTITYSTATE_GUESS_HORIZONTAL,
 };
 
 struct boost_t {
@@ -200,6 +202,9 @@ std::vector<boost_t> boosts;
 #define BOOST_DETECT_MAX_AGE 5000
 #define BOOST_DETECT_MAX_AGE_WALKING 1000 // If we are just walking (our velocity doesn't exceeed maximum walk speed), what age of boosts do we allow for consideration?
 #define BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD (JUMP_VELOCITY/2) // Vertical speed delta that must be detected for a boost (detected in playerstate) to be considered relevant (this isn't required if horizontal speed is above walking speed). Just set it to the minimum possible jump velocity/2. Just wanna avoid detecting micro-boosts that have no real impact on anything. 100-ish still won't be very meaningful usually but in some edge situations it might?
+#define BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD 150 // There are honestly so many different things that can give you a horizontal boost it's almost impossible to account for them all. But from my experience playing around, it seems very few if any non-boost situations speed you up by more than 150 in a single frame.
+#define BACKFLIP_MAX_VELOCITY_DELTA (JUMP_VELOCITY+128)
+#define YELLOWDFA_MAX_VELOCITY_DELTA 400
 
 enum trackedEntityType_t {
 	TET_NONE,
@@ -218,6 +223,7 @@ struct entityOwnerInfo_t {
 
 
 struct frameInfo_t {
+	qboolean isAlive[MAX_CLIENTS];
 	qboolean entityExists[MAX_GENTITIES];
 	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
 	vec3_t playerVelocities[MAX_CLIENTS];
@@ -230,14 +236,22 @@ struct frameInfo_t {
 	qboolean pmFlagKnockback[MAX_CLIENTS];
 	qboolean psTeleportBit[MAX_CLIENTS];
 	int pmFlagTime[MAX_CLIENTS];
-	int psCommandTime[MAX_CLIENTS];
+	int commandTime[MAX_CLIENTS];
+	int legsAnim[MAX_CLIENTS];
 };
+
+int64_t lastBackflip[MAX_CLIENTS];
 
 //int64_t walkDetectedTime[MAX_CLIENTS];
 std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS];
 
 frameInfo_t lastFrameInfo;
 frameInfo_t thisFrameInfo;
+
+struct {
+	int maxForceJumpLevel;
+	float maxForceJumpVelocityDelta;
+} forcePowersInfo;
 
 
 // For calculating top/average speed of past second.
@@ -339,6 +353,39 @@ qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
 	return qfalse;
 }
 
+
+void updateForcePowersInfo(clientActive_t* clCut) {
+	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
+	const char* playerInfo = clCut->gameState.stringData + stringOffset;
+
+	int g_forcePowerDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
+	int g_maxForceRank = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_maxForceRank"));
+
+	if (g_forcePowerDisable & (1 << FP_LEVITATION))
+	{
+		forcePowersInfo.maxForceJumpLevel = 1; // Only Ysalamiri would be 0 I believe.
+	}
+	else {
+		// Just see what the theoretical maximum jump level is that any player on this server could have.
+		int maxPoints = forceMasteryPoints[std::clamp(g_maxForceRank,0,NUM_FORCE_MASTERY_LEVELS-1)];
+		int maxReachedJumpLevel = 0;
+		int availablePoints = maxPoints;
+		for (int i = 0; i < NUM_FORCE_POWER_LEVELS; i++) {
+			if (availablePoints >= bgForcePowerCost[FP_LEVITATION][i]) {
+				maxReachedJumpLevel = i;
+				availablePoints -= bgForcePowerCost[FP_LEVITATION][i];
+			}
+			else {
+				break;
+			}
+		}
+		forcePowersInfo.maxForceJumpLevel = maxReachedJumpLevel;
+	}
+
+	// Now calculate maximum vertical speed delta
+	int curHeight = 0;
+	forcePowersInfo.maxForceJumpVelocityDelta = (forceJumpHeight[forcePowersInfo.maxForceJumpLevel] - curHeight) / forceJumpHeight[forcePowersInfo.maxForceJumpLevel] * forceJumpStrength[forcePowersInfo.maxForceJumpLevel];
+}
 
 
 qboolean demoCutConfigstringModified(clientActive_t* clCut) {
@@ -1213,6 +1260,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(teamInfo,0,sizeof(teamInfo));
 	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
+	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
+	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		lastBackflip[i] = -1;
+	}
 	//for (int i = 0; i < MAX_CLIENTS; i++) {
 	//	walkDetectedTime[i] = -1;
 	//}
@@ -1327,6 +1379,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"currentSpeedTarget	REAL,"
 		"lastSaberMoveChangeSpeed	REAL,"
 		"timeSinceLastSaberMoveChange INTEGER,"
+		"timeSinceLastBackflip INTEGER,"
 		"meansOfDeathString	TEXT NOT NULL,"
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
@@ -1489,9 +1542,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1687,6 +1740,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				CheckForNameChanges(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement);
 				setPlayerAndTeamData(&demo.cut.Cl);
+				updateForcePowersInfo(&demo.cut.Cl);
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
 				//if (!newHandle) {
@@ -1724,11 +1778,25 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
 
+						thisFrameInfo.commandTime[thisEs->number] = thisEs->pos.trType == TR_LINEAR_STOP ? thisEs->pos.trTime : -1;
+						thisFrameInfo.legsAnim[thisEs->number] = thisEs->legsAnim;
+
+						// Backflip detection
+						if (lastFrameInfo.entityExists[thisEs->number] && thisEs->legsAnim != lastFrameInfo.legsAnim[thisEs->number] && isBackflip(thisEs->legsAnim, demoType)) {
+							lastBackflip[thisEs->number] = demoCurrentTime;
+						}
+
+						// Backflip interrupt (touching ground)
+						if (thisEs->groundEntityNum != ENTITYNUM_NONE) {
+							lastBackflip[thisEs->number] = -1;
+						}
+
 						VectorCopy(thisEs->pos.trDelta, thisFrameInfo.playerVelocities[thisEs->number]);
 						//thisFrameInfo.playerGSpeeds[thisEs->number] = thisEs->speed;
 						//thisFrameInfo.playerMaxWalkSpeed[thisEs->number] = sqrtf(thisEs->speed* thisEs->speed*2);
 
 						if (!(thisEs->eFlags & EF_DEAD)) { // Don't count speeds of dead bodies. They get boosts from dying.
+							thisFrameInfo.isAlive[thisEs->number] = qtrue;
 							//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
 							float speed = VectorLength(thisEs->pos.trDelta);
 							speeds[thisEs->number].push_back({ demoCurrentTime,speed });
@@ -1771,40 +1839,51 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 					}
 				}
-				VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
-				//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
-				//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
-				thisFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] = qtrue;
-				if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
-					//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
-					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
-					speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
-					// Is this client walking?
-					if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE && VectorLength(demo.cut.Cl.snap.ps.velocity) < sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)) {
-						// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
-						walkDetectedTimes[demo.cut.Cl.snap.ps.clientNum].push_back(demoCurrentTime);
+				{ // Playerstate tracking
+					thisFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.legsAnim;
+					// Backflip detection
+					if (lastFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] && demo.cut.Cl.snap.ps.legsAnim != lastFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] && isBackflip(demo.cut.Cl.snap.ps.legsAnim, demoType)) {
+						lastBackflip[demo.cut.Cl.snap.ps.clientNum] = demoCurrentTime;
 					}
+					// Backflip interrupt (touching ground)
+					if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE) {
+						lastBackflip[demo.cut.Cl.snap.ps.clientNum] = -1;
+					}
+					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
+					//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
+					//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
+					thisFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] = qtrue;
+					if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
+						thisFrameInfo.isAlive[demo.cut.Cl.snap.ps.clientNum] = qtrue;
+						//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
+						float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
+						speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed });
+						// Is this client walking?
+						if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE && VectorLength(demo.cut.Cl.snap.ps.velocity) < sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)) {
+							// TODO: better logic here. Im naively assuming that maximum theoretical walking speed equals sqrt(g_speed*g_speed+g_speed*g_speed). This is probably not entirely correct although the ballpark seems alright.
+							walkDetectedTimes[demo.cut.Cl.snap.ps.clientNum].push_back(demoCurrentTime);
+						}
 
 #ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
-					thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKillerTime;
-					thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
+						thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKillerTime;
+						thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
 #endif
 
-					// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
-					if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
-						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange = demoCurrentTime;
-						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove = demo.cut.Cl.snap.ps.saberMove;
-						playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].speed = speed;
+						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
+						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange = demoCurrentTime;
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove = demo.cut.Cl.snap.ps.saberMove;
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].speed = speed;
+						}
 					}
 				}
-
 
 				// Playerstate boost detection
 				// If otherKiller and otherKillerTime in PS has changed from last frame, this player is boosted. Add the boost to his list.
 				{
 					thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
 					thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_time;
-					thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
+					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
 					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT);
 
 #ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -1834,7 +1913,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						boosts.push_back(newBoost);
 					}
 #else
-					int psCommandTimeDelta = thisFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum] - lastFrameInfo.psCommandTime[demo.cut.Cl.snap.ps.clientNum];
+					int psCommandTimeDelta = thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] - lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum];
 					if (thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] == lastFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] &&   // Respawn/teleport also creates knockback. But we're not looking for that.
 						thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum]
 						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(psCommandTimeDelta))
@@ -1886,6 +1965,94 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 					}
 #endif
+
+					// THE BIG MESS: Entity boost detection
+					//  
+					// VERTICAL:
+					// We wanna avoid misdetecting simple jumps as boosts. So we need to know the maximum possible velocity delta that can be caused by jumps
+					// From bg_misc.c: bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS] -	{	0,	0,	2,	6	},	// Jump			//FP_LEVITATION,//hold/duration
+					// So cost for maximum jump force is: 8 points. Depending on maxForceRank players get: 0:0, 1:5, 2:10. So a maxForceRank of 2 is enough to buy full jump force.
+					// In general, we need:
+					// g_maxForceRank (see the maximum allowed jump height on server if force jump is enabled)
+					// g_forcePowerDisable (see if force jump is enabled at all)
+					//
+					for (int i = 0; i < MAX_CLIENTS; i++) {
+						// TODO: Make it work with boosts that happen on the exact frame spectator switches angle?
+						if (thisFrameInfo.entityExists[i] && lastFrameInfo.entityExists[i] && thisFrameInfo.isAlive[i] && lastFrameInfo.isAlive[i]) { // If we are dead it doesn't count as boost. That's just our corpse getting a speed bump
+
+							boost_t newBoost;
+
+							qboolean isBoost = qfalse;
+							float horizontalDelta = VectorLength2(thisFrameInfo.playerVelocities[i]) - VectorLength2(lastFrameInfo.playerVelocities[i]);
+							qboolean horizontalSpeedAboveWalking = (qboolean)(VectorLength2(thisFrameInfo.playerVelocities[i]) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)); // TODO: use entity speed here
+							float verticalDelta = thisFrameInfo.playerVelocities[i][2] - lastFrameInfo.playerVelocities[i][2];
+							float verticalDeltaNormalized = verticalDelta <= 0 ? verticalDelta : std::min(thisFrameInfo.playerVelocities[i][2], verticalDelta); // If positive, we wanna avoid overly high numbers resulting from bunny hopping (because the negative falling velocity transitioning to jump delta is much higher than the jump delta itself)
+							
+							
+							qboolean downMoreThanGravityAllows = qfalse;
+							// If we kno command time, we can check if the downward acceleration is more than gravity would allow
+							if (thisFrameInfo.commandTime[i] != -1 && lastFrameInfo.commandTime[i] != -1) {
+								int entityCommandTimeDelta = thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i];
+								float maximumGravityCausedDelta = -demo.cut.Cl.snap.ps.gravity * (float)entityCommandTimeDelta * 0.001f - 10.0f; // TODO: Make it use gravity of this ent?
+								if (verticalDelta < (downMoreThanGravityAllows - BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD)) {
+									downMoreThanGravityAllows = qtrue;
+								}
+							}
+
+							// Vertical boost detected
+							// TODO: Deal with jumpbug somehow? Not necessary for most maps tho, it will be lower than ordinary jump speed I think.
+							// TODO: Don't check against jump velocity if we are not in a jump?
+							// TODO: Detect horizontal boosts too
+							if (verticalDeltaNormalized > forcePowersInfo.maxForceJumpVelocityDelta) {
+								// If we are in a backflip, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a backflip
+								if (isBackflip(thisFrameInfo.legsAnim[i], demoType)){
+									if (thisFrameInfo.playerVelocities[i][2] > BACKFLIP_MAX_VELOCITY_DELTA) {
+										isBoost = qtrue;
+									}
+								} 
+								// If we are in a yellow dfa, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a yellow dfa
+								else if (playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_STAB || playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_SLASH){
+									if (thisFrameInfo.playerVelocities[i][2] > YELLOWDFA_MAX_VELOCITY_DELTA) {
+										isBoost = qtrue;
+									}
+								}
+								else {
+									// No special cases detected, consider this a boost.
+									isBoost = qtrue;
+								}
+									
+								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_VERTICAL;
+							}
+							else if (downMoreThanGravityAllows) {
+								isBoost = qtrue;
+								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_VERTICAL;
+							}
+							else if (horizontalDelta > BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD
+								&& horizontalSpeedAboveWalking
+								) { // Make sure we both got a boost and our resulting speed is more than walking speed. Otherwise a bit lame and uninteresting?
+								isBoost = qtrue;
+								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_HORIZONTAL;
+							}
+							
+							if (isBoost) {
+
+								newBoost.boosterClientNum = -1; // Kinda impossible to know
+								newBoost.boostedClientNum = i;
+								newBoost.demoTime = demoCurrentTime;
+								newBoost.isEnemyBoost = -1;
+
+								vec3_t lastVelocityTmp;
+								vec3_t velocityChange;
+								VectorCopy(lastFrameInfo.playerVelocities[i],lastVelocityTmp);
+								lastVelocityTmp[2] = std::max(lastVelocityTmp[2], 0.0f); // Again, avoid too big reads resulting from a big delta when falling and immediately jumping up again
+								VectorSubtract(thisFrameInfo.playerVelocities[i], lastVelocityTmp, velocityChange);
+								newBoost.estimatedStrength = VectorLength(velocityChange);
+
+								boosts.push_back(newBoost);
+							}
+						}
+					}
+
 
 					// Remove detected boosts that are too old to matter
 					int lastIndexToRemove = -1;
@@ -2089,6 +2256,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.isFollowed = attackerIsFollowed;
 							thisKill.victimMaxSpeedPastSecond = maxSpeedTargetFloat;
 							thisKill.timeSinceSaberMoveChange = isWorldKill ? -1 : (demoCurrentTime-playerLastSaberMove[attacker].lastSaberMoveChange);
+							thisKill.timeSinceBackflip = isWorldKill ? -1 : (lastBackflip[attacker] >= 0?(demoCurrentTime-lastBackflip[attacker]):-1);
 							thisKill.speedatSaberMoveChange = isWorldKill ? -1 : (playerLastSaberMove[attacker].speed);
 
 
@@ -2197,6 +2365,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 													modInfo <<"_" << (int)thisKill.speedatSaberMoveChange<<"u";
 												}
 											}
+										}
+										if (thisKill.timeSinceBackflip != -1 && thisKill.timeSinceBackflip < 1000) {
+											modInfo << "_BF";
 										}
 										break;
 									case WP_STUN_BATON:
@@ -2571,6 +2742,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							SQLBIND(insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
 							SQLBIND(insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
 							SQLBIND(insertAngleStatement, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
+							if (thisKill.timeSinceBackflip >= 0) {
+								SQLBIND(insertAngleStatement, int, "@timeSinceLastBackflip",thisKill.timeSinceBackflip);
+							}
+							else {
+								SQLBIND_NULL(insertAngleStatement, "@timeSinceLastBackflip");
+							}
 							SQLBIND_TEXT(insertAngleStatement, "@meansOfDeathString", modString);
 							SQLBIND_TEXT(insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
 							SQLBIND(insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
@@ -2623,7 +2800,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 							std::stringstream ss;
-							std::string boostString = ((boostCountAttacker + boostCountVictim) > 0 ? va("_BST%s%s", boostCountAttacker > 0 ? va("%dA", boostCountAttacker) : "", boostCountVictim > 0 ? va("%dV", boostCountVictim) : "") : "");
+							std::string boostString = ((boostCountAttacker + boostCountVictim) > 0 ?( va("_BST%s%s", boostCountAttacker > 0 ? va("%dA", boostCountAttacker) : "", boostCountVictim > 0 ? va("%dV", boostCountVictim) : "")) : "");
 							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 							std::string targetFilename = ss.str();
@@ -3508,6 +3685,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		if (hadConfigStringCommands) {
 			CheckForNameChanges(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement);
 			setPlayerAndTeamData(&demo.cut.Cl);
+			updateForcePowersInfo(&demo.cut.Cl);
 		}
 
 #if DEBUG

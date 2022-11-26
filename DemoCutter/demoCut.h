@@ -2002,7 +2002,46 @@ typedef struct {
 
 
 
+typedef enum {
+	FORCE_MASTERY_UNINITIATED,
+	FORCE_MASTERY_INITIATE,
+	FORCE_MASTERY_PADAWAN,
+	FORCE_MASTERY_JEDI,
+	FORCE_MASTERY_JEDI_GUARDIAN,
+	FORCE_MASTERY_JEDI_ADEPT,
+	FORCE_MASTERY_JEDI_KNIGHT,
+	FORCE_MASTERY_JEDI_MASTER,
+	NUM_FORCE_MASTERY_LEVELS
+} forceMastery_t;
+extern char* forceMasteryLevels[NUM_FORCE_MASTERY_LEVELS];
+extern int forceMasteryPoints[NUM_FORCE_MASTERY_LEVELS];
 
+extern int bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS];
+
+extern float forceJumpHeight[NUM_FORCE_POWER_LEVELS];
+extern float forceJumpStrength[NUM_FORCE_POWER_LEVELS];
+
+
+
+
+
+qboolean inline isBackflip(int legsAnim, demoType_t demoType) {
+
+	int legsAnimRaw = legsAnim & ~ANIM_TOGGLEBIT;
+	return (qboolean)(
+		(demoType == DM_15 && legsAnimRaw >= BOTH_FLIP_BACK1_15 && legsAnimRaw <= BOTH_FLIP_BACK3_15)
+		|| (demoType == DM_16 && legsAnimRaw >= BOTH_FLIP_BACK1 && legsAnimRaw <= BOTH_FLIP_BACK3) // TODO JKA?
+		);
+}
+qboolean inline isYellowDFA(int legsAnim, demoType_t demoType) {
+
+	int legsAnimRaw = legsAnim & ~ANIM_TOGGLEBIT;
+	return (qboolean)(
+		(demoType == DM_15 && legsAnimRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && legsAnimRaw <= BOTH_JUMPFLIPSTABDOWN_15)
+		|| (demoType == DM_16 && legsAnimRaw >= BOTH_JUMPFLIPSLASHDOWN1 && legsAnimRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
+		);
+}
+qboolean BG_SaberInSpecialAttack(int anim);
 
 
 

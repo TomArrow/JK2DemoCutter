@@ -254,11 +254,11 @@ void Cmd_TokenizeString(const char* text_in) {
 #define VABUFFERSIZE 32000
 char* QDECL va(const char* format, ...) {
 	va_list		argptr;
-	static char		string[2][VABUFFERSIZE];	// in case va is called by nested functions
+	static char		string[10][VABUFFERSIZE];	// in case va is called by nested functions
 	static int		index = 0;
 	char* buf;
 
-	buf = string[index & 1];
+	buf = string[index % 10];
 	index++;
 
 	va_start(argptr, format);
@@ -2289,4 +2289,81 @@ Only in One Flag CTF games
 };
 
 int		bg_numItems = sizeof(bg_itemlist) / sizeof(bg_itemlist[0]) - 1;
+
+
+
+int forceMasteryPoints[NUM_FORCE_MASTERY_LEVELS] =
+{
+	0,		// FORCE_MASTERY_UNINITIATED,
+	5,		// FORCE_MASTERY_INITIATE,
+	10,		// FORCE_MASTERY_PADAWAN,
+	20,		// FORCE_MASTERY_JEDI,
+	30,		// FORCE_MASTERY_JEDI_GUARDIAN,
+	50,		// FORCE_MASTERY_JEDI_ADEPT,
+	75,		// FORCE_MASTERY_JEDI_KNIGHT,
+	100		// FORCE_MASTERY_JEDI_MASTER,
+};
+
+int bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS] = //0 == neutral
+{
+	{	0,	2,	4,	6	},	// Heal			// FP_HEAL
+	{	0,	0,	2,	6	},	// Jump			//FP_LEVITATION,//hold/duration
+	{	0,	2,	4,	6	},	// Speed		//FP_SPEED,//duration
+	{	0,	1,	3,	6	},	// Push			//FP_PUSH,//hold/duration
+	{	0,	1,	3,	6	},	// Pull			//FP_PULL,//hold/duration
+	{	0,	4,	6,	8	},	// Mind Trick	//FP_TELEPATHY,//instant
+	{	0,	1,	3,	6	},	// Grip			//FP_GRIP,//hold/duration
+	{	0,	2,	5,	8	},	// Lightning	//FP_LIGHTNING,//hold/duration
+	{	0,	4,	6,	8	},	// Dark Rage	//FP_RAGE,//duration
+	{	0,	2,	5,	8	},	// Protection	//FP_PROTECT,//duration
+	{	0,	1,	3,	6	},	// Absorb		//FP_ABSORB,//duration
+	{	0,	1,	3,	6	},	// Team Heal	//FP_TEAM_HEAL,//instant
+	{	0,	1,	3,	6	},	// Team Force	//FP_TEAM_FORCE,//instant
+	{	0,	2,	4,	6	},	// Drain		//FP_DRAIN,//hold/duration
+	{	0,	2,	5,	8	},	// Sight		//FP_SEE,//duration
+	{	0,	1,	5,	8	},	// Saber Attack	//FP_SABERATTACK,
+	{	0,	1,	5,	8	},	// Saber Defend	//FP_SABERDEFEND,
+	{	0,	4,	6,	8	}	// Saber Throw	//FP_SABERTHROW,
+	//NUM_FORCE_POWERS
+};
+
+float forceJumpHeight[NUM_FORCE_POWER_LEVELS] =
+{
+	32,//normal jump (+stepheight+crouchdiff = 66)
+	96,//(+stepheight+crouchdiff = 130)
+	192,//(+stepheight+crouchdiff = 226)
+	384//(+stepheight+crouchdiff = 418)
+};
+
+float forceJumpStrength[NUM_FORCE_POWER_LEVELS] =
+{
+	JUMP_VELOCITY,//normal jump
+	420,
+	590,
+	840
+};
+
+
+
+qboolean BG_SaberInSpecialAttack(int anim)
+{
+	switch (anim & ~ANIM_TOGGLEBIT)
+	{
+	case BOTH_A2_STABBACK1:
+	case BOTH_ATTACK_BACK:
+	case BOTH_CROUCHATTACKBACK1:
+	case BOTH_BUTTERFLY_LEFT:
+	case BOTH_BUTTERFLY_RIGHT:
+	case BOTH_FJSS_TR_BL:
+	case BOTH_FJSS_TL_BR:
+	case BOTH_LUNGE2_B__T_:
+	case BOTH_FORCELEAP2_T__B_:
+	case BOTH_JUMPFLIPSLASHDOWN1://#
+	case BOTH_JUMPFLIPSTABDOWN://#
+		return qtrue;
+	}
+	return qfalse;
+}
+
+
 
