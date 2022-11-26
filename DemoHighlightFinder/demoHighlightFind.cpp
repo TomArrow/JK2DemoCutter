@@ -181,6 +181,47 @@ std::map<int, int> timeCheckedForKillStreaks;
 #define MAX_ASSUMED_SERVER_FPS 200
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
 
+
+enum trackedEntityType_t {
+	TET_NONE,
+	TET_TRIPMINE
+};
+
+#define TETFLAG_EXPLODED 1
+#define TETFLAG_AIRBORNE 2
+
+struct entityOwnerInfo_t {
+	int64_t firstSeen; // Demo time of time we started tracking this item
+	trackedEntityType_t type;
+	int owner;
+	int flags;
+}; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
+
+
+
+struct frameInfo_t {
+	qboolean isAlive[MAX_CLIENTS];
+	qboolean entityExists[MAX_GENTITIES];
+	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
+	vec3_t playerPositions[MAX_CLIENTS];
+	vec3_t playerVelocities[MAX_CLIENTS];
+	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
+	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
+#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
+	int otherKillerValue[MAX_CLIENTS];
+	int otherKillerTime[MAX_CLIENTS];
+#endif
+	qboolean pmFlagKnockback[MAX_CLIENTS];
+	qboolean psTeleportBit[MAX_CLIENTS];
+	int pmFlagTime[MAX_CLIENTS];
+	int commandTime[MAX_CLIENTS];
+	int legsAnim[MAX_CLIENTS];
+	int groundEntityNum[MAX_CLIENTS];
+};
+frameInfo_t lastFrameInfo;
+frameInfo_t thisFrameInfo;
+
+
 enum BoostDetectionType {
 	BOOST_NONE,
 	BOOST_PLAYERSTATE,
@@ -217,8 +258,10 @@ public:
 	BoostDetectionType detectType = BOOST_NONE;
 	int isEnemyBoost = -1; // -1 if unknown
 
+	qboolean facingTowards[MAX_CLIENTS] = {}; // For each 
+
 	// The reason we put a higher requirement on the slow speed boost is simple: High speed boosts are simply more interesting and we don't wanna lose them by accident.
-	void autoSetMinimumTravelDistance(float boostSpeed) {
+	inline void autoSetMinimumTravelDistance(const float boostSpeed) {
 		if (boostSpeed > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY_ABSOLUTE) {
 			confirmed = qtrue; // Nothing more to do.
 		} else if (boostSpeed > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY) {
@@ -228,53 +271,64 @@ public:
 			minimumTravelDistance = BOOST_DETECT_MIN_TRAVEL_DISTANCE;
 		}
 	}
+
+	// 
+	inline void setFacingTowards(const frameInfo_t* referenceFrame, const vec3_t boostVelocityDelta) {
+		if (boostedClientNum == -1 || detectType == BOOST_NONE) {
+			throw std::logic_error("Internal coding error: boostedClientNum and detectType must be set before calling setFacingTowards()");
+		}
+
+		if (detectType >= BOOST_PLAYERSTATE && detectType <= BOOST_PLAYERSTATE_KNOCKBACK_FLAG) return; // We only do this check for entity boosts. For playerstate boosts we know who boosted us so we can avoid useless boosts (like results from fighting against each other)
+		
+		if (!referenceFrame->entityExists[boostedClientNum]) {
+			throw std::logic_error("Internal coding error: boostedClientNum entity doesn't exist in referenceFrame in setFacingTowards()");
+		}
+
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+			if (referenceFrame->entityExists[i]) { // If it doesn't exist, we will just assume we're not facing towards it. Better avoid misdetects than to avoid missing out. Or we end up cluttered with nonsense invalid boosts
+				static vec3_t vectorTowardsOtherClient;
+				VectorSubtract(referenceFrame->playerPositions[i], referenceFrame->playerPositions[boostedClientNum], vectorTowardsOtherClient);
+
+				// Dot product tells us, roughly speaking, whether two vectors are pointing in the same direction
+				// Or rather, it gives us the degree to which a vector extends along the length of another?
+				// Either way this should do the trick. In some other circumstances we might normalize the vectors first,
+				// but we don't care about absolute values, only whether > 0 so it doesn't really matter.
+				float dot = DotProduct(vectorTowardsOtherClient, boostVelocityDelta); 
+				if (dot > 0) {
+					facingTowards[i] = qtrue;
+				}
+			}
+		}
+		facingTowards[boostedClientNum] = qtrue; // Erm... I guess if it was a suicide? Always allow then? Idk. Deal with this some other time.
+	}
+
+	inline qboolean checkFacingTowards(const int clientNum) {
+		if (boostedClientNum == -1 || detectType == BOOST_NONE) {
+			throw std::logic_error("Internal coding error: boostedClientNum and detectType must be set before calling checkFacingTowards()");
+		}
+		if (detectType >= BOOST_PLAYERSTATE && detectType <= BOOST_PLAYERSTATE_KNOCKBACK_FLAG) {
+			return qtrue; // We only do this check for entity boosts. For playerstate boosts we know who boosted us so we can avoid useless boosts (like results from fighting against each other)
+		}
+		else if(detectType >= BOOST_ENTITYSTATE_GUESS_VERTICAL && detectType <= BOOST_ENTITYSTATE_GUESS_HORIZONTAL) {
+
+			// But what if we just didn't know at the time?
+			// Too bad. Better avoid misdetects.
+			return facingTowards[clientNum]; 
+		}
+		throw std::logic_error("Internal coding error: checkFacingTowards() didn't cover detect type.");
+	}
 };
 
 std::vector<boost_t> boosts;
 
-enum trackedEntityType_t {
-	TET_NONE,
-	TET_TRIPMINE
-};
-
-#define TETFLAG_EXPLODED 1
-#define TETFLAG_AIRBORNE 2
-
-struct entityOwnerInfo_t {
-	int64_t firstSeen; // Demo time of time we started tracking this item
-	trackedEntityType_t type;
-	int owner;
-	int flags;
-}; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
 
 
-struct frameInfo_t {
-	qboolean isAlive[MAX_CLIENTS];
-	qboolean entityExists[MAX_GENTITIES];
-	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
-	vec3_t playerPositions[MAX_CLIENTS];
-	vec3_t playerVelocities[MAX_CLIENTS];
-	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
-	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
-#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
-	int otherKillerValue[MAX_CLIENTS];
-	int otherKillerTime[MAX_CLIENTS];
-#endif
-	qboolean pmFlagKnockback[MAX_CLIENTS];
-	qboolean psTeleportBit[MAX_CLIENTS];
-	int pmFlagTime[MAX_CLIENTS];
-	int commandTime[MAX_CLIENTS];
-	int legsAnim[MAX_CLIENTS];
-	int groundEntityNum[MAX_CLIENTS];
-};
 
 int64_t lastBackflip[MAX_CLIENTS];
 
 //int64_t walkDetectedTime[MAX_CLIENTS];
 std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS];
 
-frameInfo_t lastFrameInfo;
-frameInfo_t thisFrameInfo;
 
 struct {
 	int maxForceJumpLevel;
@@ -2086,6 +2140,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								//newBoost.confirmed = (qboolean)(VectorLength(thisFrameInfo.playerVelocities[i]) > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY); 
 								newBoost.autoSetMinimumTravelDistance(VectorLength(thisFrameInfo.playerVelocities[i]));
 
+								// See which players we are facing.
+								// Since we don't have info about who boosted us for entities, we have to do a more dirty approach and only accept boosts that go in the direction of the killer/victim, 
+								// but we can only determine this at a later stage when the kill actually happens (since we don't yet know who will do a kill), so we predetermine who the boosted person
+								// is facing right now.
+								static vec3_t velocityDelta3d;
+								VectorSubtract(thisFrameInfo.playerVelocities[i], lastFrameInfo.playerVelocities[i],velocityDelta3d);
+								newBoost.setFacingTowards(&thisFrameInfo, velocityDelta3d);
+
 								vec3_t lastVelocityTmp;
 								vec3_t velocityChange;
 								VectorCopy(lastFrameInfo.playerVelocities[i],lastVelocityTmp);
@@ -2665,6 +2727,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										// Ignore mini boosts?
 										if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
 
+										if (!boosts[i].checkFacingTowards(target)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
+
 										boostCountAttacker++;
 										doThis = qtrue;
 										boostsStringStream << "[KILLER by";
@@ -2674,6 +2738,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										// Ignore mini boosts?
 										if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
 										
+										if (!boosts[i].checkFacingTowards(attacker)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
+
 										boostCountVictim++;
 										doThis = qtrue;
 										boostsStringStream << "[VICTIM by";
