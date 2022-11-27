@@ -2193,7 +2193,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							float horizontalSpeedToExceed = maximumWalkSpeed;
 							if (playerIsDFAing) {
-								horizontalSpeedToExceed = std::max(maximumWalkSpeed,DFA_MAX_VELOCITY_DELTA_HORZ);
+								horizontalSpeedToExceed = std::max(maximumWalkSpeed,DFA_MAX_VELOCITY_DELTA_HORZ+5.0f); // Adding 5 here because apparently in some rare situations we can get a horizontal speed of like 300.5 and such for a DFA. Not sure why. Just adding a little safety buffer there.
 							}
 							if (horizontalDelta > BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD
 								&& horizontalSpeed > horizontalSpeedToExceed
