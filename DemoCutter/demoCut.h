@@ -2026,20 +2026,28 @@ extern float forceJumpStrength[NUM_FORCE_POWER_LEVELS];
 
 
 
-qboolean inline isBackflip(int legsAnim, demoType_t demoType) {
+qboolean inline isBackflip(int anim, demoType_t demoType) {
 
-	int legsAnimRaw = legsAnim & ~ANIM_TOGGLEBIT;
+	int animRaw = anim & ~ANIM_TOGGLEBIT;
 	return (qboolean)(
-		(demoType == DM_15 && legsAnimRaw >= BOTH_FLIP_BACK1_15 && legsAnimRaw <= BOTH_FLIP_BACK3_15)
-		|| (demoType == DM_16 && legsAnimRaw >= BOTH_FLIP_BACK1 && legsAnimRaw <= BOTH_FLIP_BACK3) // TODO JKA?
+		(demoType == DM_15 && animRaw >= BOTH_FLIP_BACK1_15 && animRaw <= BOTH_FLIP_BACK3_15)
+		|| (demoType == DM_16 && animRaw >= BOTH_FLIP_BACK1 && animRaw <= BOTH_FLIP_BACK3) // TODO JKA?
 		);
 }
-qboolean inline isYellowDFA(int legsAnim, demoType_t demoType) {
+qboolean inline isYellowDFA(int anim, demoType_t demoType) {
 
-	int legsAnimRaw = legsAnim & ~ANIM_TOGGLEBIT;
+	int animRaw = anim & ~ANIM_TOGGLEBIT;
 	return (qboolean)(
-		(demoType == DM_15 && legsAnimRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && legsAnimRaw <= BOTH_JUMPFLIPSTABDOWN_15)
-		|| (demoType == DM_16 && legsAnimRaw >= BOTH_JUMPFLIPSLASHDOWN1 && legsAnimRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
+		(demoType == DM_15 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && animRaw <= BOTH_JUMPFLIPSTABDOWN_15)
+		|| (demoType == DM_16 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1 && animRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
+		);
+}
+qboolean inline isDFA(int anim, demoType_t demoType) {
+
+	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	return (qboolean)(
+		(demoType == DM_15 && animRaw == BOTH_FORCELEAP2_T__B__15)
+		|| (demoType == DM_16 && animRaw == BOTH_FORCELEAP2_T__B_) // TODO JKA?
 		);
 }
 qboolean BG_SaberInSpecialAttack(int anim);

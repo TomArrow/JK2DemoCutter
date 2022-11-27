@@ -216,6 +216,7 @@ struct frameInfo_t {
 	int pmFlagTime[MAX_CLIENTS];
 	int commandTime[MAX_CLIENTS];
 	int legsAnim[MAX_CLIENTS];
+	int torsoAnim[MAX_CLIENTS];
 	int groundEntityNum[MAX_CLIENTS];
 };
 frameInfo_t lastFrameInfo;
@@ -228,20 +229,24 @@ enum BoostDetectionType {
 	BOOST_PLAYERSTATE_KNOCKBACK_FLAG,
 	BOOST_ENTITYSTATE_GUESS_VERTICAL,
 	BOOST_ENTITYSTATE_GUESS_HORIZONTAL,
+	BOOST_ENTITYSTATE_GUESS_HORIZONTAL_AND_VERTICAL,
 };
 
 
 
 #define BOOST_DETECT_MAX_AGE 5000
-#define BOOST_DETECT_MIN_TRAVEL_DISTANCE 100 // If the boost didn't send us flying at least 100 units... just ignore it. We were probably either standing on the ground and just slightly pushed aside, or pushed against a wall or some other random irrelevant thing. Otherwise we just get way too many misdetects.
-#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW 50 // This is the distance we will check was travel if BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY is reached.
-#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY 600 // If the velocity after the boost exceeds this value, we ill check only against BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW
-#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY_ABSOLUTE 800 // If the velocity after the boost exceeds this value, we will automatically confirm the boost and not need to check travel distance. Reason is: Might super fast boost but get ignored because of a quick ground touch for strafe. This is a decent compromise I think.
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE 100.0f // If the boost didn't send us flying at least 100 units... just ignore it. We were probably either standing on the ground and just slightly pushed aside, or pushed against a wall or some other random irrelevant thing. Otherwise we just get way too many misdetects.
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW 50.0f // This is the distance we will check was travel if BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY is reached.
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY 600.0f // If the velocity after the boost exceeds this value, we ill check only against BOOST_DETECT_MIN_TRAVEL_DISTANCE_LOW
+#define BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY_ABSOLUTE 800.0f // If the velocity after the boost exceeds this value, we will automatically confirm the boost and not need to check travel distance. Reason is: Might super fast boost but get ignored because of a quick ground touch for strafe. This is a decent compromise I think.
 #define BOOST_DETECT_MAX_AGE_WALKING 1000 // If we are just walking (our velocity doesn't exceeed maximum walk speed), what age of boosts do we allow for consideration?
-#define BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD (JUMP_VELOCITY/2) // Vertical speed delta that must be detected for a boost (detected in playerstate) to be considered relevant (this isn't required if horizontal speed is above walking speed). Just set it to the minimum possible jump velocity/2. Just wanna avoid detecting micro-boosts that have no real impact on anything. 100-ish still won't be very meaningful usually but in some edge situations it might?
-#define BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD 150 // There are honestly so many different things that can give you a horizontal boost it's almost impossible to account for them all. But from my experience playing around, it seems very few if any non-boost situations speed you up by more than 150 in a single frame.
-#define BACKFLIP_MAX_VELOCITY_DELTA (JUMP_VELOCITY+128)
-#define YELLOWDFA_MAX_VELOCITY_DELTA 400
+#define BOOST_PS_VERTICAL_SPEED_DELTA_DETECT_THRESHOLD ((float)(JUMP_VELOCITY/2)) // Vertical speed delta that must be detected for a boost (detected in playerstate) to be considered relevant (this isn't required if horizontal speed is above walking speed). Just set it to the minimum possible jump velocity/2. Just wanna avoid detecting micro-boosts that have no real impact on anything. 100-ish still won't be very meaningful usually but in some edge situations it might?
+#define BLUEUPPERCUT_MAX_VELOCITY_DELTA_HORZ 150.0f // There are honestly so many different things that can give you a horizontal boost it's almost impossible to account for them all. But from my experience playing around, it seems very few if any non-boost situations speed you up by more than 150 in a single frame.
+#define BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD BLUEUPPERCUT_MAX_VELOCITY_DELTA_HORZ // There are honestly so many different things that can give you a horizontal boost it's almost impossible to account for them all. But from my experience playing around, it seems very few if any non-boost situations speed you up by more than 150 in a single frame. That also happens to be the maximum horizontal boost you get from blue uppercut. Additionally though, we need to check for DFA, since it can give you a 300 forward boost
+#define BACKFLIP_MAX_VELOCITY_DELTA_VERT ((float)(JUMP_VELOCITY+128))
+#define YELLOWDFA_MAX_VELOCITY_DELTA_VERT 400.0f
+#define DFA_MAX_VELOCITY_DELTA_VERT 280.0f
+#define DFA_MAX_VELOCITY_DELTA_HORZ 300.0f
 
 class boost_t {
 public:
@@ -310,7 +315,7 @@ public:
 		if (detectType >= BOOST_PLAYERSTATE && detectType <= BOOST_PLAYERSTATE_KNOCKBACK_FLAG) {
 			return qtrue; // We only do this check for entity boosts. For playerstate boosts we know who boosted us so we can avoid useless boosts (like results from fighting against each other)
 		}
-		else if(detectType >= BOOST_ENTITYSTATE_GUESS_VERTICAL && detectType <= BOOST_ENTITYSTATE_GUESS_HORIZONTAL) {
+		else if(detectType >= BOOST_ENTITYSTATE_GUESS_VERTICAL && detectType <= BOOST_ENTITYSTATE_GUESS_HORIZONTAL_AND_VERTICAL) {
 
 			// But what if we just didn't know at the time?
 			// Too bad. Better avoid misdetects.
@@ -1875,14 +1880,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 						thisFrameInfo.commandTime[thisEs->number] = thisEs->pos.trType == TR_LINEAR_STOP ? thisEs->pos.trTime : -1;
 						thisFrameInfo.legsAnim[thisEs->number] = thisEs->legsAnim;
+						thisFrameInfo.torsoAnim[thisEs->number] = thisEs->torsoAnim;
 
 						// Backflip detection
-						if (lastFrameInfo.entityExists[thisEs->number] && thisEs->legsAnim != lastFrameInfo.legsAnim[thisEs->number] && isBackflip(thisEs->legsAnim, demoType)) {
+						if (
+							lastFrameInfo.entityExists[thisEs->number] && (
+								(thisEs->legsAnim != lastFrameInfo.legsAnim[thisEs->number] && isBackflip(thisEs->legsAnim, demoType))
+							|| (thisEs->torsoAnim != lastFrameInfo.torsoAnim[thisEs->number] && isBackflip(thisEs->torsoAnim, demoType))
+							)) {
 							lastBackflip[thisEs->number] = demoCurrentTime;
 						}
-
-						// Backflip interrupt (touching ground)
-						if (thisEs->groundEntityNum != ENTITYNUM_NONE) {
+						// Backflip interrupt (touching ground) (don't interrupt if we still happen to be on ground on first frame of backflip?)
+						else if (thisEs->groundEntityNum != ENTITYNUM_NONE) {
 							lastBackflip[thisEs->number] = -1;
 						}
 
@@ -1938,14 +1947,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				}
 				{ // Playerstate tracking
 					thisFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.legsAnim;
+					thisFrameInfo.torsoAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.torsoAnim;
+
 					// Backflip detection
-					if (lastFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] && demo.cut.Cl.snap.ps.legsAnim != lastFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] && isBackflip(demo.cut.Cl.snap.ps.legsAnim, demoType)) {
+					if (
+						lastFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] && (
+							(demo.cut.Cl.snap.ps.legsAnim != lastFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] && isBackflip(demo.cut.Cl.snap.ps.legsAnim, demoType))
+							|| (demo.cut.Cl.snap.ps.torsoAnim != lastFrameInfo.torsoAnim[demo.cut.Cl.snap.ps.clientNum] && isBackflip(demo.cut.Cl.snap.ps.torsoAnim, demoType))
+							)) {
 						lastBackflip[demo.cut.Cl.snap.ps.clientNum] = demoCurrentTime;
 					}
-					// Backflip interrupt (touching ground)
-					if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE) {
+					// Backflip interrupt (touching ground) (don't interrupt if we still happen to be on ground on first frame of backflip?)
+					else if (demo.cut.Cl.snap.ps.groundEntityNum != ENTITYNUM_NONE) {
 						lastBackflip[demo.cut.Cl.snap.ps.clientNum] = -1;
 					}
+
 					thisFrameInfo.groundEntityNum[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.groundEntityNum;
 					VectorCopy(demo.cut.Cl.snap.ps.origin, thisFrameInfo.playerPositions[demo.cut.Cl.snap.ps.clientNum]);
 					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
@@ -1977,9 +1993,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					}
 				}
 
+				
+
 				// Playerstate boost detection
 				// If otherKiller and otherKillerTime in PS has changed from last frame, this player is boosted. Add the boost to his list.
 				{
+					qboolean playerStateBoostDetected = qfalse;
 					thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
 					thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_time;
 					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
@@ -1989,6 +2008,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					if (thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum]
 						|| thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum]
 						) {
+						
+						playerStateBoostDetected = qtrue;
+						
 						boost_t newBoost;
 						VectorCopy(demo.cut.Cl.snap.ps.origin, newBoost.startPosition);
 						VectorSubtract(demo.cut.Cl.snap.ps.velocity, lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum], newBoost.velocityDeltaVector);
@@ -1998,6 +2020,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						newBoost.detectType = BOOST_PLAYERSTATE;
 						//newBoost.confirmed = (qboolean)(VectorLength(thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) > BOOST_DETECT_MIN_TRAVEL_DISTANCE_OVERRIDE_VELOCITY);
 						newBoost.autoSetMinimumTravelDistance(VectorLength(thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]));
+
 
 						// Determine teams of both
 						if (newBoost.boosterClientNum != -1) {
@@ -2034,6 +2057,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							// TODO: Separate handling for vertical and horizontal
 							// && VectorLength(demo.cut.Cl.snap.ps.velocity) > VectorLength(lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]) // If the boost didn't actually increase our effective speed, don't consider it a boost (it's more of a brake I suppose).
 							) { 
+
+							playerStateBoostDetected = qtrue;
+
 							boost_t newBoost;
 							VectorCopy(demo.cut.Cl.snap.ps.origin,newBoost.startPosition);
 							VectorSubtract(demo.cut.Cl.snap.ps.velocity, lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum],newBoost.velocityDeltaVector);
@@ -2084,6 +2110,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					// g_forcePowerDisable (see if force jump is enabled at all)
 					//
 					for (int i = 0; i < MAX_CLIENTS; i++) {
+						if (i == demo.cut.Cl.snap.ps.clientNum && playerStateBoostDetected) continue; // Playerstate boosts are processed separately and we want to avoid dupes. However sometimes the playerstate detection doesn't properly work so if nothing was detected in playerstate, we will use this as a backup.
+
 						// TODO: Make it work with boosts that happen on the exact frame spectator switches angle?
 						if (thisFrameInfo.entityExists[i] && lastFrameInfo.entityExists[i] && thisFrameInfo.isAlive[i] && lastFrameInfo.isAlive[i]) { // If we are dead it doesn't count as boost. That's just our corpse getting a speed bump
 
@@ -2091,7 +2119,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							qboolean isBoost = qfalse;
 							float horizontalDelta = VectorLength2(thisFrameInfo.playerVelocities[i]) - VectorLength2(lastFrameInfo.playerVelocities[i]);
-							qboolean horizontalSpeedAboveWalking = (qboolean)(VectorLength2(thisFrameInfo.playerVelocities[i]) > sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2)); // TODO: use entity speed here
+							float maximumWalkSpeed = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
+							float horizontalSpeed = VectorLength2(thisFrameInfo.playerVelocities[i]);
+							//qboolean horizontalSpeedAboveWalking = (qboolean)(horizontalSpeed > maximumWalkSpeed); // TODO: use entity speed here
 							float verticalDelta = thisFrameInfo.playerVelocities[i][2] - lastFrameInfo.playerVelocities[i][2];
 							float verticalDeltaNormalized = verticalDelta <= 0 ? verticalDelta : std::min(thisFrameInfo.playerVelocities[i][2], verticalDelta); // If positive, we wanna avoid overly high numbers resulting from bunny hopping (because the negative falling velocity transitioning to jump delta is much higher than the jump delta itself)
 							VectorCopy(thisFrameInfo.playerPositions[i], newBoost.startPosition);
@@ -2110,20 +2140,40 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								}
 							}
 
+							qboolean playerIsDFAing = (qboolean)((thisFrameInfo.legsAnim[i] != lastFrameInfo.legsAnim[i] && isDFA(thisFrameInfo.legsAnim[i], demoType))
+								|| (thisFrameInfo.torsoAnim[i] != lastFrameInfo.torsoAnim[i] && isDFA(thisFrameInfo.torsoAnim[i], demoType)));
+
 							// Vertical boost detected
 							// TODO: Deal with jumpbug somehow? Not necessary for most maps tho, it will be lower than ordinary jump speed I think.
 							// TODO: Don't check against jump velocity if we are not in a jump?
 							// TODO: Detect horizontal boosts too
 							if (verticalDeltaNormalized > forcePowersInfo.maxForceJumpVelocityDelta) {
+
+								// If we are in a dfa, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a yellow dfa
+								// if (playerLastSaberMove[i].lastSaberMove == LS_A_JUMP_T__B_){
+								if (playerIsDFAing) {
+									//if (thisFrameInfo.playerVelocities[i][2] > DFA_MAX_VELOCITY_DELTA_VERT) {
+									if (verticalDeltaNormalized > DFA_MAX_VELOCITY_DELTA_VERT) {
+										isBoost = qtrue;
+									}
+								}
 								// If we are in a backflip, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a backflip
-								if (isBackflip(thisFrameInfo.legsAnim[i], demoType)){
-									if (thisFrameInfo.playerVelocities[i][2] > BACKFLIP_MAX_VELOCITY_DELTA) {
+								//if (isBackflip(thisFrameInfo.legsAnim[i],thisFrameInfo.torsoAnim[i], demoType)){
+								else if ((thisFrameInfo.legsAnim[i] != lastFrameInfo.legsAnim[i] && isBackflip(thisFrameInfo.legsAnim[i],demoType))
+									|| (thisFrameInfo.torsoAnim[i] != lastFrameInfo.torsoAnim[i] && isBackflip(thisFrameInfo.torsoAnim[i], demoType))
+									){
+									//if (thisFrameInfo.playerVelocities[i][2] > BACKFLIP_MAX_VELOCITY_DELTA_VERT) {
+									if (verticalDeltaNormalized > BACKFLIP_MAX_VELOCITY_DELTA_VERT) {
 										isBoost = qtrue;
 									}
 								} 
 								// If we are in a yellow dfa, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a yellow dfa
-								else if (playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_STAB || playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_SLASH){
-									if (thisFrameInfo.playerVelocities[i][2] > YELLOWDFA_MAX_VELOCITY_DELTA) {
+								//else if (playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_STAB || playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_SLASH){
+								else if ((thisFrameInfo.legsAnim[i] != lastFrameInfo.legsAnim[i] && isYellowDFA(thisFrameInfo.legsAnim[i], demoType))
+									|| (thisFrameInfo.torsoAnim[i] != lastFrameInfo.torsoAnim[i] && isYellowDFA(thisFrameInfo.torsoAnim[i], demoType))
+									){
+									//if (thisFrameInfo.playerVelocities[i][2] > YELLOWDFA_MAX_VELOCITY_DELTA_VERT) {
+									if (verticalDeltaNormalized > YELLOWDFA_MAX_VELOCITY_DELTA_VERT) {
 										isBoost = qtrue;
 									}
 								}
@@ -2134,17 +2184,23 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									
 								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_VERTICAL;
 							}
-							else if (downMoreThanGravityAllows) {
+							if (downMoreThanGravityAllows) {
 
 								// TODO: Ok but what if we hit a wall above us?
 								isBoost = qtrue;
 								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_VERTICAL;
 							}
-							else if (horizontalDelta > BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD
-								&& horizontalSpeedAboveWalking
+
+							float horizontalSpeedToExceed = maximumWalkSpeed;
+							if (playerIsDFAing) {
+								horizontalSpeedToExceed = std::max(maximumWalkSpeed,DFA_MAX_VELOCITY_DELTA_HORZ);
+							}
+							if (horizontalDelta > BOOST_ENTITY_HORIZONTAL_DELTA_DETECT_THRESHOLD
+								&& horizontalSpeed > horizontalSpeedToExceed
 								) { // Make sure we both got a boost and our resulting speed is more than walking speed. Otherwise a bit lame and uninteresting?
+								
 								isBoost = qtrue;
-								newBoost.detectType = BOOST_ENTITYSTATE_GUESS_HORIZONTAL;
+								newBoost.detectType = newBoost.detectType == BOOST_ENTITYSTATE_GUESS_VERTICAL ? BOOST_ENTITYSTATE_GUESS_HORIZONTAL_AND_VERTICAL : BOOST_ENTITYSTATE_GUESS_HORIZONTAL;
 							}
 							
 							if (isBoost) {
