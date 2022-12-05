@@ -36,8 +36,9 @@ enum demoTimeType_t {
 class demoTime_t {
 public:
 	qboolean success;
-	int64_t time; // In milliseconds
-	demoTimeType_t type;
+	int64_t time = 0; // In milliseconds
+	demoTimeType_t type = DEMOTIME;
+	int skips = 0;
 	/*int64_t compare(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration) { // >1 if this demoTime_t is bigger than the arguments. 0 if identical. >1 if smaller. 
 		int64_t referenceTime = 0;
 		switch (type) {
@@ -65,18 +66,18 @@ public:
 		}
 		return NULL;
 	}*/
-	bool isReached(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration) {
+	bool isReached(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration, int mapRestartCounter) {
 		int64_t referenceTime = 0;
 		switch (type) {
 			case DEMOTIME:
 				return time <= demoTime;
 			case GAMETIME:
 				if(!isPause){
-					return time <= (serverTime - levelStartTime);
+					return mapRestartCounter >= skips && time <= (serverTime - levelStartTime);
 				}
 				else {
 					// We can't really know
-					return time <= (serverTime - levelStartTime - pauseDuration);
+					return mapRestartCounter >= skips && time <= (serverTime - levelStartTime - pauseDuration);
 				}
 			case GAMETIME_PAUSE: 
 				// This is a bit fucky and logically very bad tbh. But we know the cases in which it's gonna be used so we can try and make it work in that way. Ideally just don't use this, ever.
@@ -93,18 +94,18 @@ public:
 		}
 		return NULL;
 	}
-	bool isSurpassed(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration) {
+	bool isSurpassed(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration, int mapRestartCounter) {
 		int64_t referenceTime = 0;
 		switch (type) {
 			case DEMOTIME:
 				return time < demoTime;
 			case GAMETIME:
 				if(!isPause){
-					return time < (serverTime - levelStartTime);
+					return  mapRestartCounter >= skips && time < (serverTime - levelStartTime);
 				}
 				else {
 					// We can't really know
-					return time < (serverTime - levelStartTime - pauseDuration);
+					return  mapRestartCounter >= skips && time < (serverTime - levelStartTime - pauseDuration);
 				}
 			case GAMETIME_PAUSE: 
 				// This is a bit fucky and logically very bad tbh. But we know the cases in which it's gonna be used so we can try and make it work in that way. Ideally just don't use this, ever.
@@ -123,13 +124,14 @@ public:
 	}
 };
 
-jp::Regex timeParser(R"raw(\s*(?<type>gp?|s|d)?(?<number1>\d+)\s*(?::(?<number2>\d+))?\s*(?:.(?<number3>\d+))?\s*)raw", "mSi");
+jp::Regex timeParser(R"raw(\s*(?<type>gp?|s|d)?(?<number1>\d+)\s*(?::(?<number2>\d+))?\s*(?:.(?<number3>\d+))?\s*(skip(?<skipNumber>\d+))?\s*)raw", "mSi");
 
 demoTime_t timeParse(std::string timeText) {
 	jp::VecNas vec_nas;
 	jp::RegexMatch rm;
 
 	demoTime_t parsedTime;
+	parsedTime.skips = 0;
 	Com_Memset(&parsedTime, 0,sizeof(parsedTime));
 
 	size_t count = rm.setRegexObject(&timeParser)                          //set associated Regex object
@@ -139,16 +141,22 @@ demoTime_t timeParse(std::string timeText) {
 		.match();
 
 	for (int matchNum = 0; matchNum < vec_nas.size(); matchNum++) { // really its just going to be 1 but whatever
+		if (matchNum > 0) break; // Regex can behave a bit weird sometimes.
 		std::string type = vec_nas[matchNum]["type"];
 		std::string number1 = vec_nas[matchNum]["number1"];
 		std::string number2 = vec_nas[matchNum]["number2"];
 		std::string number3 = vec_nas[matchNum]["number3"];
+		std::string skipNumber = vec_nas[matchNum]["skipNumber"];
 		
 		if (type == "d") parsedTime.type = DEMOTIME;
 		else if (type == "g") parsedTime.type = GAMETIME;
 		else if (type == "gp") parsedTime.type = GAMETIME_PAUSE;
 		else if (type == "s") parsedTime.type = SERVERTIME;
 		else parsedTime.type = DEMOTIME;
+
+		if (parsedTime.type == GAMETIME && skipNumber.size() != 0 ) { // Skip a number of games for gametime.
+			parsedTime.skips = atoi(skipNumber.c_str());
+		}
 
 		if (number1.size() != 0 && number2.size() == 0 && number3.size() == 0) { // Just a simple number
 			parsedTime.time = atoi(number1.c_str());
@@ -636,6 +644,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	int				lastKnownTime = 0;
 	int				lastValidSnap = -1;
 
+	int				mapRestartCounter = 0;
+
 	//mvprotocol_t	protocol;
 
 	// Since not in MME:
@@ -739,7 +749,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				break;
 			case svc_gamestate:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
-				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange)) {
+				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange,mapRestartCounter)) {
 					Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					goto cutcomplete;
 				}
@@ -828,9 +838,12 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					goto cuterror;
 				}
 			}
+			if (!strcmp(cmd, "map_restart")) {
+				mapRestartCounter++;
+			}
 		}
 		//if (demoCurrentTime > endTime) {
-		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange)) {
+		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
 			goto cutcomplete;
 		}
 		else if (framesSaved > 0) {
@@ -845,7 +858,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		}
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (demoCurrentTime >= startTime) {
-		else if (startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange)) {
+		else if (startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
 			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType);
 			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType);
 			// copy rest
