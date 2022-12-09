@@ -991,6 +991,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					}*/
 				}
 
+				if (!snapIsInterpolated) { // We already parsed this. If we didn't find a dupe of an older command now, we won't find it later either. (and it might be stuff that was only sent to some of the clients, like team chat)
+
+					demoReaders[i].commandDupesToFilter.clear();
+				}
+
 				// Ok now... redo all events for players do avoid inconsistencies. This is unelegant af but I see no realistic way of doing it properly without making it
 				// incredibly complicated, hard to read and possibly even more unelegant in places
 				std::vector<Event> newEvents = demoReaders[i].reader.GetNewEventsAtServerTime(time,EK_ALL);
