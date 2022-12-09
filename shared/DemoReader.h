@@ -33,13 +33,25 @@ public:
 	std::string command;
 };
 
+
+enum eventKind_t {
+	EK_ENTITY,
+	EK_PS_EXTERNAL,
+	EK_PS_ARRAY,
+	EK_ALL,
+	EK_COUNT
+};
+
+
 class Event {
 public:
 #ifdef DEBUG
 	int countGiven;
 #endif
-	int demoTime;
+	int64_t demoTime;
+	int serverTime;
 	entityState_t theEvent;
+	eventKind_t kind;
 	int eventNumber;
 };
 
@@ -89,9 +101,12 @@ class DemoReader {
 	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
 
+	playerState_t	oldPS;
+
 	float			lastGottenCommandsTime = 0;
 	float			lastGottenCommandsServerTime = 0;
-	float			lastGottenEventsTime = 0;
+	float			lastGottenEventsTime[EK_COUNT] = { 0 };
+	int				lastGottenEventsServerTime[EK_COUNT] = { 0 };
 
 	int				firstSnapServerTime = -1;
 
@@ -158,7 +173,8 @@ public:
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
 	std::vector<std::string> DemoReader::GetNewCommands(float time);
 	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime);
-	std::vector<Event> DemoReader::GetNewEvents(float time);
+	std::vector<Event> DemoReader::GetNewEvents(float time, eventKind_t kind=EK_ENTITY);
+	std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind=EK_ENTITY);
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum, int* maxLength);
 	const char* GetPlayerConfigString(int playerNum, int* maxLength);

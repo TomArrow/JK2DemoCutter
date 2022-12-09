@@ -3,6 +3,7 @@
 #include "anims.h"
 #include <vector>
 #include <sstream>
+#include <set>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -10,6 +11,41 @@
 //
 
 demo_t			demo;
+
+
+// When we combine demos from multiple angles, inevitably we will encounter combining events from playerstates and entitystates.
+// Sadly the two operate rather differently. To not cause myself a major headache, we'll just accumulate and rewrite all player events.
+// This means it won't be a perfect merge but honestly I think it's the best I can do.
+// What will most likely get lost is the exact timing/duration of the event value being set in entities and since each player can have
+// up to 2 events per frame, the order of them might also get lost in my head logic. Because the server doesn't send a snapshot for each
+// server frame, an event may happen on one server frame and another on the second server frame and if only the second server frame is sent
+// to the client, we might end up with only the player entity having been assigned the event and it having been overwritten on the second server frame.
+// Yet the playerstate still has both and looking at the playerstate with 2 new events it might appear as though there should be two entities carrying
+// these events yet there aren't.
+typedef struct playerEvent_t {
+	int				eventValue;
+	int				eventParm;
+	int64_t			timeFirstSeen;
+	qboolean		wasNotExternalEvent; // We can only prove that it wasn't an external event. We can't prove that it was (because when converting to entity, either external or sequence one can be converted)
+
+	// Tracking of where to write the event in output.
+	// Tracking when writing to playerstate:
+	qboolean		isAssignedPlayerState;
+	int				sequenceNum;			// We don't assign sequenceNum if it's assigned as external, to keep stuff tidy and logical (?)
+	qboolean		assignedAsExternal;
+	// Tracking when writing to entities
+	qboolean		isAssignedEntity;
+	int				assignedEntityNum;
+};
+
+#define PLAYER_MAX_EVENT_COUNT 3
+
+typedef struct playerEventData_t {
+	int				eventSequence;	// We actually have to just start at 0 I guess and just do our own numbering, because trying to keep things consistent between playerstates, entitystates, changing angles and appearing/disappearing entities might just be too much...
+	playerEvent_t	events[PLAYER_MAX_EVENT_COUNT];
+};
+
+playerEventData_t playerEventData[MAX_CLIENTS];
 
 
 class DemoReaderTrackingWrapper {
@@ -729,6 +765,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	}
 
 	memset(&demo, 0, sizeof(demo));
+	memset(&playerEventData, 0, sizeof(playerEventData));
 
 	std::vector<DemoReaderTrackingWrapper> demoReaders;
 	std::cout << "loading up demos...";
@@ -826,6 +863,21 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		Com_Memset(entityServerTime, 0, sizeof(entityServerTime));
 		qboolean mainPlayerPSIsInterpolated = qfalse;
 		int mainPlayerServerTime = 0;
+		std::set<int> extraPlayerEventEntities[MAX_CLIENTS];
+
+		// Clear expired player events and also clear info about extra player event entities while at it
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+
+			playerEventData_t* thisPlayerEventData = &playerEventData[i];
+			for (int se = 0; se < PLAYER_MAX_EVENT_COUNT; se++) {
+				if (thisPlayerEventData->events[se].timeFirstSeen < time-EVENT_VALID_MSEC && thisPlayerEventData->events[se].eventValue) {
+					memset(&thisPlayerEventData->events[se], 0, sizeof(thisPlayerEventData->events[se]));
+				}
+			}
+			extraPlayerEventEntities[i].clear();
+		}
+
+		// Assemble the entities etc
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
@@ -869,11 +921,20 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				// Copy all entities
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
+
+					// This is for events. We wanna log all the extra entities we have available to write player events to, whether or not we actually keep that entity (in case of entity Num == ps ClientNum)
+					// Reason: For each new event we must assign it to a fixed entity, otherwise we'd have glitches and events repeating/interfering
+					if (it->first >= MAX_CLIENTS && it->second.eFlags & EF_PLAYER_EVENT) {
+						extraPlayerEventEntities[it->second.otherEntityNum].insert(it->first);
+					}
+
 					if (it->first != mainPlayerPS.clientNum) {
-						if (playerEntities.find(it->first) == playerEntities.end() || (entityIsInterpolated[it->first] && (!snapIsInterpolated || entityServerTime[it->first] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
-							playerEntities[it->first] = it->second;
-							entityIsInterpolated[it->first] = snapIsInterpolated;
-							entityServerTime[it->first] = snapInfoHere->serverTime;
+						if (!(it->second.eFlags & EF_PLAYER_EVENT && it->second.otherEntityNum == mainPlayerPS.clientNum)) { // Don't copy over player event entities if we are spectating that player (all the events belong into the playerstate then)
+							if (playerEntities.find(it->first) == playerEntities.end() || (entityIsInterpolated[it->first] && (!snapIsInterpolated || entityServerTime[it->first] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
+								playerEntities[it->first] = it->second;
+								entityIsInterpolated[it->first] = snapIsInterpolated;
+								entityServerTime[it->first] = snapInfoHere->serverTime;
+							}
 						}
 					}
 					else if(mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime)){
@@ -908,12 +969,201 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					}
 				}
 
+				// Ok now... redo all events for players do avoid inconsistencies. This is unelegant af but I see no realistic way of doing it properly without making it
+				// incredibly complicated, hard to read and possibly even more unelegant in places
+				std::vector<Event> newEvents = demoReaders[i].reader.GetNewEventsAtServerTime(time,EK_ALL);
+				for (int e = 0; e < newEvents.size(); e++) {
+					// We check whether this event is already registered.
+					// Since we are combining multiple demos, each event will (or can) come from multiple places.
+
+					// Is this a player event? We only process player events due to the playerstate/entitystate discrepance. Normal entities are left alone.
+					qboolean isMainEntityPlayerEvent = (qboolean)(newEvents[e].theEvent.number >= 0 && newEvents[e].theEvent.number < MAX_CLIENTS && newEvents[e].kind == EK_ENTITY);
+					qboolean isExtraEntityPlayerEvent = (qboolean)(newEvents[e].theEvent.number >= MAX_CLIENTS && newEvents[e].kind == EK_ENTITY && newEvents[e].theEvent.eFlags & EF_PLAYER_EVENT);
+					if (isMainEntityPlayerEvent || isExtraEntityPlayerEvent || newEvents[e].kind == EK_PS_ARRAY || newEvents[e].kind == EK_PS_EXTERNAL
+						) {
+
+						int eventClientNum = isExtraEntityPlayerEvent ? newEvents[e].theEvent.otherEntityNum : newEvents[e].theEvent.number;
+
+						playerEventData_t* thisPlayerEventData = &playerEventData[eventClientNum];
+						qboolean eventIsTracked = qfalse;
+						int freeSpots = 0;
+						int freeSpot = -1;
+						int64_t oldestTrackedEventTime = INT64_MAX;
+
+						// Check the events we are tracking for this player
+						// We are checking:
+						// 1. Whether the event is being tracked
+						// 2. We try to find a free spot for a new event. This will either be a free spot or the oldest tracked event.
+						for (int se = 0; se < PLAYER_MAX_EVENT_COUNT; se++) {
+							if (thisPlayerEventData->events[se].eventValue == newEvents[e].theEvent.event) {
+								eventIsTracked = qtrue;
+								break;
+							}
+							if (thisPlayerEventData->events[se].eventValue == 0) {
+								freeSpots++;
+								freeSpot = se;
+							}
+							else if (thisPlayerEventData->events[se].timeFirstSeen < oldestTrackedEventTime) {
+								oldestTrackedEventTime = thisPlayerEventData->events[se].timeFirstSeen;
+								if (freeSpots == 0) {
+									freeSpot = se;
+								}
+							}
+						}
+
+						// If the event is already tracked, we don't have to do anything. If it isn't, we have to add it.
+						if (!eventIsTracked) {
+							memset(&thisPlayerEventData->events[freeSpot],0,sizeof(thisPlayerEventData->events[freeSpot]));
+							thisPlayerEventData->events[freeSpot].eventValue = newEvents[e].theEvent.event;
+							thisPlayerEventData->events[freeSpot].eventParm = newEvents[e].theEvent.eventParm;
+							thisPlayerEventData->events[freeSpot].timeFirstSeen = time;
+							thisPlayerEventData->events[freeSpot].wasNotExternalEvent = (qboolean)(isExtraEntityPlayerEvent || newEvents[e].kind == EK_PS_ARRAY); // External event is always written first to entitystate, so if its an extra entity, it was one of the sequence ones for sure.
+						}
+					}
+				}
+
 			}
 			if (!demoReaders[i].reader.EndReached()) {
 				allSourceDemosFinished = qfalse;
 			}
 		}
 
+
+		// Actually rewrite the player events and also assign them if not yet done.
+		// Step 1: Clear playerstate (doesn't matter who it is, we always end up clearing it anyway
+		mainPlayerPS.externalEvent = 0;
+		mainPlayerPS.externalEventParm = 0;
+		//mainPlayerPS.externalEventTime = 0; // Not sure what this one even does tbh. Game doesn't seem to use it anywhere and it's not transmitted either
+		memset(&mainPlayerPS.events, 0, sizeof(mainPlayerPS.events));
+		memset(&mainPlayerPS.eventParms, 0, sizeof(mainPlayerPS.eventParms));
+
+		// Step 2: Clear player entity events and rewrite them.
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+
+			// First, clear event data in actual entities/playerstate
+			if (playerEntities.find(i) != playerEntities.end()) { // Main player entity
+				playerEntities[i].event = 0;
+				playerEntities[i].eventParm = 0;
+			}
+			for (auto it = extraPlayerEventEntities[i].begin(); it != extraPlayerEventEntities[i].end(); it++) {
+				if (playerEntities.find(*it) != playerEntities.end()) {
+					playerEntities[*it].event = 0;
+					playerEntities[*it].eventParm = 0;
+				}
+			}
+
+			playerEventData_t* thisPlayerEventData = &playerEventData[i];
+			for (int e = 0; e < PLAYER_MAX_EVENT_COUNT; e++) {
+				if (thisPlayerEventData->events[e].eventValue) {
+
+
+					// First, assign the event to playerstate slots and entity slots if not already done.
+					if (!thisPlayerEventData->events[e].isAssignedPlayerState) {
+						// Not assigned to playerstate slot yet
+
+						// Playerstate assignment
+						// Generally speaking we have 3 places to assign something in playerstate: externalEvent and the array of 2 events.
+						// Judging by the game code, it doesn't really seem to matter which is where, they get executed just the same.
+						// So let's just treat each slot as equal for now. (TODO?)
+
+						// Check where we can put stuff/what is already occupied
+						qboolean externalEventIsFree = qtrue;
+						qboolean externalEventIsOldest = qfalse;
+						//int arraySpotsOccupied = 0;
+
+						for (int se = 0; se < PLAYER_MAX_EVENT_COUNT; se++) {
+							
+							if (thisPlayerEventData->events[se].eventValue != 0 && thisPlayerEventData->events[se].isAssignedPlayerState) {
+								if (thisPlayerEventData->events[se].assignedAsExternal) {
+									externalEventIsFree = qfalse;
+								}
+								else {
+									//arraySpotsOccupied++;
+								}
+							}
+						}
+
+						if (externalEventIsFree) {
+							// Let's put it in external event
+							thisPlayerEventData->events[e].assignedAsExternal = qtrue;
+						}
+						else  {
+							// Let's put it in array
+							thisPlayerEventData->events[e].assignedAsExternal = qfalse;
+							thisPlayerEventData->events[e].sequenceNum = thisPlayerEventData->eventSequence++;
+						}
+						thisPlayerEventData->events[e].isAssignedPlayerState = qtrue;
+					}
+
+					if (!thisPlayerEventData->events[e].isAssignedEntity) {
+						// Not assigned to entity player event slot yet
+						// We have to handle this separately from playerstate because while playerstate assignments can always be done blind,
+						// for entity slot assignments we actually need to know the entity numbers and they may not be available on every frame.
+						
+						std::set<int> thisPlayerAvailableSlots;
+						thisPlayerAvailableSlots.insert(i);
+						thisPlayerAvailableSlots.insert(extraPlayerEventEntities[i].begin(), extraPlayerEventEntities[i].end());
+
+
+						int64_t oldestTrackedEventTime = INT64_MAX;
+						int oldestSlot = -1;
+						int oldestSlotEventIndex = -1;
+
+						// Check which slots are available
+						for (int se = 0; se < PLAYER_MAX_EVENT_COUNT; se++) {
+
+							if (thisPlayerEventData->events[se].eventValue != 0 && thisPlayerEventData->events[se].isAssignedEntity) {
+
+								if (thisPlayerAvailableSlots.find(thisPlayerEventData->events[se].assignedEntityNum) != thisPlayerAvailableSlots.end()) {
+
+									thisPlayerAvailableSlots.erase(thisPlayerEventData->events[se].assignedEntityNum);
+								}
+
+								if (thisPlayerEventData->events[se].timeFirstSeen < oldestTrackedEventTime) {
+									oldestTrackedEventTime = thisPlayerEventData->events[se].timeFirstSeen;
+									oldestSlotEventIndex = se;
+									oldestSlot = thisPlayerEventData->events[se].assignedEntityNum;
+								}
+							}
+						}
+
+						// Yes, this means that if the player isn't visible at all at the moment or if we are in the playerstate perspective, a lot of events get lost. Isn't that intended tho? (TODO?)
+						int slotToUse = thisPlayerAvailableSlots.size() == 0 ? oldestSlot : *thisPlayerAvailableSlots.begin();
+
+						if (slotToUse != -1) { 
+							thisPlayerEventData->events[e].isAssignedEntity = qtrue;
+							thisPlayerEventData->events[e].assignedEntityNum = slotToUse;
+						}
+					}
+
+					// NOW
+					// Actually write the event info.
+					//
+					//
+					if (mainPlayerPS.clientNum == i) {
+						// We write the stuff to the playerstate
+						if (thisPlayerEventData->events[e].assignedAsExternal) {
+							mainPlayerPS.externalEvent = thisPlayerEventData->events[e].eventValue;
+							mainPlayerPS.externalEventParm = thisPlayerEventData->events[e].eventParm;
+						}
+						else {
+							mainPlayerPS.events[thisPlayerEventData->events[e].sequenceNum & (MAX_PS_EVENTS - 1)] = thisPlayerEventData->events[e].eventValue &~ EV_EVENT_BITS;
+							mainPlayerPS.eventParms[thisPlayerEventData->events[e].sequenceNum & (MAX_PS_EVENTS - 1)] = thisPlayerEventData->events[e].eventParm;
+						}
+					}
+					else if(thisPlayerEventData->events[e].isAssignedEntity) {
+						// We write the stuff to entities (if they are available)
+						if (playerEntities.find(thisPlayerEventData->events[e].assignedEntityNum) != playerEntities.end()) {
+							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].event = thisPlayerEventData->events[e].eventValue;
+							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eventParm = thisPlayerEventData->events[e].eventParm;
+						}
+					}
+
+				}
+			}
+			extraPlayerEventEntities[i].clear();
+		}
+		
 
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;

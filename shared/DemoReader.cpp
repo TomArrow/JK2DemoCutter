@@ -599,6 +599,9 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	memset(&thisDemo, 0, sizeof(thisDemo));
 	memset(&lastSnap, 0, sizeof(lastSnap));
 	memset(basePlayerStates, 0, sizeof(basePlayerStates));
+	memset(&oldPS, 0, sizeof(oldPS));
+	memset(lastGottenEventsTime, 0, sizeof(lastGottenEventsTime));
+	memset(lastGottenEventsServerTime, 0, sizeof(lastGottenEventsServerTime));
 
 	readGamestate = 0;
 
@@ -614,7 +617,6 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
 	lastGottenCommandsServerTime = 0;
-	lastGottenEventsTime = 0;
 	endReached = qfalse;
 
 	snapshotInfos.clear();
@@ -1350,18 +1352,33 @@ std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime
 	lastGottenCommandsServerTime = serverTime;
 	return retVal;
 }
-std::vector<Event> DemoReader::GetNewEvents(float time) {
+std::vector<Event> DemoReader::GetNewEvents(float time, eventKind_t kind) {
 	std::vector<Event> retVal;
 	SeekToTime(time);
 	for (int i = 0; i < readEvents.size(); i++) {
-		if (readEvents[i].demoTime <= time && readEvents[i].demoTime > lastGottenEventsTime) {
+		if (readEvents[i].demoTime <= time && readEvents[i].demoTime > lastGottenEventsTime[kind] && (kind == EK_ALL || readEvents[i].kind == kind)) {
 #ifdef DEBUG
 			readEvents[i].countGiven++;
 #endif
 			retVal.push_back(readEvents[i]);
 		}
 	}
-	lastGottenEventsTime = time;
+	lastGottenEventsTime[kind] = time;
+	return retVal;
+}
+
+std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind) {
+	std::vector<Event> retVal;
+	SeekToServerTime(serverTime);
+	for (int i = 0; i < readEvents.size(); i++) {
+		if (readEvents[i].serverTime <= serverTime && readEvents[i].serverTime > lastGottenEventsServerTime[kind] && (kind == EK_ALL || readEvents[i].kind == kind)) {
+#ifdef DEBUG
+			readEvents[i].countGiven++;
+#endif
+			retVal.push_back(readEvents[i]);
+		}
+	}
+	lastGottenEventsServerTime[kind] = serverTime;
 	return retVal;
 }
 
@@ -1551,7 +1568,68 @@ readNext:
 			lastKnownTime = thisDemo.cut.Cl.snap.serverTime;
 
 
-			// Fire events
+			// Fire playerstate events
+			if (thisDemo.cut.Cl.snap.ps.externalEvent && thisDemo.cut.Cl.snap.ps.externalEvent != oldPS.externalEvent) {
+				
+				Event thisEvent;
+#ifdef DEBUG
+				thisEvent.countGiven = 0;
+#endif
+				thisEvent.demoTime = demoCurrentTime;
+				thisEvent.serverTime = thisDemo.cut.Cl.snap.serverTime;
+				thisEvent.kind = EK_PS_EXTERNAL;
+				
+				memset(&thisEvent.theEvent,0,sizeof(thisEvent.theEvent));
+
+				thisEvent.theEvent.number = thisDemo.cut.Cl.snap.ps.clientNum;
+				thisEvent.theEvent.event = thisDemo.cut.Cl.snap.ps.externalEvent;
+				thisEvent.theEvent.eventParm = thisDemo.cut.Cl.snap.ps.externalEventParm;
+
+				thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
+
+				if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
+					thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
+				}
+				readEvents.push_back(thisEvent);
+
+			}
+
+			// Fire eventSequence events
+			for (int i = thisDemo.cut.Cl.snap.ps.eventSequence - MAX_PS_EVENTS; i < thisDemo.cut.Cl.snap.ps.eventSequence; i++) {
+				// if we have a new predictable event
+				if (i >= oldPS.eventSequence
+					// or the server told us to play another event instead of a predicted event we already issued
+					// or something the server told us changed our prediction causing a different event
+					|| (i > oldPS.eventSequence - MAX_PS_EVENTS && thisDemo.cut.Cl.snap.ps.events[i & (MAX_PS_EVENTS - 1)] != oldPS.events[i & (MAX_PS_EVENTS - 1)])) {
+
+
+					Event thisEvent;
+#ifdef DEBUG
+					thisEvent.countGiven = 0;
+#endif
+					thisEvent.demoTime = demoCurrentTime;
+					thisEvent.serverTime = thisDemo.cut.Cl.snap.serverTime;
+					thisEvent.kind = EK_PS_ARRAY;
+
+					memset(&thisEvent.theEvent, 0, sizeof(thisEvent.theEvent));
+
+					thisEvent.theEvent.number = thisDemo.cut.Cl.snap.ps.clientNum;
+					thisEvent.theEvent.event = thisDemo.cut.Cl.snap.ps.events[i & (MAX_PS_EVENTS - 1)] | ((i & 3) << 8); // I hope this is right, using i there....
+					thisEvent.theEvent.eventParm = thisDemo.cut.Cl.snap.ps.eventParms[i & (MAX_PS_EVENTS - 1)];
+
+					thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
+					if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
+						thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
+					}
+					readEvents.push_back(thisEvent);
+
+
+				}
+			}
+
+			// Fire entity events
 			for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 
 				entityState_t* thisEs = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
@@ -1563,7 +1641,9 @@ readNext:
 #ifdef DEBUG
 					thisEvent.countGiven = 0;
 #endif
+					thisEvent.kind = EK_ENTITY;
 					thisEvent.demoTime = demoCurrentTime;
+					thisEvent.serverTime = thisDemo.cut.Cl.snap.serverTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
 					if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
@@ -1576,76 +1656,12 @@ readNext:
 						}
 					}
 					readEvents.push_back(thisEvent);
-					/*
-					// Handle kills
-					if (eventNumber == EV_OBITUARY) {
-						int				target = thisEs->otherEntityNum;
-						int				attacker = thisEs->otherEntityNum2;
-						int				mod = thisEs->eventParm;
-						bool			victimIsFlagCarrier = false;
-						bool			isSuicide;
-						bool			isDoomKill;
-						bool			isWorldKill = false;
-						bool			isVisible = false;
-						if (target < 0 || target >= MAX_CLIENTS) {
-							std::cout << "CG_Obituary: target out of range. This should never happen really.";
-						}
-
-						if (attacker < 0 || attacker >= MAX_CLIENTS) {
-							attacker = ENTITYNUM_WORLD;
-							isWorldKill = true;
-						}
-						entityState_t* targetEntity = findEntity(target);
-						if (targetEntity) {
-							isVisible = true;
-							//if (targetEntity->powerups & (1 << PW_REDFLAG) || targetEntity->powerups & (1 << PW_BLUEFLAG)) {
-							//	// If the victim isn't visible, his entity won't be available, thus this won't be set
-							//	// But we're trying to find interesting moments, so stuff that's not even visible is not that interesting to us
-							//	victimIsFlagCarrier = true;
-							//}
-						}
-						victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
-
-						isSuicide = target == attacker;
-						if (isSuicide || !victimIsFlagCarrier || isWorldKill || !isVisible) continue; // Not that interesting.
-
-						isDoomKill = mod == MOD_FALLING;
-
-						bool attackerIsFollowed = thisDemo.cut.Cl.snap.ps.clientNum == attacker;
-
-						entityState_t* attackerEntity = findEntity(attacker);
-
-						// Find extra info for means of death.
-						std::stringstream modInfo;
-						weapon_t probableKillingWeapon = (weapon_t)weaponFromMOD[mod];
-
-						qboolean needMoreInfo = qtrue;
-						if (probableKillingWeapon == WP_NONE) { // means something like doom kill
-							if (attackerIsFollowed) {
-								probableKillingWeapon = (weapon_t)thisDemo.cut.Cl.snap.ps.weapon;
-							}
-							else if (attackerEntity) {
-								probableKillingWeapon = (weapon_t)attackerEntity->weapon;
-							}
-						}
-
-						int stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-						const char* info = thisDemo.cut.Cl.gameState.stringData + stringOffset;
-						std::string mapname = Info_ValueForKey(info,sizeof(thisDemo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
-						const char* playerInfo;
-						std::string playername = "WEIRDATTACKER";
-						if (attacker >= 0 && attacker < MAX_CLIENTS) {
-							stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
-							playerInfo = thisDemo.cut.Cl.gameState.stringData + stringOffset;
-							playername = Info_ValueForKey(playerInfo, sizeof(thisDemo.cut.Cl.gameState.stringData) - stringOffset, "n");
-						}
-						stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
-						playerInfo = thisDemo.cut.Cl.gameState.stringData + stringOffset;
-						std::string victimname = Info_ValueForKey(playerInfo, sizeof(thisDemo.cut.Cl.gameState.stringData) - stringOffset, "n");
-					}*/
+					
 				}
 			}
 
+
+			oldPS = thisDemo.cut.Cl.snap.ps;
 
 			// Find out which players are visible / followed
 			// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
