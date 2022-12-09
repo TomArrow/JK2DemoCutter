@@ -52,6 +52,7 @@ class DemoReaderTrackingWrapper {
 public:
 	DemoReader reader;
 	int packetsUsed = 0;
+	std::vector<std::string> commandDupesToFilter;
 };
 
 
@@ -865,6 +866,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		int mainPlayerServerTime = 0;
 		std::set<int> extraPlayerEventEntities[MAX_CLIENTS];
 
+
 		// Clear expired player events and also clear info about extra player event entities while at it
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 
@@ -949,8 +951,28 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				// Get new commands
 				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
+					
+					// New handling to avoid dupes
+					qboolean isADupe = qfalse;
+					for (int sc = 0; sc < demoReaders[i].commandDupesToFilter.size(); sc++) {
+						if (demoReaders[i].commandDupesToFilter[sc] == newCommandsHere[c]) {
+							isADupe = qtrue;
+							demoReaders[i].commandDupesToFilter.erase(demoReaders[i].commandDupesToFilter.begin()+sc);
+							break;
+						}
+					}
 
-					if (i == 0) { // This is the main reference demo. Just add this stuff.
+					if (!isADupe) {
+						commandsToAdd.push_back(newCommandsHere[c]);
+						for (int sd = 0; sd < demoReaders.size(); sd++) {
+							if (sd != i) {
+								demoReaders[sd].commandDupesToFilter.push_back(newCommandsHere[c]);
+							}
+						}
+					}
+
+
+					/*if (i == 0) { // This is the main reference demo. Just add this stuff.
 						commandsToAdd.push_back(newCommandsHere[c]);
 					}
 					else {
@@ -966,7 +988,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 						if (!isDupe) {
 							commandsToAdd.push_back(newCommandsHere[c]);
 						}
-					}
+					}*/
 				}
 
 				// Ok now... redo all events for players do avoid inconsistencies. This is unelegant af but I see no realistic way of doing it properly without making it
@@ -1023,7 +1045,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 
 			}
-			if (!demoReaders[i].reader.EndReached()) {
+			if (!demoReaders[i].reader.EndReachedAtServerTime(time)) {
 				allSourceDemosFinished = qfalse;
 			}
 		}

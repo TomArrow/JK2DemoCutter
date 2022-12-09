@@ -920,7 +920,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
 		clSnapshot_t mainPlayerSnapshot = demoReader->reader.GetCurrentSnap();
-		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
+		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
 
 		if (isFirstSnapshot) {
 			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);
