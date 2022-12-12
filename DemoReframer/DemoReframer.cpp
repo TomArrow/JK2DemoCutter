@@ -695,7 +695,7 @@ int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* co
 #endif
 
 
-qboolean demoReframe( const char* demoName,const char* outputName, const char* playerSearchString) {
+qboolean demoReframe( const char* demoName,const char* outputName, const char* playerSearchString, qboolean visAll) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -920,8 +920,13 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
 		clSnapshot_t mainPlayerSnapshot = demoReader->reader.GetCurrentSnap();
-		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
-
+		if (visAll) {
+			Com_Memset(demo.cut.Cl.snap.areamask, 0, sizeof(demo.cut.Cl.snap.areamask));
+		}
+		else {
+			Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask, sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
+		}
+		
 		if (isFirstSnapshot) {
 			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL);
 			isFirstSnapshot = qfalse;
@@ -998,7 +1003,7 @@ cuterror:
 
 int main(int argc, char** argv) {
 	if (argc <4) {
-		std::cout << "need 3 arguments at least: demoname, outputname, player to follow (search string or clientnum)...]";
+		std::cout << "need 3 arguments at least: demoname, outputname, player to follow (search string or clientnum), [optional: visall for demos that result in graphical artifacts]";
 		return 1;
 	}
 	char* demoName = NULL;
@@ -1010,10 +1015,15 @@ int main(int argc, char** argv) {
 	playerNameSearchString = argv[3];
 	char* filteredOutputName = new char[strlen(outputName) + 1];
 	sanitizeFilename(outputName, filteredOutputName);
+	
+	qboolean visAll = qfalse;
+	if (argc == 5 && !stricmp(argv[4],"visall")) {
+		visAll = qtrue;
+	}
 
 	std::cout << sizeof(DemoReaderTrackingWrapper);
 
-	if (demoReframe(demoName, filteredOutputName, playerNameSearchString)) {
+	if (demoReframe(demoName, filteredOutputName, playerNameSearchString, visAll)) {
 		Com_Printf("Demo %s got successfully reframed\n", demoName);
 	}
 	else {
