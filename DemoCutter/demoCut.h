@@ -3,6 +3,13 @@
 // Most of it is likely still the same as in the original Jedi Knight source code releases
 //
 
+
+#ifndef DEMOCUT_H
+#define DEMOCUT_H
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include <iostream>
 #include <cstdlib>
 #include <cstdarg>
@@ -12,6 +19,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+
 
 #include "anims.h"
 #include "animsStanceMappings.h"
@@ -2065,3 +2073,186 @@ typedef struct {
 
 // using the stringizing operator to save typing...
 #define	PSF(x) #x,(size_t)&((playerState_t*)0)->x
+
+
+void vectoangles(const vec3_t value1, vec3_t angles);
+
+void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
+
+void AnglesSubtract(vec3_t v1, vec3_t v2, vec3_t v3); 
+float	AngleSubtract(float a1, float a2);
+
+// Calculate deviation from perfect strafe, if applicable
+// Based on CG_StrafeHelper from EternalJk2mv
+template <class T>
+float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles entitystate and playerstate
+
+	vec3_t	viewAngles;
+	vec3_t	velocity;
+	int		movementDir;
+	int		groundEntityNum;
+	float	baseSpeed;
+	if constexpr (std::is_same<T, playerState_t>::value) {
+		movementDir = ((playerState_t*)state)->movementDir;
+		groundEntityNum = ((playerState_t*)state)->groundEntityNum;
+		baseSpeed = ((playerState_t*)state)->speed;
+		VectorCopy(((playerState_t*)state)->viewangles, viewAngles);
+		VectorCopy(((playerState_t*)state)->velocity, velocity);
+	}
+	else if constexpr (std::is_same<T, entityState_t>::value) {
+		movementDir = ((entityState_t*)state)->angles2[YAW];
+		groundEntityNum = ((entityState_t*)state)->groundEntityNum;
+		baseSpeed = ((entityState_t*)state)->speed;
+		VectorCopy(((entityState_t*)state)->apos.trBase, viewAngles);
+		VectorCopy(((entityState_t*)state)->pos.trDelta, velocity);
+	}
+	else {
+		if (isApplicable) *isApplicable = qfalse;
+		return INFINITY;
+	}
+
+	float pmAccel = 10.0f, pmAirAccel = 1.0f, pmFriction = 6.0f, frametime, optimalDeltaAngle;
+
+	const float currentSpeed = (float)sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1]);
+
+	usercmd_t cmd = { 0 };
+
+	switch (movementDir) {
+	case 0: // W
+		cmd.forwardmove = 1; break;
+	case 1: // WA
+		cmd.forwardmove = 1; cmd.rightmove = -1; break;
+	case 2: // A
+		cmd.rightmove = -1;	break;
+	case 3: // AS
+		cmd.rightmove = -1;	cmd.forwardmove = -1; break;
+	case 4: // S
+		cmd.forwardmove = -1; break;
+	case 5: // SD
+		cmd.forwardmove = -1; cmd.rightmove = 1; break;
+	case 6: // D
+		cmd.rightmove = 1; break;
+	case 7: // DW
+		cmd.rightmove = 1; cmd.forwardmove = 1;	break;
+	default:
+		break;
+	}
+
+	qboolean onGround = (qboolean)(groundEntityNum == ENTITYNUM_WORLD); //sadly predictedPlayerState makes it jerky so need to use cg.snap groundentityNum, and check for cg.snap earlier
+
+	if (currentSpeed < (baseSpeed - 1)) { // Dunno why
+		if (isApplicable) *isApplicable = qfalse;
+		return INFINITY;
+	}
+
+	frametime = 0.001f;// / 142.0f; // Not sure what else I can do with a demo... TODO? 0.001 prevents invalid nan(ind) coming from acos when onground sometimes?
+	/*if (cg_strafeHelper_FPS.value < 1)
+		frametime = ((float)cg.frametime * 0.001f);
+	else if (cg_strafeHelper_FPS.value > 1000) // invalid
+		frametime = 1;
+	else frametime = 1 / cg_strafeHelper_FPS.value;*/
+
+	if (onGround)//On ground
+		optimalDeltaAngle = acos((double)((baseSpeed - (pmAccel * baseSpeed * frametime)) / (currentSpeed * (1 - pmFriction * (frametime))))) * (180.0f / M_PI) - 45.0f;
+	else
+		optimalDeltaAngle = acos((double)((baseSpeed - (pmAirAccel * baseSpeed * frametime)) / currentSpeed)) * (180.0f / M_PI) - 45.0f;
+
+	if (isnan(optimalDeltaAngle)) { // It happens sometimes I guess...
+		if (isApplicable) *isApplicable = qfalse;
+		return INFINITY;
+	}
+
+	if (optimalDeltaAngle < 0 || optimalDeltaAngle > 360)
+		optimalDeltaAngle = 0;
+
+	vec3_t velocityAngle;
+	velocity[2] = 0;
+	vectoangles(velocity, velocityAngle); //We have the offset from our Velocity angle that we should be aiming at, so now we need to get our velocity angle.
+	
+	float cg_strafeHelperOffset = 75; // dunno why or what huh
+
+	float diff = INFINITY;
+	qboolean anyActive = qfalse;
+	float smallestAngleDiff = INFINITY;
+	if (cmd.forwardmove > 0 && cmd.rightmove < 0) {
+		diff = (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f)); // WA
+		smallestAngleDiff = std::min(smallestAngleDiff,abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW]+ diff)));
+		anyActive = qtrue;
+	}
+	if (cmd.forwardmove > 0 && cmd.rightmove > 0) {
+		diff = (-optimalDeltaAngle - (cg_strafeHelperOffset * 0.01f)); // WD
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+		anyActive = qtrue;
+	}
+	if (cmd.forwardmove == 0 && cmd.rightmove < 0) {
+		anyActive = qtrue;
+		// Forwards
+		diff = -(45.0f - (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f))); // A
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+		// Backwards
+		diff = (225.0f - (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f))); // A
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+	}
+	if (cmd.forwardmove == 0 && cmd.rightmove > 0) {
+		anyActive = qtrue;
+		// Forwards
+		diff = (45.0f - (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f))); // D
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+		// Backwards
+		diff = (135.0f + (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f))); // D
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+	}
+
+	if (cmd.forwardmove > 0 && cmd.rightmove == 0) {
+		anyActive = qtrue;
+		// Variation 1
+		diff = (45.0f + (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f))); // W
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+		// Variation 2
+		diff = (-45.0f - (optimalDeltaAngle + (cg_strafeHelperOffset * 0.01f))); // W
+		smallestAngleDiff = std::min(smallestAngleDiff, abs(AngleSubtract(viewAngles[YAW], velocityAngle[YAW] + diff)));
+	}
+	
+	//DrawStrafeLine(velocityAngle, , (qboolean)(), 1); //WA
+	//DrawStrafeLine(velocityAngle, , (qboolean)(, 7); //WD
+	//DrawStrafeLine(velocityAngle, , (qboolean)(cmd.forwardmove == 0 && cmd.rightmove < 0), 2); //A
+	//DrawStrafeLine(velocityAngle, , (qboolean)(), 6); //D
+	// Rear stuff? idk									
+	//DrawStrafeLine(velocityAngle, , (qboolean)(), 9); //A
+	//DrawStrafeLine(velocityAngle, , (qboolean)(), 10); //D
+	//W only
+	//DrawStrafeLine(velocityAngle, , (qboolean)(), 0); //W
+	//DrawStrafeLine(velocityAngle, , (qboolean)(), 0); //W
+
+	// DrawStrafeLine(vec3_t velocity, float diff, qboolean active, int moveDir) 
+
+	if (!anyActive) {
+		if (isApplicable) *isApplicable = qfalse;
+		return INFINITY;
+	}
+	else {
+		if (isApplicable) *isApplicable = qtrue;
+		return smallestAngleDiff;
+	}
+
+	//int cg_strafeHelperPrecision = 256; // Dunno why or what or whatever
+	//int sensitivity = cg_strafeHelperPrecision;
+
+	//vec3_t angs, forward, delta, line,start;
+
+	//VectorCopy(cg.refdef.vieworg, start);
+
+	//VectorCopy(velocityAngle, angs);
+	//angs[YAW] += diff;
+	//AngleVectors(angs, forward, NULL, NULL);
+	//VectorScale(forward, sensitivity, delta); // line length
+
+	//line[0] = delta[0] + start[0];
+	//line[1] = delta[1] + start[1];
+	//line[2] = start[2];
+	
+
+}
+
+
+#endif

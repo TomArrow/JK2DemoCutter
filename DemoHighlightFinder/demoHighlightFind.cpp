@@ -41,6 +41,8 @@ public:
 };
 
 
+#define DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET 100 // When we start to measure strafe precision of a defrag run, the start time of our measurement must fall within 100ms of the start of the run to be considered valid.
+
 
 //std::map<int,int> playerFirstVisible;
 //std::map<int,int> playerFirstFollowed;
@@ -73,6 +75,10 @@ struct VariousCappingInfo {
 	double sumSpeeds;
 	double divisorSpeeds;
 };
+struct strafeDeviationInfo_t {
+	averageHelper_t averageHelper;
+	int64_t lastReset;
+};
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS];
 int playerFirstVisible[MAX_CLIENTS];
 int playerFirstFollowed[MAX_CLIENTS];
@@ -88,6 +94,7 @@ int lastEventTime[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
+strafeDeviationInfo_t strafeDeviations[MAX_CLIENTS];
 
 
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
@@ -1361,6 +1368,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
+	Com_Memset(&strafeDeviations, 0, sizeof(strafeDeviations));
+
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 		lastBackflip[i] = -1;
@@ -1560,6 +1569,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"wasVisible	BOOLEAN NOT NULL,"
 		"wasFollowed	BOOLEAN NOT NULL,"
 		"wasFollowedOrVisible	BOOLEAN NOT NULL,"
+		"averageStrafeDeviation REAL,"
 		"runnerClientNum	INTEGER NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
@@ -1654,9 +1664,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertCaptureStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
 	preparedStatementText = "INSERT INTO laughs"
@@ -1770,6 +1780,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	while (oldSize > 0) {
 
 		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
+
+		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
+		float playerStateStrafeDeviationThisFrame = 0;
 
 	cutcontinue:
 		MSG_Init(&oldMsg, oldData, sizeof(oldData));
@@ -1945,6 +1958,16 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 					}
 				}
+
+				// Strafe precision
+				{
+					playerStateStrafeDeviationThisFrame = calculateStrafeDeviation(&demo.cut.Cl.snap.ps, &strafeApplicablePlayerStateThisFrame);
+					if (strafeApplicablePlayerStateThisFrame) {
+						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor++;
+						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum += playerStateStrafeDeviationThisFrame;
+					}
+				}
+
 				{ // Playerstate tracking
 					thisFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.legsAnim;
 					thisFrameInfo.torsoAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.torsoAnim;
@@ -3774,6 +3797,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
 					.match();*/
 				
+				if (printText.find("Timer started") != std::string::npos) {
+					strafeDeviations[demo.cut.Cl.snap.ps.clientNum].lastReset = demoCurrentTime;
+					if (strafeApplicablePlayerStateThisFrame) {
+						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 1;
+						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = playerStateStrafeDeviationThisFrame;
+					}
+					else {
+						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 0;
+						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = 0;
+					}
+				}
+
 				if (findOCDefragRun(printText, &runInfo)) {
 					runFound = qtrue;
 				} else if (findRazorDefragRun(printText, &runInfo)) {
@@ -3863,6 +3898,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SQLBIND(insertDefragRunStatement, int, "@wasVisible", wasVisible);
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
+
+					// Do we have strafe deviation info?
+					if (wasVisibleOrFollowed && playerNumber != -1 && abs(strafeDeviations[playerNumber].lastReset - runStart) < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
+						SQLBIND(insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviations[playerNumber].averageHelper.sum/strafeDeviations[playerNumber].averageHelper.divisor);
+					}
+					else {
+						SQLBIND_NULL(insertDefragRunStatement, "@averageStrafeDeviation");
+					}
+
 					SQLBIND(insertDefragRunStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 					SQLBIND(insertDefragRunStatement, int, "@runnerClientNum", playerNumber);
 
