@@ -2169,7 +2169,8 @@ float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles en
 	velocity[2] = 0;
 	vectoangles(velocity, velocityAngle); //We have the offset from our Velocity angle that we should be aiming at, so now we need to get our velocity angle.
 	
-	float cg_strafeHelperOffset = 75; // dunno why or what huh
+	//float cg_strafeHelperOffset = 75; // dunno why or what huh
+	float cg_strafeHelperOffset = 0; // dunno why or what huh
 
 	float diff = INFINITY;
 	qboolean anyActive = qfalse;

@@ -41,7 +41,7 @@ public:
 };
 
 
-#define DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET 100 // When we start to measure strafe precision of a defrag run, the start time of our measurement must fall within 100ms of the start of the run to be considered valid.
+#define DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET 500 // When we start to measure strafe precision of a defrag run, the start time of our measurement must fall within 500ms of the start of the run to be considered valid. The reason we need to accept some offset is (I guess) because of discrepance between command times, snaps, servertimes etc. Idk.
 
 
 //std::map<int,int> playerFirstVisible;
@@ -3900,7 +3900,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
 
 					// Do we have strafe deviation info?
-					if (wasVisibleOrFollowed && playerNumber != -1 && abs(strafeDeviations[playerNumber].lastReset - runStart) < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
+					int64_t measurementStartTimeOffset = abs(strafeDeviations[playerNumber].lastReset - runStart);
+					if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
 						SQLBIND(insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviations[playerNumber].averageHelper.sum/strafeDeviations[playerNumber].averageHelper.divisor);
 					}
 					else {
