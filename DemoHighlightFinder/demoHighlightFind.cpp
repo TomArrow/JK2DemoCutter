@@ -1719,6 +1719,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_exec(killDb, "CREATE TABLE playerDemoStats (" 
 		"map	TEXT NOT NULL,"
 		"playerName TEXT NOT NULL,"
+		"playerNameStripped TEXT NOT NULL,"
 		"clientNum INT NOT NULL,"
 		"averageStrafeDeviation REAL,"
 		"averageStrafeDeviationBucketsJSON TEXT,"
@@ -1787,9 +1788,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
-		"(map,playerName,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,strafeSampleCount,demoName,demoPath,demoDateTime)"
+		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,strafeSampleCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
-		"( @map,@playerName,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@strafeSampleCount,@demoName,@demoPath,@demoDateTime)";
+		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@strafeSampleCount,@demoName,@demoPath,@demoDateTime)";
 	sqlite3_stmt* insertPlayerDemoStatsStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
 
@@ -4258,6 +4259,8 @@ cuterror:
 			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5;
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@map", mapname.c_str());
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
+			std::string playernameStripped = Q_StripColorAll(playerName);
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
 			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
 
