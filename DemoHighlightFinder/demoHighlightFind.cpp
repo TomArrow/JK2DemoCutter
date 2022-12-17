@@ -2048,6 +2048,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				}
 
 				{ // Playerstate tracking
+
+					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
 					thisFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.legsAnim;
 					thisFrameInfo.torsoAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.torsoAnim;
 
@@ -2140,7 +2142,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					qboolean playerStateBoostDetected = qfalse;
 					thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
 					thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_time;
-					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
 					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT);
 
 #ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
