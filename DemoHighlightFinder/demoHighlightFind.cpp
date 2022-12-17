@@ -9,6 +9,8 @@
 #include <filesystem>
 #include "sqlite3.h"
 #include <set>
+#include "../shared/boostTupleHash.hpp"
+#include <unordered_map>
 
 #include <iso646.h>
 #include "picosha3.h"
@@ -98,11 +100,22 @@ int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 strafeDeviationInfo_t strafeDeviations[MAX_CLIENTS];
 
+struct playerDemoStats_t {
+	qboolean everUsed;
+	averageHelper_t strafeDeviation;
+};
+// Since players could connect/disconnect/rename, we keep a map with all players that existed during a game.
+// To keep good performance, we have an array of pointers towards the current playerDemoStats_t struct in the map for each player for quick access
+// This array is updated whenever a "cs" command is received (since that could mean a map or playername change or a new player connecting.
+typedef std::tuple<std::string, std::string, int> playerDemoStatsMapKey_t;
+std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
+playerDemoStats_t* playerDemoStatsPointers[MAX_CLIENTS];
+
 
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
 jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
 #define MAX_LAUGH_DELAY 7000 // From first laugh to last laugh, max delay.
-#define LAUGHS_CUT_PRE_TIME 20000 // Upon first laugh, cut last 20 seconds so we see context.
+#define LAUGHS_CUT_PRE_TIME 10000 // Upon first laugh, cut last 10 seconds so we see context.
 int firstLaugh = -1;
 int lastLaugh = -1;
 int laughCount = 0;
@@ -401,6 +414,20 @@ demo_t			demo;
 
 
 
+
+void updatePlayerDemoStatsArrayPointers() {
+	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
+	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + i];
+		const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+		std::string playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
+
+		playerDemoStatsMapKey_t mapPointer(mapname, playerName, i); // We can think of this as something of a soft (not really hard enforced in database) primary key to distinguish players.
+		playerDemoStatsPointers[i] = &playerDemoStatsMap[mapPointer];
+	}
+}
 
 qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 	jp::VecNum vec_num;
@@ -1390,6 +1417,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 	outputBatHandleLaughs.open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
 
+	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
 	Com_Memset(playerVisibleFrames,0,sizeof(playerVisibleFrames));
 	Com_Memset(playerVisibleClientFrames,0,sizeof(playerVisibleClientFrames));
 	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
@@ -1679,6 +1707,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"PRIMARY KEY(map,baseModel,variant)"
 		"); ",
 		NULL,NULL,NULL);
+	sqlite3_exec(killDb, "CREATE TABLE playerDemoStats (" 
+		"map	TEXT NOT NULL,"
+		"playerName TEXT NOT NULL,"
+		"clientNum INT NOT NULL,"
+		"averageStrafeDeviation REAL,"
+		"strafeSampleCount INTEGER NOT NULL,"
+		"demoName TEXT NOT NULL,"
+		"demoPath TEXT NOT NULL,"
+		"demoDateTime TIMESTAMP NOT NULL"//,"
+		//"PRIMARY KEY(playerName,clientNum,map,demoPath)"
+		"); ",
+		NULL,NULL,NULL);
 	
 	/*char* preparedStatementText = "INSERT INTO kills"
 		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, targetIsVisible,attackerIsVisible,"
@@ -1735,6 +1775,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	preparedStatementText = "SELECT last_insert_rowid();";
 	sqlite3_stmt* selectLastInsertRowIdStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
+
+	preparedStatementText = "INSERT INTO playerDemoStats "
+		"(map,playerName,clientNum,averageStrafeDeviation,strafeSampleCount,demoName,demoPath,demoDateTime)"
+		" VALUES "
+		"( @map,@playerName,@clientNum,@averageStrafeDeviation,@strafeSampleCount,@demoName,@demoPath,@demoDateTime)";
+	sqlite3_stmt* insertPlayerDemoStatsStatement;
+	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
+
 
 	sqlite3_exec(killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
@@ -1897,6 +1945,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				CheckForNameChanges(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement);
 				setPlayerAndTeamData(&demo.cut.Cl);
 				updateForcePowersInfo(&demo.cut.Cl);
+				updatePlayerDemoStatsArrayPointers();
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
 				//if (!newHandle) {
@@ -1933,6 +1982,16 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
+
+						// Strafe precision
+						qboolean strafeApplicable = qfalse;
+						float strafeDeviation = calculateStrafeDeviation(thisEs, &strafeApplicable);
+						if (strafeApplicable && playerDemoStatsPointers[thisEs->number]) {
+							playerDemoStatsPointers[thisEs->number]->everUsed = qtrue;
+							playerDemoStatsPointers[thisEs->number]->strafeDeviation.sum += strafeDeviation;
+							playerDemoStatsPointers[thisEs->number]->strafeDeviation.divisor++;
+						}
+
 
 						thisFrameInfo.commandTime[thisEs->number] = thisEs->pos.trType == TR_LINEAR_STOP ? thisEs->pos.trTime : -1;
 						thisFrameInfo.legsAnim[thisEs->number] = thisEs->legsAnim;
@@ -2044,6 +2103,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					if (strafeApplicablePlayerStateThisFrame) {
 						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor++;
 						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum += playerStateStrafeDeviationThisFrame;
+						if (playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]) {
+							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->everUsed = qtrue;
+							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviation.sum += playerStateStrafeDeviationThisFrame;
+							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviation.divisor++;
+						}
 					}
 				}
 
@@ -4100,6 +4164,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 			CheckForNameChanges(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement);
 			setPlayerAndTeamData(&demo.cut.Cl);
 			updateForcePowersInfo(&demo.cut.Cl);
+			updatePlayerDemoStatsArrayPointers();
 		}
 
 #if DEBUG
@@ -4154,9 +4219,38 @@ cuterror:
 			FS_FileErase(newName);
 	}*/
 
-	// One last check for unsaved laughs near end of demo
+	// One last check for unsaved laughs near end of demo. TODO Do we have to do this with some other stuff too? Not sure.
 	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, &outputBatHandleLaughs, killDb, insertLaughsStatement, selectLastInsertRowIdStatement, &oldBasename, &oldPath, oldDemoDateModified, sourceDemoFile, qtrue);
 
+
+
+	// Save player stats
+	for (auto it = playerDemoStatsMap.begin(); it != playerDemoStatsMap.end(); it++) {
+
+		if (it->second.everUsed) { // Some clients may have never been visible or not even existed at all (we have entries for all client nums by default but they're only set to "everUsed" if they were actually seen)
+
+			std::string mapname = std::get<0>(it->first);
+			std::string playerName = std::get<1>(it->first);
+			int clientNum = std::get<2>(it->first);
+			double strafeDeviation = it->second.strafeDeviation.sum / it->second.strafeDeviation.divisor;
+			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5f;
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@map", mapname.c_str());
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
+			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@demoDateTime", oldDemoDateModified);
+
+			int queryResult = sqlite3_step(insertPlayerDemoStatsStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(debugStatsDb) << "\n";
+			}
+			sqlite3_reset(insertPlayerDemoStatsStatement);
+		}
+
+	}
 
 #ifdef DEBUGSTATSDB
 	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
@@ -4209,7 +4303,6 @@ cuterror:
 #endif
 
 
-
 	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
 	sqlite3_finalize(insertLaughsStatement);
 	sqlite3_finalize(insertDefragRunStatement);
@@ -4220,6 +4313,7 @@ cuterror:
 	sqlite3_finalize(insertPlayerModelStatement);
 	sqlite3_finalize(updatePlayerModelCountStatement);
 	sqlite3_finalize(selectLastInsertRowIdStatement);
+	sqlite3_finalize(insertPlayerDemoStatsStatement);
 	sqlite3_close(killDb);
 
 	FS_FCloseFile(oldHandle);
