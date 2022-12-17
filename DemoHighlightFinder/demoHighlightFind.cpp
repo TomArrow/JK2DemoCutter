@@ -100,9 +100,18 @@ int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 strafeDeviationInfo_t strafeDeviations[MAX_CLIENTS];
 
+// From including, to excluding
+#define STRAFE_ANALYSIS_BUCKET_COUNT 18
+struct strafeAnalysisBucket {
+	float fromIncluding;
+	float toExcluding;
+};
+strafeAnalysisBucket strafeAnalysisBuckets[STRAFE_ANALYSIS_BUCKET_COUNT] = { {-9999999,250},{250,350},{350,450},{450,550},{550,650},{750,850},{850,950},{950,1050},{1050,1150},{1150,1250},{1250,1350},{1350,1450},{1450,1550},{1550,1650},{1650,1750},{1750,1850},{1850,1950},{1950,99999999999} };
+
 struct playerDemoStats_t {
 	qboolean everUsed;
 	averageHelper_t strafeDeviation;
+	averageHelper_t strafeDeviationBuckets[STRAFE_ANALYSIS_BUCKET_COUNT];
 };
 // Since players could connect/disconnect/rename, we keep a map with all players that existed during a game.
 // To keep good performance, we have an array of pointers towards the current playerDemoStats_t struct in the map for each player for quick access
@@ -1712,6 +1721,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"playerName TEXT NOT NULL,"
 		"clientNum INT NOT NULL,"
 		"averageStrafeDeviation REAL,"
+		"averageStrafeDeviationBucketsJSON TEXT,"
 		"strafeSampleCount INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
@@ -1777,9 +1787,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
-		"(map,playerName,clientNum,averageStrafeDeviation,strafeSampleCount,demoName,demoPath,demoDateTime)"
+		"(map,playerName,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,strafeSampleCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
-		"( @map,@playerName,@clientNum,@averageStrafeDeviation,@strafeSampleCount,@demoName,@demoPath,@demoDateTime)";
+		"( @map,@playerName,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@strafeSampleCount,@demoName,@demoPath,@demoDateTime)";
 	sqlite3_stmt* insertPlayerDemoStatsStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
 
@@ -1983,6 +1993,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
 
+						float speed = VectorLength(thisEs->pos.trDelta); // Used for strafe analysis buckets and saving recent speeds
+
 						// Strafe precision
 						qboolean strafeApplicable = qfalse;
 						float strafeDeviation = calculateStrafeDeviation(thisEs, &strafeApplicable);
@@ -1990,6 +2002,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							playerDemoStatsPointers[thisEs->number]->everUsed = qtrue;
 							playerDemoStatsPointers[thisEs->number]->strafeDeviation.sum += strafeDeviation;
 							playerDemoStatsPointers[thisEs->number]->strafeDeviation.divisor++;
+							for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+								if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
+									playerDemoStatsPointers[thisEs->number]->strafeDeviationBuckets[b].sum += strafeDeviation;
+									playerDemoStatsPointers[thisEs->number]->strafeDeviationBuckets[b].divisor++;
+								}
+							}
 						}
 
 
@@ -2022,7 +2040,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
 							
 							// Speeds and angular speeds/accelerations/jerks
-							float speed = VectorLength(thisEs->pos.trDelta);
 							float angularSpeed=0, angularAcceleration = 0, angularJerk = 0;
 							float timeSpan = ((float)thisFrameInfo.commandTime[thisEs->number] - (float)lastFrameInfo.commandTime[thisEs->number]) / 1000.0f;
 							qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[thisEs->number] != (float)lastFrameInfo.commandTime[thisEs->number]);
@@ -2097,8 +2114,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					}
 				}
 
-				// Strafe precision
+				// 
+				// Playerstate tracking
 				{
+					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
+
 					playerStateStrafeDeviationThisFrame = calculateStrafeDeviation(&demo.cut.Cl.snap.ps, &strafeApplicablePlayerStateThisFrame);
 					if (strafeApplicablePlayerStateThisFrame) {
 						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor++;
@@ -2107,11 +2127,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->everUsed = qtrue;
 							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviation.sum += playerStateStrafeDeviationThisFrame;
 							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviation.divisor++;
+							for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+								if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
+									playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationBuckets[b].sum += playerStateStrafeDeviationThisFrame;
+									playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationBuckets[b].divisor++;
+								}
+							}
 						}
 					}
-				}
-
-				{ // Playerstate tracking
 
 					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
 					thisFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.legsAnim;
@@ -2141,7 +2164,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						thisFrameInfo.isAlive[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 						//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
 						
-						float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
 						float angularSpeed = 0, angularAcceleration = 0, angularJerk = 0;
 						float timeSpan = ((float)thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] - (float)lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum]) / 1000.0f;
 						qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] != (float)lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum]);
@@ -4233,11 +4255,39 @@ cuterror:
 			std::string playerName = std::get<1>(it->first);
 			int clientNum = std::get<2>(it->first);
 			double strafeDeviation = it->second.strafeDeviation.sum / it->second.strafeDeviation.divisor;
-			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5f;
+			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5;
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@map", mapname.c_str());
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
 			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
+
+			std::stringstream ssStrafeJson;
+			ssStrafeJson << "[\n";
+			for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+				double valueHere = it->second.strafeDeviationBuckets[b].sum / it->second.strafeDeviationBuckets[b].divisor;
+				int64_t sampleCount = it->second.strafeDeviationBuckets[b].divisor+0.5;
+				if (b != 0) {
+					ssStrafeJson << ",\n";
+				}
+				ssStrafeJson << "{\n";
+				ssStrafeJson << "\"average\":";
+				if (sampleCount) {
+					ssStrafeJson << valueHere;
+				}
+				else {
+					ssStrafeJson << "null";
+				}
+				ssStrafeJson << ",\n";
+				ssStrafeJson << "\"sampleCount\":" << sampleCount << ",\n";
+				ssStrafeJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
+				ssStrafeJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
+				ssStrafeJson << "}\n";
+			}
+			ssStrafeJson << "]\n";
+			std::string ssStrafeJsonString = ssStrafeJson.str();
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
+
+
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
