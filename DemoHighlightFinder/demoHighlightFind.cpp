@@ -54,6 +54,10 @@ struct LastSaberMoveInfo {
 	int lastSaberMove;
 	int lastSaberMoveChange;
 	float speed;
+
+	// to track chained attacks like kills from a parry
+	int lastLastSaberMove;
+	int lastLastSaberMoveChange;
 };
 
 struct TeamInfo {
@@ -2084,6 +2088,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 							if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
+								playerLastSaberMove[thisEs->number].lastLastSaberMoveChange = playerLastSaberMove[thisEs->number].lastSaberMoveChange;
+								playerLastSaberMove[thisEs->number].lastLastSaberMove = playerLastSaberMove[thisEs->number].lastSaberMove;
 								playerLastSaberMove[thisEs->number].lastSaberMoveChange = demoCurrentTime;
 								playerLastSaberMove[thisEs->number].lastSaberMove= thisEs->saberMove;
 								playerLastSaberMove[thisEs->number].speed= speed;
@@ -2214,6 +2220,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastLastSaberMoveChange = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange;
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastLastSaberMove = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove;
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange = demoCurrentTime;
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove = demo.cut.Cl.snap.ps.saberMove;
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].speed = speed;
@@ -2784,6 +2792,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 												// Save speed at which it was executed.
 												modInfo << "_" << (int)thisKill.speedatSaberMoveChange << "u";
 											}
+
 										}
 										else {
 
@@ -2815,6 +2824,20 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 													// Save speed at which it was executed.
 													modInfo <<"_" << (int)thisKill.speedatSaberMoveChange<<"u";
 												}
+											}
+										}
+										// Is the current saber move the follow up move of a bounce, deflect, parry, deflect, knockaway etc?
+										// TODO: Detect DFA from parry?
+										//if ((playerLastSaberMove[attacker].lastLastSaberMove >= LS_K1_T_ && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL)
+										//	|| (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_D1_B_)
+										//	) {
+										if (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL) {
+											if (playerLastSaberMove[attacker].lastSaberMove == saberMoveData[playerLastSaberMove[attacker].lastLastSaberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove == saberMoveData[playerLastSaberMove[attacker].lastLastSaberMove].chain_idle) {
+												// yep this is a chain from a parry or such.
+												// not sure if we should include the stuff like broken parry which is followed by idle saber,
+												// but i guess a broken parry followed by a burn kill could be fun to know too
+												modInfo << "_FR";
+												modInfo << saberMoveNames[playerLastSaberMove[attacker].lastLastSaberMove];
 											}
 										}
 										if (thisKill.timeSinceBackflip != -1 && thisKill.timeSinceBackflip < 1000) {

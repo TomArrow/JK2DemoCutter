@@ -1810,6 +1810,21 @@ typedef enum {
 extern std::map <int, std::string>  saberMoveNames;
 extern std::map <int, std::string>  saberStyleNames;
 
+typedef struct
+{
+	char* name;
+	int animToUse;
+	int	startQuad;
+	int	endQuad;
+	unsigned animSetFlags;
+	int blendTime;
+	int blocking;
+	saberMoveName_t chain_idle;			// What move to call if the attack button is not pressed at the end of this anim
+	saberMoveName_t chain_attack;		// What move to call if the attack button (and nothing else) is pressed
+	int trailLength;
+} saberMoveData_t;
+
+extern saberMoveData_t	saberMoveData[LS_MOVE_MAX];
 
 
 
@@ -2254,6 +2269,16 @@ float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles en
 	
 
 }
+
+
+
+
+
+
+
+
+
+
 
 
 #endif
