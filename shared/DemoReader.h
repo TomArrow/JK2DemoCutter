@@ -93,7 +93,7 @@ class DemoReader {
 
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int				demoCurrentTime = 0;
+	int64_t			demoCurrentTime = 0;
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
@@ -103,9 +103,9 @@ class DemoReader {
 
 	playerState_t	oldPS;
 
-	float			lastGottenCommandsTime = 0;
-	float			lastGottenCommandsServerTime = 0;
-	float			lastGottenEventsTime[EK_COUNT] = { 0 };
+	double			lastGottenCommandsTime = 0;
+	int				lastGottenCommandsServerTime = 0;
+	double			lastGottenEventsTime[EK_COUNT] = { 0 };
 	int				lastGottenEventsServerTime[EK_COUNT] = { 0 };
 
 	int				firstSnapServerTime = -1;
@@ -153,7 +153,7 @@ public:
 
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();
-	qboolean SeekToTime(float time);
+	qboolean SeekToTime(double time);
 	int GetFirstServerTimeAfterServerTime(int serverTime);
 	int GetLastServerTimeBeforeServerTime(int serverTime);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
@@ -165,15 +165,15 @@ public:
 	qboolean LoadDemo(const char* sourceDemoFile);
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
-	playerState_t GetInterpolatedPlayerState(float time);
+	playerState_t GetInterpolatedPlayerState(double time);
 	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse);
-	playerState_t GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
+	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
-	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(float time, float* translatedTime=NULL);
+	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
-	std::vector<std::string> DemoReader::GetNewCommands(float time);
-	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime);
-	std::vector<Event> DemoReader::GetNewEvents(float time, eventKind_t kind=EK_ENTITY);
+	std::vector<std::string> DemoReader::GetNewCommands(double time);
+	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime);
+	std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind=EK_ENTITY);
 	std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind=EK_ENTITY);
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum, int* maxLength);
@@ -182,7 +182,7 @@ public:
 	const char* GetSoundConfigString(int soundNum, int* maxLength);
 	qboolean AnySnapshotParsed();
 	qboolean EndReached();
-	qboolean EndReachedAtTime(float time);
+	qboolean EndReachedAtTime(double time);
 	qboolean EndReachedAtServerTime(int serverTime);
 	int getCurrentDemoTime();
 	int getDemoRecorderClientNum();

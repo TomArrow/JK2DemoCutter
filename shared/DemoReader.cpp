@@ -640,7 +640,7 @@ qboolean DemoReader::EndReached() {
 
 	return endReached;
 }
-qboolean DemoReader::EndReachedAtTime(float time) {
+qboolean DemoReader::EndReachedAtTime(double time) {
 	SeekToTime(time);
 	return (qboolean)(demoCurrentTime < time);
 }
@@ -652,7 +652,7 @@ int DemoReader::getCurrentDemoTime() {
 	return demoCurrentTime;
 }
 
-qboolean DemoReader::SeekToTime(float time) {
+qboolean DemoReader::SeekToTime(double time) {
 	while (demoCurrentTime < time && !endReached) {
 		ReadMessage();
 	}
@@ -774,7 +774,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboo
 	}
 }
 
-playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, float time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS, float* translatedTime) {
+playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS, float* translatedTime) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 
@@ -950,7 +950,7 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 	}
 }
 
-playerState_t DemoReader::GetInterpolatedPlayerState(float time) {
+playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 	SeekToAnySnapshotIfNotYet();
@@ -1267,7 +1267,7 @@ std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 	return retVal;
 }
 
-std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time, float *translatedTime) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime = NULL) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time);
@@ -1300,7 +1300,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(float time, float *tra
 std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
-	SeekToTime(time);
+	SeekToTime(time+0.5);
 
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
@@ -1329,7 +1329,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 	return std::map<int, entityState_t>();
 }
 
-std::vector<std::string> DemoReader::GetNewCommands(float time) {
+std::vector<std::string> DemoReader::GetNewCommands(double time) {
 	std::vector<std::string> retVal;
 	SeekToTime(time);
 	for (int i = 0; i < readCommands.size(); i++) {
@@ -1341,7 +1341,7 @@ std::vector<std::string> DemoReader::GetNewCommands(float time) {
 	return retVal;
 }
 // Don't combine this with GetNewCommands, they keep track in different ways. Pick one or the other.
-std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime) {
+std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime) {
 	std::vector<std::string> retVal;
 	SeekToServerTime(serverTime);
 	for (int i = 0; i < readCommands.size(); i++) {
@@ -1352,7 +1352,7 @@ std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(float serverTime
 	lastGottenCommandsServerTime = serverTime;
 	return retVal;
 }
-std::vector<Event> DemoReader::GetNewEvents(float time, eventKind_t kind) {
+std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind) {
 	std::vector<Event> retVal;
 	SeekToTime(time);
 	for (int i = 0; i < readEvents.size(); i++) {

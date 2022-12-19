@@ -18,18 +18,18 @@ public:
 	std::string sourceName;
 	std::string demoPath;
 	std::vector<std::string> playersToCopy;
-	float delay=0.0f; // Absolute delay of the demo time against the target demo time
-	float showStart = 0.0f; // In demo time
-	float showEnd = std::numeric_limits<float>::infinity(); // In demo time
-	float playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
-	float playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
+	double delay=0.0f; // Absolute delay of the demo time against the target demo time
+	double showStart = 0.0f; // In demo time
+	double showEnd = std::numeric_limits<float>::infinity(); // In demo time
+	double playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
+	double playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
 	qboolean copyAllPlayers = qfalse;
 	qboolean copyRemainingPlayersAsG2AnimEnts = qfalse;
 };
 
 struct SourcePlayerInfo {
 	int clientNum;
-	float pingCompensation; // in ms
+	double pingCompensation; // in ms
 	qboolean asG2AnimEnt;
 };
 
@@ -821,7 +821,7 @@ int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* co
 	return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue, clCut, commandsToAdd);
 }
 
-void retimeEntity(entityState_t* entity, float newServerTime, float newDemoTime) {
+void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime) {
 	vec3_t newPos;
 	BG_EvaluateTrajectory(&entity->pos, newServerTime, newPos);
 	VectorCopy(newPos, entity->pos.trBase);
@@ -1136,9 +1136,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;
 
-	float sourceTime = 0.0f;
-	float time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
-	float fps = 60.0f;
+	double sourceTime = 0.0f;
+	double time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
+	double fps = 60.0f;
 	std::map<int, entityState_t> targetEntities;
 	std::map<int, entityState_t> targetEntitiesOld;
 	std::vector<std::string> commandsToAdd;
@@ -1173,7 +1173,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
 					//int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
-					float pingCompensationHere = demoReaders[i].playersToCopy[c].pingCompensation;
+					double pingCompensationHere = demoReaders[i].playersToCopy[c].pingCompensation;
 					qboolean asG2AnimEnt = demoReaders[i].playersToCopy[c].asG2AnimEnt;
 
 					int targetClientNum = -1;
@@ -1317,7 +1317,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 				// Get various related entities
 				int maxLengthTmp;
-				float thisTimeInServerTime;
+				double thisTimeInServerTime;
 				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay,&thisTimeInServerTime);
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					
@@ -1477,7 +1477,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				// Get new events and remember them.
 				if (demoReaders[i].sourceInfo->delay < 0 && demoReaders[i].targetFramesRead == 0) {
 					// For demos with a negative delay (part of start cut off), discard events that happened longer than 2 frames ago.
-					demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay - 2.0f * 1000.0f / fps);
+					demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay - 2.0 * 1000.0 / fps);
 					// Just ignore the return value.
 				}
 				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
@@ -1669,8 +1669,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &targetEntities, &targetEntitiesOld, &mainPlayerPSOld);
 		}
 
-		time += 1000.0f / fps;
-		sourceTime += 1000.0f / fps;
+		time += 1000.0 / fps;
+		sourceTime += 1000.0 / fps;
 		demo.cut.Clc.reliableSequence++;
 		demo.cut.Clc.serverMessageSequence++;
 
