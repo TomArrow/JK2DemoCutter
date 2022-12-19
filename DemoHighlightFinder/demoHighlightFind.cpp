@@ -233,6 +233,10 @@ struct entityOwnerInfo_t {
 }; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
 
 
+struct samplePoint_t {
+	float value;
+	double time;
+};
 
 struct frameInfo_t {
 	qboolean isAlive[MAX_CLIENTS];
@@ -241,9 +245,10 @@ struct frameInfo_t {
 	vec3_t playerPositions[MAX_CLIENTS];
 	vec3_t playerVelocities[MAX_CLIENTS];
 	vec3_t playerAngles[MAX_CLIENTS];
-	float playerAngularVelocities[MAX_CLIENTS];
-	float playerAngularAccelerations[MAX_CLIENTS];
-	float playerAngularJerks[MAX_CLIENTS];
+	samplePoint_t playerAngularVelocities[MAX_CLIENTS];
+	samplePoint_t playerAngularAccelerations[MAX_CLIENTS];
+	samplePoint_t playerAngularJerks[MAX_CLIENTS];
+	samplePoint_t playerAngularSnaps[MAX_CLIENTS];
 	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
 	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
 #ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -400,11 +405,12 @@ struct {
 //std::map<int, std::map<int, float>> speeds;
 //std::map<int, float> speeds[MAX_CLIENTS];
 struct Speed {
-	int time;
+	int64_t time;
 	float speed;
 	float angularSpeed;
 	float angularAcceleration;
 	float angularJerk;
+	float angularSnap;
 };
 std::vector<Speed> speeds[MAX_CLIENTS];
 // TODO For future? Have angle saved too. See at what angle the kill comes. Big angle between capper and chaser at high speed is more impressive?
@@ -1051,7 +1057,7 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 	return maxSpeed;
 }
 
-float getMaxAngularSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
+float getMaxAngularSpeedForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxSpeed = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
 		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularSpeed) > maxSpeed) {
@@ -1060,7 +1066,7 @@ float getMaxAngularSpeedForClientinTimeFrame(int clientNum, int fromTime, int to
 	}
 	return maxSpeed;
 }
-float getMaxAngularAccelerationForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
+float getMaxAngularAccelerationForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxAccel = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
 		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularAcceleration) > maxAccel) {
@@ -1069,7 +1075,7 @@ float getMaxAngularAccelerationForClientinTimeFrame(int clientNum, int fromTime,
 	}
 	return maxAccel;
 }
-float getMaxAngularJerkForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
+float getMaxAngularJerkForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxJerk = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
 		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularJerk) > maxJerk) {
@@ -1077,6 +1083,15 @@ float getMaxAngularJerkForClientinTimeFrame(int clientNum, int fromTime, int toT
 		}
 	}
 	return maxJerk;
+}
+float getMaxAngularSnapForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
+	float maxSnap = -1.0f;
+	for (int i = 0;i< speeds[clientNum].size(); i++) {
+		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularSnap) > maxSnap) {
+			maxSnap = abs(speeds[clientNum][i].angularSnap);
+		}
+	}
+	return maxSnap;
 }
 
 
@@ -1410,7 +1425,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	demoType_t		demoType;
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int				demoCurrentTime = 0;
+	int64_t			demoCurrentTime = 0;
 	int				demoOldTime = 0;
 	int				deltaTimeFromLastSnapshot = 0;
 	int				lastGameStateChange = 0;
@@ -1565,6 +1580,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"maxAngularSpeedAttacker	REAL,"
 		"maxAngularAccelerationAttacker	REAL,"
 		"maxAngularJerkAttacker	REAL,"
+		"maxAngularSnapAttacker	REAL,"
 
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTarget	REAL,"
@@ -1750,9 +1766,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1881,6 +1897,15 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	memset(&demo, 0, sizeof(demo));
 
 	int messageOffset = 0;
+
+
+	// Maybe we will make these user options someday...
+	const qboolean derivativeRetiming = qtrue;
+	const qboolean derivativeMagnitudeCompensate = qtrue;
+
+	float accelerationMultiplier = derivativeMagnitudeCompensate ?  1.0f / 100.0f : 1.0f;
+	float jerkMultiplier = derivativeMagnitudeCompensate ? 1.0f / 10000.0f : 1.0f;
+	float snapMultiplier = derivativeMagnitudeCompensate ? 1.0f / 1000000.0f : 1.0f;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
@@ -2045,16 +2070,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							//speeds[thisEs->number][demoCurrentTime] = VectorLength(thisEs->pos.trDelta);
 							
 							// Speeds and angular speeds/accelerations/jerks
-							float angularSpeed=0, angularAcceleration = 0, angularJerk = 0;
-							float timeSpan = ((float)thisFrameInfo.commandTime[thisEs->number] - (float)lastFrameInfo.commandTime[thisEs->number]) / 1000.0f;
-							qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[thisEs->number] != (float)lastFrameInfo.commandTime[thisEs->number]);
+							samplePoint_t angularSpeed{}, angularAcceleration{}, angularJerk{}, angularSnap{};
+							float timeSpan = ((double)thisFrameInfo.commandTime[thisEs->number] - (double)lastFrameInfo.commandTime[thisEs->number]) / 1000.0f; // double because float can't hold full precision highest value 32 bit integer i think
+							qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[thisEs->number] != lastFrameInfo.commandTime[thisEs->number]);
 							if (playerVisibleClientFrames[thisEs->number] >= 1) { // We can look back 1 past frame at least
 								if (!clientFrameHasAdvanced) {
 									// Same command time as last frame. Copy over
 									angularSpeed = lastFrameInfo.playerAngularVelocities[thisEs->number];
 								}
 								else {
-									angularSpeed = AngleSubtract(lastFrameInfo.playerAngles[thisEs->number][YAW], thisEs->apos.trBase[YAW]) / timeSpan;
+									angularSpeed.value = AngleSubtract(lastFrameInfo.playerAngles[thisEs->number][YAW], thisEs->apos.trBase[YAW]) / timeSpan;
+									angularSpeed.time = (double)thisFrameInfo.commandTime[thisEs->number]-(double)timeSpan/2.0;
 								}
 							}
 							if (playerVisibleClientFrames[thisEs->number] >= 2) { // We can look back 2 frames at least
@@ -2063,7 +2089,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									angularAcceleration = lastFrameInfo.playerAngularAccelerations[thisEs->number];
 								}
 								else {
-									angularAcceleration = (angularSpeed-lastFrameInfo.playerAngularVelocities[thisEs->number])/ timeSpan;
+									if (derivativeRetiming) {
+										angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[thisEs->number].value) * 1000.0f / (angularSpeed.time - lastFrameInfo.playerAngularVelocities[thisEs->number].time); // 1000.0f because milliseconds
+									}
+									else {
+										angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[thisEs->number].value) / timeSpan;
+									}
+									angularAcceleration.time = (angularSpeed.time + lastFrameInfo.playerAngularVelocities[thisEs->number].time)/2.0;
 								}
 							}
 							if (playerVisibleClientFrames[thisEs->number] >= 3) { // We can look back 3 frames at least. TODO: Does this need to be 4 or more? Not sure hmm. Brain meltink.
@@ -2072,13 +2104,35 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									angularJerk = lastFrameInfo.playerAngularJerks[thisEs->number];
 								}
 								else {
-									angularJerk = (angularAcceleration - lastFrameInfo.playerAngularAccelerations[thisEs->number])/ timeSpan;
+									if (derivativeRetiming) {
+										angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[thisEs->number].value) * 1000.0f / (angularAcceleration.time - lastFrameInfo.playerAngularAccelerations[thisEs->number].time); // 1000.0f because milliseconds
+									}
+									else {
+										angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[thisEs->number].value) / timeSpan;
+									}
+									angularJerk.time = (angularAcceleration.time + lastFrameInfo.playerAngularAccelerations[thisEs->number].time) / 2.0;
+								}
+							}
+							if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 4) { // We can look back 4 frames at least. TODO: Does this need to be more? Not sure hmm. Brain meltink.
+								if (!clientFrameHasAdvanced) {
+									// Same command time as last frame. Copy over
+									angularSnap = lastFrameInfo.playerAngularSnaps[thisEs->number];
+								}
+								else {
+									if (derivativeRetiming) {
+										angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[thisEs->number].value) * 1000.0f / (angularJerk.time - lastFrameInfo.playerAngularJerks[thisEs->number].time); // 1000.0f because milliseconds
+									}
+									else {
+										angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[thisEs->number].value) / timeSpan;
+									}
+									angularSnap.time = (angularJerk.time + lastFrameInfo.playerAngularJerks[thisEs->number].time) / 2.0;
 								}
 							}
 							thisFrameInfo.playerAngularVelocities[thisEs->number] = angularSpeed;
 							thisFrameInfo.playerAngularAccelerations[thisEs->number] = angularAcceleration;
 							thisFrameInfo.playerAngularJerks[thisEs->number] = angularJerk;
-							speeds[thisEs->number].push_back({ demoCurrentTime,speed, angularSpeed,angularAcceleration,angularJerk });
+							thisFrameInfo.playerAngularSnaps[thisEs->number] = angularSnap;
+							speeds[thisEs->number].push_back({ demoCurrentTime,speed, angularSpeed.value,angularAcceleration.value,angularJerk.value,angularSnap.value });
 
 							// Is this client walking?
 							if (thisEs->groundEntityNum != ENTITYNUM_NONE && VectorLength(thisEs->pos.trDelta) < sqrtf(thisEs->speed * thisEs->speed * 2)) {
@@ -2171,16 +2225,17 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						thisFrameInfo.isAlive[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 						//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
 						
-						float angularSpeed = 0, angularAcceleration = 0, angularJerk = 0;
-						float timeSpan = ((float)thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] - (float)lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum]) / 1000.0f;
-						qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] != (float)lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum]);
+						samplePoint_t angularSpeed{}, angularAcceleration{}, angularJerk{}, angularSnap{};
+						float timeSpan = ((double)thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] - (double)lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum]) / 1000.0f; // double because commandtime could be a full integer value which 32 bit floating point cant represent accurately.
+						qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum]);
 						if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 1) { // We can look back 1 past frame at least
 							if (!clientFrameHasAdvanced) {
 								// Same command time as last frame. Copy over
 								angularSpeed = lastFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum];
 							}
 							else {
-								angularSpeed = AngleSubtract(lastFrameInfo.playerAngles[demo.cut.Cl.snap.ps.clientNum][YAW], demo.cut.Cl.snap.ps.viewangles[YAW]) / timeSpan;
+								angularSpeed.value = AngleSubtract(lastFrameInfo.playerAngles[demo.cut.Cl.snap.ps.clientNum][YAW], demo.cut.Cl.snap.ps.viewangles[YAW]) / timeSpan;
+								angularSpeed.time = (double)thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] - (double)timeSpan / 2.0;
 							}
 						}
 						if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 2) { // We can look back 2 frames at least
@@ -2189,7 +2244,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								angularAcceleration = lastFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum];
 							}
 							else {
-								angularAcceleration = (angularSpeed - lastFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum]) / timeSpan;
+								if (derivativeRetiming) {
+									angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum].value) * 1000.0f / (angularSpeed.time - lastFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum].time); // 1000.0f because milliseconds
+								}
+								else {
+									angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum].value) / timeSpan;
+								}
+								angularAcceleration.time = (angularSpeed.time + lastFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum].time) / 2.0;
 							}
 						}
 						if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 3) { // We can look back 3 frames at least. TODO: Does this need to be 4 or more? Not sure hmm. Brain meltink.
@@ -2198,13 +2259,35 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								angularJerk = lastFrameInfo.playerAngularJerks[demo.cut.Cl.snap.ps.clientNum];
 							}
 							else {
-								angularJerk = (angularAcceleration - lastFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum]) / timeSpan;
+								if (derivativeRetiming) {
+									angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum].value) * 1000.0f / (angularAcceleration.time - lastFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum].time); // 1000.0f because milliseconds
+								}
+								else {
+									angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum].value) / timeSpan;
+								}
+								angularJerk.time = (angularAcceleration.time + lastFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum].time) / 2.0;
+							}
+						}
+						if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 4) { // We can look back 4 frames at least. TODO: Does this need to be more? Not sure hmm. Brain meltink.
+							if (!clientFrameHasAdvanced) {
+								// Same command time as last frame. Copy over
+								angularSnap = lastFrameInfo.playerAngularSnaps[demo.cut.Cl.snap.ps.clientNum];
+							}
+							else {
+								if (derivativeRetiming) {
+									angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[demo.cut.Cl.snap.ps.clientNum].value) * 1000.0f / (angularJerk.time - lastFrameInfo.playerAngularJerks[demo.cut.Cl.snap.ps.clientNum].time); // 1000.0f because milliseconds
+								}
+								else {
+									angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[demo.cut.Cl.snap.ps.clientNum].value) / timeSpan;
+								}
+								angularSnap.time = (angularJerk.time + lastFrameInfo.playerAngularJerks[demo.cut.Cl.snap.ps.clientNum].time) / 2.0;
 							}
 						}
 						thisFrameInfo.playerAngularVelocities[demo.cut.Cl.snap.ps.clientNum] = angularSpeed;
 						thisFrameInfo.playerAngularAccelerations[demo.cut.Cl.snap.ps.clientNum] = angularAcceleration;
 						thisFrameInfo.playerAngularJerks[demo.cut.Cl.snap.ps.clientNum] = angularJerk;
-						speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed, angularSpeed,angularAcceleration,angularJerk });
+						thisFrameInfo.playerAngularSnaps[demo.cut.Cl.snap.ps.clientNum] = angularSnap;
+						speeds[demo.cut.Cl.snap.ps.clientNum].push_back({ demoCurrentTime,speed, angularSpeed.value,angularAcceleration.value,angularJerk.value,angularSnap.value });
 
 
 						// Is this client walking?
@@ -2951,6 +3034,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							float maxAngularSpeedAttackerFloat = getMaxAngularSpeedForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
 							float maxAngularAccelerationAttackerFloat = getMaxAngularAccelerationForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
 							float maxAngularJerkAttackerFloat = getMaxAngularJerkForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
+							float maxAngularSnapAttackerFloat = getMaxAngularSnapForClientinTimeFrame(attacker, demoCurrentTime - 1000, demoCurrentTime);
 
 
 							// Create hash.
@@ -3236,8 +3320,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 							SQLBIND(insertAngleStatement, double, "@maxAngularSpeedAttacker", maxAngularSpeedAttackerFloat >= 0 ? maxAngularSpeedAttackerFloat : NULL);
-							SQLBIND(insertAngleStatement, double, "@maxAngularAccelerationAttacker", maxAngularAccelerationAttackerFloat >= 0 ? maxAngularAccelerationAttackerFloat : NULL);
-							SQLBIND(insertAngleStatement, double, "@maxAngularJerkAttacker", maxAngularJerkAttackerFloat >= 0 ? maxAngularJerkAttackerFloat : NULL);
+							SQLBIND(insertAngleStatement, double, "@maxAngularAccelerationAttacker", maxAngularAccelerationAttackerFloat >= 0 ? maxAngularAccelerationAttackerFloat * accelerationMultiplier : NULL);
+							SQLBIND(insertAngleStatement, double, "@maxAngularJerkAttacker", maxAngularJerkAttackerFloat >= 0 ? maxAngularJerkAttackerFloat * jerkMultiplier : NULL);
+							SQLBIND(insertAngleStatement, double, "@maxAngularSnapAttacker", maxAngularSnapAttackerFloat >= 0 ? maxAngularSnapAttackerFloat *snapMultiplier : NULL); 
 
 
 							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
