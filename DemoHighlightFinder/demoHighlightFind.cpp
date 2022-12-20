@@ -2071,61 +2071,64 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							
 							// Speeds and angular speeds/accelerations/jerks
 							samplePoint_t angularSpeed{}, angularAcceleration{}, angularJerk{}, angularSnap{};
-							float timeSpan = ((double)thisFrameInfo.commandTime[thisEs->number] - (double)lastFrameInfo.commandTime[thisEs->number]) / 1000.0f; // double because float can't hold full precision highest value 32 bit integer i think
-							qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[thisEs->number] != lastFrameInfo.commandTime[thisEs->number]);
-							if (playerVisibleClientFrames[thisEs->number] >= 1) { // We can look back 1 past frame at least
-								if (!clientFrameHasAdvanced) {
-									// Same command time as last frame. Copy over
-									angularSpeed = lastFrameInfo.playerAngularVelocities[thisEs->number];
-								}
-								else {
-									angularSpeed.value = AngleSubtract(lastFrameInfo.playerAngles[thisEs->number][YAW], thisEs->apos.trBase[YAW]) / timeSpan;
-									angularSpeed.time = (double)thisFrameInfo.commandTime[thisEs->number]-(double)timeSpan/2.0;
-								}
-							}
-							if (playerVisibleClientFrames[thisEs->number] >= 2) { // We can look back 2 frames at least
-								if (!clientFrameHasAdvanced) {
-									// Same command time as last frame. Copy over
-									angularAcceleration = lastFrameInfo.playerAngularAccelerations[thisEs->number];
-								}
-								else {
-									if (derivativeRetiming) {
-										angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[thisEs->number].value) * 1000.0f / (angularSpeed.time - lastFrameInfo.playerAngularVelocities[thisEs->number].time); // 1000.0f because milliseconds
+							if (thisFrameInfo.commandTime[thisEs->number] != -1) { // -1 means probably: g_smoothclients was disabled, therefore we have no info on the command time. Therefore we can't do this analysis for this player.
+
+								float timeSpan = ((double)thisFrameInfo.commandTime[thisEs->number] - (double)lastFrameInfo.commandTime[thisEs->number]) / 1000.0f; // double because float can't hold full precision highest value 32 bit integer i think
+								qboolean clientFrameHasAdvanced = (qboolean)(thisFrameInfo.commandTime[thisEs->number] != lastFrameInfo.commandTime[thisEs->number]);
+								if (playerVisibleClientFrames[thisEs->number] >= 1) { // We can look back 1 past frame at least
+									if (!clientFrameHasAdvanced) {
+										// Same command time as last frame. Copy over
+										angularSpeed = lastFrameInfo.playerAngularVelocities[thisEs->number];
 									}
 									else {
-										angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[thisEs->number].value) / timeSpan;
+										angularSpeed.value = AngleSubtract(lastFrameInfo.playerAngles[thisEs->number][YAW], thisEs->apos.trBase[YAW]) / timeSpan;
+										angularSpeed.time = (double)thisFrameInfo.commandTime[thisEs->number] - (double)timeSpan / 2.0;
 									}
-									angularAcceleration.time = (angularSpeed.time + lastFrameInfo.playerAngularVelocities[thisEs->number].time)/2.0;
 								}
-							}
-							if (playerVisibleClientFrames[thisEs->number] >= 3) { // We can look back 3 frames at least. TODO: Does this need to be 4 or more? Not sure hmm. Brain meltink.
-								if (!clientFrameHasAdvanced) {
-									// Same command time as last frame. Copy over
-									angularJerk = lastFrameInfo.playerAngularJerks[thisEs->number];
-								}
-								else {
-									if (derivativeRetiming) {
-										angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[thisEs->number].value) * 1000.0f / (angularAcceleration.time - lastFrameInfo.playerAngularAccelerations[thisEs->number].time); // 1000.0f because milliseconds
+								if (playerVisibleClientFrames[thisEs->number] >= 2) { // We can look back 2 frames at least
+									if (!clientFrameHasAdvanced) {
+										// Same command time as last frame. Copy over
+										angularAcceleration = lastFrameInfo.playerAngularAccelerations[thisEs->number];
 									}
 									else {
-										angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[thisEs->number].value) / timeSpan;
+										if (derivativeRetiming) {
+											angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[thisEs->number].value) * 1000.0f / (angularSpeed.time - lastFrameInfo.playerAngularVelocities[thisEs->number].time); // 1000.0f because milliseconds
+										}
+										else {
+											angularAcceleration.value = (angularSpeed.value - lastFrameInfo.playerAngularVelocities[thisEs->number].value) / timeSpan;
+										}
+										angularAcceleration.time = (angularSpeed.time + lastFrameInfo.playerAngularVelocities[thisEs->number].time) / 2.0;
 									}
-									angularJerk.time = (angularAcceleration.time + lastFrameInfo.playerAngularAccelerations[thisEs->number].time) / 2.0;
 								}
-							}
-							if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 4) { // We can look back 4 frames at least. TODO: Does this need to be more? Not sure hmm. Brain meltink.
-								if (!clientFrameHasAdvanced) {
-									// Same command time as last frame. Copy over
-									angularSnap = lastFrameInfo.playerAngularSnaps[thisEs->number];
-								}
-								else {
-									if (derivativeRetiming) {
-										angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[thisEs->number].value) * 1000.0f / (angularJerk.time - lastFrameInfo.playerAngularJerks[thisEs->number].time); // 1000.0f because milliseconds
+								if (playerVisibleClientFrames[thisEs->number] >= 3) { // We can look back 3 frames at least. TODO: Does this need to be 4 or more? Not sure hmm. Brain meltink.
+									if (!clientFrameHasAdvanced) {
+										// Same command time as last frame. Copy over
+										angularJerk = lastFrameInfo.playerAngularJerks[thisEs->number];
 									}
 									else {
-										angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[thisEs->number].value) / timeSpan;
+										if (derivativeRetiming) {
+											angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[thisEs->number].value) * 1000.0f / (angularAcceleration.time - lastFrameInfo.playerAngularAccelerations[thisEs->number].time); // 1000.0f because milliseconds
+										}
+										else {
+											angularJerk.value = (angularAcceleration.value - lastFrameInfo.playerAngularAccelerations[thisEs->number].value) / timeSpan;
+										}
+										angularJerk.time = (angularAcceleration.time + lastFrameInfo.playerAngularAccelerations[thisEs->number].time) / 2.0;
 									}
-									angularSnap.time = (angularJerk.time + lastFrameInfo.playerAngularJerks[thisEs->number].time) / 2.0;
+								}
+								if (playerVisibleClientFrames[demo.cut.Cl.snap.ps.clientNum] >= 4) { // We can look back 4 frames at least. TODO: Does this need to be more? Not sure hmm. Brain meltink.
+									if (!clientFrameHasAdvanced) {
+										// Same command time as last frame. Copy over
+										angularSnap = lastFrameInfo.playerAngularSnaps[thisEs->number];
+									}
+									else {
+										if (derivativeRetiming) {
+											angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[thisEs->number].value) * 1000.0f / (angularJerk.time - lastFrameInfo.playerAngularJerks[thisEs->number].time); // 1000.0f because milliseconds
+										}
+										else {
+											angularSnap.value = (angularJerk.value - lastFrameInfo.playerAngularJerks[thisEs->number].value) / timeSpan;
+										}
+										angularSnap.time = (angularJerk.time + lastFrameInfo.playerAngularJerks[thisEs->number].time) / 2.0;
+									}
 								}
 							}
 							thisFrameInfo.playerAngularVelocities[thisEs->number] = angularSpeed;
