@@ -102,7 +102,7 @@ int lastEventTime[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
-strafeDeviationInfo_t strafeDeviations[MAX_CLIENTS];
+strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS];
 
 // From including, to excluding
 #define STRAFE_ANALYSIS_BUCKET_COUNT 18
@@ -116,6 +116,11 @@ struct playerDemoStats_t {
 	qboolean everUsed;
 	averageHelper_t strafeDeviation;
 	averageHelper_t strafeDeviationBuckets[STRAFE_ANALYSIS_BUCKET_COUNT];
+
+	// Extra stats dedicated for when saber is not in use - more meaningful?
+	qboolean everUsedNoSaberMove;
+	averageHelper_t strafeDeviationNoSaberMove;
+	averageHelper_t strafeDeviationNoSaberMoveBuckets[STRAFE_ANALYSIS_BUCKET_COUNT];
 };
 // Since players could connect/disconnect/rename, we keep a map with all players that existed during a game.
 // To keep good performance, we have an array of pointers towards the current playerDemoStats_t struct in the map for each player for quick access
@@ -1463,7 +1468,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
-	Com_Memset(&strafeDeviations, 0, sizeof(strafeDeviations));
+	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -1744,6 +1749,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"averageStrafeDeviation REAL,"
 		"averageStrafeDeviationBucketsJSON TEXT,"
 		"strafeSampleCount INTEGER NOT NULL,"
+		"averageStrafeDeviationNoSaberMove REAL,"
+		"averageStrafeDeviationNoSaberMoveBucketsJSON TEXT,"
+		"strafeNoSaberMoveSampleCount INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
 		"demoDateTime TIMESTAMP NOT NULL"//,"
@@ -1808,9 +1816,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
-		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,strafeSampleCount,demoName,demoPath,demoDateTime)"
+		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
-		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@strafeSampleCount,@demoName,@demoPath,@demoDateTime)";
+		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@demoName,@demoPath,@demoDateTime)";
 	sqlite3_stmt* insertPlayerDemoStatsStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
 
@@ -2028,18 +2036,36 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						// Strafe precision
 						qboolean strafeApplicable = qfalse;
 						float strafeDeviation = calculateStrafeDeviation(thisEs, &strafeApplicable);
-						if (strafeApplicable && playerDemoStatsPointers[thisEs->number]) {
-							playerDemoStatsPointers[thisEs->number]->everUsed = qtrue;
-							playerDemoStatsPointers[thisEs->number]->strafeDeviation.sum += strafeDeviation;
-							playerDemoStatsPointers[thisEs->number]->strafeDeviation.divisor++;
-							for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
-								if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
-									playerDemoStatsPointers[thisEs->number]->strafeDeviationBuckets[b].sum += strafeDeviation;
-									playerDemoStatsPointers[thisEs->number]->strafeDeviationBuckets[b].divisor++;
+						if (strafeApplicable) {
+							//strafeDeviations[thisEs->number].averageHelper.sum += strafeDeviation; // Not really needed because we have no way to reliably reset it (since no "Timer started" info). But maybe we can use it in the futuer some time
+							//strafeDeviations[thisEs->number].averageHelper.divisor++;
+
+							if (playerDemoStatsPointers[thisEs->number]) {
+								playerDemoStatsPointers[thisEs->number]->everUsed = qtrue;
+								playerDemoStatsPointers[thisEs->number]->strafeDeviation.sum += strafeDeviation;
+								playerDemoStatsPointers[thisEs->number]->strafeDeviation.divisor++;
+								for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+									if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
+										playerDemoStatsPointers[thisEs->number]->strafeDeviationBuckets[b].sum += strafeDeviation;
+										playerDemoStatsPointers[thisEs->number]->strafeDeviationBuckets[b].divisor++;
+									}
+								}
+
+								// Special strafe value that is only measured when saber is not in any active attack
+								if (thisEs->saberMove >= LS_NONE && thisEs->saberMove <= LS_PUTAWAY) {
+
+									playerDemoStatsPointers[thisEs->number]->everUsedNoSaberMove = qtrue;
+									playerDemoStatsPointers[thisEs->number]->strafeDeviationNoSaberMove.sum += strafeDeviation;
+									playerDemoStatsPointers[thisEs->number]->strafeDeviationNoSaberMove.divisor++;
+									for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+										if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
+											playerDemoStatsPointers[thisEs->number]->strafeDeviationNoSaberMoveBuckets[b].sum += strafeDeviation;
+											playerDemoStatsPointers[thisEs->number]->strafeDeviationNoSaberMoveBuckets[b].divisor++;
+										}
+									}
 								}
 							}
 						}
-
 
 						thisFrameInfo.commandTime[thisEs->number] = thisEs->pos.trType == TR_LINEAR_STOP ? thisEs->pos.trTime : -1;
 						thisFrameInfo.legsAnim[thisEs->number] = thisEs->legsAnim;
@@ -2185,8 +2211,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					playerStateStrafeDeviationThisFrame = calculateStrafeDeviation(&demo.cut.Cl.snap.ps, &strafeApplicablePlayerStateThisFrame);
 					if (strafeApplicablePlayerStateThisFrame) {
-						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor++;
-						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum += playerStateStrafeDeviationThisFrame;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor++;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum += playerStateStrafeDeviationThisFrame;
 						if (playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]) {
 							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->everUsed = qtrue;
 							playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviation.sum += playerStateStrafeDeviationThisFrame;
@@ -2195,6 +2221,20 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
 									playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationBuckets[b].sum += playerStateStrafeDeviationThisFrame;
 									playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationBuckets[b].divisor++;
+								}
+							}
+
+							// Special strafe value that is only measured when saber is not in any active attack
+							if (demo.cut.Cl.snap.ps.saberMove >= LS_NONE && demo.cut.Cl.snap.ps.saberMove <= LS_PUTAWAY) { 
+
+								playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->everUsedNoSaberMove = qtrue;
+								playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationNoSaberMove.sum += playerStateStrafeDeviationThisFrame;
+								playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationNoSaberMove.divisor++;
+								for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+									if (speed >= strafeAnalysisBuckets[b].fromIncluding && speed < strafeAnalysisBuckets[b].toExcluding) {
+										playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationNoSaberMoveBuckets[b].sum += playerStateStrafeDeviationThisFrame;
+										playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationNoSaberMoveBuckets[b].divisor++;
+									}
 								}
 							}
 						}
@@ -4138,14 +4178,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					.match();*/
 				
 				if (printText.find("Timer started") != std::string::npos) {
-					strafeDeviations[demo.cut.Cl.snap.ps.clientNum].lastReset = demoCurrentTime;
+					strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].lastReset = demoCurrentTime;
 					if (strafeApplicablePlayerStateThisFrame) {
-						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 1;
-						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = playerStateStrafeDeviationThisFrame;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 1;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = playerStateStrafeDeviationThisFrame;
 					}
 					else {
-						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 0;
-						strafeDeviations[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = 0;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 0;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = 0;
 					}
 				}
 
@@ -4240,9 +4280,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
 
 					// Do we have strafe deviation info?
-					int64_t measurementStartTimeOffset = abs(strafeDeviations[playerNumber].lastReset - runStart);
+					int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
 					if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
-						SQLBIND(insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviations[playerNumber].averageHelper.sum/strafeDeviations[playerNumber].averageHelper.divisor);
+						SQLBIND(insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum/strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
 					}
 					else {
 						SQLBIND_NULL(insertDefragRunStatement, "@averageStrafeDeviation");
@@ -4367,16 +4407,21 @@ cuterror:
 			std::string playerName = std::get<1>(it->first);
 			int clientNum = std::get<2>(it->first);
 			double strafeDeviation = it->second.strafeDeviation.sum / it->second.strafeDeviation.divisor;
+			double strafeDeviationNoSaberMove = it->second.strafeDeviationNoSaberMove.sum / it->second.strafeDeviationNoSaberMove.divisor;
 			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5;
+			int64_t strafeNoSaberMoveSampleCount = it->second.strafeDeviationNoSaberMove.divisor+0.5;
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@map", mapname.c_str());
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
 			std::string playernameStripped = Q_StripColorAll(playerName);
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
 			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
+			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
 
 			std::stringstream ssStrafeJson;
+			std::stringstream ssStrafeNoSaberMoveJson;
 			ssStrafeJson << "[\n";
+			ssStrafeNoSaberMoveJson << "[\n";
 			for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
 				double valueHere = it->second.strafeDeviationBuckets[b].sum / it->second.strafeDeviationBuckets[b].divisor;
 				int64_t sampleCount = it->second.strafeDeviationBuckets[b].divisor+0.5;
@@ -4396,13 +4441,37 @@ cuterror:
 				ssStrafeJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
 				ssStrafeJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
 				ssStrafeJson << "}\n";
+
+				// No saber move data
+				valueHere = it->second.strafeDeviationNoSaberMoveBuckets[b].sum / it->second.strafeDeviationNoSaberMoveBuckets[b].divisor;
+				sampleCount = it->second.strafeDeviationNoSaberMoveBuckets[b].divisor+0.5;
+				if (b != 0) {
+					ssStrafeNoSaberMoveJson << ",\n";
+				}
+				ssStrafeNoSaberMoveJson << "{\n";
+				ssStrafeNoSaberMoveJson << "\"average\":";
+				if (sampleCount) {
+					ssStrafeNoSaberMoveJson << valueHere;
+				}
+				else {
+					ssStrafeNoSaberMoveJson << "null";
+				}
+				ssStrafeNoSaberMoveJson << ",\n";
+				ssStrafeNoSaberMoveJson << "\"sampleCount\":" << sampleCount << ",\n";
+				ssStrafeNoSaberMoveJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
+				ssStrafeNoSaberMoveJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
+				ssStrafeNoSaberMoveJson << "}\n";
 			}
 			ssStrafeJson << "]\n";
+			ssStrafeNoSaberMoveJson << "]\n";
 			std::string ssStrafeJsonString = ssStrafeJson.str();
+			std::string ssStrafeNoSaberMoveJsonString = ssStrafeNoSaberMoveJson.str();
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
+			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
 
 
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@demoDateTime", oldDemoDateModified);
