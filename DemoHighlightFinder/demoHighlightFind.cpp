@@ -51,6 +51,8 @@ public:
 //std::map<int,int> playerFirstFollowedOrVisible;
 //std::map<int,int> lastEvent;
 #define MAX_PAST_SABERMOVE_SAVE 3
+#define PARRY_DFA_DETECT_SLOW_THRESHOLD 350
+#define PARRY_YDFA_DETECT_SLOW_THRESHOLD 600
 struct saberMoveInfo_t {
 	int saberMove;
 	int64_t saberMoveChange;
@@ -2973,11 +2975,22 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 										else if (playerLastSaberMove[attacker].lastSaberMove[0].saberMove >= LS_A_JUMP_T__B_ && playerLastSaberMove[attacker].lastSaberMove[0].saberMove <= LS_A_FLIP_SLASH) {
 											if (playerLastSaberMove[attacker].lastSaberMove[2].saberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastSaberMove[2].saberMove <= LS_REFLECT_LL) {
 												if (playerLastSaberMove[attacker].lastSaberMove[1].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[2].saberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove[1].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[2].saberMove].chain_idle) {
-													// yep this is a chain from a parry or such.
-													// not sure if we should include the stuff like broken parry which is followed by idle saber,
-													// but i guess a broken parry followed by a burn kill could be fun to know too
-													modInfo << "_FR";
+													
+													qboolean isSlowDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMove == LS_A_JUMP_T__B_ && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_DFA_DETECT_SLOW_THRESHOLD);
+													qboolean isSlowYDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMove != LS_A_JUMP_T__B_ && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_YDFA_DETECT_SLOW_THRESHOLD);
+													if (isSlowDfa || isSlowYDfa) {
+														// We are interested mostly in those very fast parry DFAs
+														// If its a dfa from a parry that takes a while to connect.. meh
+														// Because it could just be a DFA as a result of fighting someone else and then it hits the other person after a second. 
+														// Or its a dfa that the other person runs into again after a second. Not really that fascinating.
+														// So we make it clear its a slow one by marking it _FRSL
+														modInfo << "_FRSL";
+													}
+													else {
+														modInfo << "_FR";
+													}
 													modInfo << saberMoveNames[playerLastSaberMove[attacker].lastSaberMove[2].saberMove];
+
 												}
 											}
 										}
