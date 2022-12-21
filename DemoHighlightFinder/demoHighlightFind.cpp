@@ -50,14 +50,15 @@ public:
 //std::map<int,int> playerFirstFollowed;
 //std::map<int,int> playerFirstFollowedOrVisible;
 //std::map<int,int> lastEvent;
-struct LastSaberMoveInfo {
-	int lastSaberMove;
-	int lastSaberMoveChange;
+#define MAX_PAST_SABERMOVE_SAVE 3
+struct saberMoveInfo_t {
+	int saberMove;
+	int64_t saberMoveChange;
 	float speed;
-
-	// to track chained attacks like kills from a parry
-	int lastLastSaberMove;
-	int lastLastSaberMoveChange;
+};
+struct LastSaberMoveInfo {
+	saberMoveInfo_t lastSaberMove[MAX_PAST_SABERMOVE_SAVE]; // 0 is last. 1+ are previous ones and always move up
+	// the past ones are to track chained attacks like kills from a parry
 };
 
 struct TeamInfo {
@@ -2170,12 +2171,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							}
 
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
-							if (playerLastSaberMove[thisEs->number].lastSaberMove != thisEs->saberMove) {
-								playerLastSaberMove[thisEs->number].lastLastSaberMoveChange = playerLastSaberMove[thisEs->number].lastSaberMoveChange;
-								playerLastSaberMove[thisEs->number].lastLastSaberMove = playerLastSaberMove[thisEs->number].lastSaberMove;
-								playerLastSaberMove[thisEs->number].lastSaberMoveChange = demoCurrentTime;
-								playerLastSaberMove[thisEs->number].lastSaberMove= thisEs->saberMove;
-								playerLastSaberMove[thisEs->number].speed= speed;
+							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMove != thisEs->saberMove) {
+								for (int smI = MAX_PAST_SABERMOVE_SAVE -1; smI > 0; smI--) {
+									playerLastSaberMove[thisEs->number].lastSaberMove[smI] = playerLastSaberMove[thisEs->number].lastSaberMove[smI-1];
+								}
+								playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveChange = demoCurrentTime;
+								playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMove= thisEs->saberMove;
+								playerLastSaberMove[thisEs->number].lastSaberMove[0].speed= speed;
 							}
 						}
 					}
@@ -2345,12 +2347,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 #endif
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
-						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove != demo.cut.Cl.snap.ps.saberMove) {
-							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastLastSaberMoveChange = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange;
-							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastLastSaberMove = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove;
-							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMoveChange = demoCurrentTime;
-							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove = demo.cut.Cl.snap.ps.saberMove;
-							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].speed = speed;
+						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMove != demo.cut.Cl.snap.ps.saberMove) {
+							for (int smI = MAX_PAST_SABERMOVE_SAVE - 1; smI > 0; smI--) {
+								playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[smI] = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[smI - 1];
+							}
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMoveChange = demoCurrentTime;
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMove = demo.cut.Cl.snap.ps.saberMove;
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].speed = speed;
 						}
 					}
 				}
@@ -2840,9 +2843,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							thisKill.isVisible = targetIsVisibleOrFollowed;
 							thisKill.isFollowed = attackerIsFollowed;
 							thisKill.victimMaxSpeedPastSecond = maxSpeedTargetFloat;
-							thisKill.timeSinceSaberMoveChange = isWorldKill ? -1 : (demoCurrentTime-playerLastSaberMove[attacker].lastSaberMoveChange);
+							thisKill.timeSinceSaberMoveChange = isWorldKill ? -1 : (demoCurrentTime-playerLastSaberMove[attacker].lastSaberMove[0].saberMoveChange);
 							thisKill.timeSinceBackflip = isWorldKill ? -1 : (lastBackflip[attacker] >= 0?(demoCurrentTime-lastBackflip[attacker]):-1);
-							thisKill.speedatSaberMoveChange = isWorldKill ? -1 : (playerLastSaberMove[attacker].speed);
+							thisKill.speedatSaberMoveChange = isWorldKill ? -1 : (playerLastSaberMove[attacker].lastSaberMove[0].speed);
 
 
 							// This is the place that had all the continues originally.
@@ -2953,17 +2956,29 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 											}
 										}
 										// Is the current saber move the follow up move of a bounce, deflect, parry, deflect, knockaway etc?
-										// TODO: Detect DFA from parry?
 										//if ((playerLastSaberMove[attacker].lastLastSaberMove >= LS_K1_T_ && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL)
 										//	|| (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_D1_B_)
 										//	) {
-										if (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL) {
-											if (playerLastSaberMove[attacker].lastSaberMove == saberMoveData[playerLastSaberMove[attacker].lastLastSaberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove == saberMoveData[playerLastSaberMove[attacker].lastLastSaberMove].chain_idle) {
+										if (playerLastSaberMove[attacker].lastSaberMove[1].saberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastSaberMove[1].saberMove <= LS_REFLECT_LL) {
+											if (playerLastSaberMove[attacker].lastSaberMove[0].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[1].saberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove[0].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[1].saberMove].chain_idle) {
 												// yep this is a chain from a parry or such.
 												// not sure if we should include the stuff like broken parry which is followed by idle saber,
 												// but i guess a broken parry followed by a burn kill could be fun to know too
 												modInfo << "_FR";
-												modInfo << saberMoveNames[playerLastSaberMove[attacker].lastLastSaberMove];
+												modInfo << saberMoveNames[playerLastSaberMove[attacker].lastSaberMove[1].saberMove];
+											}
+										}
+										// DFA from parry? If our attack is a DFA or other pre-swing attack resulting from a parry (well basically there's only dfa and yellow dfa I think that qualify)
+										// BUT: This doesnt find them all for some reason. Idk why. Maybe sometimes they arent true parry dfas. Who knows. Often theres nothing in the sabermove history with a saber move above 74, but rather transitions and whatnot
+										else if (playerLastSaberMove[attacker].lastSaberMove[0].saberMove >= LS_A_JUMP_T__B_ && playerLastSaberMove[attacker].lastSaberMove[0].saberMove <= LS_A_FLIP_SLASH) {
+											if (playerLastSaberMove[attacker].lastSaberMove[2].saberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastSaberMove[2].saberMove <= LS_REFLECT_LL) {
+												if (playerLastSaberMove[attacker].lastSaberMove[1].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[2].saberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove[1].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[2].saberMove].chain_idle) {
+													// yep this is a chain from a parry or such.
+													// not sure if we should include the stuff like broken parry which is followed by idle saber,
+													// but i guess a broken parry followed by a burn kill could be fun to know too
+													modInfo << "_FR";
+													modInfo << saberMoveNames[playerLastSaberMove[attacker].lastSaberMove[2].saberMove];
+												}
 											}
 										}
 										if (thisKill.timeSinceBackflip != -1 && thisKill.timeSinceBackflip < 1000) {
