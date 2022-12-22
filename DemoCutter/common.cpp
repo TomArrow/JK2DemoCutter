@@ -2669,3 +2669,51 @@ void AnglesSubtract(vec3_t v1, vec3_t v2, vec3_t v3) {
 	v3[1] = AngleSubtract(v1[1], v2[1]);
 	v3[2] = AngleSubtract(v1[2], v2[2]);
 }
+
+qboolean BG_SaberInAttack(int move)
+{
+	if (move >= LS_A_TL2BR && move <= LS_A_T2B)
+	{
+		return qtrue;
+	}
+	switch (move)
+	{
+	case LS_A_BACK:
+	case LS_A_BACK_CR:
+	case LS_A_BACKSTAB:
+	case LS_A_LUNGE:
+	case LS_A_JUMP_T__B_:
+	case LS_A_FLIP_STAB:
+	case LS_A_FLIP_SLASH:
+		return qtrue;
+		break;
+	}
+	return qfalse;
+}
+
+// TODO Handle JKA?
+qboolean PM_InSaberAnim(int anim,demoType_t demoType)
+{
+	if (demoType == DM_16 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B_ && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR
+		|| demoType == DM_15 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__15 && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_15
+		)
+	{
+		return qtrue;
+	}
+	return qfalse;
+}
+
+
+qboolean PM_SaberInBrokenParry(int move, demoType_t demoType)
+{
+	if (move >= LS_V1_BR && move <= LS_V1_B_ && demoType != DM_15) // This should be actually be check for 1.02 specifically TODO
+	{
+		return qtrue;
+	}
+	if (move >= LS_H1_T_ && move <= LS_H1_BL)
+	{
+		return qtrue;
+	}
+	return qfalse;
+}
+

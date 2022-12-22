@@ -2098,6 +2098,20 @@ void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 void AnglesSubtract(vec3_t v1, vec3_t v2, vec3_t v3); 
 float	AngleSubtract(float a1, float a2);
 
+
+
+typedef enum {
+	WEAPON_READY,
+	WEAPON_RAISING,
+	WEAPON_DROPPING,
+	WEAPON_FIRING,
+	WEAPON_CHARGING,
+	WEAPON_CHARGING_ALT,
+	WEAPON_IDLE, //lowered		// NOTENOTE Added with saber
+} weaponstate_t;
+
+
+
 // Calculate deviation from perfect strafe, if applicable
 // Based on CG_StrafeHelper from EternalJk2mv
 template <class T>
@@ -2274,6 +2288,85 @@ float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles en
 
 
 
+qboolean PM_SaberInBrokenParry(int move, demoType_t demoType);
+qboolean PM_InSaberAnim(int anim, demoType_t demoType);
+qboolean BG_SaberInAttack(int move);
+
+
+
+template<class T>
+qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType)
+{
+
+	int saberMove, torsoAnim, saberHolstered, usingATST, weapon, weaponstate, saberInFlight;
+	if constexpr (std::is_same<T, playerState_t>::value) {
+		saberMove = ((playerState_t*)state)->saberMove;
+		torsoAnim = ((playerState_t*)state)->torsoAnim;
+		saberHolstered = ((playerState_t*)state)->saberHolstered;
+		usingATST = ((playerState_t*)state)->usingATST;
+		weapon = ((playerState_t*)state)->weapon;
+		weaponstate = ((playerState_t*)state)->weaponstate;
+		saberInFlight = ((playerState_t*)state)->saberInFlight;
+	}
+	else if constexpr (std::is_same<T, entityState_t>::value) {
+		saberMove = ((entityState_t*)state)->saberMove;
+		torsoAnim = ((entityState_t*)state)->torsoAnim;
+		saberHolstered = ((entityState_t*)state)->shouldtarget;
+		usingATST = ((entityState_t*)state)->teamowner;
+		weapon = ((entityState_t*)state)->weapon;
+		weaponstate = ((entityState_t*)state)->modelindex2;
+		saberInFlight = ((entityState_t*)state)->saberInFlight;
+	}
+	else {
+		return qfalse;
+	}
+
+	if (BG_SaberInAttack(saberMove))
+	{
+		return qfalse;
+	}
+
+	if (PM_InSaberAnim(torsoAnim, demoType) &&
+		saberMove != LS_READY && saberMove != LS_NONE)
+	{
+		if (saberMove < LS_PARRY_UP || saberMove > LS_REFLECT_LL)
+		{
+			return qfalse;
+		}
+	}
+
+	if (PM_SaberInBrokenParry(saberMove,demoType) && demoType != DM_15) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
+	{
+		return qfalse;
+	}
+
+	if (saberHolstered)
+	{
+		return qfalse;
+	}
+
+	if (usingATST)
+	{
+		return qfalse;
+	}
+
+	if (weapon != WP_SABER)
+	{
+		return qfalse;
+	}
+
+	if (weaponstate == WEAPON_RAISING)
+	{
+		return qfalse;
+	}
+
+	if (saberInFlight)
+	{
+		return qfalse;
+	}
+
+	return qtrue;
+}
 
 
 

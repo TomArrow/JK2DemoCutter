@@ -126,6 +126,7 @@ struct playerDemoStats_t {
 	averageHelper_t strafeDeviationNoSaberMoveBuckets[STRAFE_ANALYSIS_BUCKET_COUNT];
 
 	int64_t hitBySaberCount;
+	int64_t hitBySaberBlockableCount;
 	int64_t parryCount;
 	int64_t attackFromParryCount;
 };
@@ -259,6 +260,7 @@ struct samplePoint_t {
 
 struct frameInfo_t {
 	qboolean isAlive[MAX_CLIENTS];
+	qboolean canBlockSimplified[MAX_CLIENTS];
 	qboolean entityExists[MAX_GENTITIES];
 	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
 	vec3_t playerPositions[MAX_CLIENTS];
@@ -1819,6 +1821,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"averageStrafeDeviationNoSaberMoveBucketsJSON TEXT,"
 		"strafeNoSaberMoveSampleCount INTEGER NOT NULL,"
 		"hitBySaberCount INTEGER NOT NULL,"
+		"hitBySaberBlockableCount INTEGER NOT NULL,"
 		"parryCount INTEGER NOT NULL,"
 		"attackFromParryCount INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
@@ -1885,9 +1888,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
-		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
+		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
-		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
+		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
 	sqlite3_stmt* insertPlayerDemoStatsStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
 
@@ -2100,6 +2103,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
+
+						thisFrameInfo.canBlockSimplified[thisEs->number] = WP_SaberCanBlock_Simple(thisEs,demoType);
 
 						float speed = VectorLength(thisEs->pos.trDelta); // Used for strafe analysis buckets and saving recent speeds
 
@@ -2338,6 +2343,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					//thisFrameInfo.playerGSpeeds[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.speed;
 					//thisFrameInfo.playerMaxWalkSpeed[demo.cut.Cl.snap.ps.clientNum] = sqrtf(demo.cut.Cl.snap.ps.speed * demo.cut.Cl.snap.ps.speed * 2);
 					thisFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] = qtrue;
+					thisFrameInfo.canBlockSimplified[demo.cut.Cl.snap.ps.clientNum] = WP_SaberCanBlock_Simple(&demo.cut.Cl.snap.ps, demoType);
+
 					if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
 						thisFrameInfo.isAlive[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 						//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
@@ -4171,6 +4178,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						if (playerDemoStatsPointers[playerNum]) {
 							playerDemoStatsPointers[playerNum]->everUsed = qtrue;
 							playerDemoStatsPointers[playerNum]->hitBySaberCount++;
+							if (lastFrameInfo.canBlockSimplified[playerNum]) {
+								playerDemoStatsPointers[playerNum]->hitBySaberBlockableCount++;
+							}
 						}
 					}
 					if (hitDetectionData[playerNum].newParryDetected) {
@@ -4642,6 +4652,7 @@ cuterror:
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
 
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
 
