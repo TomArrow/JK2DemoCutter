@@ -923,6 +923,7 @@ typedef struct {
 									// to disconnect, preventing debugging breaks from
 									// causing immediate disconnects on continue
 	clSnapshot_t	snap;			// latest received from server
+	clSnapshot_t	oldSnap;		// latest received from server
 
 	int			serverTime;			// may be paused during play
 	int			oldServerTime;		// to prevent time from flowing bakcwards

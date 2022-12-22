@@ -73,6 +73,7 @@ try to hash each game in some way so that duplicates are found.
 log times during which each player played (in both millisecond and second precision) and total play time of each player and for each section of playing, the score of that player
 log pauses, their times and durations and total pause duration
 log a number of total player changes during a game.
+TODO: use EV_PAIN to get health for entitystate->playerstate.
 
 
 Important DemoReframer:

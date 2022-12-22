@@ -124,6 +124,10 @@ struct playerDemoStats_t {
 	qboolean everUsedNoSaberMove;
 	averageHelper_t strafeDeviationNoSaberMove;
 	averageHelper_t strafeDeviationNoSaberMoveBuckets[STRAFE_ANALYSIS_BUCKET_COUNT];
+
+	int64_t hitBySaberCount;
+	int64_t parryCount;
+	int64_t attackFromParryCount;
 };
 // Since players could connect/disconnect/rename, we keep a map with all players that existed during a game.
 // To keep good performance, we have an array of pointers towards the current playerDemoStats_t struct in the map for each player for quick access
@@ -132,6 +136,13 @@ typedef std::tuple<std::string, std::string, int> playerDemoStatsMapKey_t;
 std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
 playerDemoStats_t* playerDemoStatsPointers[MAX_CLIENTS];
 
+struct hitDetectionData_t {
+	qboolean confirmedHit;
+	qboolean painDetected;
+	qboolean nearbySaberHitDetected;
+	qboolean newParryDetected;
+};
+hitDetectionData_t hitDetectionData[MAX_CLIENTS];
 
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
 jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
@@ -904,6 +915,7 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 		clCut->snapshots[oldMessageNum & PACKET_MASK].valid = qfalse;
 	}
 	// copy to the current good spot
+	clCut->oldSnap = clCut->snap;
 	clCut->snap = newSnap;
 	clCut->snap.ping = 999;
 	// calculate ping time
@@ -990,6 +1002,56 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 #ifdef RELDEBUG
 //#pragma optimize("", off)
 #endif
+
+struct eventAndParm_t {
+	int event;
+	int eventParm;
+};
+struct psEventData_t {
+	eventAndParm_t externalEvent;
+	eventAndParm_t predictableEvents[MAX_PS_EVENTS];
+};
+
+// Does this work at all? Idk
+psEventData_t demoCutGetEvent(playerState_t* ps, playerState_t* ops, int demoCurrentTime) {
+	int			i;
+	int			event;
+	psEventData_t psEventData{};
+
+	//if (lastEventTime[ps->clientNum] < demoCurrentTime - EVENT_VALID_MSEC) { // Don't do this for playerstate external because its never cleared serverside
+	//	lastEvent[ps->clientNum] = 0;
+	//}
+
+	//if (ps->externalEvent && ps->externalEvent != lastEvent[ps->clientNum]) {
+	if (ps->externalEvent && ps->externalEvent != ops->externalEvent) {
+		int eventNumberRaw = ps->externalEvent;
+		int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
+
+		lastEventTime[ps->clientNum] = demoCurrentTime;
+			
+		//lastEvent[ps->clientNum] = eventNumberRaw;
+		psEventData.externalEvent.event = eventNumber;
+		psEventData.externalEvent.eventParm = ps->externalEventParm;
+	}
+
+	int predictableIndex = 0;
+	// go through the predictable events buffer
+	for (i = ps->eventSequence - MAX_PS_EVENTS; i < ps->eventSequence; i++) {
+		// if we have a new predictable event
+		if (i >= ops->eventSequence
+			// or the server told us to play another event instead of a predicted event we already issued
+			// or something the server told us changed our prediction causing a different event
+			|| (i > ops->eventSequence - MAX_PS_EVENTS && ps->events[i & (MAX_PS_EVENTS - 1)] != ops->events[i & (MAX_PS_EVENTS - 1)])) {
+
+			psEventData.predictableEvents[predictableIndex].event = ps->events[i & (MAX_PS_EVENTS - 1)];
+			psEventData.predictableEvents[predictableIndex++].eventParm = ps->eventParms[i & (MAX_PS_EVENTS - 1)];
+
+		}
+		if (predictableIndex == 2) break; // Just to be safe :shrug:
+	}
+
+	return psEventData;
+}
 
 int demoCutGetEvent(entityState_t* es,int demoCurrentTime) {
 	//if (lastEvent.find(es->number) == lastEvent.end()) {
@@ -1472,6 +1534,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
 	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
+	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -1755,6 +1818,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		"averageStrafeDeviationNoSaberMove REAL,"
 		"averageStrafeDeviationNoSaberMoveBucketsJSON TEXT,"
 		"strafeNoSaberMoveSampleCount INTEGER NOT NULL,"
+		"hitBySaberCount INTEGER NOT NULL,"
+		"parryCount INTEGER NOT NULL,"
+		"attackFromParryCount INTEGER NOT NULL,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
 		"demoDateTime TIMESTAMP NOT NULL"//,"
@@ -1819,9 +1885,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
-		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,demoName,demoPath,demoDateTime)"
+		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
-		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@demoName,@demoPath,@demoDateTime)";
+		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
 	sqlite3_stmt* insertPlayerDemoStatsStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
 
@@ -1922,6 +1988,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	while (oldSize > 0) {
 
 		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
+		Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
 
 		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
 		float playerStateStrafeDeviationThisFrame = 0;
@@ -2174,6 +2241,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMove != thisEs->saberMove) {
+								if (thisEs->saberMove >= LS_PARRY_UP && thisEs->saberMove <= LS_PARRY_LL) {
+									hitDetectionData[thisEs->number].newParryDetected = qtrue;
+								}
 								for (int smI = MAX_PAST_SABERMOVE_SAVE -1; smI > 0; smI--) {
 									playerLastSaberMove[thisEs->number].lastSaberMove[smI] = playerLastSaberMove[thisEs->number].lastSaberMove[smI-1];
 								}
@@ -2350,6 +2420,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMove != demo.cut.Cl.snap.ps.saberMove) {
+							if (demo.cut.Cl.snap.ps.saberMove >= LS_PARRY_UP && demo.cut.Cl.snap.ps.saberMove <= LS_PARRY_LL) {
+								hitDetectionData[demo.cut.Cl.snap.ps.clientNum].newParryDetected = qtrue;
+							}
 							for (int smI = MAX_PAST_SABERMOVE_SAVE - 1; smI > 0; smI--) {
 								playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[smI] = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[smI - 1];
 							}
@@ -2713,6 +2786,18 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					else {
 						playerVisibleFrames[i] = 0;
 						playerVisibleClientFrames[i] = 0;
+					}
+				}
+				
+				{ // Playerstate events... uhm experimental?
+					psEventData_t psEventData = demoCutGetEvent(&demo.cut.Cl.snap.ps, &demo.cut.Cl.oldSnap.ps,demoCurrentTime);
+
+					// Ok this confirms he took damage.
+					if (psEventData.externalEvent.event >= EV_PAIN && psEventData.externalEvent.event <= EV_DEATH3
+						|| psEventData.predictableEvents[0].event >= EV_PAIN && psEventData.predictableEvents[0].event <= EV_DEATH3
+						|| psEventData.predictableEvents[1].event >= EV_PAIN && psEventData.predictableEvents[1].event <= EV_DEATH3
+						) {
+						hitDetectionData[demo.cut.Cl.snap.ps.clientNum].painDetected = qtrue;
 					}
 				}
 
@@ -3473,7 +3558,35 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::cout << mapname << " " << modInfo.str() << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
 						}
+
+						
+						else if (eventNumber >= EV_PAIN && eventNumber <= EV_DEATH3) {
+							// Player took some damage. Could indicate a saber hit if an EV_SABER_HIT is nearby
+							int playerNum = thisEs->number;
+							if (thisEs->eFlags & EF_PLAYER_EVENT) {
+								playerNum = thisEs->otherEntityNum;
+							}
+							if (playerNum >= 0 && playerNum < MAX_CLIENTS) {
+								hitDetectionData[playerNum].painDetected = qtrue;
+							}
+						}
 					
+						else if (eventNumber == EV_SABER_HIT && thisEs->eventParm == 1) { // Saber hit against client
+							
+							// Mark nearby players for potential saber hit detection
+							for (int playerNum = 0; playerNum < MAX_CLIENTS; playerNum++) {
+								constexpr float maxDistance = 100.0f + 2.0f * (float)SABER_LENGTH_MAX;
+								if (thisFrameInfo.entityExists[playerNum] && VectorDistance(thisFrameInfo.playerPositions[playerNum], thisEs->pos.trBase) <= maxDistance) {
+									hitDetectionData[playerNum].nearbySaberHitDetected = qtrue;
+								}
+							}
+						}
+						else if (eventNumber == EV_SHIELD_HIT) {
+							int playerNum = thisEs->otherEntityNum;
+							if (playerNum >= 0 && playerNum < MAX_CLIENTS) {
+								hitDetectionData[playerNum].confirmedHit = qtrue;
+							}
+						}
 						else if (eventNumber == EV_CTFMESSAGE && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
 							int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
@@ -4050,6 +4163,33 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				}
 				// End logging nearby enemies
+
+				// Save parries and hits for playerstats
+				// The saber hit detection isn't really all that reliable but it's good enough for a sort of global stats I guess
+				for (int playerNum = 0; playerNum < MAX_CLIENTS; playerNum++) {
+					if (hitDetectionData[playerNum].confirmedHit || hitDetectionData[playerNum].nearbySaberHitDetected && hitDetectionData[playerNum].painDetected) {
+						if (playerDemoStatsPointers[playerNum]) {
+							playerDemoStatsPointers[playerNum]->everUsed = qtrue;
+							playerDemoStatsPointers[playerNum]->hitBySaberCount++;
+						}
+					}
+					if (hitDetectionData[playerNum].newParryDetected) {
+						if (playerDemoStatsPointers[playerNum]) {
+							playerDemoStatsPointers[playerNum]->everUsed = qtrue;
+							playerDemoStatsPointers[playerNum]->parryCount++;
+						}
+					}
+					// New attack from parry?
+					if (playerLastSaberMove[playerNum].lastSaberMove[0].saberMoveChange == demoCurrentTime // Happened on this frame, avoid duplicates
+						&& playerLastSaberMove[playerNum].lastSaberMove[1].saberMove >= LS_PARRY_UP && playerLastSaberMove[playerNum].lastSaberMove[1].saberMove <= LS_PARRY_LL // last one was parry
+						&& playerLastSaberMove[playerNum].lastSaberMove[0].saberMove == saberMoveData[playerLastSaberMove[playerNum].lastSaberMove[1].saberMove].chain_attack // this one is the result if you click atack
+						) {
+						if (playerDemoStatsPointers[playerNum]) {
+							playerDemoStatsPointers[playerNum]->everUsed = qtrue;
+							playerDemoStatsPointers[playerNum]->attackFromParryCount++;
+						}
+					}
+				}
 				
 				break;
 			case svc_download:
@@ -4500,6 +4640,11 @@ cuterror:
 
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
+
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
+			SQLBIND(insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
+
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
 			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
 			SQLBIND(insertPlayerDemoStatsStatement, int, "@demoDateTime", oldDemoDateModified);
