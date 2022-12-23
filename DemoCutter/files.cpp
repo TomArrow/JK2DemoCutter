@@ -46,6 +46,10 @@ typedef struct {
 	qboolean	zipFile;
 	qboolean	streamed;
 	char		name[MAX_ZPATH];
+
+	// For LZMA compressed demos but could be used for other stuff too
+	fileCompressionScheme_t compression;
+
 } fileHandleData_t;
 
 std::recursive_mutex fshMutex;
@@ -193,7 +197,7 @@ qboolean FS_CreatePath(char* OSPath, qboolean quiet) {
 	return qfalse;
 }
 
-fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet) { // quiet parameter if we want to suppress messages. for example when creating a logfile (endless recursion otherwise)
+fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet, fileCompressionScheme_t compression) { // quiet parameter if we want to suppress messages. for example when creating a logfile (endless recursion otherwise)
 	std::string			ospath;
 	fileHandle_t	f;
 
@@ -228,6 +232,11 @@ fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet) { // quiet 
 	if (!fsh[f].handleFiles.file.o) {
 		f = 0;
 	}
+
+	if (compression) {
+		FS_Write(&compression,4,f);
+	}
+
 	return f;
 }
 
@@ -289,17 +298,21 @@ int FS_filelength(fileHandle_t f) {
 	int		end;
 	FILE* h;
 
-	h = FS_FileForHandle(f);
-	pos = ftell(h);
-	fseek(h, 0, SEEK_END);
-	end = ftell(h);
-	fseek(h, pos, SEEK_SET);
+	if (!fsh[f].compression || fsh[f].compression == FILECOMPRESSION_RAW) {
 
-	return end;
+		h = FS_FileForHandle(f);
+		pos = ftell(h);
+		fseek(h, 0, SEEK_END);
+		end = ftell(h);
+		fseek(h, pos, SEEK_SET);
+
+		return fsh[f].compression == FILECOMPRESSION_RAW ? end-4 : end; // The compression type files have 4 bytes reserved at the start for the compression type itself. Let's not count that toward the total size.
+	} 
+
 }
 
 
-int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE) {
+int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType) {
 	std::string		netpath;
 	long			hash;
 	int				l;
@@ -354,7 +367,13 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 	else {
 		Q_strncpyz(fsh[*file].name,sizeof(fsh[*file].name), filename, sizeof(fsh[*file].name));
 		fsh[*file].zipFile = qfalse;
+
+		if (compressedType) {
+			FS_Read(&fsh[*file].compression, 4, *file);
+			fsh[*file].compression = LittleLong(fsh[*file].compression);
+		}
 		return FS_filelength(*file);
+
 	}
 	
 }

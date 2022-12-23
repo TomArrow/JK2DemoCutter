@@ -1145,9 +1145,13 @@ typedef struct {
 	int		cursize;
 	int		readcount;
 	int		bit;				// for bitwise reads and writes
+
+	qboolean	raw;			// raw, everything saved as integers
+	std::vector<byte>*	dataRaw;
 } msg_t;
 
 void MSG_Init(msg_t* buf, byte* data, int length);
+void MSG_InitRaw(msg_t* buf, std::vector<byte>* dataRaw);
 void MSG_InitOOB(msg_t* buf, byte* data, int length);
 void MSG_Clear(msg_t* buf);
 void MSG_WriteData(msg_t* buf, const void* data, int length);
@@ -1276,13 +1280,22 @@ char* Cmd_Argv(int arg);
 
 char* Cmd_ArgsFrom(int arg);
 
+
+
+enum fileCompressionScheme_t {
+	FILECOMPRESSION_NONE, // Normal default file handling
+	FILECOMPRESSION_RAW, // The special compressed file format but without actually using any compression
+	FILECOMPRESSION_LZMA // The special compressed file format with LZMA compression
+};
+
+
 int		FS_Write(const void* buffer, int len, fileHandle_t f);
-fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse);
+fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse, fileCompressionScheme_t compression= FILECOMPRESSION_NONE); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
 int		FS_Read(void* buffer, int len, fileHandle_t f);
 qboolean FS_FileExists(const char* file);
 qboolean FS_FileErase(const char* file);
 void	FS_FCloseFile(fileHandle_t f);
-int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE);
+int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType = qfalse);
 
 void	QDECL Com_sprintf(char* dest,int size, const char* fmt, ...);
 
@@ -2367,6 +2380,9 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType)
 
 	return qtrue;
 }
+
+
+
 
 
 

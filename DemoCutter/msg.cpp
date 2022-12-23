@@ -236,6 +236,17 @@ void MSG_Init( msg_t *buf, byte *data, int length ) {
 	Com_Memset (buf, 0, sizeof(*buf));
 	buf->data = data;
 	buf->maxsize = length;
+	buf->raw = qfalse;
+}
+
+void MSG_InitRaw( msg_t *buf, std::vector<byte> *dataRaw) {
+	
+	Com_Memset (buf, 0, sizeof(*buf));
+	buf->dataRaw = dataRaw;
+	buf->dataRaw->reserve(MAX_MSGLEN); // It can become bigger of course but let's just reserve a certain amount so we don't have a slowdown from vector constantly resizing.
+	buf->cursize = dataRaw->size();
+	buf->maxsize = INT_MAX; // Since its a vector we arent really limited and MAX_MSGLEN would be too short for raw data I think
+	buf->raw = qtrue;
 }
 
 void MSG_InitOOB( msg_t *buf, byte *data, int length ) {
@@ -246,6 +257,7 @@ void MSG_InitOOB( msg_t *buf, byte *data, int length ) {
 	buf->data = data;
 	buf->maxsize = length;
 	buf->oob = qtrue;
+	buf->raw = qfalse;
 }
 
 void MSG_Clear( msg_t *buf ) {
@@ -323,7 +335,17 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 	if ( bits < 0 ) {
 		bits = -bits;
 	}
-	if (msg->oob) {
+	// Special handling for new raw type of message (for better compression afterwards)
+	if (msg->raw) {
+		int bitsToDo = (bits & 7) ? ((bits >> 3) + 1) << 3 : bits;
+		for (i = 0; i < bitsToDo; i += 8) {
+			msg->dataRaw->push_back(value & 0xff);
+			value = (value >> 8);
+		}
+		msg->cursize = msg->dataRaw->size();
+		return;
+	}
+	else if (msg->oob) {
 		if (bits==8) {
 			msg->data[msg->cursize] = value;
 			msg->cursize += 1;
@@ -386,7 +408,15 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 		sgn = qfalse;
 	}
 
-	if (msg->oob) {
+	if (msg->raw) {
+		int bitsToDo = (bits & 7) ? ((bits >> 3) + 1) << 3 : bits;
+		for (i = 0; i < bitsToDo; i += 8) {
+			get = (*msg->dataRaw)[msg->readcount + (i >> 3)];
+			value |= (get << i);
+		}
+		msg->readcount += bitsToDo >> 3;
+	}
+	else if (msg->oob) {
 		if (bits==8) {
 			value = msg->data[msg->readcount];
 			msg->readcount += 1;

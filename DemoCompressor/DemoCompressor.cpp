@@ -296,8 +296,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
+	std::vector<byte>	oldDataRaw;
 	msg_t			newMsg;
 	byte			newData[MAX_MSGLEN];
+	std::vector<byte>	newDataRaw;
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -306,7 +308,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//demoPlay_t* play = demo.play.handle;
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
-	char* ext;
+	//char* ext;
+	char			ext[7]{};
+	char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
@@ -316,6 +320,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	int				lastValidSnap = -1;
 
 	int				mapRestartCounter = 0;
+	qboolean		isCompressedFile = qfalse;
+	qboolean		createCompressedOutput = qtrue;
 
 	//mvprotocol_t	protocol;
 
@@ -335,22 +341,33 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
-	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+
+	char specialTypeChar = ext[3];
+	ext[3] = '_';
+
+	if (specialTypeChar == 'c') {
+		isCompressedFile = qtrue;
+	}
+
+	createCompressedOutput = (qboolean) !isCompressedFile;
+
 	if (!*ext) {
 		demoType = DM_16;
-		ext = ".dm_16";
+		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
 	else if (!_stricmp(ext, ".dm_15")) {
 
 		demoType = DM_15;
-		ext = ".dm_15";
+		strncpy_s(ext, sizeof(ext), ".dm_15", 6);
 	}
 	else if (!_stricmp(ext, ".dm_16")) {
 
 		demoType = DM_16;
-		ext = ".dm_16";
+		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for compressing.\n", oldName);
 		return qfalse;
@@ -360,6 +377,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 	int messageOffset = 0;
 
+	if (createCompressedOutput) {
+		ext[3] = 'c';
+	}
+
 	// Open new file
 	{int dupeIterator = 0;
 	while (!dupeIterator || FS_FileExists(newName)) {
@@ -368,7 +389,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				Com_sprintf(newName, sizeof(newName), "%s%s", outputName, ext);
 			}
 			else {
-				Com_sprintf(newName, sizeof(newName), "%s_recoded%s", oldName, ext);
+				Com_sprintf(newName, sizeof(newName), "%s_c%s", oldName, ext);
 			}
 		}
 		else {
@@ -376,13 +397,13 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				Com_sprintf(newName, sizeof(newName), "%s(%d)%s", outputName, 1 + dupeIterator, ext);
 			}
 			else {
-				Com_sprintf(newName, sizeof(newName), "%s_recoded(%d)%s", oldName, 1 + dupeIterator, ext);
+				Com_sprintf(newName, sizeof(newName), "%s_c(%d)%s", oldName, 1 + dupeIterator, ext);
 			}
 		}
 		dupeIterator++;
 	}}
 
-	newHandle = FS_FOpenFileWrite(newName);
+	newHandle = FS_FOpenFileWrite(newName,qfalse,createCompressedOutput ? FILECOMPRESSION_RAW : FILECOMPRESSION_NONE);
 	if (!newHandle) {
 		Com_Printf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
@@ -394,12 +415,23 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
 	//cutcontinue:
-		MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
+		if (isCompressedFile) {
+			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
+		}
+		else {
+			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
+		}
 
 		Com_Memset(&newMsg, 0, sizeof(newMsg)); // Is this necessary? idk, wanted to be safe.
-		Com_Memset(newData, 0, sizeof(newData)); // Is this necessary? idk, wanted to be safe.
+		newDataRaw.clear();
 
-		MSG_Init(&newMsg, newData, sizeof(newData)); // Output message
+		if (createCompressedOutput) { // Ironically if the output is compressed we do not compress the message to get a better compression ratio later
+			MSG_InitRaw(&newMsg, &newDataRaw); // Output message
+		}
+		else {
+			MSG_Init(&newMsg, newData,sizeof(newData)); // Output message
+		}
+		
 		MSG_Bitstream(&newMsg);
 
 		transcodeTargetMsg = &newMsg;
@@ -420,8 +452,16 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		if (oldMsg.cursize > oldMsg.maxsize)
 			goto cuterror;
 		/* Read the actual message */
-		if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
-			goto cuterror;
+		if (oldMsg.raw){
+			oldMsg.dataRaw->resize(oldMsg.cursize);
+			if (FS_Read(oldMsg.dataRaw->data(), oldMsg.cursize, oldHandle) != oldMsg.cursize){
+				goto cuterror;}
+		}
+		else {
+			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
+				goto cuterror;
+		}
+		
 		oldSize -= oldMsg.cursize;
 		// init the bitstream
 		MSG_BeginReading(&oldMsg);
@@ -530,7 +570,12 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		int cursizeToWrite = LittleLong(newMsg.cursize);
 		FS_Write(&sequenceToWrite, 4, newHandle);
 		FS_Write(&cursizeToWrite, 4, newHandle);
-		FS_Write(newMsg.data, newMsg.cursize, newHandle);
+		if (newMsg.raw) {
+			FS_Write(newMsg.dataRaw->data(), newMsg.dataRaw->size(), newHandle);
+		}
+		else {
+			FS_Write(newMsg.data, newMsg.cursize, newHandle);
+		}
 	}
 cutcomplete:
 	if (newHandle) {
