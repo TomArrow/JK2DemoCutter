@@ -20,6 +20,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoMerger", "DemoMerger\De
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoReframer", "DemoReframer\DemoReframer.vcxproj", "{E03903EF-5ACE-4FD6-B089-A01F9DD77ECD}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoCompressor", "DemoCompressor\DemoCompressor.vcxproj", "{6CEC3382-849D-42C0-AFE6-D7DD674CC021}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -76,6 +78,14 @@ Global
 		{E03903EF-5ACE-4FD6-B089-A01F9DD77ECD}.Release|x64.Build.0 = Release|x64
 		{E03903EF-5ACE-4FD6-B089-A01F9DD77ECD}.Release|x86.ActiveCfg = Release|Win32
 		{E03903EF-5ACE-4FD6-B089-A01F9DD77ECD}.Release|x86.Build.0 = Release|Win32
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Debug|x64.ActiveCfg = Debug|x64
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Debug|x64.Build.0 = Debug|x64
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Debug|x86.ActiveCfg = Debug|Win32
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Debug|x86.Build.0 = Debug|Win32
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Release|x64.ActiveCfg = Release|x64
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Release|x64.Build.0 = Release|x64
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Release|x86.ActiveCfg = Release|Win32
+		{6CEC3382-849D-42C0-AFE6-D7DD674CC021}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

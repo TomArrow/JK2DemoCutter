@@ -365,12 +365,19 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 	}
 }
 
+#ifdef MSG_READBITS_TRANSCODE
+msg_t* transcodeTargetMsg = NULL;
+#endif
+
 int MSG_ReadBits( msg_t *msg, int bits ) {
 	int			value;
 	int			get;
 	qboolean	sgn;
 	int			i, nbits;
 	value = 0;
+#ifdef MSG_READBITS_TRANSCODE
+	int originalBits = bits;
+#endif
 
 	if ( bits < 0 ) {
 		bits = -bits;
@@ -452,6 +459,12 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 			value |= -1 ^ ( ( 1 << bits ) - 1 );
 		}
 	}
+
+#ifdef MSG_READBITS_TRANSCODE // Write everything we read to the target message too.
+	if (transcodeTargetMsg) {
+		MSG_WriteBits(transcodeTargetMsg, value, originalBits);
+	}
+#endif
 
 	return value;
 }
