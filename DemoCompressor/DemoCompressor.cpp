@@ -1,7 +1,5 @@
 #include "demoCut.h"
 
-#define LZMA_C_DEFINE
-#include "pocketlzma/lzma_c.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -403,7 +401,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		dupeIterator++;
 	}}
 
-	newHandle = FS_FOpenFileWrite(newName,qfalse,createCompressedOutput ? FILECOMPRESSION_RAW : FILECOMPRESSION_NONE);
+	newHandle = FS_FOpenFileWrite(newName,qfalse,createCompressedOutput ? FILECOMPRESSION_LZMA : FILECOMPRESSION_NONE);
 	if (!newHandle) {
 		Com_Printf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;

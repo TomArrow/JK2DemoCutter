@@ -1289,9 +1289,9 @@ enum fileCompressionScheme_t {
 };
 
 
-int		FS_Write(const void* buffer, int len, fileHandle_t f);
+int		FS_Write(const void* buffer, int len, fileHandle_t f, qboolean ignoreCompression=qfalse);
 fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse, fileCompressionScheme_t compression= FILECOMPRESSION_NONE); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
-int		FS_Read(void* buffer, int len, fileHandle_t f);
+int		FS_Read(void* buffer, int len, fileHandle_t f, qboolean ignoreCompression = qfalse);
 qboolean FS_FileExists(const char* file);
 qboolean FS_FileErase(const char* file);
 void	FS_FCloseFile(fileHandle_t f);

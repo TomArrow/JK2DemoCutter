@@ -41,5 +41,8 @@
     <ClInclude Include="..\shared\include\pcre2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

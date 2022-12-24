@@ -68,9 +68,6 @@
     <ClCompile Include="..\shared\animMappingTable.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="..\shared\msg_lzma.cpp">
-      <Filter>Common</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -138,8 +135,8 @@
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp">
       <Filter>Common\pocketlzma</Filter>
     </ClInclude>
-    <ClInclude Include="..\shared\pocketlzma\lzma_helper.hpp">
-      <Filter>Common\pocketlzma</Filter>
+    <ClInclude Include="..\shared\files_lzma.hpp">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

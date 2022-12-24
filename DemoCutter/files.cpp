@@ -18,6 +18,7 @@
 
 
 #include "demoCut.h"
+#include "files_lzma.hpp"
 
 
 #define MAX_ZPATH			256
@@ -37,6 +38,15 @@ typedef struct qfile_us {
 	qboolean	unique;
 } qfile_ut;
 
+typedef struct compressedFileInfo_t {
+	fileCompressionScheme_t compression;
+
+	// For LZMA
+	qboolean readMode;
+	LZMAIncrementalCompressor* lzmaCompressor;
+	LZMADecompressor* lzmaDecompressor;
+};
+
 typedef struct {
 	qfile_ut	handleFiles;
 	qboolean	handleSync;
@@ -48,7 +58,7 @@ typedef struct {
 	char		name[MAX_ZPATH];
 
 	// For LZMA compressed demos but could be used for other stuff too
-	fileCompressionScheme_t compression;
+	compressedFileInfo_t compressedFileInfo;
 
 } fileHandleData_t;
 
@@ -56,6 +66,7 @@ std::recursive_mutex fshMutex;
 static fileHandleData_t	fsh[MAX_FILE_HANDLES];
 
 static FILE* FS_FileForHandle(fileHandle_t f) {
+
 	if (f < 0 || f > MAX_FILE_HANDLES) {
 		Com_Error(ERR_DROP, "FS_FileForHandle: out of reange");
 	}
@@ -76,7 +87,7 @@ FS_Write
 Properly handles partial writes
 =================
 */
-int FS_Write(const void* buffer, int len, fileHandle_t h) {
+int FS_Write(const void* buffer, int len, fileHandle_t h, qboolean ignoreCompression) {
 	int		block, remaining;
 	int		written;
 	byte* buf;
@@ -90,6 +101,18 @@ int FS_Write(const void* buffer, int len, fileHandle_t h) {
 	if (!h) {
 		return 0;
 	}
+
+	if (!ignoreCompression && fsh[h].compressedFileInfo.compression == FILECOMPRESSION_LZMA) { // Idk, I guess this should have better error handling or sth but there isn't much we can do tbh
+		if (!fsh[h].compressedFileInfo.readMode) {
+
+			fsh[h].compressedFileInfo.lzmaCompressor->addData((byte*)buffer, len);
+			return len;
+		}
+		else {
+			throw std::logic_error("Can't use FS_Write on LZMA stream that was opened for read.");
+		}
+	}
+
 
 	f = FS_FileForHandle(h);
 	buf = (byte*)buffer;
@@ -197,6 +220,10 @@ qboolean FS_CreatePath(char* OSPath, qboolean quiet) {
 	return qfalse;
 }
 
+
+constexpr int lzmaHeaderSize = LZMAIncrementalCompressor::getHeaderSize();
+byte lzmaDummyHeader[lzmaHeaderSize]{};
+
 fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet, fileCompressionScheme_t compression) { // quiet parameter if we want to suppress messages. for example when creating a logfile (endless recursion otherwise)
 	std::string			ospath;
 	fileHandle_t	f;
@@ -233,8 +260,20 @@ fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet, fileCompres
 		f = 0;
 	}
 
+	fsh[f].compressedFileInfo.readMode = qfalse;
+
 	if (compression) {
-		FS_Write(&compression,4,f);
+		fsh[f].compressedFileInfo.compression = compression;
+		FS_Write(&compression,4,f,qtrue); // qtrue for yes, ignore compression on that one.
+	}
+	if (compression == FILECOMPRESSION_LZMA) {
+		// We will write the header later when we know the full size of the content, which will be in FS_FCloseFile
+		FS_Write(lzmaDummyHeader, lzmaHeaderSize, f, qtrue);
+		fsh[f].compressedFileInfo.lzmaCompressor = new LZMAIncrementalCompressor(
+			[f](const void* buf, size_t size) -> size_t {
+				return (size_t)FS_Write(buf, size, f,qtrue); // Last parameter qtrue (ignoreCompression) so the stuff is just written to the file regardless.
+			} 
+		);
 	}
 
 	return f;
@@ -283,6 +322,25 @@ void FS_FCloseFile(fileHandle_t f) {
 		return;
 	}*/
 
+	if (fsh[f].compressedFileInfo.compression == FILECOMPRESSION_LZMA) {
+		if (fsh[f].compressedFileInfo.readMode) {
+
+			fsh[f].compressedFileInfo.lzmaDecompressor->Finish(); // Just a quick and dirty cleanup.
+			delete fsh[f].compressedFileInfo.lzmaDecompressor;
+			fsh[f].compressedFileInfo.lzmaDecompressor = NULL;
+		}
+		else {
+
+			lzmaHeader_t header = fsh[f].compressedFileInfo.lzmaCompressor->Finish();
+			int64_t pos = ftell(fsh[f].handleFiles.file.o);
+			fseek(fsh[f].handleFiles.file.o, 4, SEEK_SET);	// Go to the reserved space for the LZMA header
+			FS_Write(header.header, sizeof(header.header), f, qtrue); // Write LZMA header
+			fseek(fsh[f].handleFiles.file.o, pos, SEEK_SET); // Go back to end. Not that it matters?
+			delete fsh[f].compressedFileInfo.lzmaCompressor;
+			fsh[f].compressedFileInfo.lzmaCompressor = NULL;
+		}
+	}
+
 	// we didn't find it as a pak, so close it as a unique file
 	if (fsh[f].handleFiles.file.o) {
 		fclose(fsh[f].handleFiles.file.o);
@@ -298,7 +356,7 @@ int FS_filelength(fileHandle_t f) {
 	int		end;
 	FILE* h;
 
-	if (!fsh[f].compression || fsh[f].compression == FILECOMPRESSION_RAW) {
+	if (!fsh[f].compressedFileInfo.compression || fsh[f].compressedFileInfo.compression == FILECOMPRESSION_RAW) {
 
 		h = FS_FileForHandle(f);
 		pos = ftell(h);
@@ -306,8 +364,21 @@ int FS_filelength(fileHandle_t f) {
 		end = ftell(h);
 		fseek(h, pos, SEEK_SET);
 
-		return fsh[f].compression == FILECOMPRESSION_RAW ? end-4 : end; // The compression type files have 4 bytes reserved at the start for the compression type itself. Let's not count that toward the total size.
-	} 
+		return fsh[f].compressedFileInfo.compression == FILECOMPRESSION_RAW ? end-4 : end; // The compression type files have 4 bytes reserved at the start for the compression type itself. Let's not count that toward the total size.
+	}
+	else if (fsh[f].compressedFileInfo.compression == FILECOMPRESSION_LZMA) {
+		
+		if (fsh[f].compressedFileInfo.readMode) {
+
+			return fsh[f].compressedFileInfo.lzmaDecompressor->getDataSize();
+		}
+		else {
+			throw std::logic_error("Can't use FS_Filelength on LZMA files opened in write mode.");
+		}
+	}
+	else {
+		throw std::logic_error("can't use FS_filelength here");
+	}
 
 }
 
@@ -359,6 +430,9 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 	netpath = FS_BuildOSPath("", "", filename);
 	//fsh[*file].handleFiles.file.o = fopen(netpath.c_str(), "rb");
 	fopen_s(&fsh[*file].handleFiles.file.o,netpath.c_str(), "rb");
+
+	fsh[*file].compressedFileInfo.readMode = qtrue;
+
 	if (!fsh[*file].handleFiles.file.o) {
 		Com_DPrintf("Can't find %s\n", filename);
 		*file = 0;
@@ -369,8 +443,16 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 		fsh[*file].zipFile = qfalse;
 
 		if (compressedType) {
-			FS_Read(&fsh[*file].compression, 4, *file);
-			fsh[*file].compression = LittleLong(fsh[*file].compression);
+			FS_Read(&fsh[*file].compressedFileInfo.compression, 4, *file);
+			fsh[*file].compressedFileInfo.compression = LittleLong(fsh[*file].compressedFileInfo.compression);
+		}
+		if (fsh[*file].compressedFileInfo.compression == FILECOMPRESSION_LZMA) {
+			int tmp = *file;
+			fsh[*file].compressedFileInfo.lzmaDecompressor = new LZMADecompressor(
+				[tmp](void* buf, size_t size) -> size_t {
+					return (size_t)FS_Read(buf, size, tmp, qtrue); // Last parameter qtrue (ignoreCompression) so the stuff is just written to the file regardless.
+				}
+			);
 		}
 		return FS_filelength(*file);
 
@@ -378,7 +460,7 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 	
 }
 
-int FS_Read(void* buffer, int len, fileHandle_t f) {
+int FS_Read(void* buffer, int len, fileHandle_t f, qboolean ignoreCompression) {
 	int		block, remaining;
 	int		read;
 	byte* buf;
@@ -390,6 +472,16 @@ int FS_Read(void* buffer, int len, fileHandle_t f) {
 
 	if (!f) {
 		return 0;
+	}
+
+	if (!ignoreCompression && fsh[f].compressedFileInfo.compression == FILECOMPRESSION_LZMA) { // Idk, I guess this should have better error handling or sth but there isn't much we can do tbh
+		if (fsh[f].compressedFileInfo.readMode) {
+
+			return fsh[f].compressedFileInfo.lzmaDecompressor->get((byte*)buffer, len);
+		}
+		else {
+			throw std::logic_error("Can't use FS_Read on LZMA stream that was opened for write.");
+		}
 	}
 
 	buf = (byte*)buffer;

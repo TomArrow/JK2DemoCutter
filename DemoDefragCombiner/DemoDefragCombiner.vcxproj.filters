@@ -129,5 +129,8 @@
     <ClInclude Include="..\shared\zlib\zutil.h">
       <Filter>Common\zlib</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

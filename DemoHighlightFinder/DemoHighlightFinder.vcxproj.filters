@@ -48,6 +48,9 @@
     <ClInclude Include="..\shared\boostTupleHash.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

@@ -25,7 +25,6 @@
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\animMappingTable.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
-    <ClCompile Include="..\shared\msg_lzma.cpp" />
     <ClCompile Include="..\shared\zlib\adler32.c" />
     <ClCompile Include="..\shared\zlib\compress.c" />
     <ClCompile Include="..\shared\zlib\crc32.c" />
@@ -49,8 +48,8 @@
     <ClInclude Include="..\shared\DemoReader.h" />
     <ClInclude Include="..\shared\include\jpcre2.hpp" />
     <ClInclude Include="..\shared\include\pcre2.h" />
+    <ClInclude Include="..\shared\files_lzma.hpp" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />
-    <ClInclude Include="..\shared\pocketlzma\lzma_helper.hpp" />
     <ClInclude Include="..\shared\zlib\crc32.h" />
     <ClInclude Include="..\shared\zlib\deflate.h" />
     <ClInclude Include="..\shared\zlib\gzguts.h" />
