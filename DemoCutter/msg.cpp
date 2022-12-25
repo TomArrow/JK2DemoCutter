@@ -364,6 +364,31 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 			Com_Error(ERR_DROP, "can't read %d bits\n", bits);
 		}
 	} else {
+#ifdef FASTHUFFMAN
+		value &= (0xffffffff >> (32 - bits));
+		if (bits & 7) {
+			int nbits;
+			nbits = bits & 7;
+			for (i = 0; i < nbits; i++) {
+				//Huff_putBit((value & 1), msg->data, &msg->bit);
+				HuffmanPutBitFast(msg->data, msg->bit, (value & 1));
+				value = (value >> 1);
+				msg->bit++;
+			}
+			bits = bits - nbits;
+		}
+		if (bits) {
+			for (i = 0; i < bits; i += 8) {
+#ifdef _NEWHUFFTABLE_
+				fwrite(&value, 1, 1, fp);
+#endif // _NEWHUFFTABLE_
+				//Huff_offsetTransmit(&msgHuff.compressor, (value & 0xff), msg->data, &msg->bit);
+				HuffmanOffsetTransmitFast(msg->data, &msg->bit, (value & 0xff));
+				value = (value >> 8);
+			}
+		}
+		msg->cursize = (msg->bit >> 3) + 1;
+#elif
 		value &= (0xffffffff>>(32-bits));
 		if (bits&7) {
 			int nbits;
@@ -384,6 +409,7 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 			}
 		}
 		msg->cursize = (msg->bit>>3)+1;
+#endif
 	}
 }
 
@@ -2690,6 +2716,7 @@ void MSG_initHuffman() {
 #endif // _NEWHUFFTABLE_
 	
 	msgInit = qtrue;
+#ifndef FASTHUFFMAN // For an actual client we would have to do this smarter. But this will do for the demo tools.
 	Huff_Init(&msgHuff);
 	for(i=0;i<256;i++) {
 		for (j=0;j<msg_hData[i];j++) {
@@ -2697,6 +2724,7 @@ void MSG_initHuffman() {
 			Huff_addRef(&msgHuff.decompressor,	(byte)i);			// Do update
 		}
 	}
+#endif
 }
 
 #else
