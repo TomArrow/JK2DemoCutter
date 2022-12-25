@@ -606,7 +606,7 @@ cuterror:
 	wchar_t newNameWide[MAX_OSPATH];
 	wchar_t oldNameWide[MAX_OSPATH];
 	mbstowcs(newNameWide, newName, MAX_OSPATH);
-	mbstowcs(oldNameWide, va("%s%s", oldName, ext), MAX_OSPATH);
+	mbstowcs(oldNameWide, va("%s%s", oldName, originalExt), MAX_OSPATH);
 	HANDLE hFile = CreateFile(newNameWide, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	HANDLE hFileOld = CreateFile(oldNameWide, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile != INVALID_HANDLE_VALUE && hFileOld != INVALID_HANDLE_VALUE) // INVALID_FILE_HANDLE / INVALID_HANDLE_VALUE ? 
