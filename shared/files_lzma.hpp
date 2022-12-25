@@ -63,7 +63,7 @@ class LZMAIncrementalCompressor {
 	static SRes progressCallback(const ICompressProgress* p, UInt64 inSize, UInt64 outSize) {
 		constexpr size_t streamPointerOffset = offsetof(LZMAIncrementalCompressor, progressReporter);
 		LZMAIncrementalCompressor* incrementalCompressorObject = (LZMAIncrementalCompressor*)((int64_t)p - (int64_t)streamPointerOffset);
-		incrementalCompressorObject->updateProgress(inSize,outSize);
+		incrementalCompressorObject->updateProgress(inSize, outSize);
 		return SZ_OK;
 	}
 
@@ -76,7 +76,7 @@ class LZMAIncrementalCompressor {
 	static size_t dataOutputCallback(const ISeqOutStream* p, const void* buf, size_t size) {
 		constexpr size_t streamPointerOffset = offsetof(LZMAIncrementalCompressor, outStream);
 		LZMAIncrementalCompressor* incrementalCompressorObject = (LZMAIncrementalCompressor*)((int64_t)p - (int64_t)streamPointerOffset);
-		return incrementalCompressorObject->dataOutput(buf,size);
+		return incrementalCompressorObject->dataOutput(buf, size);
 	}
 
 	size_t dataOutput(const void* buf, size_t size) {
@@ -84,10 +84,10 @@ class LZMAIncrementalCompressor {
 	}
 
 	// dirty hack to make C callback work
-	static SRes dataInputCallback(const ISeqInStream* p, void* buf, size_t * size) {
+	static SRes dataInputCallback(const ISeqInStream* p, void* buf, size_t* size) {
 		constexpr size_t streamPointerOffset = offsetof(LZMAIncrementalCompressor, inStream);
 		LZMAIncrementalCompressor* incrementalCompressorObject = (LZMAIncrementalCompressor*)((int64_t)p - (int64_t)streamPointerOffset);
-		return incrementalCompressorObject->dataInput(buf,size);
+		return incrementalCompressorObject->dataInput(buf, size);
 	}
 
 	std::vector<byte>* currentVector = NULL;
@@ -95,7 +95,7 @@ class LZMAIncrementalCompressor {
 	size_t currentVectorDataLeft = 0;
 
 	SRes dataInput(void* buf, size_t* size) {
-		
+
 		byte* byteBuffer = (byte*)buf;
 		size_t requestedSize = *size;
 		*size = 0;
@@ -136,7 +136,7 @@ class LZMAIncrementalCompressor {
 					compressionQueueWait.wait(workerLock);
 				}
 			}
-			
+
 		}
 		return SZ_OK;
 	}
@@ -202,7 +202,7 @@ public:
 	LZMAIncrementalCompressor(std::function<size_t(const void*, size_t)> outputCallbackA) {
 		std::lock_guard<std::mutex> lock(fifoQueueMutex);
 		outputCallback = outputCallbackA;
-		workerThread = new std::thread  ( [this] { doCompress(); } );
+		workerThread = new std::thread([this] { doCompress(); });
 	}
 
 	// Circular buffer
@@ -215,7 +215,7 @@ public:
 		if (bufferSize > 0) {
 			std::vector<byte>* newVector = new std::vector<byte>(bufferSize);
 			byte* output = newVector->data();
-			for (size_t b=0; inputBufferOffset < totalInputSize; inputBufferOffset++,b++) {
+			for (size_t b = 0; inputBufferOffset < totalInputSize; inputBufferOffset++, b++) {
 				output[b] = inputBuffer[inputBufferOffset % IN_BUF_SIZE];
 			}
 			{
@@ -241,7 +241,7 @@ public:
 			flushInputBuffer();
 			std::vector<byte>* newVector = new std::vector<byte>(length);
 			byte* output = newVector->data();
-			for (size_t i = 0; i < length;i++) {
+			for (size_t i = 0; i < length; i++) {
 				output[i] = data[i];
 			}
 			{
@@ -255,7 +255,7 @@ public:
 			compressionQueueWait.notify_all();
 		}
 		else {
-			for (size_t i = 0,o=totalInputSize; i < length; i++,o++) {
+			for (size_t i = 0, o = totalInputSize; i < length; i++, o++) {
 				inputBuffer[o % IN_BUF_SIZE] = data[i];
 			}
 			totalInputSize += length;
@@ -310,7 +310,7 @@ class LZMADecompressor {
 
 	SRes dataInput(void* buf, size_t* size) {
 
-		size_t howMuchWeGet = inputCallback((byte*)buf,*size);
+		size_t howMuchWeGet = inputCallback((byte*)buf, *size);
 		*size = howMuchWeGet;
 		return SZ_OK;
 	}
@@ -324,6 +324,7 @@ class LZMADecompressor {
 	std::mutex outputProvideMutex;
 	std::condition_variable outputProvideWait;
 
+	bool aborted = false;
 	bool finished = false;
 
 	size_t outputBufferSize = 0;
@@ -356,7 +357,11 @@ class LZMADecompressor {
 		{
 			std::unique_lock<std::mutex> decompLock(decompressionOutputQueueMutex);
 
-			if ((outputBufferTotalWritten - outputBufferTotalRead) <= outputBufferSize-OUT_BUF_SIZE) {
+			if (aborted) {
+				return;
+			}
+
+			if ((outputBufferTotalWritten - outputBufferTotalRead) <= outputBufferSize - OUT_BUF_SIZE) {
 
 
 				if (inPos == inSize)
@@ -422,7 +427,7 @@ class LZMADecompressor {
 	std::thread* workerThread;
 
 public:
-	LZMADecompressor(std::function<size_t(void*, size_t)> inputCallbackA,size_t outputBufferSizeA = 2097152) { // 20 MB buffer by default
+	LZMADecompressor(std::function<size_t(void*, size_t)> inputCallbackA, size_t outputBufferSizeA = 2097152) { // 20 MB buffer by default
 		inputCallback = inputCallbackA;
 		inStream.Read = dataInputCallback;
 		outputBufferSize = outputBufferSizeA;
@@ -473,6 +478,11 @@ public:
 		return countGiven;
 	}
 	~LZMADecompressor() {
+		{
+			std::lock_guard<std::mutex> getLock(decompressionOutputQueueMutex);
+			aborted = true;
+		}
+		decompressionQueueWait.notify_all();
 		workerThread->join();
 		delete workerThread;
 		delete[] outputBuffer;
