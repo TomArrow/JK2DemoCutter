@@ -19,15 +19,19 @@ typedef struct lzmaHeader_t {
 	Byte header[LZMA_MY_HEADER_SIZE];
 };
 
+
+#define IN_BUF_SIZE (1 << 16)
+#define OUT_BUF_SIZE (1 << 16)
+
 class LZMAIncrementalCompressor {
 
 	ISeqInStream inStream{};
 	ISeqOutStream outStream{};
 	ICompressProgress progressReporter{};
 
-	std::queue<byte> bytesToCompressFIFO;
+	std::queue<std::vector<byte>*> bytesToCompressFIFO;
 
-	std::mutex compressionQueueMutex;
+	std::mutex fifoQueueMutex;
 	std::condition_variable compressionQueueWait;
 
 	bool finished = false;
@@ -70,26 +74,53 @@ class LZMAIncrementalCompressor {
 		return incrementalCompressorObject->dataInput(buf,size);
 	}
 
+	std::vector<byte>* currentVector = NULL;
+	byte* currentVectorData = NULL;
+	size_t currentVectorDataLeft = 0;
+
 	SRes dataInput(void* buf, size_t* size) {
 		
 		byte* byteBuffer = (byte*)buf;
 		size_t requestedSize = *size;
 		*size = 0;
 		while (*size < requestedSize) {
-			std::unique_lock<std::mutex> workerLock(compressionQueueMutex);
 
-			while (bytesToCompressFIFO.size() > 0 && *size < requestedSize) {
-				*byteBuffer = bytesToCompressFIFO.front();
-				bytesToCompressFIFO.pop();
-				byteBuffer++;
-				(*size)++;
+			if (currentVectorData && currentVectorDataLeft > 0) {
+				size_t diff = min(currentVectorDataLeft, (requestedSize - *size));
+				memcpy(byteBuffer, currentVectorData, diff);
+				currentVectorData += diff;
+				currentVectorDataLeft -= diff;
+				byteBuffer += diff;
+				*size += diff;
+			}
+			if (*size < requestedSize) { // Means the currently active vector didn't have enough to satisfy the current request.
+				std::unique_lock<std::mutex> workerLock(fifoQueueMutex);
+				if (bytesToCompressFIFO.size() > 0) { // Do we have more available in the queue? If so, get it.
+					if (currentVector) { // Clear the previous one if a previous one exists.
+						currentVectorData = NULL;
+						currentVectorDataLeft = 0;
+						delete currentVector;
+						currentVector = NULL;
+					}
+					currentVector = bytesToCompressFIFO.front();
+					bytesToCompressFIFO.pop();
+					currentVectorData = currentVector->data();
+					currentVectorDataLeft = currentVector->size();
+				}
+				else if (finished) { // No we don't. But nothing more is gonna come either.
+					if (currentVector) { // Clear the previous one if a previous one exists.
+						currentVectorData = NULL;
+						currentVectorDataLeft = 0;
+						delete currentVector;
+						currentVector = NULL;
+					}
+					return SZ_OK;
+				}
+				else { // No we don't. But more will come. Wait a bit.
+					compressionQueueWait.wait(workerLock);
+				}
 			}
 			
-			if (finished) {
-				return SZ_OK;
-			}
-
-			compressionQueueWait.wait(workerLock);
 		}
 		return SZ_OK;
 	}
@@ -101,7 +132,7 @@ class LZMAIncrementalCompressor {
 	size_t headerSize = LZMA_PROPS_SIZE;
 	size_t headerOffset = headerSize;
 
-	size_t totalCurrentSize = 0;
+	size_t totalInputSize = 0;
 
 
 	void doCompress() {
@@ -138,7 +169,7 @@ class LZMAIncrementalCompressor {
 			// Finish the header
 			int tmpHeaderOffset = headerOffset;
 			for (int i = 0; i < 8; i++) {
-				header.header[tmpHeaderOffset++] = (Byte)(totalCurrentSize >> (8 * i));
+				header.header[tmpHeaderOffset++] = (Byte)(totalInputSize >> (8 * i));
 			}
 		}
 
@@ -152,27 +183,82 @@ public:
 
 
 	LZMAIncrementalCompressor(std::function<size_t(const void*, size_t)> outputCallbackA) {
-		std::lock_guard<std::mutex> lock(compressionQueueMutex);
+		std::lock_guard<std::mutex> lock(fifoQueueMutex);
 		outputCallback = outputCallbackA;
 		workerThread = new std::thread  ( [this] { doCompress(); } );
 	}
 
-	void addData(const byte* data, size_t length) {
-		{
-			std::lock_guard<std::mutex> lock(compressionQueueMutex);
-			if (finished) {
-				throw std::logic_error("Cannot add data after compression is finished");
+	// Circular buffer
+	byte inputBuffer[IN_BUF_SIZE];
+	size_t inputBufferOffset = 0;
+
+
+	bool flushInputBuffer() {
+		size_t bufferSize = totalInputSize - inputBufferOffset;
+		if (bufferSize > 0) {
+			std::vector<byte>* newVector = new std::vector<byte>(bufferSize);
+			byte* output = newVector->data();
+			for (size_t b=0; inputBufferOffset < totalInputSize; inputBufferOffset++,b++) {
+				output[b] = inputBuffer[inputBufferOffset % IN_BUF_SIZE];
 			}
-			for (int i = 0; i < length; i++) {
-				bytesToCompressFIFO.push(data[i]);
+			{
+				std::lock_guard<std::mutex> lock(fifoQueueMutex);
+				if (finished) { // Do I have to lock it? Hmm.
+					throw std::logic_error("Cannot add data after compression is finished");
+				}
+				bytesToCompressFIFO.push(newVector);
 			}
+			compressionQueueWait.notify_all();
+			return true;
 		}
-		totalCurrentSize += length;
-		compressionQueueWait.notify_all();
+		return false;
 	}
+
+	void addData(const byte* data, size_t length) {
+		bool notify = false;
+		if ((totalInputSize - inputBufferOffset + length) > IN_BUF_SIZE) { // Don't let the circular input buffer overwrite its old stuff.
+			notify = notify || flushInputBuffer();
+		}
+		if (length > IN_BUF_SIZE) { // Ok this doesn't fit into the input buffer anyway.
+			notify = true;
+			flushInputBuffer();
+			std::vector<byte>* newVector = new std::vector<byte>(length);
+			byte* output = newVector->data();
+			for (size_t i = 0; i < length;i++) {
+				output[i] = data[i];
+			}
+			{
+				std::lock_guard<std::mutex> lock(fifoQueueMutex);
+				if (finished) { // Do I have to lock it? Hmm.
+					throw std::logic_error("Cannot add data after compression is finished");
+				}
+				totalInputSize += length;
+				bytesToCompressFIFO.push(newVector);
+			}
+			compressionQueueWait.notify_all();
+		}
+		else {
+			for (size_t i = 0,o=totalInputSize; i < length; i++,o++) {
+				inputBuffer[o % IN_BUF_SIZE] = data[i];
+			}
+			totalInputSize += length;
+		}
+		//{
+		//	std::lock_guard<std::mutex> lock(compressionQueueMutex);
+		//	if (finished) {
+		//		throw std::logic_error("Cannot add data after compression is finished");
+		//	}
+		//	for (int i = 0; i < length; i++) {
+		//		bytesToCompressFIFO.push(data[i]);
+		//	}
+		//	totalInputSize += length;
+		//}
+	}
+
 	lzmaHeader_t Finish() {
+		flushInputBuffer();
 		{
-			std::lock_guard<std::mutex> lock(compressionQueueMutex);
+			std::lock_guard<std::mutex> lock(fifoQueueMutex);
 			finished = true;
 		}
 		compressionQueueWait.notify_all();
@@ -224,8 +310,6 @@ class LZMADecompressor {
 
 	bool finished = false;
 
-#define IN_BUF_SIZE (1 << 16)
-#define OUT_BUF_SIZE (1 << 16)
 	void doDecompress() {
 		int i;
 		SRes res = 0;
