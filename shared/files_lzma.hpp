@@ -10,9 +10,25 @@
 #include <future>
 #include <functional>
 
+#ifdef _MSC_VER
+#include "Precomp.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "CpuArch.h"
+
+#include "Alloc.h"
+#include "7zFile.h"
+#include "7zVersion.h"
+#include "LzFind.h"
+#include "LzmaDec.h"
+#include "LzmaEnc.h"
+#elif
 #define LZMA_C_DEFINE
 #include "pocketlzma/lzma_c.hpp"
-
+#endif
 
 #define LZMA_MY_HEADER_SIZE LZMA_PROPS_SIZE + 8 // This isnt only the strict LZMA header, this also includes a 64 bit size of the compressed content. That's how we do it here. It could be done differently. Whatever.
 typedef struct lzmaHeader_t {
@@ -151,6 +167,7 @@ class LZMAIncrementalCompressor {
 
 		props.level = 9;
 		props.dictSize = 1 << 27;
+		//props.numThreads = 8;
 
 		res = LzmaEnc_SetProps(enc, &props);
 

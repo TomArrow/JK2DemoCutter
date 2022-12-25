@@ -68,6 +68,144 @@
     <ClCompile Include="..\shared\animMappingTable.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zArcIn.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zBuf.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zBuf2.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zCrc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zCrcOpt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zDec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zFile.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zStream.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Aes.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\AesOpt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Alloc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bcj2.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bcj2Enc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bra.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bra86.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\BraIA64.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\CpuArch.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Delta.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\DllSecur.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzFind.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzFindMt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzFindOpt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2Dec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2DecMt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2Enc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma86Dec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma86Enc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzmaDec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzmaEnc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzmaLib.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\MtCoder.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\MtDec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7Dec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7Enc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Sha256.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Sha256Opt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Sort.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Threads.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Xz.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzCrc64.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzCrc64Opt.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzDec.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzEnc.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzIn.c">
+      <Filter>Common\lzmaSDK</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -81,6 +219,9 @@
     </Filter>
     <Filter Include="Common\pocketlzma">
       <UniqueIdentifier>{dacc56a4-24a2-4b6f-9ba8-ccea8441b5d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\lzmaSDK">
+      <UniqueIdentifier>{d68bd0e0-c623-42fb-85bc-9f5715febc79}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

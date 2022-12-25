@@ -25,6 +25,52 @@
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\animMappingTable.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
+    <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zArcIn.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zBuf.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zBuf2.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zCrc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zCrcOpt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zDec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zFile.c" />
+    <ClCompile Include="..\shared\lzmaSDK\7zStream.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Aes.c" />
+    <ClCompile Include="..\shared\lzmaSDK\AesOpt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Alloc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Bcj2.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Bcj2Enc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Bra.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Bra86.c" />
+    <ClCompile Include="..\shared\lzmaSDK\BraIA64.c" />
+    <ClCompile Include="..\shared\lzmaSDK\CpuArch.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Delta.c" />
+    <ClCompile Include="..\shared\lzmaSDK\DllSecur.c" />
+    <ClCompile Include="..\shared\lzmaSDK\LzFind.c" />
+    <ClCompile Include="..\shared\lzmaSDK\LzFindMt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\LzFindOpt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2Dec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2DecMt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2Enc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Lzma86Dec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Lzma86Enc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\LzmaDec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\LzmaEnc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\LzmaLib.c" />
+    <ClCompile Include="..\shared\lzmaSDK\MtCoder.c" />
+    <ClCompile Include="..\shared\lzmaSDK\MtDec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7Dec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7Enc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Sha256.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Sha256Opt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Sort.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Threads.c" />
+    <ClCompile Include="..\shared\lzmaSDK\Xz.c" />
+    <ClCompile Include="..\shared\lzmaSDK\XzCrc64.c" />
+    <ClCompile Include="..\shared\lzmaSDK\XzCrc64Opt.c" />
+    <ClCompile Include="..\shared\lzmaSDK\XzDec.c" />
+    <ClCompile Include="..\shared\lzmaSDK\XzEnc.c" />
+    <ClCompile Include="..\shared\lzmaSDK\XzIn.c" />
     <ClCompile Include="..\shared\zlib\adler32.c" />
     <ClCompile Include="..\shared\zlib\compress.c" />
     <ClCompile Include="..\shared\zlib\crc32.c" />
@@ -116,22 +162,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>../shared/lzmaSDK;../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>../shared/lib/deb86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>../shared/lzmaSDK;../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>../shared/lib/rel86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>../shared/lzmaSDK;../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>../shared/lib/deb64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>../shared/lzmaSDK;../shared;../shared/include;include;../DemoCutter/;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>../shared/lib/rel64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
