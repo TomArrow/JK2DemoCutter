@@ -59,7 +59,8 @@ typedef struct _iobuf
 //#define	MAX_FILE_HANDLES	64
 #define	MAX_FILE_HANDLES	1024
 
-#define	MAX_MSGLEN				16384		// max length of a message, which may
+#define	MAX_MSGLEN				16384			// max length of a message, which may
+#define	MAX_MSGLEN_RAW			MAX_MSGLEN*10	// max length of a message, which may
 // be fragmented into multiple packets
 
 //#define	CMD_BACKUP			64	

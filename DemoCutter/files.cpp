@@ -325,8 +325,7 @@ void FS_FCloseFile(fileHandle_t f) {
 	if (fsh[f].compressedFileInfo.compression == FILECOMPRESSION_LZMA) {
 		if (fsh[f].compressedFileInfo.readMode) {
 
-			fsh[f].compressedFileInfo.lzmaDecompressor->Finish(); // Just a quick and dirty cleanup.
-			delete fsh[f].compressedFileInfo.lzmaDecompressor;
+			delete fsh[f].compressedFileInfo.lzmaDecompressor; // Just a quick and dirty cleanup.
 			fsh[f].compressedFileInfo.lzmaDecompressor = NULL;
 		}
 		else {

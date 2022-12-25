@@ -243,7 +243,7 @@ void MSG_InitRaw( msg_t *buf, std::vector<byte> *dataRaw) {
 	
 	Com_Memset (buf, 0, sizeof(*buf));
 	buf->dataRaw = dataRaw;
-	buf->dataRaw->reserve(MAX_MSGLEN); // It can become bigger of course but let's just reserve a certain amount so we don't have a slowdown from vector constantly resizing.
+	buf->dataRaw->reserve(MAX_MSGLEN_RAW); // It can become bigger of course but let's just reserve a certain amount so we don't have a slowdown from vector constantly resizing.
 	buf->cursize = dataRaw->size();
 	buf->maxsize = INT_MAX; // Since its a vector we arent really limited and MAX_MSGLEN would be too short for raw data I think
 	buf->raw = qtrue;

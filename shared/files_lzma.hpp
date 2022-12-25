@@ -298,7 +298,6 @@ class LZMADecompressor {
 		return SZ_OK;
 	}
 
-	std::queue<byte> outputQueue; // Let's multithread the decoding, nice!
 
 	UInt64 unpackSize = 0;
 
@@ -310,13 +309,18 @@ class LZMADecompressor {
 
 	bool finished = false;
 
+	size_t outputBufferSize = 0;
+	byte* outputBuffer = NULL;
+	size_t outputBufferTotalWritten = 0;
+	size_t outputBufferTotalRead = 0;
+
 	void doDecompress() {
 		int i;
 		SRes res = 0;
 
 		CLzmaDec state;
 
-
+		assert(outputBuffer != NULL);
 
 		LzmaDec_Construct(&state);
 		res = LzmaDec_Allocate(&state, header.header, LZMA_PROPS_SIZE, &g_Alloc);
@@ -335,7 +339,7 @@ class LZMADecompressor {
 		{
 			std::unique_lock<std::mutex> decompLock(decompressionOutputQueueMutex);
 
-			if (outputQueue.size() <= outputBufferSize-OUT_BUF_SIZE) {
+			if ((outputBufferTotalWritten - outputBufferTotalRead) <= outputBufferSize-OUT_BUF_SIZE) {
 
 
 				if (inPos == inSize)
@@ -366,9 +370,9 @@ class LZMADecompressor {
 					unpackSize -= outProcessed;
 
 					{
-						std::lock_guard<std::mutex> outputQueuePushLock(outputProvideMutex);
+						std::lock_guard<std::mutex> outputQueuePushLock(outputProvideMutex); // Do we actually have to lock this? It's a circular buffer that is only writen to here. What can go wrong? Eh better go safe...
 						for (i = 0; i < outPos; i++) {
-							outputQueue.push(outBuf[i]);
+							outputBuffer[outputBufferTotalWritten++ % outputBufferSize] = outBuf[i];
 						}
 					}
 					outputProvideWait.notify_all();
@@ -399,13 +403,13 @@ class LZMADecompressor {
 	}
 
 	std::thread* workerThread;
-	size_t outputBufferSize = 0;
 
 public:
 	LZMADecompressor(std::function<size_t(void*, size_t)> inputCallbackA,size_t outputBufferSizeA = 2097152) { // 20 MB buffer by default
 		inputCallback = inputCallbackA;
 		inStream.Read = dataInputCallback;
 		outputBufferSize = outputBufferSizeA;
+		outputBuffer = new byte[outputBufferSize];
 
 		/* Read and parse header */
 		size_t headerSize = sizeof(header.header);
@@ -432,29 +436,30 @@ public:
 	size_t get(byte* buf, size_t count) {
 
 		size_t countGiven = 0;
+		byte* byteBuffer = buf;
 		while (countGiven < count) {
 
 			{
 				std::lock_guard<std::mutex> getLock(decompressionOutputQueueMutex);
-				while (outputQueue.size() > 0 && countGiven < count) {
-					buf[countGiven] = outputQueue.front();
-					outputQueue.pop();
-					countGiven++;
+				while (outputBufferTotalWritten > outputBufferTotalRead && countGiven < count) {
+					buf[countGiven++] = outputBuffer[outputBufferTotalRead++ % outputBufferSize];
 				}
 				if (finished || countGiven == count) break; // Input data is already fully decoded.
 			}
 			decompressionQueueWait.notify_all();
 			// There's still more data coming. Wait for it.
 			std::unique_lock<std::mutex> waitForMoreLock(outputProvideMutex);
-			if (outputQueue.size() == 0) {
+			if (outputBufferTotalWritten == outputBufferTotalRead) {
 				outputProvideWait.wait(waitForMoreLock); // Wait so we don't spin this loop endlessly like idiots.
 			}
 		}
 		return countGiven;
 	}
-	void Finish() {
+	~LZMADecompressor() {
 		workerThread->join();
 		delete workerThread;
+		delete[] outputBuffer;
+		outputBuffer = NULL;
 	}
 };
 

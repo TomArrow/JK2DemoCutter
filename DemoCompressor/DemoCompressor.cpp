@@ -415,6 +415,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	while (oldSize > 0) {
 	//cutcontinue:
 		if (isCompressedFile) {
+			oldDataRaw.clear();
 			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
 		}
 		else {
@@ -422,9 +423,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		}
 
 		Com_Memset(&newMsg, 0, sizeof(newMsg)); // Is this necessary? idk, wanted to be safe.
-		newDataRaw.clear();
 
 		if (createCompressedOutput) { // Ironically if the output is compressed we do not compress the message to get a better compression ratio later
+			newDataRaw.clear();
 			MSG_InitRaw(&newMsg, &newDataRaw); // Output message
 		}
 		else {
