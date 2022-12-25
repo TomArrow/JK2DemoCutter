@@ -615,7 +615,7 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut) {
 	}
 	return qtrue;
 }
-
+/*
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
 	byte			bufData[MAX_MSGLEN];
 	msg_t			buf;
@@ -665,7 +665,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	len = LittleLong(buf.cursize);
 	FS_Write(&len, 4, f);
 	FS_Write(buf.data, buf.cursize, f);
-}
+}*/
 
 static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType) {
 	entityState_t* oldent, * newent;
@@ -733,7 +733,7 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 	FS_Write(&len, 4, f);
 	FS_Write(msg->data, msg->cursize, f);
 }
-
+/*
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
@@ -747,7 +747,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
 		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
 		MSG_WriteByte(msg, svc_serverCommand);
-		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
+		MSG_WriteLong(msg, serverCommand); // + serverCommandOffset
 		MSG_WriteString(msg, command);
 	}
 	// this is the snapshot we are creating
@@ -787,7 +787,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
 	MSG_WriteByte(msg, svc_EOF);
 	demoCutWriteDemoMessage(msg, f, clcCut);
-}
+}*/
 
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType) {
 	/* The beast that is entity parsing */
@@ -1485,6 +1485,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
+	std::vector<byte>	oldDataRaw;
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
 	//char			newName[MAX_OSPATH];
@@ -1493,7 +1494,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	//demoPlay_t* play = demo.play.handle;
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
-	char* ext;
+	char			ext[7]{};
+	char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
@@ -1504,6 +1506,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
 	int				lastValidSnap = -1;
+	qboolean		isCompressedFile = qfalse;
+	qboolean		createCompressedOutput = qtrue;
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -1942,26 +1946,39 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
 	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
-	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+
+	char specialTypeChar = ext[3];
+	ext[3] = '_';
+
+	if (specialTypeChar == 'c') {
+		isCompressedFile = qtrue;
+	}
+
+	createCompressedOutput = (qboolean)!isCompressedFile;
+
 	if (!*ext) {
 		demoType = DM_16;
-		ext = ".dm_16";
+		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
-	else if (!_stricmp(ext,".dm_15")) {
+	else if (!_stricmp(ext, ".dm_15")) {
 
 		demoType = DM_15;
-		ext = ".dm_15";
+		strncpy_s(ext, sizeof(ext), ".dm_15", 6);
 	}
-	else if (!_stricmp(ext,".dm_16")) {
+	else if (!_stricmp(ext, ".dm_16")) {
 
 		demoType = DM_16;
-		ext = ".dm_16";
+		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
+
+
 
 	std::string oldPath = va("%s%s", oldName, ext);
 	std::string oldBasename = oldPath.substr(oldPath.find_last_of("/\\") + 1);
@@ -1970,7 +1987,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	std::filesystem::path tmpFSPath = oldPath;
 	oldPath = std::filesystem::absolute(tmpFSPath).string();
 
-	std::filesystem::file_time_type filetime = std::filesystem::last_write_time(va("%s%s", oldName, ext));
+	std::filesystem::file_time_type filetime = std::filesystem::last_write_time(va("%s%s", oldName, originalExt));
 	time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
@@ -1997,7 +2014,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		float playerStateStrafeDeviationThisFrame = 0;
 
 	cutcontinue:
-		MSG_Init(&oldMsg, oldData, sizeof(oldData));
+		if (isCompressedFile) {
+			oldDataRaw.clear();
+			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
+		}
+		else {
+			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
+		}
 		/* Read the sequence number */
 		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 			goto cuterror;
@@ -2014,8 +2037,16 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		if (oldMsg.cursize > oldMsg.maxsize)
 			goto cuterror;
 		/* Read the actual message */
-		if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
-			goto cuterror;
+		if (oldMsg.raw) {
+			oldMsg.dataRaw->resize(oldMsg.cursize);
+			if (FS_Read(oldMsg.dataRaw->data(), oldMsg.cursize, oldHandle) != oldMsg.cursize) {
+				goto cuterror;
+			}
+		}
+		else {
+			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
+				goto cuterror;
+		}
 		oldSize -= oldMsg.cursize;
 		// init the bitstream
 		MSG_BeginReading(&oldMsg);
@@ -4804,9 +4835,12 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	Com_Printf("Looking at %s.\n", demoName);
+	Com_Printf("Looking at %s.\n", demoName); 
+	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat", searchMode)) {
-		Com_Printf("Highlights successfully found.\n");
+		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
+		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
+		Com_Printf("Highlights successfully found in %.5f seconds.\n",seconds);
 	}
 	else {
 		Com_Printf("Finding highlights in demo %s has resulted in errors\n", demoName);

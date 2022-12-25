@@ -4,6 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <set>
+#include <chrono>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -1295,8 +1296,12 @@ int main(int argc, char** argv) {
 		inputFiles.emplace_back(argv[i]);
 	}
 
+	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
+
 	if (demoCut(filteredOutputName,&inputFiles)) {
-		Com_Printf("Demo %s got successfully cut\n", demoName);
+		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
+		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
+		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
 	}
 	else {
 		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);

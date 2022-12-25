@@ -3,6 +3,7 @@
 #include "anims.h"
 #include <vector>
 #include <sstream>
+#include <chrono>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -1023,8 +1024,12 @@ int main(int argc, char** argv) {
 
 	std::cout << sizeof(DemoReaderTrackingWrapper);
 
+	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
+
 	if (demoReframe(demoName, filteredOutputName, playerNameSearchString, visAll)) {
-		Com_Printf("Demo %s got successfully reframed\n", demoName);
+		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
+		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
+		Com_Printf("Demo %s got successfully reframed in %.5f seconds\n", demoName,seconds);
 	}
 	else {
 		Com_Printf("Demo %s has failed to get reframed or reframed with errors\n", demoName);

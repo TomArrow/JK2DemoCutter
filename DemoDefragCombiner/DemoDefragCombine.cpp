@@ -3,6 +3,7 @@
 #include "anims.h"
 #include <vector>
 #include <sstream>
+#include <chrono>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -1024,12 +1025,14 @@ int main(int argc, char** argv) {
 	for (int i = 2; i < argc; i++) {
 		inputFiles.emplace_back(argv[i]);
 	}
-
+	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	if (demoCut(outputName,&inputFiles)) {
-		Com_Printf("Demo %s got successfully cut\n", demoName);
+		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
+		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
+		Com_Printf("Demo %s got successfully defrag combined in %.5f seconds\n", demoName,seconds);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
+		Com_Printf("Demo %s has failed to get defrag combined or defrag combined with errors\n", demoName);
 	}
 #ifdef DEBUG
 	std::cin.get();
