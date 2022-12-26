@@ -70,6 +70,22 @@
     <ClCompile Include="..\shared\lzmaSDK\XzEnc.c" />
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c" />
     <ClCompile Include="..\shared\sqlite\sqlite3.c" />
+    <ClCompile Include="..\shared\zlib\adler32.c" />
+    <ClCompile Include="..\shared\zlib\compress.c" />
+    <ClCompile Include="..\shared\zlib\crc32.c" />
+    <ClCompile Include="..\shared\zlib\deflate.c" />
+    <ClCompile Include="..\shared\zlib\gzclose.c" />
+    <ClCompile Include="..\shared\zlib\gzlib.c" />
+    <ClCompile Include="..\shared\zlib\gzread.c" />
+    <ClCompile Include="..\shared\zlib\gzwrite.c" />
+    <ClCompile Include="..\shared\zlib\infback.c" />
+    <ClCompile Include="..\shared\zlib\inffast.c" />
+    <ClCompile Include="..\shared\zlib\inflate.c" />
+    <ClCompile Include="..\shared\zlib\inftrees.c" />
+    <ClCompile Include="..\shared\zlib\ioapi.c" />
+    <ClCompile Include="..\shared\zlib\trees.c" />
+    <ClCompile Include="..\shared\zlib\uncompr.c" />
+    <ClCompile Include="..\shared\zlib\zutil.c" />
     <ClCompile Include="demoHighlightFind.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -78,6 +94,18 @@
     <ClInclude Include="..\shared\include\picosha3.h" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />
     <ClInclude Include="..\shared\sqlite\sqlite3.h" />
+    <ClInclude Include="..\shared\zlib\crc32.h" />
+    <ClInclude Include="..\shared\zlib\deflate.h" />
+    <ClInclude Include="..\shared\zlib\gzguts.h" />
+    <ClInclude Include="..\shared\zlib\inffast.h" />
+    <ClInclude Include="..\shared\zlib\inffixed.h" />
+    <ClInclude Include="..\shared\zlib\inflate.h" />
+    <ClInclude Include="..\shared\zlib\inftrees.h" />
+    <ClInclude Include="..\shared\zlib\ioapi.h" />
+    <ClInclude Include="..\shared\zlib\trees.h" />
+    <ClInclude Include="..\shared\zlib\zconf.h" />
+    <ClInclude Include="..\shared\zlib\zlib.h" />
+    <ClInclude Include="..\shared\zlib\zutil.h" />
     <ClInclude Include="include\jpcre2.hpp" />
     <ClInclude Include="include\pcre2.h" />
   </ItemGroup>
@@ -160,7 +188,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGSno;DEBUG;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGSno;DEBUG;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ControlFlowGuard>false</ControlFlowGuard>
@@ -177,7 +205,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -200,7 +228,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;DEBUG;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;DEBUG;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -216,7 +244,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>

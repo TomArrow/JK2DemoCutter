@@ -571,6 +571,7 @@ void updateForcePowersInfo(clientActive_t* clCut) {
 }
 
 
+
 qboolean demoCutConfigstringModified(clientActive_t* clCut) {
 	char* old, * s;
 	int			i, index;
@@ -608,6 +609,9 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut) {
 			Com_Printf("MAX_GAMESTATE_CHARS exceeded");
 			return qfalse;
 		}
+
+		
+
 		// append it to the gameState string buffer
 		clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
 		Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, dup, len + 1);
@@ -935,60 +939,6 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	return qtrue;
 }
 
-qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
-	int				i;
-	entityState_t* es;
-	int				newnum;
-	entityState_t	nullstate;
-	int				cmd;
-	char* s;
-	clcCut->connectPacketCount = 0;
-	Com_Memset(clCut, 0, sizeof(*clCut));
-	clcCut->serverCommandSequence = MSG_ReadLong(msg);
-	clCut->gameState.dataCount = 1;
-	while (1) {
-		cmd = MSG_ReadByte(msg);
-		if (cmd == svc_EOF) {
-			break;
-		}
-		if (cmd == svc_configstring) {
-			int len, start;
-			start = msg->readcount;
-			i = MSG_ReadShort(msg);
-			if (i < 0 || i >= MAX_CONFIGSTRINGS) {
-				Com_Printf("configstring > MAX_CONFIGSTRINGS");
-				return qfalse;
-			}
-			s = MSG_ReadBigString(msg);
-			len = strlen(s);
-			if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-				Com_Printf("MAX_GAMESTATE_CHARS exceeded");
-				return qfalse;
-			}
-			// append it to the gameState string buffer
-			clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
-			Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, s, len + 1);
-			clCut->gameState.dataCount += len + 1;
-		}
-		else if (cmd == svc_baseline) {
-			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
-			if (newnum < 0 || newnum >= MAX_GENTITIES) {
-				Com_Printf("Baseline number out of range: %i", newnum);
-				return qfalse;
-			}
-			Com_Memset(&nullstate, 0, sizeof(nullstate));
-			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, demoType);
-		}
-		else {
-			Com_Printf("demoCutParseGameState: bad command byte");
-			return qfalse;
-		}
-	}
-	clcCut->clientNum = MSG_ReadLong(msg);
-	clcCut->checksumFeed = MSG_ReadLong(msg);
-	return qtrue;
-}
 
 void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	int index;
@@ -1958,6 +1908,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 	createCompressedOutput = (qboolean)!isCompressedFile;
 
+	demo.cut.Clc.demoCheckFor103 = qfalse;
 	if (!*ext) {
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
@@ -1965,7 +1916,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	else if (!_stricmp(ext, ".dm_15")) {
 
 		demoType = DM_15;
-		strncpy_s(ext, sizeof(ext), ".dm_15", 6);
+		strncpy_s(ext, sizeof(ext), ".dm_15", 6); 
+		demo.cut.Clc.demoCheckFor103 = qtrue;
 	}
 	else if (!_stricmp(ext, ".dm_16")) {
 
@@ -2090,7 +2042,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 				//	goto cutcomplete;
 				//}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,demoType)) {
+				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType)) { // Pass demoType by reference in case we need 1.03 detection
 					goto cuterror;
 				}
 

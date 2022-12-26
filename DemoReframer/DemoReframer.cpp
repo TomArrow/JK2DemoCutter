@@ -551,60 +551,7 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	return qtrue;
 }
 
-qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
-	int				i;
-	entityState_t* es;
-	int				newnum;
-	entityState_t	nullstate;
-	int				cmd;
-	char* s;
-	clcCut->connectPacketCount = 0;
-	Com_Memset(clCut, 0, sizeof(*clCut));
-	clcCut->serverCommandSequence = MSG_ReadLong(msg);
-	clCut->gameState.dataCount = 1;
-	while (1) {
-		cmd = MSG_ReadByte(msg);
-		if (cmd == svc_EOF) {
-			break;
-		}
-		if (cmd == svc_configstring) {
-			int len, start;
-			start = msg->readcount;
-			i = MSG_ReadShort(msg);
-			if (i < 0 || i >= MAX_CONFIGSTRINGS) {
-				Com_Printf("configstring > MAX_CONFIGSTRINGS");
-				return qfalse;
-			}
-			s = MSG_ReadBigString(msg);
-			len = strlen(s);
-			if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-				Com_Printf("MAX_GAMESTATE_CHARS exceeded");
-				return qfalse;
-			}
-			// append it to the gameState string buffer
-			clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
-			Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, s, len + 1);
-			clCut->gameState.dataCount += len + 1;
-		}
-		else if (cmd == svc_baseline) {
-			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
-			if (newnum < 0 || newnum >= MAX_GENTITIES) {
-				Com_Printf("Baseline number out of range: %i", newnum);
-				return qfalse;
-			}
-			Com_Memset(&nullstate, 0, sizeof(nullstate));
-			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, demoType);
-		}
-		else {
-			Com_Printf("demoCutParseGameState: bad command byte");
-			return qfalse;
-		}
-	}
-	clcCut->clientNum = MSG_ReadLong(msg);
-	clcCut->checksumFeed = MSG_ReadLong(msg);
-	return qtrue;
-}
+
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed) {
 	int				i;
 	entityState_t* es;

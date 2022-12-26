@@ -29,6 +29,7 @@
 
 enum demoType_t {
 	DM_15,
+	DM_15_1_03,
 	DM_16,
 	DM_26
 };
@@ -1117,6 +1118,7 @@ typedef struct {
 	qboolean	firstDemoFrameSkipped;
 	fileHandle_t	demofile;
 	qboolean	newDemoPlayer;
+	qboolean	demoCheckFor103;
 
 	int			timeDemoFrames;		// counter of rendered frames
 	int			timeDemoStart;		// cls.realtime before first frame
@@ -2386,6 +2388,20 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+// Shared demo parsing functions
+
+qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
 
 
 

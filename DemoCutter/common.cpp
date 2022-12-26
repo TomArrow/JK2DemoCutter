@@ -1,6 +1,7 @@
 #include "demoCut.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <jkaStuff.h>
 
 // Code is 99%-100% from jomme, from various files.
 // Most of it is likely still the same as in the original Jedi Knight source code releases
@@ -2717,3 +2718,193 @@ qboolean PM_SaberInBrokenParry(int move, demoType_t demoType)
 	return qfalse;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+qboolean CL_ServerVersionIs103(const char* versionstr) {
+	return strstr(versionstr, "v1.03") ? qtrue : qfalse;
+}
+
+#include "zlib/zlib.h"
+void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut) {
+	int i;
+	clcCut->rmgHeightMapSize = (unsigned short)MSG_ReadShort(msg);
+	if (clcCut->rmgHeightMapSize == 0) {
+		return;
+	}
+	z_stream zdata;
+	int flatDataSize;
+	unsigned char heightmap1[15000];
+	// height map
+	if (MSG_ReadBits(msg, 1)) {
+		memset(&zdata, 0, sizeof(z_stream));
+		inflateInit(&zdata/*, Z_SYNC_FLUSH*/);
+		MSG_ReadData(msg, heightmap1, clcCut->rmgHeightMapSize);
+		zdata.next_in = heightmap1;
+		zdata.avail_in = clcCut->rmgHeightMapSize;
+		zdata.next_out = (unsigned char*)clcCut->rmgHeightMap;
+		zdata.avail_out = MAX_HEIGHTMAP_SIZE;
+		inflate(&zdata, Z_SYNC_FLUSH);
+		clcCut->rmgHeightMapSize = zdata.total_out;
+		inflateEnd(&zdata);
+	}
+	else {
+		MSG_ReadData(msg, (unsigned char*)clcCut->rmgHeightMap, clcCut->rmgHeightMapSize);
+	}
+	// Flatten map
+	flatDataSize = MSG_ReadShort(msg);
+	if (MSG_ReadBits(msg, 1)) {
+		// Read the flatten map
+		memset(&zdata, 0, sizeof(z_stream));
+		inflateInit(&zdata/*, Z_SYNC_FLUSH*/);
+		MSG_ReadData(msg, heightmap1, flatDataSize);
+		zdata.next_in = heightmap1;
+		zdata.avail_in = clcCut->rmgHeightMapSize;
+		zdata.next_out = (unsigned char*)clcCut->rmgFlattenMap;
+		zdata.avail_out = MAX_HEIGHTMAP_SIZE;
+		inflate(&zdata, Z_SYNC_FLUSH);
+		inflateEnd(&zdata);
+	}
+	else {
+		MSG_ReadData(msg, (unsigned char*)clcCut->rmgFlattenMap, flatDataSize);
+	}
+	// Seed
+	clcCut->rmgSeed = MSG_ReadLong(msg);
+	// Automap symbols
+	clcCut->rmgAutomapSymbolCount = (unsigned short)MSG_ReadShort(msg);
+	for (i = 0; i < clcCut->rmgAutomapSymbolCount; i++) {
+		clcCut->rmgAutomapSymbols[i].mType = (int)MSG_ReadByte(msg);
+		clcCut->rmgAutomapSymbols[i].mSide = (int)MSG_ReadByte(msg);
+		clcCut->rmgAutomapSymbols[i].mOrigin[0] = (float)MSG_ReadLong(msg);
+		clcCut->rmgAutomapSymbols[i].mOrigin[1] = (float)MSG_ReadLong(msg);
+	}
+}
+
+
+//
+//
+// Shared demo parsing functions
+//
+qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType) {
+	int				i;
+	entityState_t* es;
+	int				newnum;
+	entityState_t	nullstate;
+	int				cmd;
+	char* s;
+
+	int svc_EOF_realCMD = *demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
+	int maxAllowedConfigString = *demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+
+	clcCut->connectPacketCount = 0;
+	Com_Memset(clCut, 0, sizeof(*clCut));
+	clcCut->serverCommandSequence = MSG_ReadLong(msg);
+	clCut->gameState.dataCount = 1;
+	while (1) {
+		cmd = MSG_ReadByte(msg);
+		if (cmd == svc_EOF_realCMD) {
+			break;
+		}
+		if (cmd == svc_configstring) {
+			int len, start;
+			start = msg->readcount;
+			i = MSG_ReadShort(msg);
+			if (i < 0 || i >= maxAllowedConfigString) {
+				Com_Printf("configstring > MAX_CONFIGSTRINGS");
+				return qfalse;
+			}
+			s = MSG_ReadBigString(msg);
+			len = strlen(s);
+			if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
+				Com_Printf("MAX_GAMESTATE_CHARS exceeded");
+				return qfalse;
+			}
+
+			if (clcCut->demoCheckFor103 && i == CS_SERVERINFO && *demoType == DM_15) {
+				//This is the big serverinfo string containing the value of the "version" cvar of the server.
+				//If we are about to play a demo, we can use this information to ascertain whether this demo was recorded on
+				//a 1.03 server.
+				if (CL_ServerVersionIs103(Info_ValueForKey(s, BIG_INFO_STRING, "version"))) {
+					//A 1.03 demo - set the proper game version internally so parsing snapshots etc won't fail
+					*demoType = DM_15_1_03;
+				}
+
+				clcCut->demoCheckFor103 = qfalse; //No need to check this again while playing the demo.
+			}
+
+			// append it to the gameState string buffer
+			clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
+			Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, s, len + 1);
+			clCut->gameState.dataCount += len + 1;
+		}
+		else if (cmd == svc_baseline) {
+			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
+			if (newnum < 0 || newnum >= MAX_GENTITIES) {
+				Com_Printf("Baseline number out of range: %i", newnum);
+				return qfalse;
+			}
+			Com_Memset(&nullstate, 0, sizeof(nullstate));
+			es = &clCut->entityBaselines[newnum];
+			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType);
+		}
+		else {
+			Com_Printf("demoCutParseGameState: bad command byte");
+			return qfalse;
+		}
+	}
+	clcCut->clientNum = MSG_ReadLong(msg);
+	clcCut->checksumFeed = MSG_ReadLong(msg);
+
+	// RMG stuff (JKA specific)
+	if (*demoType == DM_26) {
+		ParseRMG(msg, clcCut, clCut);
+	}
+
+	return qtrue;
+}

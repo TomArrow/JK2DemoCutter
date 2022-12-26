@@ -1441,6 +1441,7 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 		numFields = sizeof(entityStateFields15) / sizeof(entityStateFields15[0]);
 		esFields = entityStateFields15;
 		break;
+	case DM_15_1_03:
 	case DM_16:
 		numFields = sizeof(entityStateFields) / sizeof(entityStateFields[0]);
 		esFields = entityStateFields;
@@ -2009,6 +2010,7 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 		numFields = sizeof(playerStateFields15) / sizeof(playerStateFields15[0]);
 		psFields = playerStateFields15;
 		break;
+	case DM_15_1_03:
 	case DM_16:
 		numFields = sizeof(playerStateFields) / sizeof(playerStateFields[0]);
 		psFields = playerStateFields;

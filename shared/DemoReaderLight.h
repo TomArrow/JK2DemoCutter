@@ -44,10 +44,10 @@ class DemoReaderLight {
 
 	qboolean ConfigstringModified(clientActive_t* clCut);
 	void ParseCommandString(msg_t* msg, clientConnection_t* clcCut);
-	qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
+	//qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 	qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
-	void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut);
+	//void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut);
 
 
 	qboolean PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap);
