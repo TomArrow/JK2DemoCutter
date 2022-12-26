@@ -655,6 +655,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	char* ext;
 	demoType_t		demoType;
 
+	// TODO Deal with extensions better, kind of annoying, also what about 1.03 detection?
+
 	strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 	ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {

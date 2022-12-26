@@ -382,7 +382,7 @@ int FS_filelength(fileHandle_t f) {
 }
 
 
-int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType) {
+int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed) {
 	std::string		netpath;
 	long			hash;
 	int				l;
@@ -444,6 +444,9 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 		if (compressedType) {
 			FS_Read(&fsh[*file].compressedFileInfo.compression, 4, *file);
 			fsh[*file].compressedFileInfo.compression = LittleLong(fsh[*file].compressedFileInfo.compression);
+			if (compressionUsed) {
+				*compressionUsed = fsh[*file].compressedFileInfo.compression;
+			}
 		}
 		if (fsh[*file].compressedFileInfo.compression == FILECOMPRESSION_LZMA) {
 			int tmp = *file;

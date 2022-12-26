@@ -233,8 +233,9 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut) {
 	return qtrue;
 }
 
-void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
+void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
 	byte			bufData[MAX_MSGLEN];
+	std::vector<byte>			bufDataRaw;
 	msg_t			buf;
 	int				i;
 	int				len;
@@ -242,7 +243,13 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	entityState_t	nullstate;
 	char* s;
 	// write out the gamestate message
-	MSG_Init(&buf, bufData, sizeof(bufData));
+	if (raw) {
+		bufDataRaw.clear();
+		MSG_InitRaw(&buf, &bufDataRaw);
+	}
+	else {
+		MSG_Init(&buf, bufData, sizeof(bufData));
+	}
 	MSG_Bitstream(&buf);
 	// NOTE, MRE: all server->client messages now acknowledge
 	MSG_WriteLong(&buf, clcCut->reliableSequence);
@@ -281,7 +288,13 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	FS_Write(&len, 4, f);
 	len = LittleLong(buf.cursize);
 	FS_Write(&len, 4, f);
-	FS_Write(buf.data, buf.cursize, f);
+
+	if (buf.raw) {
+		FS_Write(buf.dataRaw->data(), buf.dataRaw->size(), f);
+	}
+	else {
+		FS_Write(buf.data, buf.cursize, f);
+	}
 }
 
 static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType) {
@@ -348,16 +361,28 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 	// skip the packet sequencing information
 	len = LittleLong(msg->cursize);
 	FS_Write(&len, 4, f);
-	FS_Write(msg->data, msg->cursize, f);
+	if (msg->raw) {
+		FS_Write(msg->dataRaw->data(), msg->dataRaw->size(), f);
+	}
+	else {
+		FS_Write(msg->data, msg->cursize, f);
+	}
 }
 
-void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
+void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
+	std::vector<byte>			msgDataRaw;
 	clSnapshot_t* frame, * oldframe;
 	int				lastframe = 0;
 	int				snapFlags;
-	MSG_Init(msg, msgData, sizeof(msgData));
+	if (raw) {
+		msgDataRaw.clear();
+		MSG_InitRaw(msg, &msgDataRaw);
+	}
+	else {
+		MSG_Init(msg, msgData, sizeof(msgData));
+	}
 	MSG_Bitstream(msg);
 	MSG_WriteLong(msg, clcCut->reliableSequence);
 	// copy over any commands
@@ -573,6 +598,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
+	std::vector<byte>	oldDataRaw;
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -581,7 +607,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	//demoPlay_t* play = demo.play.handle;
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
-	char* ext;
+	char			ext[7]{};
+	char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
@@ -611,23 +638,42 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	//ext = Cvar_FindVar("mme_demoExt")->string;
 	demo.cut.Clc.demoCheckFor103 = qfalse;
 	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
-	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+	//ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+
+	qboolean isCompressedFile = qfalse;
+	qboolean createCompressedOutput = qfalse;
+
+	char specialTypeChar = ext[3];
+	ext[3] = '_';
+
+	if (specialTypeChar == 'c') {
+		isCompressedFile = qtrue;
+	}
+
+	createCompressedOutput = isCompressedFile;
+
+
 	if (!*ext) {
 		demoType = DM_16;
-		ext = ".dm_16";
+		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
 	else if (!_stricmp(ext,".dm_15")) {
 
 		demoType = DM_15;
-		ext = ".dm_15"; 
+		strncpy_s(ext, sizeof(ext), ".dm_15", 6);
 		demo.cut.Clc.demoCheckFor103 = qtrue;
 	}
 	else if (!_stricmp(ext,".dm_16")) {
 
 		demoType = DM_16;
-		ext = ".dm_16";
+		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
+
+	fileCompressionScheme_t compressionSchemeUsed = FILECOMPRESSION_NONE;
+
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for cutting.\n", oldName);
 		return qfalse;
@@ -637,10 +683,21 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	int messageOffset = 0;
 
+
+	if (createCompressedOutput) {
+		ext[3] = 'c';
+	}
+
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
 	cutcontinue:
-		MSG_Init(&oldMsg, oldData, sizeof(oldData));
+		if (isCompressedFile) {
+			oldDataRaw.clear();
+			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
+		}
+		else {
+			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
+		}
 		/* Read the sequence number */
 		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 			goto cuterror;
@@ -657,8 +714,16 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		if (oldMsg.cursize > oldMsg.maxsize)
 			goto cuterror;
 		/* Read the actual message */
-		if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
-			goto cuterror;
+		if (oldMsg.raw) {
+			oldMsg.dataRaw->resize(oldMsg.cursize);
+			if (FS_Read(oldMsg.dataRaw->data(), oldMsg.cursize, oldHandle) != oldMsg.cursize) {
+				goto cuterror;
+			}
+		}
+		else {
+			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
+				goto cuterror;
+		}
 		oldSize -= oldMsg.cursize;
 		// init the bitstream
 		MSG_BeginReading(&oldMsg);
@@ -726,8 +791,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 						}
 						dupeIterator++;
 					}}
-
-					newHandle = FS_FOpenFileWrite(newName);
+					newHandle = FS_FOpenFileWrite(newName,qfalse, compressionSchemeUsed); // Maintain the compression scheme of the original file
 					if (!newHandle) {
 						Com_Printf("Failed to open %s for target cutting.\n", newName);
 						return qfalse;
@@ -796,19 +860,19 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		}
 		else if (framesSaved > 0) {
 			/* this msg is in range, write it */
-			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum)) {
+			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum)) { // Hmm did I do this? I don't recall...
 				demoCutWriteDemoMessage(&oldMsg, newHandle, &demo.cut.Clc);
 			}
 			else {
-				demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl,demoType);
+				demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl,demoType, createCompressedOutput);
 			}
 			framesSaved++;
 		}
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (demoCurrentTime >= startTime) {
 		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
-			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType);
-			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType);
+			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
+			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
 			// copy rest
 			framesSaved = 1;
 		}
@@ -842,7 +906,7 @@ cuterror:
 	wchar_t newNameWide[MAX_OSPATH];
 	wchar_t oldNameWide[MAX_OSPATH];
 	mbstowcs(newNameWide,newName,MAX_OSPATH);
-	mbstowcs(oldNameWide, va("%s%s", oldName, ext),MAX_OSPATH);
+	mbstowcs(oldNameWide, va("%s%s", oldName, originalExt),MAX_OSPATH); 
 	HANDLE hFile = CreateFile(newNameWide, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	HANDLE hFileOld = CreateFile(oldNameWide, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile != INVALID_HANDLE_VALUE && hFileOld != INVALID_HANDLE_VALUE) // INVALID_FILE_HANDLE / INVALID_HANDLE_VALUE ? 
