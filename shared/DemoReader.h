@@ -16,16 +16,7 @@ enum highlightSearchMode_t {
 	SEARCH_TOP10_DEFRAG, // Top10 Defrags, even if not number 1.
 };
 
-class SnapshotInfo {
-public:
-	int snapNum;
-	std::map<int, entityState_t> entities;
-	std::map<int, int> playerCommandOrServerTimes;
-	playerState_t playerState;
-	int serverTime;
-	qboolean playerStateTeleport;
-	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
-};
+
 class Command {
 public:
 	int demoTime;
@@ -97,7 +88,6 @@ class DemoReader {
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
-	int				lastKnownCommandTime = 0;
 	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
 
@@ -108,21 +98,19 @@ class DemoReader {
 	double			lastGottenEventsTime[EK_COUNT] = { 0 };
 	int				lastGottenEventsServerTime[EK_COUNT] = { 0 };
 
-	int				firstSnapServerTime = -1;
-
 	qboolean		anySnapshotParsed = qfalse;
 	qboolean		endReached = qfalse;
 
 
-	clSnapshot_t lastSnap;
+	//clSnapshot_t lastSnap;
 
 	int messageOffset = 0;
 
-	qboolean ConfigstringModified(clientActive_t* clCut);
+	//qboolean ConfigstringModified(clientActive_t* clCut);
 	int GetEvent(entityState_t* es);
-	void ParseCommandString(msg_t* msg, clientConnection_t* clcCut);
+	//void ParseCommandString(msg_t* msg, clientConnection_t* clcCut);
 	//qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
-	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
+	//void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 	qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	//void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut);
 

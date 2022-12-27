@@ -935,6 +935,7 @@ typedef struct {
 	qboolean	extrapolatedSnapshot;	// set if any cgame frame has been forced to extrapolate
 									// cleared when CL_AdjustTimeDelta looks at it
 	qboolean	newSnapshots;		// set on parse of any valid packet
+	qboolean	lastSnapshotFinishedParsing; // set during any parsesnapshot to qtrue or qfalse (different from newsnapshots which is set only to qtrue and then remains that)
 
 	gameState_t	gameState;			// configstrings
 	char		mapname[MAX_QPATH];	// extracted from CS_SERVERINFO
@@ -1119,6 +1120,15 @@ typedef struct {
 	fileHandle_t	demofile;
 	qboolean	newDemoPlayer;
 	qboolean	demoCheckFor103;
+
+	int			lastKnownCommandTime; // For DemoReaderLight
+
+	// For DemoReader:
+	int			firstSnapServerTime;
+
+	// For Cutter and generally
+	qboolean	lastValidSnapSet;
+	int			lastValidSnap;
 
 	int			timeDemoFrames;		// counter of rendered frames
 	int			timeDemoStart;		// cls.realtime before first frame
@@ -2400,11 +2410,22 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType)
 
 
 // Shared demo parsing functions
-
+class SnapshotInfo {
+public:
+	int snapNum;
+	std::map<int, entityState_t> entities;
+	std::map<int, int> playerCommandOrServerTimes;
+	playerState_t playerState;
+	int serverTime;
+	qboolean playerStateTeleport;
+	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
+};
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
+void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
+void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
+qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
 
-
-
+qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
 
 
 

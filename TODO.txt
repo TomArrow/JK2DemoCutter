@@ -77,6 +77,9 @@ TODO: use EV_PAIN to get health for entitystate->playerstate.
 
 Demo compressor: make it use fast huffman writing.
 
+Demo Compressor: Add Reed Solomon correction.
+Use https://github.com/quiet/libcorrect ?
+
 
 get from jk2mv: demoCheckFor103
 

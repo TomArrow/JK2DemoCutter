@@ -29,7 +29,6 @@ class DemoReaderLight {
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
-	int				lastKnownCommandTime = 0;
 
 	float			lastGottenCommandsTime = 0;
 	float			lastGottenEventsTime = 0;
@@ -38,15 +37,15 @@ class DemoReaderLight {
 	qboolean		endReached = qfalse;
 
 
-	clSnapshot_t lastSnap;
+	//clSnapshot_t lastSnap;
 
 	int messageOffset = 0;
 
-	qboolean ConfigstringModified(clientActive_t* clCut);
-	void ParseCommandString(msg_t* msg, clientConnection_t* clcCut);
+	//qboolean ConfigstringModified(clientActive_t* clCut);
+	//void ParseCommandString(msg_t* msg, clientConnection_t* clcCut);
 	//qboolean ParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
-	void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
-	qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
+	//void ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
+	//qboolean ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType);
 	//void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut);
 
 

@@ -16,97 +16,9 @@
 
 
 
-qboolean DemoReaderLight::ConfigstringModified(clientActive_t* clCut) {
-	char* old, * s;
-	int			i, index;
-	char* dup;
-	gameState_t	oldGs;
-	int			len;
-	index = atoi(Cmd_Argv(1));
-	int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
-	if (index < 0 || index >= maxAllowedConfigString) {
-		Com_Printf("demoCutConfigstringModified: bad index %i", index);
-		return qtrue;
-	}
-	// get everything after "cs <num>"
-	s = Cmd_ArgsFrom(2);
-	old = clCut->gameState.stringData + clCut->gameState.stringOffsets[index];
-	if (!strcmp(old, s)) {
-		return qtrue; // unchanged
-	}
-	// build the new gameState_t
-	oldGs = clCut->gameState;
-	Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
-	// leave the first 0 for uninitialized strings
-	clCut->gameState.dataCount = 1;
-	for (i = 0; i < maxAllowedConfigString; i++) {
-		if (i == index) {
-			dup = s;
-		}
-		else {
-			dup = oldGs.stringData + oldGs.stringOffsets[i];
-		}
-		if (!dup[0]) {
-			continue; // leave with the default empty string
-		}
-		len = strlen(dup);
-		if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-			Com_Printf("MAX_GAMESTATE_CHARS exceeded");
-			return qfalse;
-		}
-		// append it to the gameState string buffer
-		clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
-		Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, dup, len + 1);
-		clCut->gameState.dataCount += len + 1;
-	}
-	return qtrue;
-}
 
 
 
-void DemoReaderLight::ParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType) {
-	/* The beast that is entity parsing */
-	int			newnum;
-	entityState_t* oldstate, * newstate;
-	int			oldindex = 0;
-	int			oldnum;
-	newSnap->parseEntitiesNum = clCut->parseEntitiesNum;
-	newSnap->numEntities = 0;
-	newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
-	while (1) {
-		// read the entity index number
-		if (oldSnap && oldindex < oldSnap->numEntities) {
-			oldstate = &clCut->parseEntities[(oldSnap->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
-			oldnum = oldstate->number;
-		}
-		else {
-			oldstate = 0;
-			oldnum = 99999;
-		}
-		newstate = &clCut->parseEntities[clCut->parseEntitiesNum];
-		if (!oldstate && (newnum == (MAX_GENTITIES - 1))) {
-			break;
-		}
-		else if (oldnum < newnum) {
-			*newstate = *oldstate;
-			oldindex++;
-		}
-		else if (oldnum == newnum) {
-			oldindex++;
-			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType);
-			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
-		}
-		else if (oldnum > newnum) {
-			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType);
-			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
-		}
-		if (newstate->number == MAX_GENTITIES - 1)
-			continue;
-		clCut->parseEntitiesNum++;
-		clCut->parseEntitiesNum &= (MAX_PARSE_ENTITIES - 1);
-		newSnap->numEntities++;
-	}
-}
 
 qboolean DemoReaderLight::PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap) {
 	// if the next frame is a teleport for the playerstate, we
@@ -129,133 +41,13 @@ qboolean DemoReaderLight::PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapsh
 }
 
 
-qboolean DemoReaderLight::ParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
-	int len;
-	clSnapshot_t* oldSnap;
-	clSnapshot_t newSnap;
-	int deltaNum;
-	int oldMessageNum;
-	int i, packetNum;
-	Com_Memset(&newSnap, 0, sizeof(newSnap));
-	newSnap.serverCommandNum = clcCut->serverCommandSequence;
-	newSnap.serverTime = MSG_ReadLong(msg);
-	//cl_paused->modified = qfalse;
-	newSnap.messageNum = clcCut->serverMessageSequence;
-	deltaNum = MSG_ReadByte(msg);
-	newSnap.snapFlags = MSG_ReadByte(msg);
-	if (!deltaNum) {
-		newSnap.deltaNum = -1;
-		newSnap.valid = qtrue;		// uncompressed frame
-		oldSnap = NULL;
-	}
-	else {
-		newSnap.deltaNum = newSnap.messageNum - deltaNum;
-		oldSnap = &clCut->snapshots[newSnap.deltaNum & PACKET_MASK];
-		if (!oldSnap->valid) {
-			// should never happen
-			Com_Printf("Delta from invalid frame (not supposed to happen!).\n");
-		}
-		else if (oldSnap->messageNum != newSnap.deltaNum) {
-			// The frame that the server did the delta from
-			// is too old, so we can't reconstruct it properly.
-			Com_Printf("Delta frame too old.\n");
-		}
-		else if (clCut->parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128) {
-			Com_DPrintf("Delta parseEntitiesNum too old.\n");
-		}
-		else {
-			newSnap.valid = qtrue;	// valid delta parse
-		}
-	}
-	// read areamask
-	len = MSG_ReadByte(msg);
-	//if (len > sizeof(newSnap.areamask)) {
-	//	Com_Printf("demoCutParseSnapshot: Invalid size %d for areamask", len);
-	//	return qfalse;
-	//}
-	MSG_ReadData(msg, &newSnap.areamask, len);
-	// read playerinfo
-	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse);
-
-	// JKA-specific
-	if (demoType == DM_26 && newSnap.ps.m_iVehicleNum)
-		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
-
-	// read packet entities
-	ParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
-	// if not valid, dump the entire thing now that it has
-	// been properly read
-	if (!newSnap.valid) {
-		return qtrue;
-	}
-	// clear the valid flags of any snapshots between the last
-	// received and this one, so if there was a dropped packet
-	// it won't look like something valid to delta from next
-	// time we wrap around in the buffer
-	oldMessageNum = clCut->snap.messageNum + 1;
-	if (newSnap.messageNum - oldMessageNum >= PACKET_BACKUP) {
-		oldMessageNum = newSnap.messageNum - (PACKET_BACKUP - 1);
-	}
-	for (; oldMessageNum < newSnap.messageNum; oldMessageNum++) {
-		clCut->snapshots[oldMessageNum & PACKET_MASK].valid = qfalse;
-	}
-	// copy to the current good spot
-	clCut->snap = newSnap;
-	clCut->snap.ping = 999;
-	// calculate ping time
-	for (i = 0; i < PACKET_BACKUP; i++) {
-		packetNum = (clcCut->netchan.outgoingSequence - 1 - i) & PACKET_MASK;
-		if (clCut->snap.ps.commandTime >= clCut->outPackets[packetNum].p_serverTime) {
-			//clCut->snap.ping = cls.realtime - clCut->outPackets[packetNum].p_realtime;
-			// Dont see how this is needed?
-			break;
-		}
-	}
-	// save the frame off in the backup array for later delta comparisons
-	clCut->snapshots[clCut->snap.messageNum & PACKET_MASK] = clCut->snap;
-	clCut->newSnapshots = qtrue;
-
-	for (int pe = clCut->snap.parseEntitiesNum; pe < clCut->snap.parseEntitiesNum + clCut->snap.numEntities; pe++) {
-		entityState_t* thisEntity = &clCut->parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-
-		// See if we can figure out the command time of this entity if it's a player.
-		if (thisEntity->number >= 0 && thisEntity->number < MAX_CLIENTS) {
-			int commandOrServerTimeHere = 0;
-			if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
-				commandOrServerTimeHere = thisEntity->pos.trTime;
-			}
-			else {
-				commandOrServerTimeHere = clCut->snap.serverTime; // Just use servertime. Will mean ping 0, but best we can do.
-			}
-			int pingHere = clCut->snap.serverTime - commandOrServerTimeHere;
-			pingValues[thisEntity->number].push_back(pingHere);
-		}
-	}
-	int psPingHere = clCut->snap.serverTime - clCut->snap.ps.commandTime;
-	pingValues[clCut->snap.ps.clientNum].push_back(psPingHere);
-
-	lastKnownCommandTime = clCut->snap.ps.commandTime;
-
-	lastSnap = clCut->snap;
-
-	return qtrue;
-}
 
 
 
 
 
-void DemoReaderLight::ParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
-	int index;
-	int seq = MSG_ReadLong(msg);
-	char* s = MSG_ReadString(msg);
-	if (clcCut->serverCommandSequence >= seq) {
-		return;
-	}
-	clcCut->serverCommandSequence = seq;
-	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
-}
+
+
 #ifdef RELDEBUG
 //#pragma optimize("", off)
 #endif
@@ -309,7 +101,6 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	}
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
-	memset(&lastSnap, 0, sizeof(lastSnap));
 	memset(&playerSeen, 0, sizeof(playerSeen));
 
 	readGamestate = 0;
@@ -320,7 +111,7 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	lastGameStateChange = 0;
 	lastGameStateChangeInDemoTime = 0;
 	lastKnownTime = 0;
-	lastKnownCommandTime = 0;
+	thisDemo.cut.Clc.lastKnownCommandTime = 0;
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
 	lastGottenEventsTime = 0;
@@ -373,10 +164,10 @@ qboolean DemoReaderLight::SeekToServerTime(int serverTime) {
 	return qtrue;
 }
 qboolean DemoReaderLight::SeekToCommandTime(int serverTime) {
-	while (lastKnownCommandTime < serverTime && !endReached) {
+	while (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && !endReached) {
 		ReadMessage();
 	}
-	if (lastKnownCommandTime < serverTime && endReached) return qfalse;
+	if (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && endReached) return qfalse;
 	return qtrue;
 }
 qboolean DemoReaderLight::SeekToAnySnapshotIfNotYet() {
@@ -592,7 +383,7 @@ readNext:
 		case svc_nop:
 			break;
 		case svc_serverCommand:
-			ParseCommandString(&oldMsg, &thisDemo.cut.Clc);
+			demoCutParseCommandString(&oldMsg, &thisDemo.cut.Clc);
 			break;
 		case svc_gamestate:
 			lastGameStateChange = thisDemo.cut.Cl.snap.serverTime;
@@ -613,8 +404,29 @@ readNext:
 			readGamestate++;
 			break;
 		case svc_snapshot:
-			if (!ParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
+			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
 				return qfalse;
+			}
+
+			if (thisDemo.cut.Cl.lastSnapshotFinishedParsing) {
+				for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
+					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+
+					// See if we can figure out the command time of this entity if it's a player.
+					if (thisEntity->number >= 0 && thisEntity->number < MAX_CLIENTS) {
+						int commandOrServerTimeHere = 0;
+						if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
+							commandOrServerTimeHere = thisEntity->pos.trTime;
+						}
+						else {
+							commandOrServerTimeHere = thisDemo.cut.Cl.snap.serverTime; // Just use servertime. Will mean ping 0, but best we can do.
+						}
+						int pingHere = thisDemo.cut.Cl.snap.serverTime - commandOrServerTimeHere;
+						pingValues[thisEntity->number].push_back(pingHere);
+					}
+				}
+				int psPingHere = thisDemo.cut.Cl.snap.serverTime - thisDemo.cut.Cl.snap.ps.commandTime;
+				pingValues[thisDemo.cut.Cl.snap.ps.clientNum].push_back(psPingHere);
 			}
 
 			anySnapshotParsed = qtrue;
@@ -765,7 +577,7 @@ readNext:
 			firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
 		}
 		if (!strcmp(cmd, "cs")) {
-			if (!ConfigstringModified(&thisDemo.cut.Cl)) {
+			if (!demoCutConfigstringModified(&thisDemo.cut.Cl,demoType)) {
 				return qfalse;
 			}
 			hadConfigStringChanges = qtrue;
