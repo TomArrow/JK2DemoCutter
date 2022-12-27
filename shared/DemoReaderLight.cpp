@@ -68,12 +68,17 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	char			oldName[MAX_OSPATH];
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
-	char* ext;
+	//char* ext; 
+	char ext[7];
+	//char originalExt[7];
 	oldHandle = 0; // TODO if already loaded, gracefully close
 
 	thisDemo.cut.Clc.demoCheckFor103 = qfalse;
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
-	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+
+	demoCutGetDemoType(sourceDemoFile, ext, &demoType, &isCompressedFile, &thisDemo.cut.Clc.demoCheckFor103);
+
+	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
 	if (!*ext) {
 		demoType = DM_16;
 		ext = ".dm_16";
@@ -93,8 +98,8 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 
 		demoType = DM_26;
 		ext = ".dm_26";
-	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
+	}*/
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue,isCompressedFile);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
@@ -327,8 +332,15 @@ readNext:
 	int				buf;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
+	std::vector<byte> oldDataRaw;
 
-	MSG_Init(&oldMsg, oldData, sizeof(oldData));
+	if (isCompressedFile) {
+		oldDataRaw.clear();
+		MSG_InitRaw(&oldMsg, &oldDataRaw);
+	}
+	else {
+		MSG_Init(&oldMsg, oldData, sizeof(oldData));
+	}
 	/* Read the sequence number */
 	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 		return qfalse;
@@ -345,7 +357,7 @@ readNext:
 	if (oldMsg.cursize > oldMsg.maxsize)
 		return qfalse;
 	/* Read the actual message */
-	if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
+	if (FS_Read(&oldMsg, oldHandle) != oldMsg.cursize)
 		return qfalse;
 	oldSize -= oldMsg.cursize;
 	// init the bitstream

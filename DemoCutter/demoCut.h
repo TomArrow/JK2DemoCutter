@@ -1303,12 +1303,15 @@ enum fileCompressionScheme_t {
 
 
 int		FS_Write(const void* buffer, int len, fileHandle_t f, qboolean ignoreCompression=qfalse);
-fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse, fileCompressionScheme_t compression= FILECOMPRESSION_NONE); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
+//fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse, fileCompressionScheme_t compression= FILECOMPRESSION_NONE); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
+fileHandle_t	FS_FOpenFileWrite(const char* qpath, fileCompressionScheme_t compression, qboolean quiet = qfalse); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
+int		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression = qfalse);
 int		FS_Read(void* buffer, int len, fileHandle_t f, qboolean ignoreCompression = qfalse);
 qboolean FS_FileExists(const char* file);
 qboolean FS_FileErase(const char* file);
 void	FS_FCloseFile(fileHandle_t f);
-int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType = qfalse, fileCompressionScheme_t* compressionUsed=NULL);
+//int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType = qfalse, fileCompressionScheme_t* compressionUsed=NULL);
+int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed=NULL);
 
 void	QDECL Com_sprintf(char* dest,int size, const char* fmt, ...);
 
@@ -1946,7 +1949,7 @@ extern demo_t demo;
 
 
 
-void sanitizeFilename(const char* input, char* output);
+void sanitizeFilename(const char* input, char* output, qboolean allowExtension=qfalse);
 
 
 std::vector<std::string> splitString(std::string input, std::string separator, bool trim = true, bool allowEmpty = false);
@@ -2424,9 +2427,23 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
-
 qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
 
+void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType);
+void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);
+void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
+void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
+qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value);
+void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities);
+qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);
+void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
 
+std::string makeConfigStringCommand(int index, std::string value);
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd);
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd);
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd);
+void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
+
+qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t* demoType, qboolean* isCompressed, qboolean* checkFor103 = NULL);
 
 #endif

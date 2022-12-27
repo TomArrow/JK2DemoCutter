@@ -224,13 +224,16 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	char			oldName[MAX_OSPATH];
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
-	char* ext;
+	//char* ext;
+	char ext[7];
+	//char originalExt[7];
 	oldHandle = 0; // TODO if already loaded, gracefully close
 
-	thisDemo.cut.Clc.demoCheckFor103 = qfalse;
 
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
-	ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+
+	demoCutGetDemoType(sourceDemoFile, ext,&demoType,&isCompressedFile,&thisDemo.cut.Clc.demoCheckFor103);
+	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
 	if (!*ext) {
 		demoType = DM_16;
 		ext = ".dm_16";
@@ -250,8 +253,8 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 
 		demoType = DM_26;
 		ext = ".dm_26";
-	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue);
+	}*/
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue,isCompressedFile);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
@@ -1119,8 +1122,15 @@ readNext:
 	int				buf;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
+	std::vector<byte>			oldDataRaw;
 
-	MSG_Init(&oldMsg, oldData, sizeof(oldData));
+	if (isCompressedFile) {
+		oldDataRaw.clear();
+		MSG_InitRaw(&oldMsg, &oldDataRaw);
+	}
+	else {
+		MSG_Init(&oldMsg, oldData, sizeof(oldData));
+	}
 	/* Read the sequence number */
 	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4) {
 		Com_Printf("[NOTE] Demo cutter, reading sequence number failed.\n");
@@ -1145,7 +1155,7 @@ readNext:
 		return qfalse;
 	}
 	/* Read the actual message */
-	if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize) {
+	if (FS_Read(&oldMsg, oldHandle) != oldMsg.cursize) {
 		Com_Printf("[NOTE] Demo cutter, reading actual message failed.\n");
 		return qfalse;
 	}
@@ -1600,6 +1610,28 @@ int main(int argc, char** argv) {
 	std::cin.get();
 #endif
 }*/
+
+
+void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2) {
+	int eventHere = tmpEntity->event & ~EV_EVENT_BITS;
+	int maxLength = 0;
+	if (eventHere == EV_GENERAL_SOUND) {
+		int soundIndex = tmpEntity->eventParm;
+		const char* soundName = reader->GetSoundConfigString(soundIndex, &maxLength);
+		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd);
+		tmpEntity->eventParm = newSoundIndex;
+	}
+	if (doModelIndex && tmpEntity->modelindex) {
+		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex, &maxLength);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
+		tmpEntity->modelindex = newModelIndex;
+	}
+	if (doModelIndex2 && tmpEntity->modelindex2) {
+		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex2, &maxLength);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
+		tmpEntity->modelindex2 = newModelIndex;
+	}
+}
 
 #ifdef RELDEBUG
 //#pragma optimize("", on)

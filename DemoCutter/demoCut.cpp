@@ -190,203 +190,13 @@ demoTime_t timeParse(std::string timeText) {
 
 
 
-void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
-	byte			bufData[MAX_MSGLEN];
-	std::vector<byte>			bufDataRaw;
-	msg_t			buf;
-	int				i;
-	int				len;
-	entityState_t* ent;
-	entityState_t	nullstate;
-	char* s;
-	// write out the gamestate message
-	if (raw) {
-		bufDataRaw.clear();
-		MSG_InitRaw(&buf, &bufDataRaw);
-	}
-	else {
-		MSG_Init(&buf, bufData, sizeof(bufData));
-	}
-	MSG_Bitstream(&buf);
-	// NOTE, MRE: all server->client messages now acknowledge
-	MSG_WriteLong(&buf, clcCut->reliableSequence);
-	MSG_WriteByte(&buf, svc_gamestate);
-	MSG_WriteLong(&buf, clcCut->serverCommandSequence);
-	// configstrings
-	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
-		if (!clCut->gameState.stringOffsets[i]) {
-			continue;
-		}
-		s = clCut->gameState.stringData + clCut->gameState.stringOffsets[i];
-		MSG_WriteByte(&buf, svc_configstring);
-		MSG_WriteShort(&buf, i);
-		MSG_WriteBigString(&buf, s);
-	}
-	// baselines
-	Com_Memset(&nullstate, 0, sizeof(nullstate));
-	for (i = 0; i < MAX_GENTITIES; i++) {
-		ent = &clCut->entityBaselines[i];
-		if (!ent->number) {
-			continue;
-		}
-		MSG_WriteByte(&buf, svc_baseline);
-		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue,(qboolean)(demoType == DM_15));
-	}
-	MSG_WriteByte(&buf, svc_EOF);
-	// finished writing the gamestate stuff
-	// write the client num
-	MSG_WriteLong(&buf, clcCut->clientNum);
-	// write the checksum feed
-	MSG_WriteLong(&buf, clcCut->checksumFeed);
-	// finished writing the client packet
-	MSG_WriteByte(&buf, svc_EOF);
-	// write it to the demo file
-	len = LittleLong(clcCut->serverMessageSequence - 1);
-	FS_Write(&len, 4, f);
-	len = LittleLong(buf.cursize);
-	FS_Write(&len, 4, f);
 
-	if (buf.raw) {
-		FS_Write(buf.dataRaw->data(), buf.dataRaw->size(), f);
-	}
-	else {
-		FS_Write(buf.data, buf.cursize, f);
-	}
-}
 
-static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType) {
-	entityState_t* oldent, * newent;
-	int oldindex, newindex;
-	int oldnum, newnum;
-	int from_num_entities;
-	// generate the delta update
-	if (!from) {
-		from_num_entities = 0;
-	}
-	else {
-		from_num_entities = from->numEntities;
-	}
-	newent = NULL;
-	oldent = NULL;
-	newindex = 0;
-	oldindex = 0;
-	while (newindex < to->numEntities || oldindex < from_num_entities) {
-		if (newindex >= to->numEntities) {
-			newnum = 9999;
-		}
-		else {
-			newent = &clCut->parseEntities[(to->parseEntitiesNum + newindex) & (MAX_PARSE_ENTITIES - 1)];
-			newnum = newent->number;
-		}
-		if (oldindex >= from_num_entities) {
-			oldnum = 9999;
-		}
-		else {
-			oldent = &clCut->parseEntities[(from->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
-			oldnum = oldent->number;
-		}
-		if (newnum == oldnum) {
-			// delta update from old position
-			// because the force parm is qfalse, this will not result
-			// in any bytes being emited if the entity has not changed at all
-			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, (qboolean)(demoType == DM_15));
-			oldindex++;
-			newindex++;
-			continue;
-		}
-		if (newnum < oldnum) {
-			// this is a new entity, send it from the baseline
-			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, (qboolean)(demoType == DM_15));
-			newindex++;
-			continue;
-		}
-		if (newnum > oldnum) {
-			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue,(qboolean)(demoType == DM_15));
-			oldindex++;
-			continue;
-		}
-	}
-	MSG_WriteBits(msg, (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
-}
 
-void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut) {
-	int len;
-	// write the packet sequence
-	len = LittleLong(clcCut->serverMessageSequence);
-	FS_Write(&len, 4, f);
-	// skip the packet sequencing information
-	len = LittleLong(msg->cursize);
-	FS_Write(&len, 4, f);
-	if (msg->raw) {
-		FS_Write(msg->dataRaw->data(), msg->dataRaw->size(), f);
-	}
-	else {
-		FS_Write(msg->data, msg->cursize, f);
-	}
-}
 
-void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
-	msg_t			msgImpl, * msg = &msgImpl;
-	byte			msgData[MAX_MSGLEN];
-	std::vector<byte>			msgDataRaw;
-	clSnapshot_t* frame, * oldframe;
-	int				lastframe = 0;
-	int				snapFlags;
-	if (raw) {
-		msgDataRaw.clear();
-		MSG_InitRaw(msg, &msgDataRaw);
-	}
-	else {
-		MSG_Init(msg, msgData, sizeof(msgData));
-	}
-	MSG_Bitstream(msg);
-	MSG_WriteLong(msg, clcCut->reliableSequence);
-	// copy over any commands
-	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
-		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
-		MSG_WriteByte(msg, svc_serverCommand);
-		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
-		MSG_WriteString(msg, command);
-	}
-	// this is the snapshot we are creating
-	frame = &clCut->snap;
-	if (clCut->snap.messageNum > 0 && !forceNonDelta) {
-		lastframe = 1;
-		oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
-		if (!oldframe->valid) {
-			// not yet set
-			lastframe = 0;
-			oldframe = NULL;
-		}
-	}
-	else {
-		lastframe = 0;
-		oldframe = NULL;
-	}
-	MSG_WriteByte(msg, svc_snapshot);
-	// send over the current server time so the client can drift
-	// its view of time to try to match
-	MSG_WriteLong(msg, frame->serverTime);
-	// what we are delta'ing from
-	MSG_WriteByte(msg, lastframe);
-	snapFlags = frame->snapFlags;
-	MSG_WriteByte(msg, snapFlags);
-	// send over the areabits
-	MSG_WriteByte(msg, sizeof(frame->areamask));
-	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
-	// delta encode the playerstate
-	if (oldframe) {
-		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, (qboolean)(demoType == DM_15));
-	}
-	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, (qboolean)(demoType == DM_15));
-	}
-	// delta encode the entities
-	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
-	MSG_WriteByte(msg, svc_EOF);
-	demoCutWriteDemoMessage(msg, f, clcCut);
-}
+
+
+
 
 
 
@@ -397,6 +207,9 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 #ifdef RELDEBUG
 //#pragma optimize("", off)
 #endif
+
+
+
 
 
 qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName) {
@@ -414,7 +227,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
 	char			ext[7]{};
-	char			originalExt[7]{};
+	//char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
@@ -446,22 +259,25 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
 	//ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
 	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
-	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
 	qboolean isCompressedFile = qfalse;
 	qboolean createCompressedOutput = qfalse;
 
+
+	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile,&demo.cut.Clc.demoCheckFor103);
+	/*
 	char specialTypeChar = ext[3];
 	ext[3] = '_';
 
 	if (specialTypeChar == 'c') {
 		isCompressedFile = qtrue;
-	}
+	}*/
 
 	createCompressedOutput = isCompressedFile;
 
 
-	if (!*ext) {
+	/*if (!*ext) {
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}
@@ -475,11 +291,11 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
-	}
+	}*/
 
 	fileCompressionScheme_t compressionSchemeUsed = FILECOMPRESSION_NONE;
 
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed);
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for cutting.\n", oldName);
 		return qfalse;
@@ -597,7 +413,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 						}
 						dupeIterator++;
 					}}
-					newHandle = FS_FOpenFileWrite(newName,qfalse, compressionSchemeUsed); // Maintain the compression scheme of the original file
+					newHandle = FS_FOpenFileWrite(newName, compressionSchemeUsed, qfalse); // Maintain the compression scheme of the original file
 					if (!newHandle) {
 						Com_Printf("Failed to open %s for target cutting.\n", newName);
 						return qfalse;
@@ -712,7 +528,7 @@ cuterror:
 	wchar_t newNameWide[MAX_OSPATH];
 	wchar_t oldNameWide[MAX_OSPATH];
 	mbstowcs(newNameWide,newName,MAX_OSPATH);
-	mbstowcs(oldNameWide, va("%s%s", oldName, originalExt),MAX_OSPATH); 
+	mbstowcs(oldNameWide, va("%s%s", oldName, ext),MAX_OSPATH); 
 	HANDLE hFile = CreateFile(newNameWide, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	HANDLE hFileOld = CreateFile(oldNameWide, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile != INVALID_HANDLE_VALUE && hFileOld != INVALID_HANDLE_VALUE) // INVALID_FILE_HANDLE / INVALID_HANDLE_VALUE ? 

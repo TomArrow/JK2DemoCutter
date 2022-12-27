@@ -19,6 +19,7 @@ class DemoReaderLight {
 
 	// Info during reading
 	demoType_t		demoType;
+	qboolean		isCompressedFile;
 	fileHandle_t	oldHandle = 0;
 	int				oldSize;
 	int				readGamestate = 0;

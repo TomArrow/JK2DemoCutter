@@ -83,19 +83,21 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
-	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
-	char specialTypeChar = ext[3];
+	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile, &demo.cut.Clc.demoCheckFor103);
+
+	/*char specialTypeChar = ext[3];
 	ext[3] = '_';
 
 	if (specialTypeChar == 'c') {
 		isCompressedFile = qtrue;
-	}
+	}*/
 
 	createCompressedOutput = (qboolean) !isCompressedFile;
 
-	demo.cut.Clc.demoCheckFor103 = qfalse;
+	/*demo.cut.Clc.demoCheckFor103 = qfalse;
 	if (!*ext) {
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
@@ -110,7 +112,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
-	}
+	}*/
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for compressing.\n", oldName);
@@ -123,6 +125,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 	if (createCompressedOutput) {
 		ext[3] = 'c';
+	}
+	else {
+		ext[3] = '_';
 	}
 
 	// Open new file
@@ -147,7 +152,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		dupeIterator++;
 	}}
 
-	newHandle = FS_FOpenFileWrite(newName,qfalse,createCompressedOutput ? FILECOMPRESSION_LZMA : FILECOMPRESSION_NONE);
+	newHandle = FS_FOpenFileWrite(newName,createCompressedOutput ? FILECOMPRESSION_LZMA : FILECOMPRESSION_NONE, qfalse);
 	if (!newHandle) {
 		Com_Printf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;

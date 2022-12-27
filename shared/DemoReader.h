@@ -1,4 +1,7 @@
 #pragma once
+#ifndef DEMOREADER_H
+#define DEMOREADER_H
+
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
 #include <demoCut.h>
@@ -78,6 +81,7 @@ class DemoReader {
 
 	// Info during reading
 	demoType_t		demoType;
+	qboolean		isCompressedFile;
 	fileHandle_t	oldHandle = 0;
 	int				oldSize;
 	int				readGamestate = 0;
@@ -175,3 +179,8 @@ public:
 	int getCurrentDemoTime();
 	int getDemoRecorderClientNum();
 };
+
+
+void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2);
+
+#endif

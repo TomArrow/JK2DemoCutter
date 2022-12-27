@@ -572,179 +572,11 @@ void updateForcePowersInfo(clientActive_t* clCut) {
 
 
 
-/*
-void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
-	byte			bufData[MAX_MSGLEN];
-	msg_t			buf;
-	int				i;
-	int				len;
-	entityState_t* ent;
-	entityState_t	nullstate;
-	char* s;
-	// write out the gamestate message
-	MSG_Init(&buf, bufData, sizeof(bufData));
-	MSG_Bitstream(&buf);
-	// NOTE, MRE: all server->client messages now acknowledge
-	MSG_WriteLong(&buf, clcCut->reliableSequence);
-	MSG_WriteByte(&buf, svc_gamestate);
-	MSG_WriteLong(&buf, clcCut->serverCommandSequence);
-	// configstrings
-	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
-		if (!clCut->gameState.stringOffsets[i]) {
-			continue;
-		}
-		s = clCut->gameState.stringData + clCut->gameState.stringOffsets[i];
-		MSG_WriteByte(&buf, svc_configstring);
-		MSG_WriteShort(&buf, i);
-		MSG_WriteBigString(&buf, s);
-	}
-	// baselines
-	Com_Memset(&nullstate, 0, sizeof(nullstate));
-	for (i = 0; i < MAX_GENTITIES; i++) {
-		ent = &clCut->entityBaselines[i];
-		if (!ent->number) {
-			continue;
-		}
-		MSG_WriteByte(&buf, svc_baseline);
-		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue,(qboolean)(demoType == DM_15));
-	}
-	MSG_WriteByte(&buf, svc_EOF);
-	// finished writing the gamestate stuff
-	// write the client num
-	MSG_WriteLong(&buf, clcCut->clientNum);
-	// write the checksum feed
-	MSG_WriteLong(&buf, clcCut->checksumFeed);
-	// finished writing the client packet
-	MSG_WriteByte(&buf, svc_EOF);
-	// write it to the demo file
-	len = LittleLong(clcCut->serverMessageSequence - 1);
-	FS_Write(&len, 4, f);
-	len = LittleLong(buf.cursize);
-	FS_Write(&len, 4, f);
-	FS_Write(buf.data, buf.cursize, f);
-}*/
 
-static void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType) {
-	entityState_t* oldent, * newent;
-	int oldindex, newindex;
-	int oldnum, newnum;
-	int from_num_entities;
-	// generate the delta update
-	if (!from) {
-		from_num_entities = 0;
-	}
-	else {
-		from_num_entities = from->numEntities;
-	}
-	newent = NULL;
-	oldent = NULL;
-	newindex = 0;
-	oldindex = 0;
-	while (newindex < to->numEntities || oldindex < from_num_entities) {
-		if (newindex >= to->numEntities) {
-			newnum = 9999;
-		}
-		else {
-			newent = &clCut->parseEntities[(to->parseEntitiesNum + newindex) & (MAX_PARSE_ENTITIES - 1)];
-			newnum = newent->number;
-		}
-		if (oldindex >= from_num_entities) {
-			oldnum = 9999;
-		}
-		else {
-			oldent = &clCut->parseEntities[(from->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
-			oldnum = oldent->number;
-		}
-		if (newnum == oldnum) {
-			// delta update from old position
-			// because the force parm is qfalse, this will not result
-			// in any bytes being emited if the entity has not changed at all
-			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, (qboolean)(demoType == DM_15));
-			oldindex++;
-			newindex++;
-			continue;
-		}
-		if (newnum < oldnum) {
-			// this is a new entity, send it from the baseline
-			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, (qboolean)(demoType == DM_15));
-			newindex++;
-			continue;
-		}
-		if (newnum > oldnum) {
-			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue,(qboolean)(demoType == DM_15));
-			oldindex++;
-			continue;
-		}
-	}
-	MSG_WriteBits(msg, (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
-}
 
-void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut) {
-	int len;
-	// write the packet sequence
-	len = LittleLong(clcCut->serverMessageSequence);
-	FS_Write(&len, 4, f);
-	// skip the packet sequencing information
-	len = LittleLong(msg->cursize);
-	FS_Write(&len, 4, f);
-	FS_Write(msg->data, msg->cursize, f);
-}
-/*
-void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType) {
-	msg_t			msgImpl, * msg = &msgImpl;
-	byte			msgData[MAX_MSGLEN];
-	clSnapshot_t* frame, * oldframe;
-	int				lastframe = 0;
-	int				snapFlags;
-	MSG_Init(msg, msgData, sizeof(msgData));
-	MSG_Bitstream(msg);
-	MSG_WriteLong(msg, clcCut->reliableSequence);
-	// copy over any commands
-	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
-		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
-		MSG_WriteByte(msg, svc_serverCommand);
-		MSG_WriteLong(msg, serverCommand); // + serverCommandOffset
-		MSG_WriteString(msg, command);
-	}
-	// this is the snapshot we are creating
-	frame = &clCut->snap;
-	if (clCut->snap.messageNum > 0 && !forceNonDelta) {
-		lastframe = 1;
-		oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
-		if (!oldframe->valid) {
-			// not yet set
-			lastframe = 0;
-			oldframe = NULL;
-		}
-	}
-	else {
-		lastframe = 0;
-		oldframe = NULL;
-	}
-	MSG_WriteByte(msg, svc_snapshot);
-	// send over the current server time so the client can drift
-	// its view of time to try to match
-	MSG_WriteLong(msg, frame->serverTime);
-	// what we are delta'ing from
-	MSG_WriteByte(msg, lastframe);
-	snapFlags = frame->snapFlags;
-	MSG_WriteByte(msg, snapFlags);
-	// send over the areabits
-	MSG_WriteByte(msg, sizeof(frame->areamask));
-	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
-	// delta encode the playerstate
-	if (oldframe) {
-		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, (qboolean)(demoType == DM_15));
-	}
-	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, (qboolean)(demoType == DM_15));
-	}
-	// delta encode the entities
-	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
-	MSG_WriteByte(msg, svc_EOF);
-	demoCutWriteDemoMessage(msg, f, clcCut);
-}*/
+
+
+
 
 
 
@@ -1242,7 +1074,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
 	char			ext[7]{};
-	char			originalExt[7]{};
+	//char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
 	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
@@ -1253,7 +1085,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
 	qboolean		isCompressedFile = qfalse;
-	qboolean		createCompressedOutput = qtrue;
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -1692,18 +1523,21 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
 	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
-	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
-	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
-	char specialTypeChar = ext[3];
+	/*char specialTypeChar = ext[3];
 	ext[3] = '_';
 
 	if (specialTypeChar == 'c') {
 		isCompressedFile = qtrue;
-	}
+	}*/
 
-	createCompressedOutput = (qboolean)!isCompressedFile;
+	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile,&demo.cut.Clc.demoCheckFor103);
 
+	//createCompressedOutput = (qboolean)!isCompressedFile;
+
+	/**
 	demo.cut.Clc.demoCheckFor103 = qfalse;
 	if (!*ext) {
 		demoType = DM_16;
@@ -1719,8 +1553,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
-	}
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
+	}*/
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
@@ -1735,7 +1569,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	std::filesystem::path tmpFSPath = oldPath;
 	oldPath = std::filesystem::absolute(tmpFSPath).string();
 
-	std::filesystem::file_time_type filetime = std::filesystem::last_write_time(va("%s%s", oldName, originalExt));
+	std::filesystem::file_time_type filetime = std::filesystem::last_write_time(va("%s%s", oldName, ext));
 	time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));

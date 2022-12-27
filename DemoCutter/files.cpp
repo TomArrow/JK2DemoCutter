@@ -224,7 +224,7 @@ qboolean FS_CreatePath(char* OSPath, qboolean quiet) {
 constexpr int lzmaHeaderSize = LZMAIncrementalCompressor::getHeaderSize();
 byte lzmaDummyHeader[lzmaHeaderSize]{};
 
-fileHandle_t FS_FOpenFileWrite(const char* filename, qboolean quiet, fileCompressionScheme_t compression) { // quiet parameter if we want to suppress messages. for example when creating a logfile (endless recursion otherwise)
+fileHandle_t FS_FOpenFileWrite(const char* filename, fileCompressionScheme_t compression, qboolean quiet) { // quiet parameter if we want to suppress messages. for example when creating a logfile (endless recursion otherwise)
 	std::string			ospath;
 	fileHandle_t	f;
 
@@ -460,6 +460,17 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 
 	}
 	
+}
+
+
+int		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression) {
+	if (msg->raw) {
+		msg->dataRaw->resize(msg->cursize);
+		return FS_Read(msg->dataRaw->data(),msg->cursize,f,ignoreCompression);
+	}
+	else {
+		return FS_Read(msg->data, msg->cursize, f, ignoreCompression);
+	}
 }
 
 int FS_Read(void* buffer, int len, fileHandle_t f, qboolean ignoreCompression) {
