@@ -58,7 +58,6 @@ class DemoReaderLight {
 
 	qboolean ReadMessage();
 
-	template <demoType_t D>
 	qboolean ReadMessageReal();
 	qboolean SeekToServerTime(int serverTime);
 

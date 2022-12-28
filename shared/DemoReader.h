@@ -129,7 +129,6 @@ class DemoReader {
 
 	qboolean ReadMessage();
 
-	template <demoType_t D>
 	qboolean ReadMessageReal();
 	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS = qfalse);
 

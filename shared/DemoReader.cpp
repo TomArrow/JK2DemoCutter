@@ -1092,12 +1092,7 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 qboolean DemoReader::ReadMessage() {
 	if (endReached) return qfalse;
 	qboolean realReadResult = qfalse;
-	if (demoType == DM_26) {
-		realReadResult = ReadMessageReal<DM_26>();
-	}
-	else {
-		realReadResult = ReadMessageReal<DM_15>();
-	}
+	realReadResult = ReadMessageReal();
 	if (!realReadResult) {
 		endReached = qtrue;
 		return qfalse;
@@ -1110,12 +1105,11 @@ int DemoReader::getDemoRecorderClientNum() {
 	return demo.cut.Clc.clientNum;
 }
 
-template <demoType_t D>
 qboolean DemoReader::ReadMessageReal() {
 
-	constexpr int svc_mapchange_realCMD = D == DM_26 ? svc_mapchange+1: svc_mapchange;
-	constexpr int svc_EOF_realCMD = D == DM_26 ? svc_EOF+1 : svc_EOF;
-	constexpr int svc_setgame_realCMD = D == DM_26 ? 8 : 100; // A non-JKA demo won't have this, let's just set something ridiculously high
+	//constexpr int svc_mapchange_realCMD = D == DM_26 ? svc_mapchange+1: svc_mapchange;
+	//constexpr int svc_EOF_realCMD = D == DM_26 ? svc_EOF+1 : svc_EOF;
+	//constexpr int svc_setgame_realCMD = D == DM_26 ? 8 : 100; // A non-JKA demo won't have this, let's just set something ridiculously high
 
 
 readNext:
@@ -1174,14 +1168,15 @@ readNext:
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
-		if (cmd == svc_EOF_realCMD) {
+		cmd = generalizeGameSVCOp(cmd,demoType);
+		if (cmd == svc_EOF_general) {
 			break;
 		}
 		//I'm not sure what this does or why it does it...
 		// skip all the gamestates until we reach needed
 		if (readGamestate < thisDemo.currentNum) {
 			//if (readGamestate < (demo.nextNum-1)) { // not sure if this is correct tbh... but I dont wanna rewrite entire cl_demos
-			if (cmd == svc_gamestate) {
+			if (cmd == svc_gamestate_general) {
 				readGamestate++;
 			}
 			goto readNext;
@@ -1192,12 +1187,12 @@ readNext:
 		default:
 			Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 			return qfalse;
-		case svc_nop:
+		case svc_nop_general:
 			break;
-		case svc_serverCommand:
+		case svc_serverCommand_general:
 			demoCutParseCommandString(&oldMsg, &thisDemo.cut.Clc);
 			break;
-		case svc_gamestate:
+		case svc_gamestate_general:
 			lastGameStateChange = thisDemo.cut.Cl.snap.serverTime;
 			lastGameStateChangeInDemoTime = demoCurrentTime;
 			//if (readGamestate > demo.currentNum) {
@@ -1217,7 +1212,7 @@ readNext:
 			//}
 			readGamestate++;
 			break;
-		case svc_snapshot:
+		case svc_snapshot_general:
 			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType,qtrue)) {
 				Com_Printf("[NOTE] Demo cutter, parsing snapshot failed.\n");
 				return qfalse;
@@ -1409,7 +1404,7 @@ readNext:
 			}*/
 
 			break;
-		case svc_download:
+		case svc_download_general:
 			// read block number
 			buf = MSG_ReadShort(&oldMsg);
 			if (!buf)	//0 block, read file size
@@ -1420,7 +1415,7 @@ readNext:
 			for (; buf > 0; buf--)
 				MSG_ReadByte(&oldMsg);
 			break;
-		case svc_setgame_realCMD:
+		case svc_setgame_general:
 			{
 				static char	newGameDir[MAX_QPATH];
 				int i = 0;
@@ -1438,7 +1433,7 @@ readNext:
 				// But here we stop, and don't do more. If this goes horribly wrong sometime, you might have to go and actually do something with this.
 			}
 			break;
-		case svc_mapchange_realCMD:
+		case svc_mapchange_general:
 			// nothing to parse.
 			break;
 		}

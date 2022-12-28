@@ -227,7 +227,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				goto cuterror;
 			}
 			cmd = MSG_ReadByte(&oldMsg);
-			if (cmd == svc_EOF) {
+			cmd = generalizeGameSVCOp(cmd, demoType);
+			if (cmd == svc_EOF_general) {
 				break;
 			}
 			// skip all the gamestates until we reach needed
@@ -243,12 +244,12 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			default:
 				Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 				goto cuterror;
-			case svc_nop:
+			case svc_nop_general:
 				break;
-			case svc_serverCommand:
+			case svc_serverCommand_general:
 				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
 				break;
-			case svc_gamestate:
+			case svc_gamestate_general:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
 				//if (readGamestate > demo.currentNum) {
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
@@ -260,7 +261,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				
 				readGamestate++;
 				break;
-			case svc_snapshot:
+			case svc_snapshot_general:
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType)) {
 					goto cuterror;
 				}
@@ -281,7 +282,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 					demo.lastPMT = demo.cut.Cl.snap.ps.pm_type;
 				}*/
 				break;
-			case svc_download:
+			case svc_download_general:
 				// read block number
 				buf = MSG_ReadShort(&oldMsg);
 				if (!buf)	//0 block, read file size
@@ -292,7 +293,25 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				for (; buf > 0; buf--)
 					MSG_ReadByte(&oldMsg);
 				break;
-			case svc_mapchange:
+			case svc_setgame_general:
+				{
+					static char	newGameDir[MAX_QPATH];
+					int i = 0;
+					while (i < MAX_QPATH) {
+						int next = MSG_ReadByte(&oldMsg);
+						if (next) {
+							newGameDir[i] = next;
+						}
+						else {
+							break;
+						}
+						i++;
+					}
+					newGameDir[i] = 0;
+					// But here we stop, and don't do more. If this goes horribly wrong sometime, you might have to go and actually do something with this.
+				}
+				break;
+			case svc_mapchange_general:
 				// nothing to parse.
 				break;
 			}

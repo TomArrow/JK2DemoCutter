@@ -2849,7 +2849,7 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 	int				cmd;
 	char* s;
 
-	int svc_EOF_realCMD = *demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
+	//int svc_EOF_realCMD = *demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
 	int maxAllowedConfigString = *demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
 
 	clcCut->connectPacketCount = 0;
@@ -2858,10 +2858,11 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 	clCut->gameState.dataCount = 1;
 	while (1) {
 		cmd = MSG_ReadByte(msg);
-		if (cmd == svc_EOF_realCMD) {
+		cmd = generalizeGameSVCOp(cmd,*demoType);
+		if (cmd == svc_EOF_general) {
 			break;
 		}
-		if (cmd == svc_configstring) {
+		if (cmd == svc_configstring_general) {
 			int len, start;
 			start = msg->readcount;
 			i = MSG_ReadShort(msg);
@@ -2893,7 +2894,7 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 			Com_Memcpy(clCut->gameState.stringData + clCut->gameState.dataCount, s, len + 1);
 			clCut->gameState.dataCount += len + 1;
 		}
-		else if (cmd == svc_baseline) {
+		else if (cmd == svc_baseline_general) {
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 			if (newnum < 0 || newnum >= MAX_GENTITIES) {
 				Com_Printf("Baseline number out of range: %i", newnum);
@@ -3229,7 +3230,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	MSG_Bitstream(&buf);
 	// NOTE, MRE: all server->client messages now acknowledge
 	MSG_WriteLong(&buf, clcCut->reliableSequence);
-	MSG_WriteByte(&buf, svc_gamestate);
+	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_gamestate_general,demoType));
 	MSG_WriteLong(&buf, clcCut->serverCommandSequence);
 	// configstrings
 	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
@@ -3237,7 +3238,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 			continue;
 		}
 		s = clCut->gameState.stringData + clCut->gameState.stringOffsets[i];
-		MSG_WriteByte(&buf, svc_configstring);
+		MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_configstring_general, demoType));
 		MSG_WriteShort(&buf, i);
 		MSG_WriteBigString(&buf, s);
 	}
@@ -3248,17 +3249,17 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 		if (!ent->number) {
 			continue;
 		}
-		MSG_WriteByte(&buf, svc_baseline);
+		MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_baseline_general, demoType));
 		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue, (qboolean)(demoType == DM_15));
 	}
-	MSG_WriteByte(&buf, svc_EOF);
+	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	// finished writing the gamestate stuff
 	// write the client num
 	MSG_WriteLong(&buf, clcCut->clientNum);
 	// write the checksum feed
 	MSG_WriteLong(&buf, clcCut->checksumFeed);
 	// finished writing the client packet
-	MSG_WriteByte(&buf, svc_EOF);
+	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	// write it to the demo file
 	len = LittleLong(clcCut->serverMessageSequence - 1);
 	FS_Write(&len, 4, f);
@@ -3292,7 +3293,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	// copy over any commands
 	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
 		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
-		MSG_WriteByte(msg, svc_serverCommand);
+		MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general,demoType));
 		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
 		MSG_WriteString(msg, command);
 	}
@@ -3311,7 +3312,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 		lastframe = 0;
 		oldframe = NULL;
 	}
-	MSG_WriteByte(msg, svc_snapshot);
+	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_snapshot_general, demoType));
 	// send over the current server time so the client can drift
 	// its view of time to try to match
 	MSG_WriteLong(msg, frame->serverTime);
@@ -3331,7 +3332,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
-	MSG_WriteByte(msg, svc_EOF);
+	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
 
@@ -3498,7 +3499,7 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 		MSG_WriteString(msg, command);
 	}*/
 	for (int i = 0; i < newCommands->size(); i++) {
-		MSG_WriteByte(msg, svc_serverCommand);
+		MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general,demoType));
 		MSG_WriteLong(msg, ++clcCut->serverCommandSequence/* + serverCommandOffset*/);
 		MSG_WriteString(msg, (*newCommands)[i].c_str());
 	}
@@ -3519,7 +3520,7 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 		lastframe = 0;
 		//oldframe = NULL;
 	}
-	MSG_WriteByte(msg, svc_snapshot);
+	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_snapshot_general, demoType));
 	// send over the current server time so the client can drift
 	// its view of time to try to match
 	MSG_WriteLong(msg, frame->serverTime);
@@ -3539,7 +3540,7 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntitiesManual(msg, clCut, demoType, entities, fromEntities);
-	MSG_WriteByte(msg, svc_EOF);
+	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
 

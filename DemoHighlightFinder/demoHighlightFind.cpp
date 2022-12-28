@@ -1644,13 +1644,14 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				goto cuterror;
 			}
 			cmd = MSG_ReadByte(&oldMsg);
-			if (cmd == svc_EOF) {
+			cmd = generalizeGameSVCOp(cmd, demoType);
+			if (cmd == svc_EOF_general) {
 				break;
 			}
 			// skip all the gamestates until we reach needed
 			if (readGamestate < demo.currentNum) {
 				//if (readGamestate < (demo.nextNum-1)) { // not sure if this is correct tbh... but I dont wanna rewrite entire cl_demos
-				if (cmd == svc_gamestate) {
+				if (cmd == svc_gamestate_general) {
 					readGamestate++;
 				}
 				goto cutcontinue;
@@ -1660,12 +1661,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 			default:
 				Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 				goto cuterror;
-			case svc_nop:
+			case svc_nop_general:
 				break;
-			case svc_serverCommand:
+			case svc_serverCommand_general:
 				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
 				break;
-			case svc_gamestate:
+			case svc_gamestate_general:
 				lastGameStateChange = demo.cut.Cl.snap.serverTime;
 				lastGameStateChangeInDemoTime = demoCurrentTime;
 				//if (readGamestate > demo.currentNum) {
@@ -1688,7 +1689,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				//}
 				readGamestate++;
 				break;
-			case svc_snapshot:
+			case svc_snapshot_general:
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,qtrue)) {
 					goto cuterror;
 				}
@@ -3815,7 +3816,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				}
 				
 				break;
-			case svc_download:
+			case svc_download_general:
 				// read block number
 				buf = MSG_ReadShort(&oldMsg);
 				if (!buf)	//0 block, read file size
@@ -3826,7 +3827,25 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				for (; buf > 0; buf--)
 					MSG_ReadByte(&oldMsg);
 				break;
-			case svc_mapchange:
+			case svc_setgame_general:
+				{
+					static char	newGameDir[MAX_QPATH];
+					int i = 0;
+					while (i < MAX_QPATH) {
+						int next = MSG_ReadByte(&oldMsg);
+						if (next) {
+							newGameDir[i] = next;
+						}
+						else {
+							break;
+						}
+						i++;
+					}
+					newGameDir[i] = 0;
+					// But here we stop, and don't do more. If this goes horribly wrong sometime, you might have to go and actually do something with this.
+				}
+				break;
+			case svc_mapchange_general:
 				// nothing to parse.
 				break;
 			}
