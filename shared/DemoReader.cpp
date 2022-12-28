@@ -1471,16 +1471,22 @@ readNext:
 	// process any new server commands
 	for (; thisDemo.cut.Clc.lastExecutedServerCommand <= thisDemo.cut.Clc.serverCommandSequence; thisDemo.cut.Clc.lastExecutedServerCommand++) {
 		char* command = thisDemo.cut.Clc.serverCommands[thisDemo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
-		Command readCommand;
-		readCommand.command = command;
-		readCommand.demoTime = demoCurrentTime;
-		readCommand.serverTime = thisDemo.cut.Cl.snap.serverTime;
-		readCommands.push_back(readCommand);
+		
 		Cmd_TokenizeString(command);
 		char* cmd = Cmd_Argv(0);
 		if (cmd[0]) {
 			firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
 		}
+		else {
+			continue;
+		}
+
+		Command readCommand;
+		readCommand.command = command;
+		readCommand.demoTime = demoCurrentTime;
+		readCommand.serverTime = thisDemo.cut.Cl.snap.serverTime;
+		readCommands.push_back(readCommand);
+
 		if (!strcmp(cmd, "cs")) {
 			if (!demoCutConfigstringModified(&thisDemo.cut.Cl,demoType)) {
 				Com_Printf("[NOTE] Demo cutter, configstring parsing failed.\n");
