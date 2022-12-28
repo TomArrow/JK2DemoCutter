@@ -26,7 +26,6 @@
 
 
 
-
 enum demoType_t {
 	DEMOTYPE_NONE,
 	DM_15,
@@ -497,6 +496,8 @@ typedef struct playerState_s {
 								// of movement to the view angle (axial and diagonals)
 								// when at rest, the value will remain unchanged
 								// used to twist the legs during strafing
+
+	vec3_t		grapplePoint;	// Q3 specific: location of grapple to pull towards if PMF_GRAPPLE_PULL 
 
 	int			eFlags;			// copied to entityState_t->eFlags
 
@@ -1217,11 +1218,11 @@ void MSG_WriteDeltaUsercmdKey(msg_t* msg, int key, usercmd_t* from, usercmd_t* t
 void MSG_ReadDeltaUsercmdKey(msg_t* msg, int key, usercmd_t* from, usercmd_t* to);
 
 void MSG_WriteDeltaEntity(msg_t* msg, struct entityState_s* from, struct entityState_s* to
-	, qboolean force, qboolean demo15detected);
+	, qboolean force, demoType_t demoType);
 void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
 	int number, demoType_t demoType);
 
-void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean demo15detected);
+void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType);
 void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS);
 
 
@@ -2477,125 +2478,29 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 
 
-
+extern void initializeGameInfos();
 
 // Multi game support related
-static struct gameInfo_t {
-	demoType_t demoType;
-	svc_ops_e_general opsToGeneral[svc_ops_general_count];
-	int generalToOps[svc_ops_general_count]; // Is auto-filled by democutter tools.
+struct gameInfo_t {
+	demoType_t			demoType;
+	svc_ops_e_general	opsToGeneral[svc_ops_general_count];
+	netField_t*			entityStateFields;
+	int					entityStateFieldsNum;
+	netField_t*			playerStateFields;
+	int					playerStateFieldsNum;
+	qboolean			playerStateFieldsRequireSpecialHandling;
+
+	// Is auto-filled by democutter tools.
+	int generalToOps[svc_ops_general_count]; 
 };
 
-static gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT]{}; // Is auto-filled by democutter tools.
+extern gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT];
 
-static gameInfo_t gameInfos[] = {
-	{
-		DM_15, 
-		{
-			svc_bad_general,
-			svc_nop_general,
-			svc_gamestate_general,
-			svc_configstring_general,			// [short] [string] only in gamestate messages
-			svc_baseline_general,				// only in gamestate messages
-			svc_serverCommand_general,			// [string] to be executed by client game module
-			svc_download_general,				// [short] size [size bytes]
-			svc_snapshot_general,
-			svc_mapchange_general,
-			svc_EOF_general
-		}
-	},{
-		DM_15_1_03, 
-		{
-			svc_bad_general,
-			svc_nop_general,
-			svc_gamestate_general,
-			svc_configstring_general,			// [short] [string] only in gamestate messages
-			svc_baseline_general,				// only in gamestate messages
-			svc_serverCommand_general,			// [string] to be executed by client game module
-			svc_download_general,				// [short] size [size bytes]
-			svc_snapshot_general,
-			svc_mapchange_general,
-			svc_EOF_general
-		}
-	},{
-		DM_16, 
-		{
-			svc_bad_general,
-			svc_nop_general,
-			svc_gamestate_general,
-			svc_configstring_general,			// [short] [string] only in gamestate messages
-			svc_baseline_general,				// only in gamestate messages
-			svc_serverCommand_general,			// [string] to be executed by client game module
-			svc_download_general,				// [short] size [size bytes]
-			svc_snapshot_general,
-			svc_mapchange_general,
-			svc_EOF_general
-		}
-	},{
-		DM_26, 
-		{
-			svc_bad_general,
-			svc_nop_general,
-			svc_gamestate_general,
-			svc_configstring_general,			// [short] [string] only in gamestate messages
-			svc_baseline_general,				// only in gamestate messages
-			svc_serverCommand_general,			// [string] to be executed by client game module
-			svc_download_general,				// [short] size [size bytes]
-			svc_snapshot_general,
-			svc_setgame_general,
-			svc_mapchange_general,
-			svc_EOF_general
-		}
-	},{
-		DM_26_XBOX, 
-		{
-			svc_bad_general,
-			svc_nop_general,
-			svc_gamestate_general,
-			svc_configstring_general,			// [short] [string] only in gamestate messages
-			svc_baseline_general,				// only in gamestate messages
-			svc_serverCommand_general,			// [string] to be executed by client game module
-			svc_download_general,				// [short] size [size bytes]
-			svc_snapshot_general,
-			svc_setgame_general,
-			svc_mapchange_general,
-			svc_newpeer_general,				//jsw//inform current clients about new player
-			svc_removepeer_general,				//jsw//inform current clients about dying player
-			svc_xbInfo_general,					//jsw//update client with current server xbOnlineInfo
-			svc_EOF_general
-		}
-	},{
-		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
-		{
-			svc_bad_general,
-			svc_nop_general,
-			svc_gamestate_general,
-			svc_configstring_general,			// [short] [string] only in gamestate messages
-			svc_baseline_general,				// only in gamestate messages
-			svc_serverCommand_general,			// [string] to be executed by client game module
-			svc_download_general,				// [short] size [size bytes]
-			svc_snapshot_general,
-			svc_EOF_general
-		}
-	},
-};
-
-static qboolean gameInfosInitialized = qfalse;
-
-static inline void initializeGameInfos() {
-	if (!gameInfosInitialized) {
-		constexpr int countGameMappings = sizeof(gameInfos)/sizeof(gameInfo_t);
-		for (int i = 0; i < countGameMappings;i++) {
-			gameInfosMapped[gameInfos[i].demoType] = &gameInfos[i];
-			// Fill reverse svc lookup table
-			for (int gameOp = svc_ops_general_count -1; gameOp >= 0; gameOp --) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
-				svc_ops_e_general generalOp = gameInfos[i].opsToGeneral[gameOp];
-				gameInfos[i].generalToOps[generalOp] = gameOp;
-			}
-		}
-		gameInfosInitialized = qtrue;
-	}
-}
+//inline svc_ops_e_general generalizeGameSVCOp(int gameOp, demoType_t demoType);
+//inline int specializeGeneralSVCOp(svc_ops_e_general generalOp, demoType_t demoType);
+//inline qboolean getEntityStateFields(netField_t** fields, int* fieldCount, demoType_t demoType);
+//inline qboolean getPlayerStateFields(netField_t** fields, int* fieldCount, demoType_t demoType);
+//inline qboolean playerStateRequiresSpecialHandling(demoType_t demoType);
 
 inline svc_ops_e_general generalizeGameSVCOp(int gameOp, demoType_t demoType) {
 	initializeGameInfos();
@@ -2617,9 +2522,49 @@ inline int specializeGeneralSVCOp(svc_ops_e_general generalOp, demoType_t demoTy
 	}
 }
 
+inline qboolean getEntityStateFields(netField_t** fields, int* fieldCount, demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		if (gameInfosMapped[demoType]->entityStateFields && gameInfosMapped[demoType]->entityStateFieldsNum) {
 
+			*fields = gameInfosMapped[demoType]->entityStateFields;
+			*fieldCount = gameInfosMapped[demoType]->entityStateFieldsNum;
+			return qtrue;
+		}
+		else {
+			return qfalse;
+		}
+	}
+	else {
+		return qfalse;
+	}
+}
+inline qboolean getPlayerStateFields(netField_t** fields, int* fieldCount, demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		if (gameInfosMapped[demoType]->playerStateFields && gameInfosMapped[demoType]->playerStateFieldsNum) {
 
-
+			*fields = gameInfosMapped[demoType]->playerStateFields;
+			*fieldCount = gameInfosMapped[demoType]->playerStateFieldsNum;
+			return qtrue;
+		}
+		else {
+			return qfalse;
+		}
+	}
+	else {
+		return qfalse;
+	}
+}
+inline qboolean playerStateRequiresSpecialHandling(demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		return gameInfosMapped[demoType]->playerStateFieldsRequireSpecialHandling;
+	}
+	else {
+		return qtrue;
+	}
+}
 
 
 #endif

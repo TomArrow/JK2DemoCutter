@@ -2,6 +2,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <jkaStuff.h>
+#include <stateFields.h>
 #include <sstream>
 
 // Code is 99%-100% from jomme, from various files.
@@ -3173,20 +3174,20 @@ void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg,
 			// delta update from old position
 			// because the force parm is qfalse, this will not result
 			// in any bytes being emited if the entity has not changed at all
-			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, (qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, demoType);
 			oldindex++;
 			newindex++;
 			continue;
 		}
 		if (newnum < oldnum) {
 			// this is a new entity, send it from the baseline
-			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, (qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, demoType);
 			newindex++;
 			continue;
 		}
 		if (newnum > oldnum) {
 			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, (qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, demoType);
 			oldindex++;
 			continue;
 		}
@@ -3250,7 +3251,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 			continue;
 		}
 		MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_baseline_general, demoType));
-		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue, (qboolean)(demoType == DM_15));
+		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue, demoType);
 	}
 	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	// finished writing the gamestate stuff
@@ -3325,10 +3326,10 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
 	if (oldframe) {
-		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, (qboolean)(demoType == DM_15));
+		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, demoType);
 	}
 	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, (qboolean)(demoType == DM_15));
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, demoType);
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
@@ -3432,7 +3433,7 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 			// delta update from old position
 			// because the force parm is qfalse, this will not result
 			// in any bytes being emited if the entity has not changed at all
-			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, (qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, demoType);
 			oldindex++;
 			oldIterator++;
 			newindex++;
@@ -3441,14 +3442,14 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 		}
 		if (newnum < oldnum) {
 			// this is a new entity, send it from the baseline
-			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, (qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue,demoType);
 			newindex++;
 			newIterator++;
 			continue;
 		}
 		if (newnum > oldnum) {
 			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, (qboolean)(demoType == DM_15));
+			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, demoType);
 			oldindex++;
 			oldIterator++;
 			continue;
@@ -3533,10 +3534,10 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
 	if (doDelta) {
-		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps, (qboolean)(demoType == DM_15));
+		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps, demoType);
 	}
 	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, (qboolean)(demoType == DM_15));
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,demoType );
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntitiesManual(msg, clCut, demoType, entities, fromEntities);
@@ -3680,4 +3681,160 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 	}
 
 	return qtrue;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Multi game related
+gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT]{}; // Is auto-filled by democutter tools.
+
+static gameInfo_t gameInfos[] = {
+	{
+		DM_15,
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_mapchange_general,
+			svc_EOF_general
+		},
+		entityStateFields15,
+		sizeof(entityStateFields15) / sizeof(entityStateFields15[0]),
+		playerStateFields15,
+		sizeof(playerStateFields15) / sizeof(playerStateFields15[0]),
+	},{
+		DM_15_1_03,
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_mapchange_general,
+			svc_EOF_general
+		},
+		entityStateFields,
+		sizeof(entityStateFields) / sizeof(entityStateFields[0]),
+		playerStateFields,
+		sizeof(playerStateFields) / sizeof(playerStateFields[0]),
+	},{
+		DM_16,
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_mapchange_general,
+			svc_EOF_general
+		},
+		entityStateFields,
+		sizeof(entityStateFields) / sizeof(entityStateFields[0]),
+		playerStateFields,
+		sizeof(playerStateFields) / sizeof(playerStateFields[0]),
+	},{
+		DM_26,
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_setgame_general,
+			svc_mapchange_general,
+			svc_EOF_general
+		},
+		entityStateFieldsJKA,
+		sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),
+		playerStateFieldsJKA,
+		sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]),
+		qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
+	},{
+		DM_26_XBOX,
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_setgame_general,
+			svc_mapchange_general,
+			svc_newpeer_general,				//jsw//inform current clients about new player
+			svc_removepeer_general,				//jsw//inform current clients about dying player
+			svc_xbInfo_general,					//jsw//update client with current server xbOnlineInfo
+			svc_EOF_general
+		}
+	},{
+		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general
+		},
+		entityStateFieldsQ3DM26,
+		sizeof(entityStateFieldsQ3DM26) / sizeof(entityStateFieldsQ3DM26[0]),
+		playerStateFieldsQ3DM26,
+		sizeof(playerStateFieldsQ3DM26) / sizeof(playerStateFieldsQ3DM26[0]),
+	},
+};
+
+static qboolean gameInfosInitialized = qfalse;
+
+void initializeGameInfos() {
+	if (!gameInfosInitialized) {
+		constexpr int countGameMappings = sizeof(gameInfos) / sizeof(gameInfo_t);
+		for (int i = 0; i < countGameMappings; i++) {
+			gameInfosMapped[gameInfos[i].demoType] = &gameInfos[i];
+			// Fill reverse svc lookup table
+			for (int gameOp = svc_ops_general_count - 1; gameOp >= 0; gameOp--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
+				svc_ops_e_general generalOp = gameInfos[i].opsToGeneral[gameOp];
+				gameInfos[i].generalToOps[generalOp] = gameOp;
+			}
+		}
+		gameInfosInitialized = qtrue;
+	}
 }
