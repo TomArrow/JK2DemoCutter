@@ -81,6 +81,13 @@ integrate: https://github.com/TheSil/JkaDemoTools
 
 TODO: JKA Integration: CS_PLAYERS etc, and, anim/event remappings checkup.
 
+TODO: JKA zlib compression of that heightmap stuff
+
+Figure out: 
+Protocol 71,
+83,84: Enemy territory?
+
+
 Demo compressor: make it use fast huffman writing.
 
 Demo Compressor: Add Reed Solomon correction.

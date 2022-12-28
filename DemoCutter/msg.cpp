@@ -1305,6 +1305,9 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 	}*/
 	lc = MSG_ReadByte(msg);
 
+	if (lc > numFields || lc < 0)
+		Com_Error(ERR_DROP, "invalid entityState field count (got: %i, expecting: %i)", lc, numFields);
+
 	// shownet 2/3 will interleave with other printed info, -1 will
 	// just print the delta records`
 	/*if ( cl_shownet->integer >= 2 || cl_shownet->integer == -1 ) {
@@ -1574,7 +1577,7 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 					if (i == STAT_WEAPONS)
 					{ //ugly.. but we're gonna need it anyway -rww
 						//(just send this one in MAX_WEAPONS bits, so that we can add up to MAX_WEAPONS weaps without hassle)
-						MSG_WriteBits(msg, to->stats[i], MAX_WEAPONS);
+						MSG_WriteBits(msg, to->stats[i], MAX_WEAPONS_JKA);
 					}
 					else
 					{
@@ -1698,14 +1701,14 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					int isPilot = MSG_ReadBits(msg, 1);
 					if (isPilot)
 					{//pilot riding *inside* a vehicle!
-						numFields = sizeof(pilotPlayerStateFieldsJKA) / sizeof(pilotPlayerStateFieldsJKA[0]) - 82;
+						numFields = sizeof(pilotPlayerStateFieldsJKA) / sizeof(pilotPlayerStateFieldsJKA[0]) -82; // Why -82? jedis repository has this but eternaljk doesnt. Hmm.
 						psFields = pilotPlayerStateFieldsJKA;
 					}
 					else
 					{//normal client
 						numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+					}
 				}
-			}
 				//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
 #else//_OPTIMIZED_VEHICLE_NETWORKING
 				numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
@@ -1718,6 +1721,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	}
 	
 	lc = MSG_ReadByte(msg);
+
+	if (lc > numFields || lc < 0)
+		Com_Error(ERR_DROP, "invalid playerState field count (got: %i, expecting: %i)", lc, numFields);
 
 #ifdef _DONETPROFILE_
 	int startBytes,endBytes;
@@ -1785,7 +1791,14 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 			bits = MSG_ReadShort (msg);
 			for (i=0 ; i<16 ; i++) {
 				if (bits & (1<<i) ) {
-					to->stats[i] = MSG_ReadShort(msg);
+					if ((demoType == DM_26 || demoType == DM_25)&& i == STAT_WEAPONS)
+					{ //ugly.. but we're gonna need it anyway -rww
+						to->stats[i] = MSG_ReadBits(msg, MAX_WEAPONS_JKA);
+					}
+					else
+					{
+						to->stats[i] = MSG_ReadShort(msg);
+					}
 				}
 			}
 		}

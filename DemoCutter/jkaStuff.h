@@ -46,6 +46,8 @@ static weapon_t jkaWeaponMap[] {
 	WP_NUM_WEAPONS
 };
 
+#define	MAX_WEAPONS_JKA				19
+
 
 static entity_event_t jkaEventToJk2Map [] ={
 	EV_NONE,
@@ -2849,7 +2851,7 @@ static  netField_t	playerStateFieldsJKA[] =
 
 
 
-static  netField_t	entityStateFieldsJKA[] =
+static  netField_t	entityStateFieldsJKA[] = // Apply to both DM_25 and DM_26 from what I can tell
 {
 { NETF(pos.trTime), 32 },
 { NETF(pos.trBase[1]), 0 },
@@ -3027,6 +3029,7 @@ static  netField_t	entityStateFieldsJKA[] =
 { NETF(boneAngles4[2]), 0 },
 
 //rww - for use by mod authors only
+// These don't exist on Xbox btw:
 { NETF(userInt1), 1 },
 { NETF(userInt2), 1 },
 { NETF(userInt3), 1 },
