@@ -387,8 +387,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			// Get ping info by preparsing entire demo in the lighter demo reader
 			//float	medianPingsHere[MAX_CLIENTS];
 			//float	medianOfLocalAveragePingsHere[MAX_CLIENTS];
-			int	lowestPingsHere[MAX_CLIENTS];
-			qboolean	playerExistsAsEntity[MAX_CLIENTS];
+			int	lowestPingsHere[MAX_CLIENTS_MAX];
+			qboolean	playerExistsAsEntity[MAX_CLIENTS_MAX];
 			pingDemoReaders[i].ReadToEnd();
 			//pingDemoReaders[i].GetMedianPingData(medianPingsHere);
 			//pingDemoReaders[i].GetMedianOfLocalAveragesPingData(medianOfLocalAveragePingsHere);
@@ -416,7 +416,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				std::cout << "Copying remaining players"<< (asAnimEnts ? " as G2AnimEnts" : "") << std::endl;
 				// We'll also be copying over all other players, either as full players or only as G2 Anim Ents
 				// they won't have clientinfo etc.
-				for (int p = 0; p < MAX_CLIENTS; p++) {
+				int maxClientsThisDemo = demoReaders[i].reader.getMaxClients();
+				for (int p = 0; p < maxClientsThisDemo; p++) {
 					if (clientNumsUsedHere.find(p) != clientNumsUsedHere.end()) continue; // Don't add players twice that are already added.
 					int maxLength;
 					const char* playerCS = demoReaders[i].reader.GetPlayerConfigString(p,&maxLength);
@@ -506,6 +507,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				sourceTime<= (demoReaders[i].sourceInfo->delay+ demoReaders[i].sourceInfo->showEnd) && // Don't show stuff from this demo if we're past showEnd
 				demoReaders[i].reader.SeekToTime(sourceTime-demoReaders[i].sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 
+
+				int maxClientsThisDemo = demoReaders[i].reader.getMaxClients();
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
@@ -562,7 +565,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 						for (auto it = oldSnap->entities.begin(); it != oldSnap->entities.end(); it++) {
 							// Players are already handled otherwhere
-							if (it->first >= MAX_CLIENTS) {
+							//if (it->first >= MAX_CLIENTS) {
+							if (it->first >= maxClientsThisDemo) {
 								// Is this a corpse?
 								if (it->second.eType == ET_BODY && it->second.clientNum == clientNumHere) {
 									// Check if we are tracking this player
@@ -656,6 +660,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				int maxLengthTmp;
 				double thisTimeInServerTime;
 				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay,&thisTimeInServerTime);
+				
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					
 					// EFFECT_EXPLOSION_TRIPMINE (EV_PLAY_EFFECT)
@@ -765,7 +770,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					
 					// Players are already handled otherwhere
-					if (it->first >= MAX_CLIENTS) {
+					if (it->first >= maxClientsThisDemo) {
 						/* Now handling this up there
 						// Is this a corpse?
 						if (it->second.eType == ET_BODY) {
@@ -926,7 +931,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 						// Check if there's any tracked player entity nearby, aka whether it makes sense to copy this over.
 						for (auto entitIt = entitiesHere.begin(); entitIt != entitiesHere.end(); entitIt++) {
-							if (entitIt->first < 0 || entitIt->first >= MAX_CLIENTS) break;
+							if (entitIt->first < 0 || entitIt->first >= maxClientsThisDemo) break;
 							int target = slotManager.getSlotIfExists(i, entitIt->second.number);
 							vec3_t distanceVec;
 							VectorSubtract(entitIt->second.pos.trBase, thisEvent->theEvent.pos.trBase, distanceVec);

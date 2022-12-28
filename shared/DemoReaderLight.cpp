@@ -1,5 +1,6 @@
 #include "demoCut.h"
 #include "jkaStuff.h"
+#include "otherGameStuff.h"
 #include "DemoReaderLight.h"
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
@@ -78,6 +79,8 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 
 	demoCutGetDemoType(sourceDemoFile, ext, &demoType, &isCompressedFile, &thisDemo.cut.Clc.demoCheckFor103);
 
+	maxClientsThisDemo = getMAX_CLIENTS(demoType);
+
 	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
 	if (!*ext) {
 		demoType = DM_16;
@@ -121,7 +124,7 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	lastGottenCommandsTime = 0;
 	lastGottenEventsTime = 0;
 
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < maxClientsThisDemo; i++) {
 		pingValues[i].clear();
 	}
 
@@ -191,7 +194,7 @@ void DemoReaderLight::GetPlayersSeen(qboolean* playersSeenA) { // Requires point
 }
 void DemoReaderLight::GetMedianPingData(int* playerPingData) { // Requires pointer to array with 32 ints
 
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < maxClientsThisDemo; i++) {
 		int countHere = pingValues[i].size();
 		if (countHere > 0) {
 			sort(pingValues[i].begin(),pingValues[i].end());
@@ -212,7 +215,7 @@ void DemoReaderLight::GetMedianPingData(int* playerPingData) { // Requires point
 }
 void DemoReaderLight::GetLowestPingData(int* playerPingData) { // Requires pointer to array with 32 ints
 
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < maxClientsThisDemo; i++) {
 		int countHere = pingValues[i].size();
 		if (countHere > 0) {
 			int lowestPing = INT_MAX;
@@ -230,7 +233,7 @@ void DemoReaderLight::GetLowestPingData(int* playerPingData) { // Requires point
 #define LOCAL_AVERAGE_SAMPLE_COUNT 100
 void DemoReaderLight::GetMedianOfLocalAveragesPingData(float* playerPingData) { // Requires pointer to array with 32 ints
 
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < maxClientsThisDemo; i++) {
 
 		static float localAverageData[LOCAL_AVERAGE_SAMPLE_COUNT];
 		std::vector<float> localAverages;
@@ -272,7 +275,7 @@ void DemoReaderLight::GetMedianOfLocalAveragesPingData(float* playerPingData) { 
 
 
 void DemoReaderLight::FreePingData() {
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < maxClientsThisDemo; i++) {
 		pingValues[i].clear();
 	}
 }
@@ -421,7 +424,7 @@ readNext:
 					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
 					// See if we can figure out the command time of this entity if it's a player.
-					if (thisEntity->number >= 0 && thisEntity->number < MAX_CLIENTS) {
+					if (thisEntity->number >= 0 && thisEntity->number < maxClientsThisDemo) {
 						int commandOrServerTimeHere = 0;
 						if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
 							commandOrServerTimeHere = thisEntity->pos.trTime;
@@ -459,7 +462,7 @@ readNext:
 				entityState_t* thisEs = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
 				// Document which players we've seen.
-				if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
+				if (thisEs->number >= 0 && thisEs->number < maxClientsThisDemo) {
 					playerSeen[thisEs->number] = qtrue;
 				}
 
@@ -478,11 +481,11 @@ readNext:
 						bool			isDoomKill;
 						bool			isWorldKill = false;
 						bool			isVisible = false;
-						if (target < 0 || target >= MAX_CLIENTS) {
+						if (target < 0 || target >= maxClientsThisDemo) {
 							std::cout << "CG_Obituary: target out of range. This should never happen really.";
 						}
 
-						if (attacker < 0 || attacker >= MAX_CLIENTS) {
+						if (attacker < 0 || attacker >= maxClientsThisDemo) {
 							attacker = ENTITYNUM_WORLD;
 							isWorldKill = true;
 						}
@@ -525,7 +528,7 @@ readNext:
 						std::string mapname = Info_ValueForKey(info,sizeof(thisDemo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
 						const char* playerInfo;
 						std::string playername = "WEIRDATTACKER";
-						if (attacker >= 0 && attacker < MAX_CLIENTS) {
+						if (attacker >= 0 && attacker < maxClientsThisDemo) {
 							stringOffset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
 							playerInfo = thisDemo.cut.Cl.gameState.stringData + stringOffset;
 							playername = Info_ValueForKey(playerInfo, sizeof(thisDemo.cut.Cl.gameState.stringData) - stringOffset, "n");
@@ -626,7 +629,7 @@ readNext:
 
 				// Find player
 				int playerNumber = -1;
-				for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
+				for (int clientNum = 0; clientNum < maxClientsThisDemo; clientNum++) {
 
 					const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
 					std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");

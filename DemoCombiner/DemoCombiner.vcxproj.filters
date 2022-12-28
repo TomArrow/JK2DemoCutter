@@ -294,5 +294,8 @@
     <ClInclude Include="..\shared\stateFields.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\otherGameStuff.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

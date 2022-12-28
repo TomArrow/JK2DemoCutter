@@ -59,11 +59,13 @@ public:
 
 class DemoReader {
 
+	int		maxClientsThisDemo = MAX_CLIENTS;
+
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
 	jp::Regex defragRecordFinishRegex;
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
 
-	playerState_t basePlayerStates[MAX_CLIENTS]; // Contains stuff like team and max health and other stuff that otherwise messes up rendering.
+	playerState_t basePlayerStates[MAX_CLIENTS_MAX]; // Contains stuff like team and max health and other stuff that otherwise messes up rendering.
 
 	std::map<int, int> playerFirstVisible;
 	std::map<int, int> playerFirstFollowed;
@@ -141,6 +143,8 @@ public:
 
 	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
 	};
+	
+	int getMaxClients();
 
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();

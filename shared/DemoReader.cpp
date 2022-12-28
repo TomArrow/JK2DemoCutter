@@ -1,6 +1,7 @@
 #include "demoCut.h"
 #include "anims.h"
 #include "jkaStuff.h"
+#include "otherGameStuff.h"
 #include "DemoReader.h"
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
@@ -15,6 +16,9 @@
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
 
+int DemoReader::getMaxClients() {
+	return maxClientsThisDemo;
+}
 
 int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine) {
 	std::string* thisPlayer = playerSearchString;
@@ -40,7 +44,7 @@ int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean pr
 		std::vector<NameMatch> matches;
 
 		// Find matching player name
-		for (int c = 0; c < MAX_CLIENTS; c++) {
+		for (int c = 0; c < maxClientsThisDemo; c++) {
 			tmpConfigString = reader->GetPlayerConfigString(c, &tmpConfigStringMaxLength);
 			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
 			std::string nameHereLower = nameHere;
@@ -233,6 +237,8 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
 
 	demoCutGetDemoType(sourceDemoFile, ext,&demoType,&isCompressedFile,&thisDemo.cut.Clc.demoCheckFor103);
+
+	maxClientsThisDemo = getMAX_CLIENTS(demoType);
 	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
 	if (!*ext) {
 		demoType = DM_16;
@@ -603,8 +609,14 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		ps->legsAnim = jkaAnimMapping[ps->legsAnim];
 		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;
 		ps->weapon = jkaWeaponMap[ps->weapon];
+	} else if (demoType == DM_68) { // TODO Allow other ones too? But idk if anims changed
+
+		ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
+		ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
+		ps->weapon = q3WeaponMap[ps->weapon];
+		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	}
-	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25) {
+	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) {
 
 		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
 		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
@@ -1080,7 +1092,7 @@ const char* DemoReader::GetConfigString(int configStringNum, int* maxLength) {
 
 void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-relevant by also reading tinfo and filling health and armor and such
 	int maxLength;
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < maxClientsThisDemo; i++) {
 		const char* playerCS = GetPlayerConfigString(i,&maxLength);
 		int team = atoi(Info_ValueForKey(playerCS, maxLength, "t"));
 		basePlayerStates[i].persistant[PERS_TEAM] = team;
@@ -1228,7 +1240,7 @@ readNext:
 					lastMessageWithEntity[thisEntity->number] = thisDemo.cut.Cl.snap.messageNum;
 
 					// See if we can figure out the command time of this entity if it's a player.
-					if (thisEntity->number >= 0 && thisEntity->number < MAX_CLIENTS) {
+					if (thisEntity->number >= 0 && thisEntity->number < maxClientsThisDemo) {
 						if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
 							snapshotInfo.playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = thisEntity->pos.trTime;
 						}
@@ -1282,6 +1294,9 @@ readNext:
 				if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 					thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 					thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
+				} else if (demoType == DM_68) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					thisEvent.eventNumber = q3dm68EventToJk2Map[thisEvent.eventNumber];
+					thisEvent.theEvent.event = MapQ3DM68EventJK2(thisEvent.theEvent.event);
 				}
 				readEvents.push_back(thisEvent);
 
@@ -1315,6 +1330,10 @@ readNext:
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
 					}
+					else if (demoType == DM_68) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+						thisEvent.eventNumber = q3dm68EventToJk2Map[thisEvent.eventNumber];
+						thisEvent.theEvent.event = MapQ3DM68EventJK2(thisEvent.theEvent.event);
+					}
 					readEvents.push_back(thisEvent);
 
 
@@ -1341,10 +1360,19 @@ readNext:
 					if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						if (thisEvent.theEvent.eType > ET_EVENTS_JKA) {
-							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS_JKA;
+							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS; // I just changed this, but should I? Hmm
 						}
 						else {
 							thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
+						}
+					}
+					else if (demoType == DM_68) {
+						thisEvent.eventNumber = q3dm68EventToJk2Map[thisEvent.eventNumber];
+						if (thisEvent.theEvent.eType > ET_EVENTS_Q3) {
+							thisEvent.theEvent.eType = q3dm68EventToJk2Map[thisEvent.theEvent.eType - ET_EVENTS_Q3] + ET_EVENTS;
+						}
+						else {
+							thisEvent.theEvent.event = MapQ3DM68EventJK2(thisEvent.theEvent.event);
 						}
 					}
 					readEvents.push_back(thisEvent);
@@ -1358,7 +1386,7 @@ readNext:
 			// Find out which players are visible / followed
 			// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
 			/*lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
-			for (int p = 0; p < MAX_CLIENTS; p++) {
+			for (int p = 0; p < maxClientsThisDemo; p++) {
 				// Go through parseenttities of last snap to see if client is in it
 				bool clientIsInSnapshot = false;
 				bool clientVisibleOrFollowed = false;
@@ -1496,7 +1524,7 @@ readNext:
 
 				// Find player
 				int playerNumber = -1;
-				for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
+				for (int clientNum = 0; clientNum < maxClientsThisDemo; clientNum++) {
 
 					const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
 					std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");

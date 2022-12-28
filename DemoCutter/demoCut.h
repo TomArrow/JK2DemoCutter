@@ -56,6 +56,7 @@ typedef struct _iobuf
 #define LittleShort
 
 #define MAX_CLIENTS			32
+#define MAX_CLIENTS_MAX		64 // Highest of any game
 
 #define MAX_TEAMS 64 // This is some bs from ui_local.h lol. I don't think it's valid but it's best I got
 
@@ -2565,12 +2566,20 @@ struct gameNetFieldInfo_t {
 	qboolean			playerStateFieldsRequireSpecialHandling;
 };
 
+struct gameConfigStringOffsetsInfo_t {
+	int MODELS;
+	int SOUNDS;
+	int PLAYERS;
+};
+
 // Multi game support related
 struct gameInfo_t {
-	demoType_t			demoType;
-	svc_ops_e_general	opsToGeneral[svc_ops_general_count];
-	gameNetFieldInfo_t	netFieldInfo;
-	int					maxConfigstrings;
+	demoType_t						demoType;
+	svc_ops_e_general				opsToGeneral[svc_ops_general_count];
+	gameNetFieldInfo_t				netFieldInfo;
+	int								maxConfigstrings;
+	gameConfigStringOffsetsInfo_t	CS;
+	int								maxClients;
 
 	// Is auto-filled by democutter tools.
 	int generalToOps[svc_ops_general_count]; 
@@ -2653,7 +2662,43 @@ inline int getMaxConfigStrings(demoType_t demoType) {
 		return gameInfosMapped[demoType]->maxConfigstrings ? gameInfosMapped[demoType]->maxConfigstrings : MAX_CONFIGSTRINGS;
 	}
 	else {
-		return qtrue;
+		return MAX_CONFIGSTRINGS;
+	}
+}
+inline int getCS_PLAYERS(demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		return gameInfosMapped[demoType]->CS.PLAYERS ? gameInfosMapped[demoType]->CS.PLAYERS : CS_PLAYERS;
+	}
+	else {
+		return CS_PLAYERS;
+	}
+}
+inline int getCS_MODELS(demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		return gameInfosMapped[demoType]->CS.PLAYERS ? gameInfosMapped[demoType]->CS.MODELS : CS_MODELS;
+	}
+	else {
+		return CS_MODELS;
+	}
+}
+inline int getCS_SOUNDS(demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		return gameInfosMapped[demoType]->CS.PLAYERS ? gameInfosMapped[demoType]->CS.SOUNDS : CS_SOUNDS;
+	}
+	else {
+		return CS_SOUNDS;
+	}
+}
+inline int getMAX_CLIENTS(demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		return gameInfosMapped[demoType]->maxClients ? gameInfosMapped[demoType]->maxClients : MAX_CLIENTS;
+	}
+	else {
+		return MAX_CLIENTS;
 	}
 }
 

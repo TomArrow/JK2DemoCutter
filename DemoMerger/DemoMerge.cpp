@@ -6,6 +6,7 @@
 #include <set>
 #include <chrono>
 #include <jkaStuff.h>
+#include "otherGameStuff.h"
 
 // TODO attach amount of dropped frames in filename.
 

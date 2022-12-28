@@ -2,6 +2,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <jkaStuff.h>
+#include "otherGameStuff.h"
 #include <stateFields.h>
 #include <sstream>
 
@@ -3870,7 +3871,8 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]),
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
-		MAX_CONFIGSTRINGS_JKA
+		MAX_CONFIGSTRINGS_JKA,
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA},
 	},{
 		DM_26,
 		{
@@ -3893,7 +3895,8 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]),
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
-		MAX_CONFIGSTRINGS_JKA
+		MAX_CONFIGSTRINGS_JKA,
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA},
 	},{
 		DM_26_XBOX,
 		{
@@ -3933,7 +3936,9 @@ static gameInfo_t gameInfos[] = {
 			playerStateFieldsQ3DM68,
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
-		1024
+		MAX_CONFIGSTRINGS_Q3,
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3},
+		64
 	},{
 		DM_67,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
 		{
@@ -3953,7 +3958,9 @@ static gameInfo_t gameInfos[] = {
 			playerStateFieldsQ3DM68,
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
-		1024
+		MAX_CONFIGSTRINGS_Q3,
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3},
+		64
 	},{
 		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
 		{
@@ -3973,7 +3980,9 @@ static gameInfo_t gameInfos[] = {
 			playerStateFieldsQ3DM68,
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
-		1024
+		MAX_CONFIGSTRINGS_Q3,
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3},
+		64
 	},
 };
 
