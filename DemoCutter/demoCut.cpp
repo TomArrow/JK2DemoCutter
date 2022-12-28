@@ -629,7 +629,7 @@ int main(int argc, char** argv) {
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	if (demoCut(demoName, startTime, endTime, outputName)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
-		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkStartTime - benchmarkStartTime).count() / 1000000.0f;
+		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
 	}
 	else {

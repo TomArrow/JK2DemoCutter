@@ -4,6 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <chrono>
+#include <jkaStuff.h>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -87,10 +88,12 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	int tmpConfigStringMaxLength;
 	// Copy over configstrings from first demo.
 	// Later maybe we can do something more refined and clever.
-	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
+	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	int maxAllowedConfigString = getMaxConfigStrings(demoType);
+	for (int i = 0; i < maxAllowedConfigString; i++) {
 		tmpConfigString = demoReader->reader.GetConfigString(i,&tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
-			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
+			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString,demoType);
 		}
 	}
 
@@ -116,9 +119,9 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	infoCopy[0] = 0;
 	strcpy_s(infoCopy, MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy);
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy,demoType);
 
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially reframed using JK2DemoCutter tools.");
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially reframed using JK2DemoCutter tools.", demoType);
 
 	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
 	// Note: We will simply use a null state as entity baselines. Not memory efficient but it should do for starters. Don't hav to do anything for that, since we already nulled the whole demo_t struct

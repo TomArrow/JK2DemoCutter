@@ -2783,7 +2783,7 @@ qboolean CL_ServerVersionIs103(const char* versionstr) {
 }
 
 #include "zlib/zlib.h"
-void ParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut) {
+void demoCutParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut) {
 	int i;
 	clcCut->rmgHeightMapSize = (unsigned short)MSG_ReadShort(msg);
 	if (clcCut->rmgHeightMapSize == 0) {
@@ -2851,7 +2851,8 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 	char* s;
 
 	//int svc_EOF_realCMD = *demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
-	int maxAllowedConfigString = *demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	//int maxAllowedConfigString = *demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	int maxAllowedConfigString = getMaxConfigStrings(*demoType);
 
 	clcCut->connectPacketCount = 0;
 	Com_Memset(clCut, 0, sizeof(*clCut));
@@ -2914,8 +2915,8 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 	clcCut->checksumFeed = MSG_ReadLong(msg);
 
 	// RMG stuff (JKA specific)
-	if (*demoType == DM_26) {
-		ParseRMG(msg, clcCut, clCut);
+	if (*demoType == DM_26 || *demoType == DM_25) {
+		demoCutParseRMG(msg, clcCut, clCut);
 	}
 
 	return qtrue;
@@ -2985,7 +2986,8 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 	gameState_t	oldGs;
 	int			len;
 	index = atoi(Cmd_Argv(1));
-	int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	int maxAllowedConfigString = getMaxConfigStrings(demoType);
 	if (index < 0 || index >= maxAllowedConfigString) {
 		Com_Printf("demoCutConfigstringModified: bad index %i", index);
 		return qtrue;
@@ -3085,7 +3087,7 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse);
 
 	// JKA-specific
-	if (demoType == DM_26 && newSnap.ps.m_iVehicleNum)
+	if ((demoType == DM_26 || demoType == DM_25) && newSnap.ps.m_iVehicleNum)
 		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
 
 	// read packet entities
@@ -3220,6 +3222,10 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	entityState_t* ent;
 	entityState_t	nullstate;
 	char* s;
+
+	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	int maxAllowedConfigString = getMaxConfigStrings(demoType);
+
 	// write out the gamestate message
 	if (raw) {
 		bufDataRaw.clear();
@@ -3234,7 +3240,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_gamestate_general,demoType));
 	MSG_WriteLong(&buf, clcCut->serverCommandSequence);
 	// configstrings
-	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
+	for (i = 0; i < maxAllowedConfigString; i++) {
 		if (!clCut->gameState.stringOffsets[i]) {
 			continue;
 		}
@@ -3259,6 +3265,34 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	MSG_WriteLong(&buf, clcCut->clientNum);
 	// write the checksum feed
 	MSG_WriteLong(&buf, clcCut->checksumFeed);
+
+	if (demoType == DM_26 || demoType == DM_25) {
+		// RMG stuff
+		if (clcCut->rmgHeightMapSize) {
+			// Height map
+			MSG_WriteShort(&buf, (unsigned short)clcCut->rmgHeightMapSize);
+			MSG_WriteBits(&buf, 0, 1);
+			MSG_WriteData(&buf, clcCut->rmgHeightMap, clcCut->rmgHeightMapSize);
+			// Flatten map
+			MSG_WriteShort(&buf, (unsigned short)clcCut->rmgHeightMapSize);
+			MSG_WriteBits(&buf, 0, 1);
+			MSG_WriteData(&buf, clcCut->rmgFlattenMap, clcCut->rmgHeightMapSize);
+			// Seed
+			MSG_WriteLong(&buf, clcCut->rmgSeed);
+			// Automap symbols
+			MSG_WriteShort(&buf, (unsigned short)clcCut->rmgAutomapSymbolCount);
+			for (i = 0; i < clcCut->rmgAutomapSymbolCount; i++) {
+				MSG_WriteByte(&buf, (unsigned char)clcCut->rmgAutomapSymbols[i].mType);
+				MSG_WriteByte(&buf, (unsigned char)clcCut->rmgAutomapSymbols[i].mSide);
+				MSG_WriteLong(&buf, (long)clcCut->rmgAutomapSymbols[i].mOrigin[0]);
+				MSG_WriteLong(&buf, (long)clcCut->rmgAutomapSymbols[i].mOrigin[1]);
+			}
+		}
+		else {
+			MSG_WriteShort(&buf, 0);
+		}
+	}
+
 	// finished writing the client packet
 	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	// write it to the demo file
@@ -3326,10 +3360,29 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
 	if (oldframe) {
-		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps, demoType);
+		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps,qfalse, demoType);
+		if (demoType == DM_26 || demoType == DM_25) {
+			if (frame->ps.m_iVehicleNum) {
+				//then write the vehicle's playerstate too
+				if (!oldframe->ps.m_iVehicleNum) {
+					//if last frame didn't have vehicle, then the old vps isn't gonna delta
+					//properly (because our vps on the client could be anything)
+					MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue, demoType);
+				}
+				else {
+					MSG_WriteDeltaPlayerstate(msg, &oldframe->vps, &frame->vps, qtrue, demoType);
+				}
+			}
+		}
 	}
 	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps, demoType);
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse, demoType);
+		if (demoType == DM_26 || demoType == DM_25) {
+			if (frame->ps.m_iVehicleNum) {
+				//then write the vehicle's playerstate too
+				MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue,demoType);
+			}
+		}
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
@@ -3337,7 +3390,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
 
-qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value) {
+qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType) { 
 	char* old;
 	const char* s;
 	int			i, index;
@@ -3345,8 +3398,12 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 	gameState_t	oldGs;
 	int			len;
 	index = configStringNum;
-	if (index < 0 || index >= MAX_CONFIGSTRINGS) {
-		Com_Printf("demoCutConfigstringModified: bad index %i", index);
+
+	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	int maxAllowedConfigString = getMaxConfigStrings(demoType);
+
+	if (index < 0 || index >= maxAllowedConfigString) {
+		Com_Printf("demoCutConfigstringModifiedManual: bad index %i", index);
 		return qtrue;
 	}
 	// get everything after "cs <num>"
@@ -3360,7 +3417,7 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 	Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
 	// leave the first 0 for uninitialized strings
 	clCut->gameState.dataCount = 1;
-	for (i = 0; i < MAX_CONFIGSTRINGS; i++) {
+	for (i = 0; i < maxAllowedConfigString; i++) {
 		if (i == index) {
 			dup = s;
 		}
@@ -3476,6 +3533,7 @@ qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* c
 
 
 //void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
+// TODO: Make this work for JKA? No idea. Whatever.
 void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
@@ -3534,10 +3592,10 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
 	if (doDelta) {
-		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps, demoType);
+		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps,qfalse, demoType);
 	}
 	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,demoType );
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse,demoType );
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntitiesManual(msg, clCut, demoType, entities, fromEntities);
@@ -3557,7 +3615,7 @@ G_FindConfigstringIndex
 
 ================
 */
-int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd,demoType_t demoType) {
 	int		i;
 	//char	s[MAX_STRING_CHARS];
 	char* s;
@@ -3590,18 +3648,18 @@ int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, cli
 	}
 
 	//trap_SetConfigstring(start + i, name);
-	demoCutConfigstringModifiedManual(clCut, start + i, name);
+	demoCutConfigstringModifiedManual(clCut, start + i, name,demoType);
 	commandsToAdd->push_back(makeConfigStringCommand(start + i, name));
 
 	return i;
 }
 
 
-int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
-	return G_FindConfigstringIndex(name, CS_SOUNDS, MAX_SOUNDS, qtrue, clCut, commandsToAdd);
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+	return G_FindConfigstringIndex(name, CS_SOUNDS, MAX_SOUNDS, qtrue, clCut, commandsToAdd, demoType);
 }
-int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd) {
-	return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue, clCut, commandsToAdd);
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+	return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue, clCut, commandsToAdd, demoType);
 }
 
 
@@ -3666,9 +3724,29 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 		*demoType = DM_16;
 		//strncpy_s(normalizedExt, 7, ".dm_16", 6);
 	}
+	else if (!_stricmp(normalizedExt, ".dm_25")) {
+
+		*demoType = DM_25;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
 	else if (!_stricmp(normalizedExt, ".dm_26")) {
 
 		*demoType = DM_26;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
+	else if (!_stricmp(normalizedExt, ".dm_66")) {
+
+		*demoType = DM_66;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
+	else if (!_stricmp(normalizedExt, ".dm_67")) {
+
+		*demoType = DM_67;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
+	else if (!_stricmp(normalizedExt, ".dm_68")) {
+
+		*demoType = DM_68;
 		//strncpy_s(normalizedExt,7, ".dm_26", 6);
 	} else {
 
@@ -3724,10 +3802,12 @@ static gameInfo_t gameInfos[] = {
 			svc_mapchange_general,
 			svc_EOF_general
 		},
-		entityStateFields15,
-		sizeof(entityStateFields15) / sizeof(entityStateFields15[0]),
-		playerStateFields15,
-		sizeof(playerStateFields15) / sizeof(playerStateFields15[0]),
+		{
+			entityStateFields15,
+			sizeof(entityStateFields15) / sizeof(entityStateFields15[0]),
+			playerStateFields15,
+			sizeof(playerStateFields15) / sizeof(playerStateFields15[0]),
+		}
 	},{
 		DM_15_1_03,
 		{
@@ -3742,10 +3822,12 @@ static gameInfo_t gameInfos[] = {
 			svc_mapchange_general,
 			svc_EOF_general
 		},
-		entityStateFields,
-		sizeof(entityStateFields) / sizeof(entityStateFields[0]),
-		playerStateFields,
-		sizeof(playerStateFields) / sizeof(playerStateFields[0]),
+		{
+			entityStateFields,
+			sizeof(entityStateFields) / sizeof(entityStateFields[0]),
+			playerStateFields,
+			sizeof(playerStateFields) / sizeof(playerStateFields[0]),
+		}
 	},{
 		DM_16,
 		{
@@ -3760,10 +3842,35 @@ static gameInfo_t gameInfos[] = {
 			svc_mapchange_general,
 			svc_EOF_general
 		},
-		entityStateFields,
-		sizeof(entityStateFields) / sizeof(entityStateFields[0]),
-		playerStateFields,
-		sizeof(playerStateFields) / sizeof(playerStateFields[0]),
+		{
+			entityStateFields,
+			sizeof(entityStateFields) / sizeof(entityStateFields[0]),
+			playerStateFields,
+			sizeof(playerStateFields) / sizeof(playerStateFields[0]),
+		}
+	},{
+		DM_25, // Ok this is experimental. Idk if DM_25 is the same as DM_26 in all these aspects... trust this less.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_setgame_general,
+			svc_mapchange_general,
+			svc_EOF_general
+		},
+		{
+			entityStateFieldsJKA,
+			sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),
+			playerStateFieldsJKA,
+			sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]),
+			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
+		},
+		MAX_CONFIGSTRINGS_JKA
 	},{
 		DM_26,
 		{
@@ -3779,11 +3886,14 @@ static gameInfo_t gameInfos[] = {
 			svc_mapchange_general,
 			svc_EOF_general
 		},
-		entityStateFieldsJKA,
-		sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),
-		playerStateFieldsJKA,
-		sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]),
-		qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
+		{
+			entityStateFieldsJKA,
+			sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),
+			playerStateFieldsJKA,
+			sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]),
+			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
+		},
+		MAX_CONFIGSTRINGS_JKA
 	},{
 		DM_26_XBOX,
 		{
@@ -3801,7 +3911,49 @@ static gameInfo_t gameInfos[] = {
 			svc_removepeer_general,				//jsw//inform current clients about dying player
 			svc_xbInfo_general,					//jsw//update client with current server xbOnlineInfo
 			svc_EOF_general
-		}
+		},
+		{},
+		MAX_CONFIGSTRINGS_JKA
+	},{
+		DM_66,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general
+		},
+		{
+			entityStateFieldsQ3DM68,
+			sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),
+			playerStateFieldsQ3DM68,
+			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
+		},
+		1024
+	},{
+		DM_67,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general
+		},
+		{
+			entityStateFieldsQ3DM68,
+			sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),
+			playerStateFieldsQ3DM68,
+			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
+		},
+		1024
 	},{
 		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
 		{
@@ -3815,10 +3967,13 @@ static gameInfo_t gameInfos[] = {
 			svc_snapshot_general,
 			svc_EOF_general
 		},
-		entityStateFieldsQ3DM26,
-		sizeof(entityStateFieldsQ3DM26) / sizeof(entityStateFieldsQ3DM26[0]),
-		playerStateFieldsQ3DM26,
-		sizeof(playerStateFieldsQ3DM26) / sizeof(playerStateFieldsQ3DM26[0]),
+		{
+			entityStateFieldsQ3DM68,
+			sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),
+			playerStateFieldsQ3DM68,
+			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
+		},
+		1024
 	},
 };
 

@@ -75,6 +75,12 @@ log pauses, their times and durations and total pause duration
 log a number of total player changes during a game.
 TODO: use EV_PAIN to get health for entitystate->playerstate.
 
+
+integrate: https://github.com/videoP/Demo2Trail
+integrate: https://github.com/TheSil/JkaDemoTools
+
+TODO: JKA Integration: CS_PLAYERS etc, and, anim/event remappings checkup.
+
 Demo compressor: make it use fast huffman writing.
 
 Demo Compressor: Add Reed Solomon correction.

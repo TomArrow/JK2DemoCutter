@@ -81,11 +81,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	int tmpConfigStringMaxLength;
 	// Copy over configstrings from first demo.
 	// Later maybe we can do something more refined and clever.
-	for (int i = 0; i < MAX_CONFIGSTRINGS; i++) {
+	int maxConfigStrings = getMaxConfigStrings(demoType); // This does NOT guarantee proper integration. We still rely on hardcoded CS_PLAYERS etc. Just consider anything but JK2 NOT working here.
+	for (int i = 0; i < maxConfigStrings; i++) {
 		if (i >= CS_PLAYERS && i < (CS_PLAYERS + MAX_CLIENTS)) continue; // Player stuff will be copied manually.
 		tmpConfigString = demoReaders[0].GetConfigString(i,&tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
-			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString);
+			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString,demoType);
 		}
 	}
 
@@ -99,21 +100,21 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 			if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
 			tmpConfigString = demoReaders[i].GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
 			if (strlen(tmpConfigString)) {
-				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
+				demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString, demoType);
 			}
 		}
 	}
 	
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000");
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000", demoType);
 
 	// Add "fake demo" server name.
 	char infoCopy[MAX_INFO_STRING];
 	infoCopy[0] = 0;
 	strcpy_s(infoCopy, MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy);
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy, demoType);
 
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially created using JK2DemoCutter tools.");
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially created using JK2DemoCutter tools.", demoType);
 
 	// TODO In general: Generate scoreboard commands with the scores from the playerstates?
 	// Note: We will simply use a null state as entity baselines. Not memory efficient but it should do for starters. Don't hav to do anything for that, since we already nulled the whole demo_t struct
@@ -169,7 +170,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				if (lastSpectatedClientNums[i] != originalPlayerstateClientNum && i<MAX_CLIENTS) {
 					tmpConfigString = demoReaders[i].GetPlayerConfigString(originalPlayerstateClientNum, &tmpConfigStringMaxLength);
 					if (strlen(tmpConfigString)) {
-						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
+						demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString, demoType);
 					}
 					ss.str(std::string());
 					ss << "cs " << (CS_PLAYERS + i) << " " << tmpConfigString;
@@ -215,7 +216,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 								}
 							}
 
-							tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd);
+							tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd, demoType);
 						}
 						/*tmpES.number += 32; // This was just for debugging.
 						tmpES.clientNum += 32;

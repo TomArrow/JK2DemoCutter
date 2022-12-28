@@ -1119,8 +1119,8 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 						   qboolean force, demoType_t demoType) {
 	int			i, lc;
 	int			numFields;
-	netField_t	*entityStateFieldsHere;
-	netField_t	*field;
+	const netField_t	*entityStateFieldsHere;
+	const netField_t	*field;
 	int			trunc;
 	float		fullFloat;
 	int			*fromF, *toF;
@@ -1247,7 +1247,7 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 						 int number,demoType_t demoType) {
 	int			i, lc;
 	int			numFields;
-	netField_t	*field;
+	const netField_t	*field;
 	int			*fromF, *toF;
 	int			print;
 	int			trunc;
@@ -1280,7 +1280,7 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 		return;
 	}
 
-	netField_t* esFields = NULL;
+	const netField_t* esFields = NULL;
 	/*if (demo15detected)
 		numFields = sizeof(entityStateFields15)/sizeof(entityStateFields15[0]);
 	else
@@ -1405,7 +1405,7 @@ MSG_WriteDeltaPlayerstate
 
 =============
 */
-void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct playerState_s *to, demoType_t demoType) {
+void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct playerState_s *to, qboolean isVehiclePS, demoType_t demoType) {
 	int				i;
 	playerState_t	dummy;
 	int				statsbits;
@@ -1414,8 +1414,8 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	int				powerupbits;
 	int				numFields;
 	int				c;
-	netField_t		*playerStateFieldsHere;
-	netField_t		*field;
+	const netField_t		*playerStateFieldsHere;
+	const netField_t		*field;
 	int				*fromF, *toF;
 	float			fullFloat;
 	int				trunc, lc;
@@ -1432,6 +1432,38 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	}
 	if (playerStateRequiresSpecialHandling(demoType)) {
 		switch (demoType) {
+		case DM_25:
+		case DM_26:
+			//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
+#ifdef _OPTIMIZED_VEHICLE_NETWORKING
+			if (isVehiclePS)
+			{//a vehicle playerstate
+				numFields = sizeof(vehPlayerStateFieldsJKA) / sizeof(vehPlayerStateFieldsJKA[0]);
+				playerStateFieldsHere = vehPlayerStateFieldsJKA;
+			}
+			else
+			{//regular client playerstate
+				if (to->m_iVehicleNum
+					&& (to->eFlags & EF_NODRAW))
+				{//pilot riding *inside* a vehicle!
+					MSG_WriteBits(msg, 1, 1);	// Pilot player state
+					numFields = sizeof(pilotPlayerStateFieldsJKA) / sizeof(pilotPlayerStateFieldsJKA[0]) - 82;
+					playerStateFieldsHere = pilotPlayerStateFieldsJKA;
+				}
+				else
+				{//normal client
+					MSG_WriteBits(msg, 0, 1);	// Normal player state
+					numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+					playerStateFieldsHere = playerStateFieldsJKA;
+				}
+			}
+			//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
+
+#else// _OPTIMIZED_VEHICLE_NETWORKING
+			numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+			playerStateFieldsHere = playerStateFieldsJKA;
+#endif// _OPTIMIZED_VEHICLE_NETWORKING
+			break;
 		default:
 			throw std::exception("demoType doesn't have playerstate writing implemented yet.");
 			break;
@@ -1448,6 +1480,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		toF = (int *)( (byte *)to + field->offset );
 		if ( *fromF != *toF ) {
 			lc = i+1;
+//#ifndef FINAL_BUILD // JKA stuff, forget about it
+//			field->mCount++;
+//#endif
 		}
 	}
 
@@ -1532,9 +1567,25 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	if ( statsbits ) {
 		MSG_WriteBits( msg, 1, 1 );	// changed
 		MSG_WriteShort( msg, statsbits );
-		for (i=0 ; i<16 ; i++)
-			if (statsbits & (1<<i) )
-				MSG_WriteShort (msg, to->stats[i]);
+		for (i = 0; i < 16; i++) {
+
+			if (statsbits & (1 << i)) {
+				if (demoType == DM_26 || demoType == DM_25) {
+					if (i == STAT_WEAPONS)
+					{ //ugly.. but we're gonna need it anyway -rww
+						//(just send this one in MAX_WEAPONS bits, so that we can add up to MAX_WEAPONS weaps without hassle)
+						MSG_WriteBits(msg, to->stats[i], MAX_WEAPONS);
+					}
+					else
+					{
+						MSG_WriteShort(msg, to->stats[i]);
+					}
+				}
+				else {
+					MSG_WriteShort(msg, to->stats[i]);
+				}
+			}
+		}
 	} else {
 		MSG_WriteBits( msg, 0, 1 );	// no change
 	}
@@ -1583,7 +1634,7 @@ MSG_ReadDeltaPlayerstate
 void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, demoType_t demoType, qboolean isVehiclePS) { // vehicle ps stuff is for JKA
 	int			i, lc;
 	int			bits;
-	netField_t	*field;
+	const netField_t	*field;
 	int			numFields;
 	int			startBit, endBit;
 	int			print;
@@ -1612,7 +1663,7 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 		print = 0;
 	}
 
-	netField_t* psFields = NULL;
+	const netField_t* psFields = NULL;
 	/*if (demo15detected)
 		numFields = sizeof( playerStateFields15 ) / sizeof( playerStateFields15[0] );
 	else
@@ -1632,6 +1683,7 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				numFields = sizeof(playerStateFields) / sizeof(playerStateFields[0]);
 				psFields = playerStateFields;
 				break;*/
+			case DM_25:
 			case DM_26:
 				psFields = playerStateFieldsJKA;
 				//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================

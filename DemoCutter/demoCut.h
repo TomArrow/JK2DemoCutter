@@ -331,9 +331,10 @@ typedef enum {
 	MAX_JOYSTICK_AXIS
 } joystickAxis_t;
 
+#define MAX_CONFIGSTRINGS_MAX 1700 // Highest I found anywhere (JKA). We gotta be able to hold it all.
 
 typedef struct {
-	int			stringOffsets[MAX_CONFIGSTRINGS];
+	int			stringOffsets[MAX_CONFIGSTRINGS_MAX];
 	char		stringData[MAX_GAMESTATE_CHARS];
 	int			dataCount;
 } gameState_t;
@@ -728,6 +729,53 @@ typedef struct playerState_s {
 #endif
 
 
+	// RTCW (according to uber demo tools):
+
+	/* for weapons that don't fire immediately when 'fire' is hit (grenades, venom, ...) */
+	int weaponDelay;
+	/* for delayed grenade throwing. this is set to a #define for grenade */
+	/* lifetime when the attack button goes down, then when attack is released * /
+	/* this is the amount of time left before the grenade goes off */
+	/* (or if it gets to 0 while in player's hand, it explodes) */
+	int grenadeTimeLeft;
+	float leanf;             /* amount of 'lean' when player is looking around corner */
+	int weapons[2];          /* 64 bits for weapons held */
+	int weapAnim;            /* mask off ANIM_TOGGLEBIT */
+	vec3_t mins, maxs;
+	float crouchMaxZ;
+	float crouchViewHeight, standViewHeight, deadViewHeight;
+	float runSpeedScale, sprintSpeedScale, crouchSpeedScale; /* variable movement speed */
+	int viewlocked;          /* view locking for mg42 */
+	int viewlocked_entNum;
+	/* need this to fix friction problems with slow zombies whereby */
+	/* the friction prevents them from accelerating to their full potential */
+	float friction;
+	int aiChar;              /* AI character id is used for weapon association */
+	int teamNum;
+	int gunfx;
+	int sprintTime;
+	int aimSpreadScale;      /* 0-255 increases with angular movement */
+	int onFireStart;         /* burning effect is required for view blending effect */
+	int classWeaponTime;
+	int serverCursorHint;    /* what type of cursor hint the server is dictating */
+	int serverCursorHintVal; /* a value (0-255) associated with the above */
+	int curWeapHeat;         /* for the currently selected weapon */
+	int aiState;
+	int ammoclip[64];
+	int holdable[16];
+
+	// Quake Live (according to uber demo tools):
+	int doubleJumped; /* qboolean */
+	int jumpTime;
+	int weaponPrimary;
+	int crouchTime;
+	int crouchSlideTime;
+	int location;
+	int fov;
+	int forwardmove;
+	int rightmove;
+	int upmove;
+
 } playerState_t;
 
 typedef struct {
@@ -926,6 +974,35 @@ typedef struct entityState_s {
 	vec3_t		userVec1;
 	vec3_t		userVec2;
 
+
+	// RTCW (according to uber demo tools)
+	int dl_intensity;  /* used for coronas */
+	int eventSequence; /* pmove generated events */
+	int events[4];
+	int eventParms[4];
+	int density;       /* for particle effects */
+	/* to pass along additional information for damage effects for players */
+	/* also used for cursorhints for non-player entities */
+	int dmgFlags;
+	int onFireStart;
+	int onFireEnd;
+	int aiChar;
+	int teamNum;
+	int effect1Time;
+	int effect2Time;
+	int effect3Time;
+	int aiState;
+	int animMovetype;  /* clients can't derive movetype of other clients for anim scripting system */
+
+
+	// Quake Live (according to uber demo tools)
+	int pos_gravity;  /* part of idEntityStateBase::pos trajectory */
+	int apos_gravity; /* part of idEntityStateBase::apos trajectory */
+	int jumpTime;
+	int doubleJumped; /* qboolean */
+	//int health; // Already exists through jka
+	int armor;
+	int location;
 } entityState_t;
 
 typedef struct {
@@ -1222,7 +1299,7 @@ void MSG_WriteDeltaEntity(msg_t* msg, struct entityState_s* from, struct entityS
 void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
 	int number, demoType_t demoType);
 
-void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType);
+void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean isVehiclePS, demoType_t demoType);
 void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS);
 
 
@@ -2461,15 +2538,15 @@ void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg,
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
-qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value);
+qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);
 void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities);
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);
 void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
 
 std::string makeConfigStringCommand(int index, std::string value);
-int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd);
-int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd);
-int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd);
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t* demoType, qboolean* isCompressed, qboolean* checkFor103 = NULL);
@@ -2480,15 +2557,20 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 extern void initializeGameInfos();
 
+struct gameNetFieldInfo_t {
+	const netField_t* entityStateFields;
+	int					entityStateFieldsNum;
+	const netField_t* playerStateFields;
+	int					playerStateFieldsNum;
+	qboolean			playerStateFieldsRequireSpecialHandling;
+};
+
 // Multi game support related
 struct gameInfo_t {
 	demoType_t			demoType;
 	svc_ops_e_general	opsToGeneral[svc_ops_general_count];
-	netField_t*			entityStateFields;
-	int					entityStateFieldsNum;
-	netField_t*			playerStateFields;
-	int					playerStateFieldsNum;
-	qboolean			playerStateFieldsRequireSpecialHandling;
+	gameNetFieldInfo_t	netFieldInfo;
+	int					maxConfigstrings;
 
 	// Is auto-filled by democutter tools.
 	int generalToOps[svc_ops_general_count]; 
@@ -2522,13 +2604,13 @@ inline int specializeGeneralSVCOp(svc_ops_e_general generalOp, demoType_t demoTy
 	}
 }
 
-inline qboolean getEntityStateFields(netField_t** fields, int* fieldCount, demoType_t demoType) {
+inline qboolean getEntityStateFields(const netField_t** fields, int* fieldCount, demoType_t demoType) {
 	initializeGameInfos();
 	if (gameInfosMapped[demoType]) {
-		if (gameInfosMapped[demoType]->entityStateFields && gameInfosMapped[demoType]->entityStateFieldsNum) {
+		if (gameInfosMapped[demoType]->netFieldInfo.entityStateFields && gameInfosMapped[demoType]->netFieldInfo.entityStateFieldsNum) {
 
-			*fields = gameInfosMapped[demoType]->entityStateFields;
-			*fieldCount = gameInfosMapped[demoType]->entityStateFieldsNum;
+			*fields = gameInfosMapped[demoType]->netFieldInfo.entityStateFields;
+			*fieldCount = gameInfosMapped[demoType]->netFieldInfo.entityStateFieldsNum;
 			return qtrue;
 		}
 		else {
@@ -2539,13 +2621,13 @@ inline qboolean getEntityStateFields(netField_t** fields, int* fieldCount, demoT
 		return qfalse;
 	}
 }
-inline qboolean getPlayerStateFields(netField_t** fields, int* fieldCount, demoType_t demoType) {
+inline qboolean getPlayerStateFields(const netField_t** fields, int* fieldCount, demoType_t demoType) {
 	initializeGameInfos();
 	if (gameInfosMapped[demoType]) {
-		if (gameInfosMapped[demoType]->playerStateFields && gameInfosMapped[demoType]->playerStateFieldsNum) {
+		if (gameInfosMapped[demoType]->netFieldInfo.playerStateFields && gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsNum) {
 
-			*fields = gameInfosMapped[demoType]->playerStateFields;
-			*fieldCount = gameInfosMapped[demoType]->playerStateFieldsNum;
+			*fields = gameInfosMapped[demoType]->netFieldInfo.playerStateFields;
+			*fieldCount = gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsNum;
 			return qtrue;
 		}
 		else {
@@ -2559,7 +2641,16 @@ inline qboolean getPlayerStateFields(netField_t** fields, int* fieldCount, demoT
 inline qboolean playerStateRequiresSpecialHandling(demoType_t demoType) {
 	initializeGameInfos();
 	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->playerStateFieldsRequireSpecialHandling;
+		return gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsRequireSpecialHandling;
+	}
+	else {
+		return qtrue;
+	}
+}
+inline int getMaxConfigStrings(demoType_t demoType) {
+	initializeGameInfos();
+	if (gameInfosMapped[demoType]) {
+		return gameInfosMapped[demoType]->maxConfigstrings ? gameInfosMapped[demoType]->maxConfigstrings : MAX_CONFIGSTRINGS;
 	}
 	else {
 		return qtrue;

@@ -596,7 +596,7 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 }
 
 void DemoReader::mapAnimsToDM15(playerState_t* ps) {
-	if (demoType == DM_26) {
+	if (demoType == DM_26 || demoType == DM_25) {
 
 		ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
 		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT;
@@ -604,7 +604,7 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;
 		ps->weapon = jkaWeaponMap[ps->weapon];
 	}
-	if (demoType == DM_16 || demoType == DM_26) {
+	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25) {
 
 		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
 		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
@@ -1055,19 +1055,19 @@ clSnapshot_t DemoReader::GetCurrentSnap() {
 }
 
 const char* DemoReader::GetPlayerConfigString(int playerNum,int* maxLength) {
-	int configStringBaseIndex = demoType == DM_26 ? CS_PLAYERS_JKA : CS_PLAYERS;
+	int configStringBaseIndex = (demoType == DM_26 || demoType == DM_25) ? CS_PLAYERS_JKA : CS_PLAYERS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + playerNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
 const char* DemoReader::GetSoundConfigString(int soundNum,int* maxLength) {
-	int configStringBaseIndex = demoType == DM_26 ? CS_SOUNDS_JKA : CS_SOUNDS;
+	int configStringBaseIndex = (demoType == DM_26 || demoType == DM_25) ? CS_SOUNDS_JKA : CS_SOUNDS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + soundNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
 const char* DemoReader::GetModelConfigString(int modelNum,int* maxLength) {
-	int configStringBaseIndex = demoType == DM_26 ? CS_MODELS_JKA : CS_MODELS;
+	int configStringBaseIndex = (demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + modelNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
@@ -1279,7 +1279,7 @@ readNext:
 
 				thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
 
-				if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+				if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 					thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 					thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
 				}
@@ -1311,7 +1311,7 @@ readNext:
 					thisEvent.theEvent.eventParm = thisDemo.cut.Cl.snap.ps.eventParms[i & (MAX_PS_EVENTS - 1)];
 
 					thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
-					if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
 					}
@@ -1338,7 +1338,7 @@ readNext:
 					thisEvent.serverTime = thisDemo.cut.Cl.snap.serverTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
-					if (demoType == DM_26) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						if (thisEvent.theEvent.eType > ET_EVENTS_JKA) {
 							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS_JKA;
@@ -1607,23 +1607,23 @@ int main(int argc, char** argv) {
 }*/
 
 
-void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2) {
+void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
 	int eventHere = tmpEntity->event & ~EV_EVENT_BITS;
 	int maxLength = 0;
 	if (eventHere == EV_GENERAL_SOUND) {
 		int soundIndex = tmpEntity->eventParm;
 		const char* soundName = reader->GetSoundConfigString(soundIndex, &maxLength);
-		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd);
+		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd, demoType);
 		tmpEntity->eventParm = newSoundIndex;
 	}
 	if (doModelIndex && tmpEntity->modelindex) {
 		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex, &maxLength);
-		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd, demoType);
 		tmpEntity->modelindex = newModelIndex;
 	}
 	if (doModelIndex2 && tmpEntity->modelindex2) {
 		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex2, &maxLength);
-		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd, demoType);
 		tmpEntity->modelindex2 = newModelIndex;
 	}
 }
