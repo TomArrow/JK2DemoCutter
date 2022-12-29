@@ -73,10 +73,11 @@ struct CapperKillsInfo {
 	int kills;
 	int rets;
 };
+
 struct EnemyNearbyInfo {
 	int lastUpdateTime;
-	int enemyNearbyTimes[MAX_CLIENTS + 1]; // There can be 31 nearby enemies (one oneself cant be an enemy) max. Also 0. 32 means: unknown. Index 32 (+1) is for unknown, if flag carrier wasnt visible.
-	int enemyVeryCloseTimes[MAX_CLIENTS + 1];
+	int enemyNearbyTimes[MAX_CLIENTS_MAX + 1]; // There can be 31 nearby enemies (one oneself cant be an enemy) max. Also 0. 32 means: unknown. Index 32 (+1) is for unknown, if flag carrier wasnt visible.
+	int enemyVeryCloseTimes[MAX_CLIENTS_MAX + 1];
 };
 struct VariousCappingInfo {
 	int lastUpdateTime;
@@ -88,24 +89,25 @@ struct strafeDeviationInfo_t {
 	averageHelper_t averageHelper;
 	int64_t lastReset;
 };
-LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS];
-int playerFirstVisible[MAX_CLIENTS];
-int playerFirstFollowed[MAX_CLIENTS];
-int playerFirstFollowedOrVisible[MAX_CLIENTS];
-int recentFlagHoldTimes[MAX_CLIENTS];
-int playerVisibleFrames[MAX_CLIENTS];
-int playerVisibleClientFrames[MAX_CLIENTS];
-CapperKillsInfo recentKillsDuringFlagHold[MAX_CLIENTS];
-EnemyNearbyInfo recentFlagHoldEnemyNearbyTimes[MAX_CLIENTS]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
-VariousCappingInfo recentFlagHoldVariousInfo[MAX_CLIENTS]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
-int playerTeams[MAX_CLIENTS];
+
+LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
+int playerFirstVisible[MAX_CLIENTS_MAX];
+int playerFirstFollowed[MAX_CLIENTS_MAX];
+int playerFirstFollowedOrVisible[MAX_CLIENTS_MAX];
+int recentFlagHoldTimes[MAX_CLIENTS_MAX];
+int playerVisibleFrames[MAX_CLIENTS_MAX];
+int playerVisibleClientFrames[MAX_CLIENTS_MAX];
+CapperKillsInfo recentKillsDuringFlagHold[MAX_CLIENTS_MAX];
+EnemyNearbyInfo recentFlagHoldEnemyNearbyTimes[MAX_CLIENTS_MAX]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
+VariousCappingInfo recentFlagHoldVariousInfo[MAX_CLIENTS_MAX]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
+int playerTeams[MAX_CLIENTS_MAX];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 int lastEventTime[MAX_GENTITIES];
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
-strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS];
+strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
 
 // From including, to excluding
 #define STRAFE_ANALYSIS_BUCKET_COUNT 18
@@ -135,7 +137,8 @@ struct playerDemoStats_t {
 // This array is updated whenever a "cs" command is received (since that could mean a map or playername change or a new player connecting.
 typedef std::tuple<std::string, std::string, int> playerDemoStatsMapKey_t;
 std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
-playerDemoStats_t* playerDemoStatsPointers[MAX_CLIENTS];
+
+playerDemoStats_t* playerDemoStatsPointers[MAX_CLIENTS_MAX];
 
 struct hitDetectionData_t {
 	qboolean confirmedHit;
@@ -143,7 +146,8 @@ struct hitDetectionData_t {
 	qboolean nearbySaberHitDetected;
 	qboolean newParryDetected;
 };
-hitDetectionData_t hitDetectionData[MAX_CLIENTS];
+
+hitDetectionData_t hitDetectionData[MAX_CLIENTS_MAX];
 
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
 jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
@@ -258,33 +262,36 @@ struct samplePoint_t {
 	double time;
 };
 
+
 struct frameInfo_t {
-	qboolean isAlive[MAX_CLIENTS];
-	qboolean canBlockSimplified[MAX_CLIENTS];
+	qboolean isAlive[MAX_CLIENTS_MAX];
+	qboolean canBlockSimplified[MAX_CLIENTS_MAX];
 	qboolean entityExists[MAX_GENTITIES];
 	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
-	vec3_t playerPositions[MAX_CLIENTS];
-	vec3_t playerVelocities[MAX_CLIENTS];
-	vec3_t playerAngles[MAX_CLIENTS];
-	samplePoint_t playerAngularVelocities[MAX_CLIENTS];
-	samplePoint_t playerAngularAccelerations[MAX_CLIENTS];
-	samplePoint_t playerAngularJerks[MAX_CLIENTS];
-	samplePoint_t playerAngularSnaps[MAX_CLIENTS];
-	//float playerGSpeeds[MAX_CLIENTS]; // "speed" value that basically contains g_speed
-	//float playerMaxWalkSpeed[MAX_CLIENTS]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
+	vec3_t playerPositions[MAX_CLIENTS_MAX];
+	vec3_t playerVelocities[MAX_CLIENTS_MAX];
+	vec3_t playerAngles[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularVelocities[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularAccelerations[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularJerks[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularSnaps[MAX_CLIENTS_MAX];
+	//float playerGSpeeds[max_clients]; // "speed" value that basically contains g_speed
+	//float playerMaxWalkSpeed[max_clients]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
 #ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
-	int otherKillerValue[MAX_CLIENTS];
-	int otherKillerTime[MAX_CLIENTS];
+	int otherKillerValue[max_clients];
+	int otherKillerTime[max_clients];
 #endif
-	qboolean pmFlagKnockback[MAX_CLIENTS];
-	qboolean psTeleportBit[MAX_CLIENTS];
-	int pmFlagTime[MAX_CLIENTS];
-	int commandTime[MAX_CLIENTS];
-	int legsAnim[MAX_CLIENTS];
-	int torsoAnim[MAX_CLIENTS];
-	int groundEntityNum[MAX_CLIENTS];
-};
+	qboolean pmFlagKnockback[MAX_CLIENTS_MAX];
+	qboolean psTeleportBit[MAX_CLIENTS_MAX];
+	int pmFlagTime[MAX_CLIENTS_MAX];
+	int commandTime[MAX_CLIENTS_MAX];
+	int legsAnim[MAX_CLIENTS_MAX];
+	int torsoAnim[MAX_CLIENTS_MAX];
+	int groundEntityNum[MAX_CLIENTS_MAX];
+}; 
+
 frameInfo_t lastFrameInfo;
+
 frameInfo_t thisFrameInfo;
 
 
@@ -313,6 +320,7 @@ enum BoostDetectionType {
 #define DFA_MAX_VELOCITY_DELTA_VERT 280.0f
 #define DFA_MAX_VELOCITY_DELTA_HORZ 300.0f
 
+
 class boost_t {
 public:
 	int64_t demoTime = -1;
@@ -329,7 +337,7 @@ public:
 	BoostDetectionType detectType = BOOST_NONE;
 	int isEnemyBoost = -1; // -1 if unknown
 
-	qboolean facingTowards[MAX_CLIENTS] = {}; // For each 
+	qboolean facingTowards[MAX_CLIENTS_MAX] = {}; // For each 
 
 	// The reason we put a higher requirement on the slow speed boost is simple: High speed boosts are simply more interesting and we don't wanna lose them by accident.
 	inline void autoSetMinimumTravelDistance(const float boostSpeed) {
@@ -344,6 +352,7 @@ public:
 	}
 
 	// 
+	template<unsigned int max_clients>
 	inline void setFacingTowards(const frameInfo_t* referenceFrame, const vec3_t boostVelocityDelta) {
 		if (boostedClientNum == -1 || detectType == BOOST_NONE) {
 			throw std::logic_error("Internal coding error: boostedClientNum and detectType must be set before calling setFacingTowards()");
@@ -355,7 +364,7 @@ public:
 			throw std::logic_error("Internal coding error: boostedClientNum entity doesn't exist in referenceFrame in setFacingTowards()");
 		}
 
-		for (int i = 0; i < MAX_CLIENTS; i++) {
+		for (int i = 0; i < max_clients; i++) {
 			if (referenceFrame->entityExists[i]) { // If it doesn't exist, we will just assume we're not facing towards it. Better avoid misdetects than to avoid missing out. Or we end up cluttered with nonsense invalid boosts
 				static vec3_t vectorTowardsOtherClient;
 				VectorSubtract(referenceFrame->playerPositions[i], referenceFrame->playerPositions[boostedClientNum], vectorTowardsOtherClient);
@@ -407,10 +416,10 @@ std::vector<boost_t> boosts;
 
 
 
-int64_t lastBackflip[MAX_CLIENTS];
+int64_t lastBackflip[MAX_CLIENTS_MAX];
 
-//int64_t walkDetectedTime[MAX_CLIENTS];
-std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS];
+//int64_t walkDetectedTime[max_clients];
+std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS_MAX];
 
 
 struct {
@@ -433,7 +442,8 @@ struct Speed {
 	float angularJerk;
 	float angularSnap;
 };
-std::vector<Speed> speeds[MAX_CLIENTS];
+
+std::vector<Speed> speeds[MAX_CLIENTS_MAX];
 // TODO For future? Have angle saved too. See at what angle the kill comes. Big angle between capper and chaser at high speed is more impressive?
 
 
@@ -454,13 +464,14 @@ demo_t			demo;
 
 
 
-
-void updatePlayerDemoStatsArrayPointers() {
+template<unsigned int max_clients>
+void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
-	for (int i = 0; i < MAX_CLIENTS; i++) {
-		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + i];
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+	for (int i = 0; i < max_clients; i++) {
+		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
 
@@ -708,6 +719,7 @@ float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
 	return maxSpeed;
 }
 
+
 float getMaxAngularSpeedForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxSpeed = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
@@ -717,6 +729,8 @@ float getMaxAngularSpeedForClientinTimeFrame(int clientNum, int64_t fromTime, in
 	}
 	return maxSpeed;
 }
+
+
 float getMaxAngularAccelerationForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxAccel = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
@@ -726,6 +740,8 @@ float getMaxAngularAccelerationForClientinTimeFrame(int clientNum, int64_t fromT
 	}
 	return maxAccel;
 }
+
+
 float getMaxAngularJerkForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxJerk = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
@@ -735,6 +751,8 @@ float getMaxAngularJerkForClientinTimeFrame(int clientNum, int64_t fromTime, int
 	}
 	return maxJerk;
 }
+
+
 float getMaxAngularSnapForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
 	float maxSnap = -1.0f;
 	for (int i = 0;i< speeds[clientNum].size(); i++) {
@@ -745,13 +763,14 @@ float getMaxAngularSnapForClientinTimeFrame(int clientNum, int64_t fromTime, int
 	return maxSnap;
 }
 
-
-void setPlayerAndTeamData(clientActive_t* clCut) {
+template <unsigned int max_clients>
+void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 	int stringOffset;
 	memset(teamInfo,0,sizeof(teamInfo));
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+	for (int i = 0; i < max_clients; i++) {
 
-		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS + i];
+		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = clCut->gameState.stringData + stringOffset;
 		const char* playerTeam = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "t");
 		if (strlen(playerTeam)) {
@@ -766,8 +785,8 @@ void setPlayerAndTeamData(clientActive_t* clCut) {
 	teamInfo[TEAM_BLUE].score = atoi(clCut->gameState.stringData + stringOffset);
 }
 
-
-void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* insertPlayerModelStatement,sqlite3_stmt* updatePlayerModelCountStatement) {
+template<unsigned int max_clients>
+void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* insertPlayerModelStatement,sqlite3_stmt* updatePlayerModelCountStatement, demoType_t demoType) {
 
 
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -776,9 +795,11 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 
 	static std::vector<std::string> modelsToAdd;
 	modelsToAdd.clear();
-	for (int i = 0; i < MAX_CLIENTS; i++) {
 
-		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + i];
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+	for (int i = 0; i < max_clients; i++) {
+
+		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string modelName = Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "model");
 		if (modelName != lastPlayerModel[i]) {
@@ -832,28 +853,30 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 
 }
 
+template<unsigned int max_clients>
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType) {
 
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified) {
-
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 		const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
 		std::string playername = "WEIRDATTACKER";
-		if (clientNumAttacker >= 0 && clientNumAttacker < MAX_CLIENTS) {
 
-			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNumAttacker];
+		if (clientNumAttacker >= 0 && clientNumAttacker < max_clients) {
+
+			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNumAttacker];
 			const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
 		}
-		//playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
+		//playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + target];
 		//std::string victimname = Info_ValueForKey(playerInfo, "n");
 
 		std::stringstream victimsSS;
 		std::stringstream victimsStrippedSS;
 		std::stringstream victimsNumsSS;
 		/*for (int i = 0; i < victims->size(); i++) {
-			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
+			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + (*victims)[i]];
 			const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			victimsSS << (*victims)[i] << ": " << Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData)-stringOffset, "n") << " ("<< (*killsOfThisSpree)[i].modInfoString<<")" << "\n";
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
@@ -861,7 +884,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		int lastKillTime = 0;
 		std::set<int> nearbyPlayers;
 		for (int i = 0; i < killsOfThisSpree->size(); i++) {
-			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + (*victims)[i]];
+			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + (*victims)[i]];
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
 			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
@@ -1059,7 +1082,10 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 	}
 }
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, highlightSearchMode_t searchMode) {
+
+
+template<unsigned int max_clients>
+qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, highlightSearchMode_t searchMode) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -1120,10 +1146,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+	for (int i = 0; i < max_clients; i++) {
 		lastBackflip[i] = -1;
 	}
-	//for (int i = 0; i < MAX_CLIENTS; i++) {
+	//for (int i = 0; i < max_clients; i++) {
 	//	walkDetectedTime[i] = -1;
 	//}
 	Com_Memset(&cgs,0,sizeof(cgs));
@@ -1535,6 +1561,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile,&demo.cut.Clc.demoCheckFor103);
 
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+
 	//createCompressedOutput = (qboolean)!isCompressedFile;
 
 	/**
@@ -1677,10 +1705,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					goto cuterror;
 				}
 
-				CheckForNameChanges(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement);
-				setPlayerAndTeamData(&demo.cut.Cl);
+				CheckForNameChanges<max_clients>(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement,demoType);
+				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				updateForcePowersInfo(&demo.cut.Cl);
-				updatePlayerDemoStatsArrayPointers();
+				updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
 				//if (!newHandle) {
@@ -1716,7 +1744,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					thisFrameInfo.entityExists[thisEs->number] = qtrue;
 
 					// Player related tracking
-					if (thisEs->number >= 0 && thisEs->number < MAX_CLIENTS) {
+					if (thisEs->number >= 0 && thisEs->number < max_clients) {
 
 						thisFrameInfo.canBlockSimplified[thisEs->number] = WP_SaberCanBlock_Simple(thisEs,demoType);
 
@@ -2074,7 +2102,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						boost_t newBoost;
 						VectorCopy(demo.cut.Cl.snap.ps.origin, newBoost.startPosition);
 						VectorSubtract(demo.cut.Cl.snap.ps.velocity, lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum], newBoost.velocityDeltaVector);
-						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.otherKiller >= 0 && demo.cut.Cl.snap.ps.otherKiller < MAX_CLIENTS) ?demo.cut.Cl.snap.ps.otherKiller:-1;
+						newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.otherKiller >= 0 && demo.cut.Cl.snap.ps.otherKiller < max_clients) ?demo.cut.Cl.snap.ps.otherKiller:-1;
 						newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 						newBoost.demoTime = demoCurrentTime;
 						newBoost.detectType = BOOST_PLAYERSTATE;
@@ -2085,10 +2113,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						// Determine teams of both
 						if (newBoost.boosterClientNum != -1) {
 
-							int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boosterClientNum];
+							int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + newBoost.boosterClientNum];
 							const char * playerInfo = demo.cut.Cl.gameState.stringData + offset;
 							int boosterTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
-							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boostedClientNum];
+							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + newBoost.boostedClientNum];
 							playerInfo = demo.cut.Cl.gameState.stringData + offset;
 							int boostedTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
 							newBoost.isEnemyBoost = boosterTeam == boostedTeam ? 1 : 0;
@@ -2123,7 +2151,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							boost_t newBoost;
 							VectorCopy(demo.cut.Cl.snap.ps.origin,newBoost.startPosition);
 							VectorSubtract(demo.cut.Cl.snap.ps.velocity, lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum],newBoost.velocityDeltaVector);
-							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < MAX_CLIENTS) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
+							newBoost.boosterClientNum = (demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] >= 0 && demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] < max_clients) ? demo.cut.Cl.snap.ps.persistant[PERS_ATTACKER] : -1;
 							newBoost.boostedClientNum = demo.cut.Cl.snap.ps.clientNum;
 							newBoost.demoTime = demoCurrentTime;
 							newBoost.detectType = BOOST_PLAYERSTATE_KNOCKBACK_FLAG;
@@ -2142,10 +2170,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 							if (newBoost.boosterClientNum != -1) {
 
-								int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boosterClientNum];
+								int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + newBoost.boosterClientNum];
 								const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
 								int boosterTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
-								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + newBoost.boostedClientNum];
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + newBoost.boostedClientNum];
 								playerInfo = demo.cut.Cl.gameState.stringData + offset;
 								int boostedTeam = atoi(Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "t"));
 								newBoost.isEnemyBoost = boosterTeam != boostedTeam ? 1 : 0;
@@ -2169,7 +2197,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					// g_maxForceRank (see the maximum allowed jump height on server if force jump is enabled)
 					// g_forcePowerDisable (see if force jump is enabled at all)
 					//
-					for (int i = 0; i < MAX_CLIENTS; i++) {
+					for (int i = 0; i < max_clients; i++) {
 						if (i == demo.cut.Cl.snap.ps.clientNum && playerStateBoostDetected) continue; // Playerstate boosts are processed separately and we want to avoid dupes. However sometimes the playerstate detection doesn't properly work so if nothing was detected in playerstate, we will use this as a backup.
 
 						// TODO: Make it work with boosts that happen on the exact frame spectator switches angle?
@@ -2278,7 +2306,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								// is facing right now.
 								static vec3_t velocityDelta3d;
 								VectorSubtract(thisFrameInfo.playerVelocities[i], lastFrameInfo.playerVelocities[i],velocityDelta3d);
-								newBoost.setFacingTowards(&thisFrameInfo, velocityDelta3d);
+								newBoost.setFacingTowards<max_clients>(&thisFrameInfo, velocityDelta3d);
 
 								vec3_t lastVelocityTmp;
 								vec3_t velocityChange;
@@ -2327,9 +2355,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					// TLDR: If we can find a detected walk that is older than BOOST_DETECT_MAX_AGE_WALKING but newer than a boost, we remove that boost.
 					
 					// Some preparation. Find the relevant walk times that are older than BOOST_DETECT_MAX_AGE_WALKING, but out of those, find the newest one so we can use that info to remove any boosts that happened before that.
-					static int64_t newestRemoveWorthyWalks[MAX_CLIENTS];
+					static int64_t newestRemoveWorthyWalks[max_clients];
 					Com_Memset(newestRemoveWorthyWalks, 0, sizeof(newestRemoveWorthyWalks));
-					for (int i = 0; i < MAX_CLIENTS; i++) {
+					for (int i = 0; i < max_clients; i++) {
 						size_t maxIndexToRemove = -1;
 						for (int w = 0; w < walkDetectedTimes[i].size(); w++) {
 							bool isRemoveWorthy = (demoCurrentTime - walkDetectedTimes[i][w]) > BOOST_DETECT_MAX_AGE_WALKING;
@@ -2397,7 +2425,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				// Update player visible frames
 				// For some info like angular velocity, acceleration and jerk we need to know that the past X frames had info about the player, else the value becomes invalid.
-				for (int i = 0; i < MAX_CLIENTS;i++) {
+				for (int i = 0; i < max_clients;i++) {
 					if (thisFrameInfo.entityExists[i]) {
 						playerVisibleFrames[i]++;
 						if (thisFrameInfo.commandTime[i] != lastFrameInfo.commandTime[i]) {
@@ -2444,11 +2472,11 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							bool			attackerIsVisibleOrFollowed = false;
 							bool			targetIsVisibleOrFollowed = false;
 							bool			attackerIsVisible = false;
-							if (target < 0 || target >= MAX_CLIENTS) {
+							if (target < 0 || target >= max_clients) {
 								std::cout << "CG_Obituary: target out of range. This should never happen really.";
 							}
 
-							if (attacker < 0 || attacker >= MAX_CLIENTS) {
+							if (attacker < 0 || attacker >= max_clients) {
 								attacker = ENTITYNUM_WORLD;
 								isWorldKill = true;
 							}
@@ -2783,12 +2811,12 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::string serverName = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)-offset, "sv_hostname");
 							std::string playername = "WEIRDATTACKER";
 							const char* playerInfo;
-							if (attacker >= 0 && attacker < MAX_CLIENTS) {
-								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + attacker];
+							if (attacker >= 0 && attacker < max_clients) {
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + attacker];
 								playerInfo = demo.cut.Cl.gameState.stringData + offset;
 								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
 							}
-							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + target];
+							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + target];
 							playerInfo = demo.cut.Cl.gameState.stringData + offset;
 							std::string victimname = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- offset, "n");
 
@@ -2834,7 +2862,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							int nearbyPlayersCount = 0;
 							for (int subPe = demo.cut.Cl.snap.parseEntitiesNum; subPe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; subPe++) {
 								entityState_t* thisEntitySub = &demo.cut.Cl.parseEntities[subPe & (MAX_PARSE_ENTITIES - 1)];
-								if (thisEntitySub->number >= 0 && thisEntitySub->number < MAX_CLIENTS && thisEntitySub->number != attacker && thisEntitySub->number != target) {
+								if (thisEntitySub->number >= 0 && thisEntitySub->number < max_clients && thisEntitySub->number != attacker && thisEntitySub->number != target) {
 									float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, thisEs->pos.trBase);
 									if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
 										nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " ("<<(int)nearbyPlayerDistance<<")";
@@ -2868,7 +2896,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								averageHelper_t nearbyHelper, veryCloseHelper;
 								Com_Memset(&nearbyHelper, 0, sizeof(nearbyHelper));
 								Com_Memset(&veryCloseHelper, 0, sizeof(veryCloseHelper));
-								for (int nearbyCount = 0; nearbyCount < MAX_CLIENTS; nearbyCount++) { // You'd think here it should be <= MAX_CLIENTS because 32 is a valid number, BUT with max of 32 players you can only have a max of 31 enemies. 32 is actually a valid index though, for "unknown", but we aren't currently tracking that. We just track for the time that the flag carrier WAS visible.
+								for (int nearbyCount = 0; nearbyCount < max_clients; nearbyCount++) { // You'd think here it should be <= MAX_CLIENTS because 32 is a valid number, BUT with max of 32 players you can only have a max of 31 enemies. 32 is actually a valid index though, for "unknown", but we aren't currently tracking that. We just track for the time that the flag carrier WAS visible.
 									int nearbyTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[target].enemyNearbyTimes[nearbyCount];
 									int veryCloseTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[target].enemyVeryCloseTimes[nearbyCount];
 
@@ -2955,7 +2983,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 									// ok let's bother
 									std::string boosterName = "";
 									if (boosts[i].boosterClientNum != -1) {
-										int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + boosts[i].boosterClientNum];
+										int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + boosts[i].boosterClientNum];
 										const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
 										boosterName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
 									}
@@ -3187,7 +3215,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							if (thisEs->eFlags & EF_PLAYER_EVENT) {
 								playerNum = thisEs->otherEntityNum;
 							}
-							if (playerNum >= 0 && playerNum < MAX_CLIENTS) {
+							if (playerNum >= 0 && playerNum < max_clients) {
 								hitDetectionData[playerNum].painDetected = qtrue;
 							}
 						}
@@ -3195,7 +3223,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						else if (eventNumber == EV_SABER_HIT && thisEs->eventParm == 1) { // Saber hit against client
 							
 							// Mark nearby players for potential saber hit detection
-							for (int playerNum = 0; playerNum < MAX_CLIENTS; playerNum++) {
+							for (int playerNum = 0; playerNum < max_clients; playerNum++) {
 								constexpr float maxDistance = 100.0f + 2.0f * (float)SABER_LENGTH_MAX;
 								if (thisFrameInfo.entityExists[playerNum] && VectorDistance(thisFrameInfo.playerPositions[playerNum], thisEs->pos.trBase) <= maxDistance) {
 									hitDetectionData[playerNum].nearbySaberHitDetected = qtrue;
@@ -3204,7 +3232,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 						}
 						else if (eventNumber == EV_SHIELD_HIT) {
 							int playerNum = thisEs->otherEntityNum;
-							if (playerNum >= 0 && playerNum < MAX_CLIENTS) {
+							if (playerNum >= 0 && playerNum < max_clients) {
 								hitDetectionData[playerNum].confirmedHit = qtrue;
 							}
 						}
@@ -3230,8 +3258,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "sv_hostname");
 							std::string playername = "WEIRDONAME";
 							const char* playerInfo;
-							if (playerNum >= 0 && playerNum < MAX_CLIENTS) {
-								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
+							if (playerNum >= 0 && playerNum < max_clients) {
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + playerNum];
 								playerInfo = demo.cut.Cl.gameState.stringData + offset;
 								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
 							}
@@ -3291,7 +3319,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								}
 								for (int subPe = demo.cut.Cl.snap.parseEntitiesNum; subPe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; subPe++) {
 									entityState_t* thisEntitySub = &demo.cut.Cl.parseEntities[subPe & (MAX_PARSE_ENTITIES - 1)];
-									if (thisEntitySub->number >= 0 && thisEntitySub->number < MAX_CLIENTS && thisEntitySub->number != playerNum) {
+									if (thisEntitySub->number >= 0 && thisEntitySub->number < max_clients && thisEntitySub->number != playerNum) {
 										float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, currentPos);
 										if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
 											nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " (" << (int)nearbyPlayerDistance << ")";
@@ -3344,7 +3372,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							averageHelper_t nearbyHelper,veryCloseHelper;
 							Com_Memset(&nearbyHelper, 0, sizeof(nearbyHelper));
 							Com_Memset(&veryCloseHelper, 0, sizeof(veryCloseHelper));
-							for (int nearbyCount = 0; nearbyCount < MAX_CLIENTS; nearbyCount++) { // You'd think here it should be <= MAX_CLIENTS because 32 is a valid number, BUT with max of 32 players you can only have a max of 31 enemies. 32 is actually a valid index though, for "unknown", but we aren't currently tracking that. We just track for the time that the flag carrier WAS visible.
+							for (int nearbyCount = 0; nearbyCount < max_clients; nearbyCount++) { // You'd think here it should be <= MAX_CLIENTS because 32 is a valid number, BUT with max of 32 players you can only have a max of 31 enemies. 32 is actually a valid index though, for "unknown", but we aren't currently tracking that. We just track for the time that the flag carrier WAS visible.
 								int nearbyTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[playerNum].enemyNearbyTimes[nearbyCount];
 								int veryCloseTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[playerNum].enemyVeryCloseTimes[nearbyCount];
 
@@ -3585,7 +3613,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 								// This kill is not part of a killspree. Reset.
 								// But first, check if this concludes an existing killspree that we can now save.
 								if (countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-									CheckSaveKillstreak(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified);
+									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType);
 								}
 
 								// Reset.
@@ -3598,7 +3626,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 							}
 						}
 						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-							CheckSaveKillstreak(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified);
+							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType);
 						}
 
 					}
@@ -3639,7 +3667,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 				lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
 				vec3_t lastKnownBlueFlagCarrierPosition, lastKnownRedFlagCarrierPosition;
 				vec3_t lastKnownBlueFlagCarrierVelocity, lastKnownRedFlagCarrierVelocity;
-				for (int p = 0; p < MAX_CLIENTS; p++) {
+				for (int p = 0; p < max_clients; p++) {
 					// Go through parseenttities of last snap to see if client is in it
 					bool clientIsInSnapshot = false;
 					bool clientVisibleOrFollowed = false;
@@ -3741,7 +3769,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					
 					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-						if (thisEntity->number < 0 || thisEntity->number >= MAX_CLIENTS || playerTeams[thisEntity->number]==TEAM_SPECTATOR) continue; 
+						if (thisEntity->number < 0 || thisEntity->number >= max_clients || playerTeams[thisEntity->number]==TEAM_SPECTATOR) continue;
 						if (lastKnownBlueFlagCarrier != -1 && playerTeams[thisEntity->number] == TEAM_BLUE) {
 							float distance = VectorDistance(lastKnownBlueFlagCarrierPosition,thisEntity->pos.trBase);
 							if (distance <= NEARBY_PLAYER_MAX_DISTANCE) {
@@ -3787,7 +3815,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 				// Save parries and hits for playerstats
 				// The saber hit detection isn't really all that reliable but it's good enough for a sort of global stats I guess
-				for (int playerNum = 0; playerNum < MAX_CLIENTS; playerNum++) {
+				for (int playerNum = 0; playerNum < max_clients; playerNum++) {
 					if (hitDetectionData[playerNum].confirmedHit || hitDetectionData[playerNum].nearbySaberHitDetected && hitDetectionData[playerNum].painDetected) {
 						if (playerDemoStatsPointers[playerNum]) {
 							playerDemoStatsPointers[playerNum]->everUsed = qtrue;
@@ -4038,9 +4066,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 					
 					// Find player
 					int playerNumber = -1;
-					for (int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++) {
+					for (int clientNum = 0; clientNum < max_clients; clientNum++) {
 
-						int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
+						int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
 						const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 						std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "n");
 						if (playerNameCompare == playername) {
@@ -4145,10 +4173,10 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 		}
 
 		if (hadConfigStringCommands) {
-			CheckForNameChanges(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement);
-			setPlayerAndTeamData(&demo.cut.Cl);
+			CheckForNameChanges<max_clients>(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement, demoType);
+			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			updateForcePowersInfo(&demo.cut.Cl);
-			updatePlayerDemoStatsArrayPointers();
+			updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
 		}
 
 #if DEBUG
@@ -4381,6 +4409,26 @@ cuterror:
  	return ret;
 }
 
+
+
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, highlightSearchMode_t searchMode) {
+	char			ext[7]{};
+	demoType_t		demoType;
+	qboolean		isCompressedFile = qfalse;
+	demoCutGetDemoType(sourceDemoFile, ext, &demoType, &isCompressedFile);
+	int maxClientsHere = getMAX_CLIENTS(demoType);
+	switch (maxClientsHere) {
+	case 32:
+		return demoHighlightFindReal<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
+		break;
+	case 64:
+		return demoHighlightFindReal<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
+		break;
+	default:
+		throw std::exception("unsupported MAX_CLIENTS count.");
+		break;
+	}
+}
 /*void CL_DemoCut_f(void) {
 	double startTime, endTime;
 	char demoName[MAX_OSPATH];
@@ -4417,6 +4465,7 @@ int main(int argc, char** argv) {
 		std::cin.get();
 		return 1;
 	}
+
 
 	char* demoName = argv[1];
 	float bufferTime = atof(argv[2]);
