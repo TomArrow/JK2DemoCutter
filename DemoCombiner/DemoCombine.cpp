@@ -1076,6 +1076,7 @@ int main(int argc, char** argv) {
 		std::cout << "need 2 arguments: outputname, scriptname";
 		return 1;
 	}
+	initializeGameInfos();
 	char* scriptName = NULL;
 	char* outputName = NULL;
 

@@ -2558,11 +2558,20 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 extern void initializeGameInfos();
 
+template <class T>
+struct wannabeArray_t {
+	T* data;
+	int count;
+};
+
+
 struct gameNetFieldInfo_t {
-	const netField_t* entityStateFields;
-	int					entityStateFieldsNum;
-	const netField_t* playerStateFields;
-	int					playerStateFieldsNum;
+	wannabeArray_t<const netField_t> entityStateFields;
+	wannabeArray_t<const netField_t> playerStateFields;
+	//const netField_t* entityStateFields;
+	//int					entityStateFieldsNum;
+	//const netField_t* playerStateFields;
+	//int					playerStateFieldsNum;
 	qboolean			playerStateFieldsRequireSpecialHandling;
 };
 
@@ -2583,6 +2592,7 @@ struct gameInfo_t {
 
 	// Is auto-filled by democutter tools.
 	int generalToOps[svc_ops_general_count]; 
+	qboolean						isDefault;
 };
 
 extern gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT];
@@ -2594,112 +2604,40 @@ extern gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT];
 //inline qboolean playerStateRequiresSpecialHandling(demoType_t demoType);
 
 inline svc_ops_e_general generalizeGameSVCOp(int gameOp, demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->opsToGeneral[gameOp];
-	}
-	else {
-		return svc_bad_general;
-	}
+	return gameInfosMapped[demoType]->opsToGeneral[gameOp];
 }
 
 inline int specializeGeneralSVCOp(svc_ops_e_general generalOp, demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->generalToOps[generalOp];
-	}
-	else {
-		return 0;
-	}
+	return gameInfosMapped[demoType]->generalToOps[generalOp];
 }
 
 inline qboolean getEntityStateFields(const netField_t** fields, int* fieldCount, demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		if (gameInfosMapped[demoType]->netFieldInfo.entityStateFields && gameInfosMapped[demoType]->netFieldInfo.entityStateFieldsNum) {
-
-			*fields = gameInfosMapped[demoType]->netFieldInfo.entityStateFields;
-			*fieldCount = gameInfosMapped[demoType]->netFieldInfo.entityStateFieldsNum;
-			return qtrue;
-		}
-		else {
-			return qfalse;
-		}
-	}
-	else {
-		return qfalse;
-	}
+	*fields = gameInfosMapped[demoType]->netFieldInfo.entityStateFields.data;
+	*fieldCount = gameInfosMapped[demoType]->netFieldInfo.entityStateFields.count;
+	return qtrue;
 }
 inline qboolean getPlayerStateFields(const netField_t** fields, int* fieldCount, demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		if (gameInfosMapped[demoType]->netFieldInfo.playerStateFields && gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsNum) {
-
-			*fields = gameInfosMapped[demoType]->netFieldInfo.playerStateFields;
-			*fieldCount = gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsNum;
-			return qtrue;
-		}
-		else {
-			return qfalse;
-		}
-	}
-	else {
-		return qfalse;
-	}
+	*fields = gameInfosMapped[demoType]->netFieldInfo.playerStateFields.data;
+	*fieldCount = gameInfosMapped[demoType]->netFieldInfo.playerStateFields.count;
+	return qtrue;
 }
 inline qboolean playerStateRequiresSpecialHandling(demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsRequireSpecialHandling;
-	}
-	else {
-		return qtrue;
-	}
+	return gameInfosMapped[demoType]->netFieldInfo.playerStateFieldsRequireSpecialHandling;
 }
 inline int getMaxConfigStrings(demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->maxConfigstrings ? gameInfosMapped[demoType]->maxConfigstrings : MAX_CONFIGSTRINGS;
-	}
-	else {
-		return MAX_CONFIGSTRINGS;
-	}
+	return gameInfosMapped[demoType]->maxConfigstrings;
 }
 inline int getCS_PLAYERS(demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->CS.PLAYERS ? gameInfosMapped[demoType]->CS.PLAYERS : CS_PLAYERS;
-	}
-	else {
-		return CS_PLAYERS;
-	}
+	return gameInfosMapped[demoType]->CS.PLAYERS;;
 }
 inline int getCS_MODELS(demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->CS.PLAYERS ? gameInfosMapped[demoType]->CS.MODELS : CS_MODELS;
-	}
-	else {
-		return CS_MODELS;
-	}
+	return gameInfosMapped[demoType]->CS.PLAYERS;
 }
 inline int getCS_SOUNDS(demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->CS.PLAYERS ? gameInfosMapped[demoType]->CS.SOUNDS : CS_SOUNDS;
-	}
-	else {
-		return CS_SOUNDS;
-	}
+		return gameInfosMapped[demoType]->CS.PLAYERS;
 }
 inline int getMAX_CLIENTS(demoType_t demoType) {
-	initializeGameInfos();
-	if (gameInfosMapped[demoType]) {
-		return gameInfosMapped[demoType]->maxClients ? gameInfosMapped[demoType]->maxClients : MAX_CLIENTS;
-	}
-	else {
-		return MAX_CLIENTS;
-	}
+	return gameInfosMapped[demoType]->maxClients;
 }
 
 

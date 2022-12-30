@@ -601,6 +601,7 @@ int main(int argc, char** argv) {
 		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime";
 		return 1;
 	}
+	initializeGameInfos();
 	char* demoName = NULL;
 	char* outputName = NULL;
 	//float startTime = 0;

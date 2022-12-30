@@ -429,6 +429,7 @@ int main(int argc, char** argv) {
 		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
 		return 1;
 	}
+	initializeGameInfos();
 	char* demoName = NULL;
 	char* outputName = NULL;
 	if (argc == 2) {

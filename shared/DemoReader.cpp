@@ -1610,6 +1610,7 @@ int main(int argc, char** argv) {
 		std::cin.get();
 		return 1;
 	}
+	initializeGameInfos();
 
 	char* demoName = argv[1];
 	float bufferTime = atof(argv[2]);

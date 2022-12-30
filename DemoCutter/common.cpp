@@ -3789,7 +3789,7 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT]{}; // Is auto-filled by democutter tools.
 
 static gameInfo_t gameInfos[] = {
-	{
+	{ // First is treated as default.
 		DM_15,
 		{
 			svc_bad_general,
@@ -3989,6 +3989,7 @@ static gameInfo_t gameInfos[] = {
 static qboolean gameInfosInitialized = qfalse;
 
 void initializeGameInfos() {
+
 	if (!gameInfosInitialized) {
 		constexpr int countGameMappings = sizeof(gameInfos) / sizeof(gameInfo_t);
 		for (int i = 0; i < countGameMappings; i++) {
@@ -3998,6 +3999,12 @@ void initializeGameInfos() {
 				svc_ops_e_general generalOp = gameInfos[i].opsToGeneral[gameOp];
 				gameInfos[i].generalToOps[generalOp] = gameOp;
 			}
+			// Set some defaults.
+			if (!gameInfos[i].maxConfigstrings) gameInfos[i].maxConfigstrings = MAX_CONFIGSTRINGS;
+			if (!gameInfos[i].CS.MODELS) gameInfos[i].CS.MODELS = CS_MODELS;
+			if (!gameInfos[i].CS.SOUNDS) gameInfos[i].CS.SOUNDS = CS_SOUNDS;
+			if (!gameInfos[i].CS.PLAYERS) gameInfos[i].CS.PLAYERS = CS_PLAYERS;
+			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 		}
 		gameInfosInitialized = qtrue;
 	}

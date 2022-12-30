@@ -352,6 +352,7 @@ int main(int argc, char** argv) {
 		std::cout << "need 3 arguments at least: demoname, outputname, player to follow (search string or clientnum), [optional: visall for demos that result in graphical artifacts]";
 		return 1;
 	}
+	initializeGameInfos();
 	char* demoName = NULL;
 	char* outputName = NULL;
 	char* playerNameSearchString = NULL;
