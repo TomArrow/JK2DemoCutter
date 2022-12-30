@@ -2582,7 +2582,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								mod == MOD_DET_PACK_SPLASH_GENERAL
 
 								// JK 3
-								|| mod == MOD_COLLISION_GENERAL
+								|| mod == MOD_COLLISION_GENERAL // Not sure about this one... in one demo i have it was just 2 ppl running into each other and falling to their deaths. but that demo was weird in general (flechette detected as mine etc)
 								|| mod == MOD_VEH_EXPLOSION_GENERAL
 								//|| mod == MOD_CONC_ALT_GENERAL
 								// 
