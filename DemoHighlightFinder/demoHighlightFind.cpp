@@ -1905,7 +1905,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					else if (thisEs->eType == ET_GENERAL && thisEs->weapon == WP_TRIP_MINE && (thisEs->eFlags & EF_MISSILE_STICK)) { // tripmine
 						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->genericenemyindex - 1024;
 						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_TRIPMINE;
-						if ((thisEs->event & ~EV_EVENT_BITS) == EV_MISSILE_MISS) {
+						if (generalizeEvent(thisEs->event & ~EV_EVENT_BITS,demoType) == EV_MISSILE_MISS_GENERAL) {
 							// This mine is exploding right now
 							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_EXPLODED;
 						}
@@ -2442,9 +2442,12 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					psEventData_t psEventData = demoCutGetEvent(&demo.cut.Cl.snap.ps, &demo.cut.Cl.oldSnap.ps,demoCurrentTime);
 
 					// Ok this confirms he took damage.
-					if (psEventData.externalEvent.event >= EV_PAIN && psEventData.externalEvent.event <= EV_DEATH3
-						|| psEventData.predictableEvents[0].event >= EV_PAIN && psEventData.predictableEvents[0].event <= EV_DEATH3
-						|| psEventData.predictableEvents[1].event >= EV_PAIN && psEventData.predictableEvents[1].event <= EV_DEATH3
+					int generalEvent = generalizeEvent(psEventData.externalEvent.event, demoType);
+					int generalEventPred0 = generalizeEvent(psEventData.predictableEvents[0].event, demoType);
+					int generalEventPred1 = generalizeEvent(psEventData.predictableEvents[1].event, demoType);
+					if (generalEvent >= EV_PAIN_GENERAL && generalEvent <= EV_DEATH3_GENERAL
+						|| generalEventPred0 >= EV_PAIN_GENERAL && generalEventPred0 <= EV_DEATH3_GENERAL
+						|| generalEventPred1 >= EV_PAIN_GENERAL && generalEventPred1 <= EV_DEATH3_GENERAL
 						) {
 						hitDetectionData[demo.cut.Cl.snap.ps.clientNum].painDetected = qtrue;
 					}
@@ -2455,11 +2458,12 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 					int eventNumber = demoCutGetEvent(thisEs,demoCurrentTime);
+					eventNumber = generalizeEvent(eventNumber,demoType);
 					if (eventNumber) {
 						
 
 						// Handle kills
-						if (eventNumber == EV_OBITUARY) {
+						if (eventNumber == EV_OBITUARY_GENERAL) {
 							int				target = thisEs->otherEntityNum;
 							int				attacker = thisEs->otherEntityNum2;
 							int				mod = thisEs->eventParm;
@@ -3209,7 +3213,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						}
 
 						
-						else if (eventNumber >= EV_PAIN && eventNumber <= EV_DEATH3) {
+						else if (eventNumber >= EV_PAIN_GENERAL && eventNumber <= EV_DEATH3_GENERAL) {
 							// Player took some damage. Could indicate a saber hit if an EV_SABER_HIT is nearby
 							int playerNum = thisEs->number;
 							if (thisEs->eFlags & EF_PLAYER_EVENT) {
@@ -3220,7 +3224,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 						}
 					
-						else if (eventNumber == EV_SABER_HIT && thisEs->eventParm == 1) { // Saber hit against client
+						else if (eventNumber == EV_SABER_HIT_GENERAL && thisEs->eventParm == 1) { // Saber hit against client
 							
 							// Mark nearby players for potential saber hit detection
 							for (int playerNum = 0; playerNum < max_clients; playerNum++) {
@@ -3230,13 +3234,13 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 							}
 						}
-						else if (eventNumber == EV_SHIELD_HIT) {
+						else if (eventNumber == EV_SHIELD_HIT_GENERAL) {
 							int playerNum = thisEs->otherEntityNum;
 							if (playerNum >= 0 && playerNum < max_clients) {
 								hitDetectionData[playerNum].confirmedHit = qtrue;
 							}
 						}
-						else if (eventNumber == EV_CTFMESSAGE && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
+						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
 							int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
 							// A bit pointless tbh because we reset it to -1 anyway before checking entities. 
@@ -3247,7 +3251,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								lastKnownBlueFlagCarrier = playerNum;
 							}
 						}
-						else if (eventNumber == EV_CTFMESSAGE && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
+						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
 							//Capture.
 							int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;

@@ -3785,8 +3785,6 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 
 
-// Multi game related
-gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT]{}; // Is auto-filled by democutter tools.
 
 static gameInfo_t gameInfos[] = {
 	{ // First is treated as default.
@@ -3802,6 +3800,10 @@ static gameInfo_t gameInfos[] = {
 			svc_snapshot_general,
 			svc_mapchange_general,
 			svc_EOF_general
+		},
+		{
+			{},
+			{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral)/sizeof(jk2EntityEventsToGeneral[0])}
 		},
 		{
 			entityStateFields15,
@@ -3824,6 +3826,10 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
+			{},
+			{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}
+		},
+		{
 			entityStateFields,
 			sizeof(entityStateFields) / sizeof(entityStateFields[0]),
 			playerStateFields,
@@ -3842,6 +3848,10 @@ static gameInfo_t gameInfos[] = {
 			svc_snapshot_general,
 			svc_mapchange_general,
 			svc_EOF_general
+		},
+		{
+			{},
+			{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}
 		},
 		{
 			entityStateFields,
@@ -3863,6 +3873,10 @@ static gameInfo_t gameInfos[] = {
 			svc_setgame_general,
 			svc_mapchange_general,
 			svc_EOF_general
+		},
+		{
+			{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
+			{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])}
 		},
 		{
 			entityStateFieldsJKA,
@@ -3887,6 +3901,10 @@ static gameInfo_t gameInfos[] = {
 			svc_setgame_general,
 			svc_mapchange_general,
 			svc_EOF_general
+		},
+		{
+			{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
+			{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])}
 		},
 		{
 			entityStateFieldsJKA,
@@ -3915,6 +3933,10 @@ static gameInfo_t gameInfos[] = {
 			svc_xbInfo_general,					//jsw//update client with current server xbOnlineInfo
 			svc_EOF_general
 		},
+		{
+			{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
+			{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])}
+		},
 		{},
 		MAX_CONFIGSTRINGS_JKA
 	},{
@@ -3929,6 +3951,10 @@ static gameInfo_t gameInfos[] = {
 			svc_download_general,				// [short] size [size bytes]
 			svc_snapshot_general,
 			svc_EOF_general
+		},
+		{
+			{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map)/sizeof(q3dm68EventToJk2Map[0])}},
+			{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])}
 		},
 		{
 			entityStateFieldsQ3DM68,
@@ -3953,6 +3979,10 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
+			{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
+			{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])}
+		},
+		{
 			entityStateFieldsQ3DM68,
 			sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),
 			playerStateFieldsQ3DM68,
@@ -3975,6 +4005,10 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
+			{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
+			{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])}
+		},
+		{
 			entityStateFieldsQ3DM68,
 			sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),
 			playerStateFieldsQ3DM68,
@@ -3986,6 +4020,10 @@ static gameInfo_t gameInfos[] = {
 	},
 };
 
+
+// Multi game related
+specializedGameMappingsContainer_t specializedMappings[DEMOTYPE_COUNT][DEMOTYPE_COUNT]{};
+gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT]{}; // Is auto-filled by democutter tools.
 static qboolean gameInfosInitialized = qfalse;
 
 void initializeGameInfos() {
@@ -4005,6 +4043,26 @@ void initializeGameInfos() {
 			if (!gameInfos[i].CS.SOUNDS) gameInfos[i].CS.SOUNDS = CS_SOUNDS;
 			if (!gameInfos[i].CS.PLAYERS) gameInfos[i].CS.PLAYERS = CS_PLAYERS;
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
+
+			// We create the reverse event lookup table unless the programmer has specifically decided to provide one (no idea why anyone would do that but oh well).
+			if (!gameInfos[i].mappings.eventMappingsReverse.data) {
+				gameInfos[i].mappings.eventMappingsReverse.data = new const int[EV_ENTITY_EVENT_COUNT_GENERAL] {};
+				for (int gameEvent = gameInfos[i].mappings.eventMappingsReverse.count - 1; gameEvent >= 0; gameEvent--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
+					entity_event_t generalEvent = gameInfos[i].mappings.eventMappings.data[gameEvent];
+					((int*)gameInfos[i].mappings.eventMappingsReverse.data)[generalEvent] = gameEvent; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
+				}
+			}
+
+			// Check for specialized mappings and point to them.
+			for (int s = 0; s < MAX_SPECIALIZED_MAPPINGS; s++) {
+				if (gameInfos[i].mappings.specializedEventMappings[s].mapping.data) { // Will be a null ptr if it wasnt initialized/added
+					for (int td = 0; td < MAX_MAPPING_TARGET_DEMOTYPES; td++) {
+						if (gameInfos[i].mappings.specializedEventMappings[s].targetDemoTypes[td]) {
+							specializedMappings[gameInfos[i].demoType][gameInfos[i].mappings.specializedEventMappings[s].targetDemoTypes[td]].eventMapping = gameInfos[i].mappings.specializedEventMappings[s].mapping;
+						}
+					}
+				}
+			}
 		}
 		gameInfosInitialized = qtrue;
 	}

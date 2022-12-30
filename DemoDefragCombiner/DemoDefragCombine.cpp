@@ -245,13 +245,13 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					Event* thisEvent = &newEventsHere[c];
 					int eventNumber = thisEvent->eventNumber;
 					qboolean addThisEvent = qfalse;
-					if (eventNumber == EV_PLAYER_TELEPORT_IN || eventNumber == EV_PLAYER_TELEPORT_OUT) {
+					if (eventNumber == EV_PLAYER_TELEPORT_IN_JK2 || eventNumber == EV_PLAYER_TELEPORT_OUT_JK2) {
 						if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
 							thisEvent->theEvent.clientNum = i;
 							addThisEvent = qtrue;
 						}
 					}
-					if (eventNumber == EV_OBITUARY) {
+					if (eventNumber == EV_OBITUARY_JK2) {
 						addThisEvent = qtrue; // TODO Fix this, this is nonsensical here really...just for testing
 					}
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);

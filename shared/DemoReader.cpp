@@ -1643,9 +1643,9 @@ int main(int argc, char** argv) {
 
 
 void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
-	int eventHere = tmpEntity->event & ~EV_EVENT_BITS;
+	int eventHere = generalizeEvent(tmpEntity->event & ~EV_EVENT_BITS,demoType);
 	int maxLength = 0;
-	if (eventHere == EV_GENERAL_SOUND) {
+	if (eventHere == EV_GENERAL_SOUND_GENERAL) {
 		int soundIndex = tmpEntity->eventParm;
 		const char* soundName = reader->GetSoundConfigString(soundIndex, &maxLength);
 		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd, demoType);

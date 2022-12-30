@@ -578,7 +578,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 											tmpEntity.number = targetEntitySlot;
 											retimeEntity(&tmpEntity, realTranslatedTime, time);
 											//tmpEntity.pos.trTime = time;
-											if (EV_BODY_QUEUE_COPY == (tmpEntity.event & ~EV_EVENT_BITS)) {
+											if (EV_BODY_QUEUE_COPY_JK2 == (tmpEntity.event & ~EV_EVENT_BITS)) {
 												tmpEntity.eventParm = targetClientNum;
 											}
 											targetEntities[targetEntitySlot] = tmpEntity;
@@ -827,9 +827,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
 				for (int c = 0; c < newEventsHere.size(); c++) {
 					Event* thisEvent = &newEventsHere[c];
-					int eventNumber = thisEvent->eventNumber;
+					int eventNumber = thisEvent->eventNumber; // This is currently all specialized for jk2 output! Maybe generalize some day... 
 					qboolean addThisEvent = qfalse;
-					if (eventNumber == EV_PLAYER_TELEPORT_IN || eventNumber == EV_PLAYER_TELEPORT_OUT) {
+					if (eventNumber == EV_PLAYER_TELEPORT_IN_JK2 || eventNumber == EV_PLAYER_TELEPORT_OUT_JK2) {
 						//if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
 						//if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(), thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
 						//	thisEvent->theEvent.clientNum = i;
@@ -841,7 +841,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					else if (eventNumber == EV_OBITUARY) {
+					else if (eventNumber == EV_OBITUARY_JK2) {
 
 						//int				target = ent->otherEntityNum;
 						//int				attacker = ent->otherEntityNum2;
@@ -856,7 +856,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					else if (eventNumber == EV_CTFMESSAGE) {
+					else if (eventNumber == EV_CTFMESSAGE_JK2) {
 
 						//int				target = ent->otherEntityNum;
 						//int				attacker = ent->otherEntityNum2;
@@ -869,11 +869,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					else if (eventNumber == EV_PLAY_EFFECT) {
+					else if (eventNumber == EV_PLAY_EFFECT_JK2) {
 
 						addThisEvent = qtrue;
 					}
-					else if (eventNumber == EV_GENERAL_SOUND && thisEvent->theEvent.eType > ET_EVENTS) { // Only copy event entities. Not players with the event or sth.
+					else if (eventNumber == EV_GENERAL_SOUND_JK2 && thisEvent->theEvent.eType > ET_EVENTS) { // Only copy event entities. Not players with the event or sth.
 
 						// Are we tracking the entity that generated this sound? Actually: This doesnt work bc it only remembers that information if it was a player.
 						if (thisEvent->theEvent.eFlags == EF_SOUNDTRACKER) {
@@ -893,7 +893,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					else if (eventNumber == EV_SHIELD_HIT) {
+					else if (eventNumber == EV_SHIELD_HIT_JK2) {
 
 						// Check if we are tracking this player.
 						int target = slotManager.getSlotIfExists(i, thisEvent->theEvent.otherEntityNum);
@@ -905,7 +905,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							addThisEvent = qtrue;
 						}
 					}
-					else if (eventNumber == EV_SABER_HIT || eventNumber == EV_SABER_BLOCK) { // How to get rid of hits with no corresponding player copied? Check distance?
+					else if (eventNumber == EV_SABER_HIT_JK2 || eventNumber == EV_SABER_BLOCK_JK2) { // How to get rid of hits with no corresponding player copied? Check distance?
 
 						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i].reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue);
 
