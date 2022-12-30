@@ -200,7 +200,7 @@ int DemoReader::GetEvent(entityState_t* es) {
 		lastEvent[es->number] = 0;
 	}
 
-	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
+	int eventNumberRaw = es->eType > getET_EVENTS(demoType) ? es->eType - getET_EVENTS(demoType) : es->event;
 	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
 
 	lastEventTime[es->number] = demoCurrentTime;

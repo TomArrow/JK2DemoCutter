@@ -645,7 +645,7 @@ psEventData_t demoCutGetEvent(playerState_t* ps, playerState_t* ops, int demoCur
 	return psEventData;
 }
 
-int demoCutGetEvent(entityState_t* es,int demoCurrentTime) {
+int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType) {
 	//if (lastEvent.find(es->number) == lastEvent.end()) {
 	//	lastEvent[es->number] = 0;
 	//} // Not really necessary is it? That's what it will be by default?
@@ -680,7 +680,7 @@ int demoCutGetEvent(entityState_t* es,int demoCurrentTime) {
 		lastEvent[es->number] = 0;
 	}
 
-	int eventNumberRaw = es->eType > ET_EVENTS ? es->eType - ET_EVENTS : es->event;
+	int eventNumberRaw = es->eType > getET_EVENTS(demoType) ? es->eType - getET_EVENTS(demoType) : es->event;
 	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
 
 	lastEventTime[es->number] = demoCurrentTime;
@@ -2457,7 +2457,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-					int eventNumber = demoCutGetEvent(thisEs,demoCurrentTime);
+					int eventNumber = demoCutGetEvent(thisEs,demoCurrentTime,demoType);
 					eventNumber = generalizeEvent(eventNumber,demoType);
 					if (eventNumber) {
 						

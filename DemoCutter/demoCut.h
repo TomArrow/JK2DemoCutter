@@ -2992,10 +2992,11 @@ struct gameNetFieldInfo_t {
 	qboolean			playerStateFieldsRequireSpecialHandling;
 };
 
-struct gameConfigStringOffsetsInfo_t {
-	int MODELS;
-	int SOUNDS;
-	int PLAYERS;
+struct gameConstantsInfo_t {
+	int cs_models;
+	int cs_sounds;
+	int cs_players;
+	int	et_events;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -3023,7 +3024,7 @@ struct gameInfo_t {
 	gameMappings_t					mappings;
 	gameNetFieldInfo_t				netFieldInfo;
 	int								maxConfigstrings;
-	gameConfigStringOffsetsInfo_t	CS;
+	gameConstantsInfo_t				constants;
 	int								maxClients;
 
 	// Is auto-filled by democutter tools.
@@ -3065,13 +3066,16 @@ inline int getMaxConfigStrings(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxConfigstrings;
 }
 inline int getCS_PLAYERS(demoType_t demoType) {
-	return gameInfosMapped[demoType]->CS.PLAYERS;;
+	return gameInfosMapped[demoType]->constants.cs_players;;
 }
 inline int getCS_MODELS(demoType_t demoType) {
-	return gameInfosMapped[demoType]->CS.PLAYERS;
+	return gameInfosMapped[demoType]->constants.cs_models;
 }
 inline int getCS_SOUNDS(demoType_t demoType) {
-		return gameInfosMapped[demoType]->CS.PLAYERS;
+		return gameInfosMapped[demoType]->constants.cs_sounds;
+}
+inline int getET_EVENTS(demoType_t demoType) {
+		return gameInfosMapped[demoType]->constants.et_events;
 }
 inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;

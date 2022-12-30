@@ -3886,7 +3886,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA},
 	},{
 		DM_26,
 		{
@@ -3914,7 +3914,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA},
 	},{
 		DM_26_XBOX,
 		{
@@ -3963,7 +3963,7 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3},
 		64
 	},{
 		DM_67,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -3989,7 +3989,7 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3},
 		64
 	},{
 		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -4015,7 +4015,7 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3},
 		64
 	},
 };
@@ -4039,9 +4039,10 @@ void initializeGameInfos() {
 			}
 			// Set some defaults.
 			if (!gameInfos[i].maxConfigstrings) gameInfos[i].maxConfigstrings = MAX_CONFIGSTRINGS;
-			if (!gameInfos[i].CS.MODELS) gameInfos[i].CS.MODELS = CS_MODELS;
-			if (!gameInfos[i].CS.SOUNDS) gameInfos[i].CS.SOUNDS = CS_SOUNDS;
-			if (!gameInfos[i].CS.PLAYERS) gameInfos[i].CS.PLAYERS = CS_PLAYERS;
+			if (!gameInfos[i].constants.cs_models) gameInfos[i].constants.cs_models = CS_MODELS;
+			if (!gameInfos[i].constants.cs_sounds) gameInfos[i].constants.cs_sounds = CS_SOUNDS;
+			if (!gameInfos[i].constants.cs_players) gameInfos[i].constants.cs_players = CS_PLAYERS;
+			if (!gameInfos[i].constants.cs_players) gameInfos[i].constants.et_events = ET_EVENTS;
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 
 			// We create the reverse event lookup table unless the programmer has specifically decided to provide one (no idea why anyone would do that but oh well).
