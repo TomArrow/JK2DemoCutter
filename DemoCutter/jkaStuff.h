@@ -10,45 +10,210 @@
 
 
 
+// entityState_t->eFlags
+#define	EF_G2ANIMATING_JKA			(1<<0)		//perform g2 bone anims based on torsoAnim and legsAnim, works for ET_GENERAL -rww
+#define	EF_DEAD_JKA					(1<<1)		// don't draw a foe marker over players with EF_DEAD
+//#define	EF_BOUNCE_SHRAPNEL		(1<<2)		// special shrapnel flag
+//do not use eflags for server-only things, it wastes bandwidth -rww
+#define EF_RADAROBJECT_JKA			(1<<2)		// display on team radar
+
+#define	EF_TELEPORT_BIT_JKA			(1<<3)		// toggled every time the origin abruptly changes
+
+#define	EF_SHADER_ANIM_JKA			(1<<4)		// Animating shader (by s.frame)
+
+#define EF_PLAYER_EVENT_JKA			(1<<5)
+//#define	EF_BOUNCE				(1<<5)		// for missiles
+//#define	EF_BOUNCE_HALF			(1<<6)		// for missiles
+//these aren't even referenced in bg or client code and do not need to be eFlags, so I
+//am using these flags for rag stuff -rww
+
+#define EF_RAG_JKA					(1<<6)		//ragdoll him even if he's alive
+
+
+#define EF_PERMANENT_JKA			(1<<7)		// rww - I am claiming this. (for permanent entities)
+
+#define	EF_NODRAW_JKA				(1<<8)		// may have an event, but no model (unspawned items)
+#define	EF_FIRING_JKA				(1<<9)		// for lightning gun
+#define EF_ALT_FIRING_JKA			(1<<10)		// for alt-fires, mostly for lightning guns though
+#define	EF_JETPACK_ACTIVE_JKA		(1<<11)		//jetpack is activated
+
+#define EF_NOT_USED_1_JKA			(1<<12)		// not used
+
+#define	EF_TALK_JKA					(1<<13)		// draw a talk balloon
+#define	EF_CONNECTION_JKA			(1<<14)		// draw a connection trouble sprite
+#define	EF_NOT_USED_6_JKA			(1<<15)		// not used
+
+#define	EF_NOT_USED_2_JKA			(1<<16)		// not used
+#define	EF_NOT_USED_3_JKA			(1<<17)		// not used
+#define	EF_NOT_USED_4_JKA			(1<<18)		// not used
+
+#define	EF_BODYPUSH_JKA				(1<<19)		//rww - claiming this for fullbody push effect
+
+#define	EF_DOUBLE_AMMO_JKA			(1<<20)		// Hacky way to get around ammo max
+#define EF_SEEKERDRONE_JKA			(1<<21)		// show seeker drone floating around head
+#define EF_MISSILE_STICK_JKA		(1<<22)		// missiles that stick to the wall.
+#define EF_ITEMPLACEHOLDER_JKA		(1<<23)		// item effect
+#define EF_SOUNDTRACKER_JKA			(1<<24)		// sound position needs to be updated in relation to another entity
+#define EF_DROPPEDWEAPON_JKA		(1<<25)		// it's a dropped weapon
+#define EF_DISINTEGRATION_JKA		(1<<26)		// being disintegrated by the disruptor
+#define EF_INVULNERABLE_JKA			(1<<27)		// just spawned in or whatever, so is protected
+
+#define EF_CLIENTSMOOTH_JKA			(1<<28)		// standard lerporigin smooth override on client
+
+#define EF_JETPACK_JKA				(1<<29)		//rww - wearing a jetpack
+#define EF_JETPACK_FLAMING_JKA		(1<<30)		//rww - jetpack fire effect
+
+#define	EF_NOT_USED_5_JKA			(1<<31)		// not used
+
+//These new EF2_??? flags were added for NPCs, they really should not be used often.
+//NOTE: we only allow 10 of these!
+#define	EF2_HELD_BY_MONSTER_JKA		(1<<0)		// Being held by something, like a Rancor or a Wampa
+#define	EF2_USE_ALT_ANIM_JKA		(1<<1)		// For certain special runs/stands for creatures like the Rancor and Wampa whose runs/stands are conditional
+#define	EF2_ALERTED_JKA				(1<<2)		// For certain special anims, for Rancor: means you've had an enemy, so use the more alert stand
+#define	EF2_GENERIC_NPC_FLAG_JKA	(1<<3)		// So far, used for Rancor...
+#define	EF2_FLYING_JKA				(1<<4)		// Flying FIXME: only used on NPCs doesn't *really* have to be passed over, does it?
+#define	EF2_HYPERSPACE_JKA			(1<<5)		// Used to both start the hyperspace effect on the predicted client and to let the vehicle know it can now jump into hyperspace (after turning to face the proper angle)
+#define	EF2_BRACKET_ENTITY_JKA		(1<<6)		// Draw as bracketed
+#define	EF2_SHIP_DEATH_JKA			(1<<7)		// "died in ship" mode
+#define	EF2_NOT_USED_1_JKA			(1<<8)		// not used
+
+
+
+
+
+
+
+
+
+
+
+
 #define _OPTIMIZED_VEHICLE_NETWORKING
 #define BASE_COMPAT
 
-static weapon_t jkaWeaponMap[] {
-	WP_NONE,
+static int jkaModToGeneralMap[]{
+	MOD_UNKNOWN_GENERAL,
+	MOD_STUN_BATON_GENERAL,
+	MOD_MELEE_GENERAL,
+	MOD_SABER_GENERAL,
+	MOD_BRYAR_PISTOL_GENERAL,
+	MOD_BRYAR_PISTOL_ALT_GENERAL,
+	MOD_BLASTER_GENERAL,
+	MOD_TURBLAST_GENERAL,
+	MOD_DISRUPTOR_GENERAL,
+	MOD_DISRUPTOR_SPLASH_GENERAL,
+	MOD_DISRUPTOR_SNIPER_GENERAL,
+	MOD_BOWCASTER_GENERAL,
+	MOD_REPEATER_GENERAL,
+	MOD_REPEATER_ALT_GENERAL,
+	MOD_REPEATER_ALT_SPLASH_GENERAL,
+	MOD_DEMP2_GENERAL,
+	MOD_DEMP2_ALT_GENERAL,
+	MOD_FLECHETTE_GENERAL,
+	MOD_FLECHETTE_ALT_SPLASH_GENERAL,
+	MOD_ROCKET_GENERAL,
+	MOD_ROCKET_SPLASH_GENERAL,
+	MOD_ROCKET_HOMING_GENERAL,
+	MOD_ROCKET_HOMING_SPLASH_GENERAL,
+	MOD_THERMAL_GENERAL,
+	MOD_THERMAL_SPLASH_GENERAL,
+	MOD_TRIP_MINE_SPLASH_GENERAL,
+	MOD_TIMED_MINE_SPLASH_GENERAL,
+	MOD_DET_PACK_SPLASH_GENERAL,
+	MOD_VEHICLE_GENERAL,
+	MOD_CONC_GENERAL,
+	MOD_CONC_ALT_GENERAL,
+	MOD_FORCE_DARK_GENERAL,
+	MOD_SENTRY_GENERAL,
+	MOD_WATER_GENERAL,
+	MOD_SLIME_GENERAL,
+	MOD_LAVA_GENERAL,
+	MOD_CRUSH_GENERAL,
+	MOD_TELEFRAG_GENERAL,
+	MOD_FALLING_GENERAL,
+	MOD_COLLISION_GENERAL,
+	MOD_VEH_EXPLOSION_GENERAL,
+	MOD_SUICIDE_GENERAL,
+	MOD_TARGET_LASER_GENERAL,
+	MOD_TRIGGER_HURT_GENERAL,
+	MOD_TEAM_CHANGE_GENERAL,
+	//AURELIO: when/if you put this back in_GENERAL, remember to make a case for it in all the other places where
+	//mod's are checked. Also_GENERAL, it probably isn't the most elegant solution for what you want - just add
+	//a frag back to the player after you call the player_die (and keep a local of his pre-death score to
+	//make sure he actually lost points_GENERAL, there may be cases where you don't lose points on changing teams
+	//or suiciding_GENERAL, and so you would actually be giving him a point) -Rich
+	// I put it back in for now_GENERAL, if it becomes a problem we'll work around it later (it shouldn't though)...
+	MOD_MAX_GENERAL
+};
 
-	WP_STUN_BATON,
-	WP_NONE,//WP_MELEE,
-	WP_SABER,
-	WP_BRYAR_PISTOL,
-	WP_BLASTER,
-	WP_DISRUPTOR,
-	WP_BOWCASTER,
-	WP_REPEATER,
-	WP_DEMP2,
-	WP_FLECHETTE,
-	WP_ROCKET_LAUNCHER,
-	WP_THERMAL,
-	WP_TRIP_MINE,
-	WP_DET_PACK,
-	WP_NONE,//WP_CONCUSSION,
-	WP_NONE,//WP_BRYAR_OLD,
-	WP_EMPLACED_GUN,
-	WP_TURRET,
+static int jkaWeaponToJK2Map[] {
+	WP_NONE_JK2,
 
-	//	WP_GAUNTLET,
-	//	WP_MACHINEGUN,			// Bryar
-	//	WP_SHOTGUN,				// Blaster
-	//	WP_GRENADE_LAUNCHER,	// Thermal
-	//	WP_LIGHTNING,			// 
-	//	WP_RAILGUN,				// 
-	//	WP_GRAPPLING_HOOK,
+	WP_STUN_BATON_JK2,
+	WP_NONE_JK2,//WP_MELEE_JK2,
+	WP_SABER_JK2,
+	WP_BRYAR_PISTOL_JK2,
+	WP_BLASTER_JK2,
+	WP_DISRUPTOR_JK2,
+	WP_BOWCASTER_JK2,
+	WP_REPEATER_JK2,
+	WP_DEMP2_JK2,
+	WP_FLECHETTE_JK2,
+	WP_ROCKET_LAUNCHER_JK2,
+	WP_THERMAL_JK2,
+	WP_TRIP_MINE_JK2,
+	WP_DET_PACK_JK2,
+	WP_NONE_JK2,//WP_CONCUSSION_JK2,
+	WP_NONE_JK2,//WP_BRYAR_OLD_JK2,
+	WP_EMPLACED_GUN_JK2,
+	WP_TURRET_JK2,
 
-	WP_NUM_WEAPONS
+	//	WP_GAUNTLET_JK2,
+	//	WP_MACHINEGUN_JK2,			// Bryar
+	//	WP_SHOTGUN_JK2,				// Blaster
+	//	WP_GRENADE_LAUNCHER_JK2,	// Thermal
+	//	WP_LIGHTNING_JK2,			// 
+	//	WP_RAILGUN_JK2,				// 
+	//	WP_GRAPPLING_HOOK_JK2,
+
+	WP_NUM_WEAPONS_JK2
+};
+static int jkaWeaponToGeneralMap[] {
+	WP_NONE_GENERAL,
+
+	WP_STUN_BATON_GENERAL,
+	WP_MELEE_GENERAL,
+	WP_SABER_GENERAL,
+	WP_BRYAR_PISTOL_GENERAL,
+	WP_BLASTER_GENERAL,
+	WP_DISRUPTOR_GENERAL,
+	WP_BOWCASTER_GENERAL,
+	WP_REPEATER_GENERAL,
+	WP_DEMP2_GENERAL,
+	WP_FLECHETTE_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,
+	WP_THERMAL_GENERAL,
+	WP_TRIP_MINE_GENERAL,
+	WP_DET_PACK_GENERAL,
+	WP_CONCUSSION_GENERAL,
+	WP_BRYAR_OLD_GENERAL,
+	WP_EMPLACED_GUN_GENERAL,
+	WP_TURRET_GENERAL,
+
+	//	WP_GAUNTLET_GENERAL,
+	//	WP_MACHINEGUN_GENERAL,			// Bryar
+	//	WP_SHOTGUN_GENERAL,				// Blaster
+	//	WP_GRENADE_LAUNCHER_GENERAL,	// Thermal
+	//	WP_LIGHTNING_GENERAL,			// 
+	//	WP_RAILGUN_GENERAL,				// 
+	//	WP_GRAPPLING_HOOK_GENERAL,
+
+	WP_NUM_WEAPONS_GENERAL
 };
 
 #define	MAX_WEAPONS_JKA				19
 
-const static entity_event_t jkaEventToGeneralMap[] = {
+const static int jkaEventToGeneralMap[] = {
 	EV_NONE_GENERAL,
 
 	EV_CLIENTJOIN_GENERAL,

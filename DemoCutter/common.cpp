@@ -602,46 +602,120 @@ void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char*
 
 
 // MOD-weapon mapping array.
-int weaponFromMOD[MOD_MAX] =
+int weaponFromMOD_JK2[MOD_MAX_JK2] =
 {
-	WP_NONE,				//MOD_UNKNOWN,
-	WP_STUN_BATON,			//MOD_STUN_BATON,
-	WP_NONE,				//MOD_MELEE,
-	WP_SABER,				//MOD_SABER,
-	WP_BRYAR_PISTOL,		//MOD_BRYAR_PISTOL,
-	WP_BRYAR_PISTOL,		//MOD_BRYAR_PISTOL_ALT,
-	WP_BLASTER,				//MOD_BLASTER,
-	WP_DISRUPTOR,			//MOD_DISRUPTOR,
-	WP_DISRUPTOR,			//MOD_DISRUPTOR_SPLASH,
-	WP_DISRUPTOR,			//MOD_DISRUPTOR_SNIPER,
-	WP_BOWCASTER,			//MOD_BOWCASTER,
-	WP_REPEATER,			//MOD_REPEATER,
-	WP_REPEATER,			//MOD_REPEATER_ALT,
-	WP_REPEATER,			//MOD_REPEATER_ALT_SPLASH,
-	WP_DEMP2,				//MOD_DEMP2,
-	WP_DEMP2,				//MOD_DEMP2_ALT,
-	WP_FLECHETTE,			//MOD_FLECHETTE,
-	WP_FLECHETTE,			//MOD_FLECHETTE_ALT_SPLASH,
-	WP_ROCKET_LAUNCHER,		//MOD_ROCKET,
-	WP_ROCKET_LAUNCHER,		//MOD_ROCKET_SPLASH,
-	WP_ROCKET_LAUNCHER,		//MOD_ROCKET_HOMING,
-	WP_ROCKET_LAUNCHER,		//MOD_ROCKET_HOMING_SPLASH,
-	WP_THERMAL,				//MOD_THERMAL,
-	WP_THERMAL,				//MOD_THERMAL_SPLASH,
-	WP_TRIP_MINE,			//MOD_TRIP_MINE_SPLASH,
-	WP_TRIP_MINE,			//MOD_TIMED_MINE_SPLASH,
-	WP_DET_PACK,			//MOD_DET_PACK_SPLASH,
-	WP_NONE,				//MOD_FORCE_DARK,
-	WP_NONE,				//MOD_SENTRY,
-	WP_NONE,				//MOD_WATER,
-	WP_NONE,				//MOD_SLIME,
-	WP_NONE,				//MOD_LAVA,
-	WP_NONE,				//MOD_CRUSH,
-	WP_NONE,				//MOD_TELEFRAG,
-	WP_NONE,				//MOD_FALLING,
-	WP_NONE,				//MOD_SUICIDE,
-	WP_NONE,				//MOD_TARGET_LASER,
-	WP_NONE,				//MOD_TRIGGER_HURT,
+	WP_NONE_JK2,				//MOD_UNKNOWN_JK2,
+	WP_STUN_BATON_JK2,			//MOD_STUN_BATON_JK2,
+	WP_NONE_JK2,				//MOD_MELEE_JK2,
+	WP_SABER_JK2,				//MOD_SABER_JK2,
+	WP_BRYAR_PISTOL_JK2,		//MOD_BRYAR_PISTOL_JK2,
+	WP_BRYAR_PISTOL_JK2,		//MOD_BRYAR_PISTOL_ALT_JK2,
+	WP_BLASTER_JK2,				//MOD_BLASTER_JK2,
+	WP_DISRUPTOR_JK2,			//MOD_DISRUPTOR_JK2,
+	WP_DISRUPTOR_JK2,			//MOD_DISRUPTOR_SPLASH_JK2,
+	WP_DISRUPTOR_JK2,			//MOD_DISRUPTOR_SNIPER_JK2,
+	WP_BOWCASTER_JK2,			//MOD_BOWCASTER_JK2,
+	WP_REPEATER_JK2,			//MOD_REPEATER_JK2,
+	WP_REPEATER_JK2,			//MOD_REPEATER_ALT_JK2,
+	WP_REPEATER_JK2,			//MOD_REPEATER_ALT_SPLASH_JK2,
+	WP_DEMP2_JK2,				//MOD_DEMP2_JK2,
+	WP_DEMP2_JK2,				//MOD_DEMP2_ALT_JK2,
+	WP_FLECHETTE_JK2,			//MOD_FLECHETTE_JK2,
+	WP_FLECHETTE_JK2,			//MOD_FLECHETTE_ALT_SPLASH_JK2,
+	WP_ROCKET_LAUNCHER_JK2,		//MOD_ROCKET_JK2,
+	WP_ROCKET_LAUNCHER_JK2,		//MOD_ROCKET_SPLASH_JK2,
+	WP_ROCKET_LAUNCHER_JK2,		//MOD_ROCKET_HOMING_JK2,
+	WP_ROCKET_LAUNCHER_JK2,		//MOD_ROCKET_HOMING_SPLASH_JK2,
+	WP_THERMAL_JK2,				//MOD_THERMAL_JK2,
+	WP_THERMAL_JK2,				//MOD_THERMAL_SPLASH_JK2,
+	WP_TRIP_MINE_JK2,			//MOD_TRIP_MINE_SPLASH_JK2,
+	WP_TRIP_MINE_JK2,			//MOD_TIMED_MINE_SPLASH_JK2,
+	WP_DET_PACK_JK2,			//MOD_DET_PACK_SPLASH_JK2,
+	WP_NONE_JK2,				//MOD_FORCE_DARK_JK2,
+	WP_NONE_JK2,				//MOD_SENTRY_JK2,
+	WP_NONE_JK2,				//MOD_WATER_JK2,
+	WP_NONE_JK2,				//MOD_SLIME_JK2,
+	WP_NONE_JK2,				//MOD_LAVA_JK2,
+	WP_NONE_JK2,				//MOD_CRUSH_JK2,
+	WP_NONE_JK2,				//MOD_TELEFRAG_JK2,
+	WP_NONE_JK2,				//MOD_FALLING_JK2,
+	WP_NONE_JK2,				//MOD_SUICIDE_JK2,
+	WP_NONE_JK2,				//MOD_TARGET_LASER_JK2,
+	WP_NONE_JK2,				//MOD_TRIGGER_HURT_JK2,
+};
+
+// MOD-weapon mapping array.
+int weaponFromMOD_GENERAL[MOD_MAX_GENERAL] =
+{
+	WP_NONE_GENERAL,				//MOD_UNKNOWN_GENERAL,
+	WP_STUN_BATON_GENERAL,			//MOD_STUN_BATON_GENERAL,
+	WP_NONE_GENERAL,				//MOD_MELEE_GENERAL,
+	WP_SABER_GENERAL,				//MOD_SABER_GENERAL,
+	WP_BRYAR_PISTOL_GENERAL,		//MOD_BRYAR_PISTOL_GENERAL,
+	WP_BRYAR_PISTOL_GENERAL,		//MOD_BRYAR_PISTOL_ALT_GENERAL,
+	WP_BLASTER_GENERAL,				//MOD_BLASTER_GENERAL,
+	WP_DISRUPTOR_GENERAL,			//MOD_DISRUPTOR_GENERAL,
+	WP_DISRUPTOR_GENERAL,			//MOD_DISRUPTOR_SPLASH_GENERAL,
+	WP_DISRUPTOR_GENERAL,			//MOD_DISRUPTOR_SNIPER_GENERAL,
+	WP_BOWCASTER_GENERAL,			//MOD_BOWCASTER_GENERAL,
+	WP_REPEATER_GENERAL,			//MOD_REPEATER_GENERAL,
+	WP_REPEATER_GENERAL,			//MOD_REPEATER_ALT_GENERAL,
+	WP_REPEATER_GENERAL,			//MOD_REPEATER_ALT_SPLASH_GENERAL,
+	WP_DEMP2_GENERAL,				//MOD_DEMP2_GENERAL,
+	WP_DEMP2_GENERAL,				//MOD_DEMP2_ALT_GENERAL,
+	WP_FLECHETTE_GENERAL,			//MOD_FLECHETTE_GENERAL,
+	WP_FLECHETTE_GENERAL,			//MOD_FLECHETTE_ALT_SPLASH_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,		//MOD_ROCKET_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,		//MOD_ROCKET_SPLASH_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,		//MOD_ROCKET_HOMING_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,		//MOD_ROCKET_HOMING_SPLASH_GENERAL,
+	WP_THERMAL_GENERAL,				//MOD_THERMAL_GENERAL,
+	WP_THERMAL_GENERAL,				//MOD_THERMAL_SPLASH_GENERAL,
+	WP_TRIP_MINE_GENERAL,			//MOD_TRIP_MINE_SPLASH_GENERAL,
+	WP_TRIP_MINE_GENERAL,			//MOD_TIMED_MINE_SPLASH_GENERAL,
+	WP_DET_PACK_GENERAL,			//MOD_DET_PACK_SPLASH_GENERAL,
+	WP_NONE_GENERAL,				//MOD_FORCE_DARK_GENERAL,
+	WP_NONE_GENERAL,				//MOD_SENTRY_GENERAL,
+	WP_NONE_GENERAL,				//MOD_WATER_GENERAL,
+	WP_NONE_GENERAL,				//MOD_SLIME_GENERAL,
+	WP_NONE_GENERAL,				//MOD_LAVA_GENERAL,
+	WP_NONE_GENERAL,				//MOD_CRUSH_GENERAL,
+	WP_NONE_GENERAL,				//MOD_TELEFRAG_GENERAL,
+	WP_NONE_GENERAL,				//MOD_FALLING_GENERAL,
+	WP_NONE_GENERAL,				//MOD_SUICIDE_GENERAL,
+	WP_NONE_GENERAL,				//MOD_TARGET_LASER_GENERAL,
+	WP_NONE_GENERAL,				//MOD_TRIGGER_HURT_GENERAL,
+	// JK3
+	WP_NONE_GENERAL,//MOD_TURBLAST_GENERAL,
+	WP_NONE_GENERAL,//MOD_VEHICLE_GENERAL,
+	WP_CONCUSSION_GENERAL,//MOD_CONC_GENERAL,
+	WP_CONCUSSION_GENERAL,//MOD_CONC_ALT_GENERAL,
+	WP_NONE_GENERAL,//MOD_COLLISION_GENERAL,
+	WP_NONE_GENERAL,//MOD_VEH_EXPLOSION_GENERAL,
+	WP_NONE_GENERAL,//MOD_TEAM_CHANGE_GENERAL,
+
+	//q3
+	WP_SHOTGUN_GENERAL,//MOD_SHOTGUN_GENERAL,
+	WP_GAUNTLET_GENERAL,//MOD_GAUNTLET_GENERAL,
+	WP_MACHINEGUN_GENERAL,//MOD_MACHINEGUN_GENERAL,
+	WP_GRENADE_LAUNCHER_GENERAL,//MOD_GRENADE_GENERAL,
+	WP_GRENADE_LAUNCHER_GENERAL,//MOD_GRENADE_SPLASH_GENERAL,
+	WP_PLASMAGUN_GENERAL,//MOD_PLASMA_GENERAL,
+	WP_PLASMAGUN_GENERAL,//MOD_PLASMA_SPLASH_GENERAL,
+	WP_RAILGUN_GENERAL,//MOD_RAILGUN_GENERAL,
+	WP_LIGHTNING_GENERAL,//MOD_LIGHTNING_GENERAL,
+	WP_BFG_GENERAL,//MOD_BFG_GENERAL,
+	WP_BFG_GENERAL,//MOD_BFG_SPLASH_GENERAL,
+	// 
+	//#ifdef MISSIONPACK
+	WP_NAILGUN_GENERAL,//MOD_NAIL_GENERAL,
+	WP_CHAINGUN_GENERAL,//MOD_CHAINGUN_GENERAL,
+	WP_PROX_LAUNCHER_GENERAL, //MOD_PROXIMITY_MINE_GENERAL,
+	WP_NONE_GENERAL,//MOD_KAMIKAZE_GENERAL,
+	WP_NONE_GENERAL,//MOD_JUICED_GENERAL,
+	//#endif
+
+	WP_GRAPPLING_HOOK_GENERAL,//MOD_GRAPPLE_GENERAL,
 };
 
 typedef enum {
@@ -1292,12 +1366,12 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		ps->holocronBits = s->time2;
 
 		if (!enhanceOnly) { // This stuff is kinda guesswork so... eh. Not use that if we are enhancing
-			if (s->weapon < WP_NUM_WEAPONS) {
+			if (s->weapon < specializeGameValue<GMAP_WEAPONS>( WP_NUM_WEAPONS_GENERAL,demoType)) {
 
 				ps->stats[STAT_WEAPONS] |= 1 << s->weapon; // To make weapon select wheel look correct
 			}
 
-			if (s->weapon == WP_SABER && s->fireflag == 0) {
+			if (generalizeGameValue<GMAP_WEAPONS>( s->weapon,demoType) == WP_SABER_GENERAL && s->fireflag == 0) {
 				// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
 				byte probability;
 				ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType, &probability);
@@ -2018,7 +2092,7 @@ Don't place this
 		/* pickup *///	"Stun Baton",
 				100,
 				IT_WEAPON,
-				WP_STUN_BATON,
+				WP_STUN_BATON_JK2,
 				/* precache */ "",
 				/* sounds */ ""
 					},
@@ -2036,7 +2110,7 @@ Don't place this
 			/* pickup *///	"Lightsaber",
 					100,
 					IT_WEAPON,
-					WP_SABER,
+					WP_SABER_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2054,7 +2128,7 @@ Don't place this
 			/* pickup *///	"Bryar Pistol",
 					100,
 					IT_WEAPON,
-					WP_BRYAR_PISTOL,
+					WP_BRYAR_PISTOL_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2071,7 +2145,7 @@ Don't place this
 			/* pickup *///	"E11 Blaster Rifle",
 					100,
 					IT_WEAPON,
-					WP_BLASTER,
+					WP_BLASTER_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2088,7 +2162,7 @@ Don't place this
 			/* pickup *///	"Tenloss Disruptor Rifle",
 					100,
 					IT_WEAPON,
-					WP_DISRUPTOR,
+					WP_DISRUPTOR_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2105,7 +2179,7 @@ Don't place this
 			/* pickup *///	"Wookiee Bowcaster",
 					100,
 					IT_WEAPON,
-					WP_BOWCASTER,
+					WP_BOWCASTER_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2122,7 +2196,7 @@ Don't place this
 			/* pickup *///	"Imperial Heavy Repeater",
 					100,
 					IT_WEAPON,
-					WP_REPEATER,
+					WP_REPEATER_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2140,7 +2214,7 @@ Don't place this
 			/* pickup *///	"DEMP2",
 					100,
 					IT_WEAPON,
-					WP_DEMP2,
+					WP_DEMP2_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2157,7 +2231,7 @@ Don't place this
 			/* pickup *///	"Golan Arms Flechette",
 					100,
 					IT_WEAPON,
-					WP_FLECHETTE,
+					WP_FLECHETTE_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2174,7 +2248,7 @@ Don't place this
 			/* pickup *///	"Merr-Sonn Missile System",
 					3,
 					IT_WEAPON,
-					WP_ROCKET_LAUNCHER,
+					WP_ROCKET_LAUNCHER_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2241,7 +2315,7 @@ Don't place this
 			/* pickup *///	"Thermal Detonator",
 					4,
 					IT_WEAPON,
-					WP_THERMAL,
+					WP_THERMAL_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2258,7 +2332,7 @@ Don't place this
 			/* pickup *///	"Trip Mine",
 					3,
 					IT_WEAPON,
-					WP_TRIP_MINE,
+					WP_TRIP_MINE_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2274,7 +2348,7 @@ Don't place this
 			/* pickup *///	"Det Pack",
 					3,
 					IT_WEAPON,
-					WP_DET_PACK,
+					WP_DET_PACK_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2291,7 +2365,7 @@ Don't place this
 			/* pickup *///	"Emplaced Gun",
 					50,
 					IT_WEAPON,
-					WP_EMPLACED_GUN,
+					WP_EMPLACED_GUN_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -2308,7 +2382,7 @@ Don't place this
 			/* pickup *///	"Turret Gun",
 					50,
 					IT_WEAPON,
-					WP_TURRET,
+					WP_TURRET_JK2,
 					/* precache */ "",
 					/* sounds */ ""
 						},
@@ -3802,8 +3876,9 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{},
-			{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral)/sizeof(jk2EntityEventsToGeneral[0])}
+			{{},{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}},
+			{{},{jk2WeaponsToGeneral,sizeof(jk2WeaponsToGeneral) / sizeof(jk2WeaponsToGeneral[0])}},
+			{{},{jk2modToGeneralMap,sizeof(jk2modToGeneralMap) / sizeof(jk2modToGeneralMap[0])}}
 		},
 		{
 			entityStateFields15,
@@ -3826,8 +3901,9 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{},
-			{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}
+			{{},{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}},
+			{{},{jk2WeaponsToGeneral,sizeof(jk2WeaponsToGeneral) / sizeof(jk2WeaponsToGeneral[0])}},
+			{{},{jk2modToGeneralMap,sizeof(jk2modToGeneralMap) / sizeof(jk2modToGeneralMap[0])}}
 		},
 		{
 			entityStateFields,
@@ -3850,8 +3926,9 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{},
-			{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}
+			{{},{jk2EntityEventsToGeneral,sizeof(jk2EntityEventsToGeneral) / sizeof(jk2EntityEventsToGeneral[0])}},
+			{{},{jk2WeaponsToGeneral,sizeof(jk2WeaponsToGeneral) / sizeof(jk2WeaponsToGeneral[0])}},
+			{{},{jk2modToGeneralMap,sizeof(jk2modToGeneralMap) / sizeof(jk2modToGeneralMap[0])}}
 		},
 		{
 			entityStateFields,
@@ -3875,8 +3952,16 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
-			{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])}
+			{
+				{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
+				{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},jkaWeaponToJK2Map,sizeof(jkaWeaponToJK2Map) / sizeof(jkaWeaponToJK2Map[0])}},
+				{jkaWeaponToGeneralMap,sizeof(jkaWeaponToGeneralMap) / sizeof(jkaWeaponToGeneralMap[0])},
+			},{
+				{},
+				{jkaModToGeneralMap,sizeof(jkaModToGeneralMap) / sizeof(jkaModToGeneralMap[0])},
+			}
 		},
 		{
 			entityStateFieldsJKA,
@@ -3886,7 +3971,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA},
 	},{
 		DM_26,
 		{
@@ -3903,8 +3988,16 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
-			{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])}
+			{
+				{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
+				{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},jkaWeaponToJK2Map,sizeof(jkaWeaponToJK2Map) / sizeof(jkaWeaponToJK2Map[0])}},
+				{jkaWeaponToGeneralMap,sizeof(jkaWeaponToGeneralMap) / sizeof(jkaWeaponToGeneralMap[0])},
+			},{
+				{},
+				{jkaModToGeneralMap,sizeof(jkaModToGeneralMap) / sizeof(jkaModToGeneralMap[0])},
+			}
 		},
 		{
 			entityStateFieldsJKA,
@@ -3914,7 +4007,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA},
 	},{
 		DM_26_XBOX,
 		{
@@ -3934,8 +4027,16 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
-			{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])}
+			{
+				{{{DM_15,DM_15_1_03,DM_16},jkaEventToJk2Map,sizeof(jkaEventToJk2Map) / sizeof(jkaEventToJk2Map[0])}},
+				{jkaEventToGeneralMap,sizeof(jkaEventToGeneralMap) / sizeof(jkaEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},jkaWeaponToJK2Map,sizeof(jkaWeaponToJK2Map) / sizeof(jkaWeaponToJK2Map[0])}},
+				{jkaWeaponToGeneralMap,sizeof(jkaWeaponToGeneralMap) / sizeof(jkaWeaponToGeneralMap[0])},
+			},{
+				{},
+				{jkaModToGeneralMap,sizeof(jkaModToGeneralMap) / sizeof(jkaModToGeneralMap[0])},
+			}
 		},
 		{},
 		MAX_CONFIGSTRINGS_JKA
@@ -3953,8 +4054,16 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map)/sizeof(q3dm68EventToJk2Map[0])}},
-			{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])}
+			{
+				{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
+				{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},q3WeaponToJK2Map,sizeof(q3WeaponToJK2Map) / sizeof(q3WeaponToJK2Map[0])}},
+				{q3WeaponToGeneralMap,sizeof(q3WeaponToGeneralMap) / sizeof(q3WeaponToGeneralMap[0])},
+			},{
+				{},
+				{q3ModToGeneralMap,sizeof(q3ModToGeneralMap) / sizeof(q3ModToGeneralMap[0])},
+			}
 		},
 		{
 			entityStateFieldsQ3DM68,
@@ -3963,7 +4072,7 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1},
 		64
 	},{
 		DM_67,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -3979,8 +4088,16 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
-			{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])}
+			{
+				{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
+				{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},q3WeaponToJK2Map,sizeof(q3WeaponToJK2Map) / sizeof(q3WeaponToJK2Map[0])}},
+				{q3WeaponToGeneralMap,sizeof(q3WeaponToGeneralMap) / sizeof(q3WeaponToGeneralMap[0])},
+			},{
+				{},
+				{q3ModToGeneralMap,sizeof(q3ModToGeneralMap) / sizeof(q3ModToGeneralMap[0])},
+			}
 		},
 		{
 			entityStateFieldsQ3DM68,
@@ -3989,7 +4106,7 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1},
 		64
 	},{
 		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -4005,8 +4122,16 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
-			{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])}
+			{
+				{{{DM_15,DM_15_1_03,DM_16},q3dm68EventToJk2Map,sizeof(q3dm68EventToJk2Map) / sizeof(q3dm68EventToJk2Map[0])}},
+				{q3dm68EventToGeneralMap,sizeof(q3dm68EventToGeneralMap) / sizeof(q3dm68EventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},q3WeaponToJK2Map,sizeof(q3WeaponToJK2Map) / sizeof(q3WeaponToJK2Map[0])}},
+				{q3WeaponToGeneralMap,sizeof(q3WeaponToGeneralMap) / sizeof(q3WeaponToGeneralMap[0])},
+			},{
+				{},
+				{q3ModToGeneralMap,sizeof(q3ModToGeneralMap) / sizeof(q3ModToGeneralMap[0])},
+			}
 		},
 		{
 			entityStateFieldsQ3DM68,
@@ -4015,14 +4140,14 @@ static gameInfo_t gameInfos[] = {
 			sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1},
 		64
 	},
 };
 
 
 // Multi game related
-specializedGameMappingsContainer_t specializedMappings[DEMOTYPE_COUNT][DEMOTYPE_COUNT]{};
+specializedGameMappingsContainer_t specializedMappings[GAMEMAPPINGTYPES_COUNT][DEMOTYPE_COUNT][DEMOTYPE_COUNT]{};
 gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT]{}; // Is auto-filled by democutter tools.
 static qboolean gameInfosInitialized = qfalse;
 
@@ -4042,15 +4167,47 @@ void initializeGameInfos() {
 			if (!gameInfos[i].constants.cs_models) gameInfos[i].constants.cs_models = CS_MODELS;
 			if (!gameInfos[i].constants.cs_sounds) gameInfos[i].constants.cs_sounds = CS_SOUNDS;
 			if (!gameInfos[i].constants.cs_players) gameInfos[i].constants.cs_players = CS_PLAYERS;
-			if (!gameInfos[i].constants.cs_players) gameInfos[i].constants.et_events = ET_EVENTS;
+			if (!gameInfos[i].constants.et_events) gameInfos[i].constants.et_events = ET_EVENTS;
+			if (!gameInfos[i].constants.ef_missile_stick) gameInfos[i].constants.ef_missile_stick = EF_MISSILE_STICK;
+			if (gameInfos[i].constants.ef_missile_stick == -1) gameInfos[i].constants.ef_missile_stick = NULL; // Q3 for example doesn't have mixxile stick at all.
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 
-			// We create the reverse event lookup table unless the programmer has specifically decided to provide one (no idea why anyone would do that but oh well).
-			if (!gameInfos[i].mappings.eventMappingsReverse.data) {
-				gameInfos[i].mappings.eventMappingsReverse.data = new const int[EV_ENTITY_EVENT_COUNT_GENERAL] {};
-				for (int gameEvent = gameInfos[i].mappings.eventMappingsReverse.count - 1; gameEvent >= 0; gameEvent--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
-					entity_event_t generalEvent = gameInfos[i].mappings.eventMappings.data[gameEvent];
-					((int*)gameInfos[i].mappings.eventMappingsReverse.data)[generalEvent] = gameEvent; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
+			// BTw for dynamically created arrays here: We don't care about destroying them. They are created one time at startup and that's it. When program closes they disappear too.
+
+			for (int gmapType = 0; gmapType < GAMEMAPPINGTYPES_COUNT; gmapType++) {
+				if (!gameInfos[i].mappings[gmapType].reversedMapping.data) {
+					gameInfos[i].mappings[gmapType].reversedMapping = { new const int[gameMappingTypeGeneralArrayLength[gmapType]] {}, gameMappingTypeGeneralArrayLength[gmapType] }; // we add +1 because we wanna map the Max_ thing too and not cause writing to some random memory location, damaging it and causing crashes
+					for (int gameValue = gameInfos[i].mappings[gmapType].mapping.count - 1; gameValue >= 0; gameValue--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
+						int generalValue = gameInfos[i].mappings[gmapType].mapping.data[gameValue];
+						((int*)gameInfos[i].mappings[gmapType].reversedMapping.data)[generalValue] = gameValue; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
+					}
+				}
+
+				for (int s = 0; s < MAX_SPECIALIZED_MAPPINGS; s++) {
+					if (gameInfos[i].mappings[gmapType].specializedMappings[s].mapping.data) { // Will be a null ptr if it wasnt initialized/added
+						for (int td = 0; td < MAX_MAPPING_TARGET_DEMOTYPES; td++) {
+							if (gameInfos[i].mappings[gmapType].specializedMappings[s].targetDemoTypes[td]) {
+								specializedMappings[gmapType][gameInfos[i].demoType][gameInfos[i].mappings[gmapType].specializedMappings[s].targetDemoTypes[td]].mapping = gameInfos[i].mappings[gmapType].specializedMappings[s].mapping;
+							}
+						}
+					}
+				}
+			}
+			/*// We create the reverse event lookup table unless the programmer has specifically decided to provide one (no idea why anyone would do that but oh well).
+			if (!gameInfos[i].mappings[GMAP_EVENTS].reversedMapping.data) {
+				gameInfos[i].mappings[GMAP_EVENTS].reversedMapping = { new const int[EV_ENTITY_EVENT_COUNT_GENERAL] {}, EV_ENTITY_EVENT_COUNT_GENERAL };
+				for (int gameEvent = gameInfos[i].mappings[GMAP_EVENTS].mapping.count - 1; gameEvent >= 0; gameEvent--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
+					entity_event_t generalEvent = (entity_event_t)gameInfos[i].mappings[GMAP_EVENTS].mapping.data[gameEvent];
+					((int*)gameInfos[i].mappings[GMAP_EVENTS].reversedMapping.data)[generalEvent] = gameEvent; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
+				}
+			}
+			
+			// We create the reverse weapon lookup table unless the programmer has specifically decided to provide one (no idea why anyone would do that but oh well).
+			if (!gameInfos[i].mappings[GMAP_WEAPONS].reversedMapping.data) {
+				gameInfos[i].mappings[GMAP_WEAPONS].reversedMapping = { new const int[WP_NUM_WEAPONS_GENERAL] {}_JK2, WP_NUM_WEAPONS_GENERAL };
+				for (int gameWeapon = gameInfos[i].mappings[GMAP_WEAPONS].mapping.count - 1; gameWeapon >= 0; gameWeapon--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
+					weapon_t generalWeapon = (weapon_t)gameInfos[i].mappings[GMAP_WEAPONS].mapping.data[gameWeapon];
+					((int*)gameInfos[i].mappings[GMAP_WEAPONS].reversedMapping.data)[generalWeapon] = gameWeapon; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
 				}
 			}
 
@@ -4063,7 +4220,14 @@ void initializeGameInfos() {
 						}
 					}
 				}
-			}
+				if (gameInfos[i].mappings.specializedWeaponMappings[s].mapping.data) { // Will be a null ptr if it wasnt initialized/added
+					for (int td = 0; td < MAX_MAPPING_TARGET_DEMOTYPES; td++) {
+						if (gameInfos[i].mappings.specializedWeaponMappings[s].targetDemoTypes[td]) {
+							specializedMappings[gameInfos[i].demoType][gameInfos[i].mappings.specializedWeaponMappings[s].targetDemoTypes[td]].weaponMapping = gameInfos[i].mappings.specializedWeaponMappings[s].mapping;
+						}
+					}
+				}
+			}*/
 		}
 		gameInfosInitialized = qtrue;
 	}

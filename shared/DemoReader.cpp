@@ -608,12 +608,14 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT;
 		ps->legsAnim = jkaAnimMapping[ps->legsAnim];
 		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;
-		ps->weapon = jkaWeaponMap[ps->weapon];
+		//ps->weapon = jkaWeaponMap[ps->weapon];
+		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon,demoType,DM_15);
 	} else if (demoType == DM_68) { // TODO Allow other ones too? But idk if anims changed
 
 		ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
 		ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
-		ps->weapon = q3WeaponMap[ps->weapon];
+		//ps->weapon = q3WeaponMap[ps->weapon];
+		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon, demoType, DM_15);;
 		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	}
 	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) {
@@ -1643,7 +1645,7 @@ int main(int argc, char** argv) {
 
 
 void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
-	int eventHere = generalizeEvent(tmpEntity->event & ~EV_EVENT_BITS,demoType);
+	int eventHere = generalizeGameValue<GMAP_EVENTS>(tmpEntity->event & ~EV_EVENT_BITS,demoType);
 	int maxLength = 0;
 	if (eventHere == EV_GENERAL_SOUND_GENERAL) {
 		int soundIndex = tmpEntity->eventParm;

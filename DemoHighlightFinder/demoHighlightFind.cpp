@@ -1902,10 +1902,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					}
 					// Track trip mine owners and the first time they were seen.
 					// Careful: The current way it is handled is blocked if the mine is temporarily not visible. The detection will think it appeared later.
-					else if (thisEs->eType == ET_GENERAL && thisEs->weapon == WP_TRIP_MINE && (thisEs->eFlags & EF_MISSILE_STICK)) { // tripmine
+					else if (thisEs->eType == ET_GENERAL && generalizeGameValue<GMAP_WEAPONS>( thisEs->weapon,demoType) == WP_TRIP_MINE_GENERAL && (thisEs->eFlags & getEF_MISSILE_STICK(demoType))) { // tripmine
 						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->genericenemyindex - 1024;
 						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_TRIPMINE;
-						if (generalizeEvent(thisEs->event & ~EV_EVENT_BITS,demoType) == EV_MISSILE_MISS_GENERAL) {
+						if (generalizeGameValue<GMAP_EVENTS>(thisEs->event & ~EV_EVENT_BITS,demoType) == EV_MISSILE_MISS_GENERAL) {
 							// This mine is exploding right now
 							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_EXPLODED;
 						}
@@ -2414,7 +2414,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				}
 
 #ifdef DEBUGSTATSDB
-				if(demo.cut.Cl.snap.ps.weapon==WP_SABER){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
+				if(generalizeGameValue<GMAP_WEAPONS>( demo.cut.Cl.snap.ps.weapon,demoType)==WP_SABER_GENERAL){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
 					
 					animStanceKey keyHere = { demoType,demo.cut.Cl.snap.ps.saberHolstered,demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT,demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT,demo.cut.Cl.snap.ps.saberMove,demo.cut.Cl.snap.ps.fd.saberAnimLevel };  // torsoAnim,legsAnim,saberMove,stance
 					animStanceCounts[keyHere]++;
@@ -2442,9 +2442,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					psEventData_t psEventData = demoCutGetEvent(&demo.cut.Cl.snap.ps, &demo.cut.Cl.oldSnap.ps,demoCurrentTime);
 
 					// Ok this confirms he took damage.
-					int generalEvent = generalizeEvent(psEventData.externalEvent.event, demoType);
-					int generalEventPred0 = generalizeEvent(psEventData.predictableEvents[0].event, demoType);
-					int generalEventPred1 = generalizeEvent(psEventData.predictableEvents[1].event, demoType);
+					int generalEvent = generalizeGameValue<GMAP_EVENTS>(psEventData.externalEvent.event, demoType);
+					int generalEventPred0 = generalizeGameValue<GMAP_EVENTS>(psEventData.predictableEvents[0].event, demoType);
+					int generalEventPred1 = generalizeGameValue<GMAP_EVENTS>(psEventData.predictableEvents[1].event, demoType);
 					if (generalEvent >= EV_PAIN_GENERAL && generalEvent <= EV_DEATH3_GENERAL
 						|| generalEventPred0 >= EV_PAIN_GENERAL && generalEventPred0 <= EV_DEATH3_GENERAL
 						|| generalEventPred1 >= EV_PAIN_GENERAL && generalEventPred1 <= EV_DEATH3_GENERAL
@@ -2458,7 +2458,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 					int eventNumber = demoCutGetEvent(thisEs,demoCurrentTime,demoType);
-					eventNumber = generalizeEvent(eventNumber,demoType);
+					eventNumber = generalizeGameValue<GMAP_EVENTS>(eventNumber,demoType);
 					if (eventNumber) {
 						
 
@@ -2467,6 +2467,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							int				target = thisEs->otherEntityNum;
 							int				attacker = thisEs->otherEntityNum2;
 							int				mod = thisEs->eventParm;
+							int				originalMod = mod;
 							bool			victimIsFlagCarrier = false;
 							bool			attackerIsFlagCarrier = false;
 							bool			isSuicide;
@@ -2484,6 +2485,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								attacker = ENTITYNUM_WORLD;
 								isWorldKill = true;
 							}
+							
+							mod = generalizeGameValue<GMAP_MEANSOFDEATH>(mod,demoType);
+
 							entityState_t* targetEntity = findEntity(target);
 							if (targetEntity) {
 								targetIsVisible = true;
@@ -2551,7 +2555,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 
 							isSuicide = target == attacker;
-							isDoomKill = mod == MOD_FALLING;
+							isDoomKill = mod == MOD_FALLING_GENERAL;
 							bool targetIsFollowed = demo.cut.Cl.snap.ps.clientNum == target;
 							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
 							attackerIsVisibleOrFollowed = attackerIsFollowed || attackerIsVisible;
@@ -2565,18 +2569,35 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							thisKill.isRet = victimIsFlagCarrier;
 							thisKill.isSuicide = isSuicide;
 							thisKill.isDoom = isDoomKill;
-							thisKill.isExplosion = (mod == MOD_FLECHETTE ||
-								mod == MOD_FLECHETTE_ALT_SPLASH ||
-								mod == MOD_ROCKET ||
-								mod == MOD_ROCKET_SPLASH ||
-								mod == MOD_ROCKET_HOMING ||
-								mod == MOD_ROCKET_HOMING_SPLASH ||
-								mod == MOD_THERMAL ||
-								mod == MOD_THERMAL_SPLASH ||
-								mod == MOD_TRIP_MINE_SPLASH ||
-								mod == MOD_TIMED_MINE_SPLASH ||
-								mod == MOD_DET_PACK_SPLASH);
-							thisKill.mod = (meansOfDeath_t)mod;
+							thisKill.isExplosion = (mod == MOD_FLECHETTE_GENERAL ||
+								mod == MOD_FLECHETTE_ALT_SPLASH_GENERAL ||
+								mod == MOD_ROCKET_GENERAL ||
+								mod == MOD_ROCKET_SPLASH_GENERAL ||
+								mod == MOD_ROCKET_HOMING_GENERAL ||
+								mod == MOD_ROCKET_HOMING_SPLASH_GENERAL ||
+								mod == MOD_THERMAL_GENERAL ||
+								mod == MOD_THERMAL_SPLASH_GENERAL ||
+								mod == MOD_TRIP_MINE_SPLASH_GENERAL ||
+								mod == MOD_TIMED_MINE_SPLASH_GENERAL ||
+								mod == MOD_DET_PACK_SPLASH_GENERAL
+
+								// JK 3
+								|| mod == MOD_COLLISION_GENERAL
+								|| mod == MOD_VEH_EXPLOSION_GENERAL
+								//|| mod == MOD_CONC_ALT_GENERAL
+								// 
+								// Q3
+								|| mod == MOD_GRENADE_GENERAL
+								|| mod == MOD_GRENADE_SPLASH_GENERAL
+								|| mod == MOD_KAMIKAZE_GENERAL
+								//|| mod == MOD_PLASMA_GENERAL, // Idk if i should count plasma as explosive... not really?
+								//|| mod == MOD_PLASMA_SPLASH_GENERAL,
+								//|| mod == MOD_BFG_GENERAL
+								//|| mod == MOD_BFG_SPLASH_GENERAL // Bfg is kinda explosive for gibbing purposes, but not really in terms im interested in here?
+								|| mod == MOD_PROXIMITY_MINE_GENERAL
+								);
+							thisKill.mod = (meansOfDeath_t)mod; // Hmm. Use generalized? Or normal. Tough question. investigate
+
 							thisKill.targetClientNum = target;
 							thisKill.time = demoCurrentTime;
 							//thisKill.isVisible = targetIsVisible;
@@ -2594,62 +2615,114 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							// Find extra info for means of death.
 							std::stringstream modInfo;
-							weapon_t probableKillingWeapon = (weapon_t)weaponFromMOD[mod];
+							weapon_t probableKillingWeapon = (weapon_t)weaponFromMOD_GENERAL[mod];
 							
 							qboolean needMoreInfo = qtrue;
-							if (probableKillingWeapon == WP_NONE) { // means something like doom kill
+							if (probableKillingWeapon == WP_NONE_GENERAL) { // means something like doom kill
 								switch (mod) {
-									case MOD_UNKNOWN:
+									case MOD_UNKNOWN_GENERAL:
 										modInfo << "_WEIRD";
 										break;
-									case MOD_FORCE_DARK:
+									case MOD_FORCE_DARK_GENERAL:
 										modInfo << "_FORCE";
 										needMoreInfo = qfalse;
 										break;
-									case MOD_SENTRY:
+									case MOD_SENTRY_GENERAL:
 										modInfo << "_SENTRY";
 										needMoreInfo = qfalse;
 										break;
-									case MOD_WATER:
+									case MOD_WATER_GENERAL:
 										modInfo << "_DROWN";
 										break;
-									case MOD_SLIME:
+									case MOD_SLIME_GENERAL:
 										modInfo << "_SLIME";
 										break;
-									case MOD_LAVA:
+									case MOD_LAVA_GENERAL:
 										modInfo << "_LAVA";
 										break;
-									case MOD_CRUSH:
+									case MOD_CRUSH_GENERAL:
 										modInfo << "_CRUSH";
 										break;
-									case MOD_TELEFRAG:
+									case MOD_TELEFRAG_GENERAL:
 										modInfo << "_TELE";
 										break;
-									case MOD_FALLING:
+									case MOD_FALLING_GENERAL:
 										modInfo << "_DOOM";
 										break;
-									case MOD_SUICIDE:
+									case MOD_SUICIDE_GENERAL:
 										modInfo << "_SUIC";
 										break;
-									case MOD_TARGET_LASER:
+									case MOD_TARGET_LASER_GENERAL:
 										modInfo << "_LASER";
 										break;
-									case MOD_TRIGGER_HURT:
+									case MOD_TRIGGER_HURT_GENERAL:
 										modInfo << "_TRIG";
+										break;
+
+									//JK3
+									case MOD_TURBLAST_GENERAL:
+										modInfo << "_TURBLAST";
+										break;
+									case MOD_VEHICLE_GENERAL:
+										// Do special handling
+										probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS>(thisEs->generic1,demoType);
+										switch (probableKillingWeapon)
+										{
+											case WP_BLASTER_GENERAL://primary blasters
+												modInfo << "_VEHBLASTERS";
+												needMoreInfo = qfalse;
+												break;
+											case WP_ROCKET_LAUNCHER_GENERAL://missile
+												modInfo << "_VEHMISSILE";
+												needMoreInfo = qfalse;
+												break;
+											case WP_THERMAL_GENERAL://bomb
+												modInfo << "_VEHBOMB";
+												needMoreInfo = qfalse;
+												break;
+											case WP_DEMP2_GENERAL://ion cannon
+												modInfo << "_VEHION";
+												needMoreInfo = qfalse;
+												break;
+											case WP_TURRET_GENERAL://turret
+												modInfo << "_VEHTURRET";
+												needMoreInfo = qfalse;
+												break;
+											default:
+												modInfo << "_VEHICLE";
+												break;
+										}
+										break;
+									case MOD_COLLISION_GENERAL:
+										modInfo << "_COLLIDE";
+										break;
+									case MOD_VEH_EXPLOSION_GENERAL:
+										modInfo << "_VEHEXP";
+										break;
+									case MOD_TEAM_CHANGE_GENERAL:
+										modInfo << "_TEAMCHANGE";
+										break;
+
+									// Q3
+									case MOD_KAMIKAZE_GENERAL:
+										modInfo << "_KAMIKAZE";
+										break;
+									case MOD_JUICED_GENERAL:
+										modInfo << "_JUICED";
 										break;
 								}
 								if(needMoreInfo)
 									modInfo << "_~";
 								if (attackerIsFollowed) {
-									probableKillingWeapon = (weapon_t)demo.cut.Cl.snap.ps.weapon;
+									probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS>(demo.cut.Cl.snap.ps.weapon, demoType);
 								}
 								else if (attackerEntity) {
-									probableKillingWeapon = (weapon_t)attackerEntity->weapon;
+									probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS>(attackerEntity->weapon, demoType);
 								}
 							}
 							if (needMoreInfo) {
 								switch (probableKillingWeapon) {
-									case WP_SABER:
+									case WP_SABER_GENERAL:
 										if (attackerIsFollowed) {
 
 											modInfo << saberMoveNames[demo.cut.Cl.snap.ps.saberMove];
@@ -2736,47 +2809,96 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 											modInfo << "_BF";
 										}
 										break;
-									case WP_STUN_BATON:
+									case WP_STUN_BATON_GENERAL:
 										modInfo << "_STUN";
 										break;
-									case WP_BRYAR_PISTOL:
+									case WP_BRYAR_PISTOL_GENERAL:
 										modInfo << "_BRYAR";
 										break;
-									case WP_BLASTER:
+									case WP_BLASTER_GENERAL:
 										modInfo << "_BLASTER";
 										break;
-									case WP_DISRUPTOR:
+									case WP_DISRUPTOR_GENERAL:
 										modInfo << "_DISRUPTOR";
 										break;
-									case WP_BOWCASTER:
+									case WP_BOWCASTER_GENERAL:
 										modInfo << "_BOWCAST";
 										break;
-									case WP_REPEATER:
+									case WP_REPEATER_GENERAL:
 										modInfo << "_REPEATER";
 										break;
-									case WP_DEMP2:
+									case WP_DEMP2_GENERAL:
 										modInfo << "_DEMP2";
 										break;
-									case WP_FLECHETTE:
+									case WP_FLECHETTE_GENERAL:
 										modInfo << "_FLECH";
 										break;
-									case WP_ROCKET_LAUNCHER:
+									case WP_ROCKET_LAUNCHER_GENERAL:
 										modInfo << "_ROCKET";
 										break;
-									case WP_THERMAL:
+									case WP_THERMAL_GENERAL:
 										modInfo << "_THERMAL";
 										break;
-									case WP_TRIP_MINE:
+									case WP_TRIP_MINE_GENERAL:
 										modInfo << "_MINE";
 										break;
-									case WP_DET_PACK:
+									case WP_DET_PACK_GENERAL:
 										modInfo << "_DTPCK";
 										break;
-									case WP_EMPLACED_GUN:
+									case WP_EMPLACED_GUN_GENERAL:
 										modInfo << "_EMPLACED";
 										break;
-									case WP_TURRET:
+									case WP_TURRET_GENERAL:
 										modInfo << "_TURRET";
+										break;
+									
+									//JK 3
+									case WP_MELEE_GENERAL:
+										modInfo << "_MELEE";
+										break;
+									case WP_CONCUSSION_GENERAL:
+										modInfo << "_CONC";
+										break;
+									case WP_BRYAR_OLD_GENERAL:
+										modInfo << "_BRYAROLD";
+										break;
+									
+									//q3
+									case WP_GAUNTLET_GENERAL:
+										modInfo << "_GAUNTLET";
+										break;
+									case WP_MACHINEGUN_GENERAL:
+										modInfo << "_MACHINEGUN";
+										break;
+									case WP_SHOTGUN_GENERAL:
+										modInfo << "_SHOTGUN";
+										break;
+									case WP_GRENADE_LAUNCHER_GENERAL:
+										modInfo << "_GRENLAUNCH";
+										break;
+									case WP_LIGHTNING_GENERAL:
+										modInfo << "_LIGHTNING";
+										break;
+									case WP_RAILGUN_GENERAL:
+										modInfo << "_RAILGUN";
+										break;
+									case WP_PLASMAGUN_GENERAL:
+										modInfo << "_PLASMA";
+										break;
+									case WP_BFG_GENERAL:
+										modInfo << "_BFG";
+										break;
+									case WP_GRAPPLING_HOOK_GENERAL:
+										modInfo << "_GRAPPLE";
+										break;
+									case WP_NAILGUN_GENERAL:
+										modInfo << "_NAILGUN";
+										break;
+									case WP_PROX_LAUNCHER_GENERAL:
+										modInfo << "_PROXMINE";
+										break;
+									case WP_CHAINGUN_GENERAL:
+										modInfo << "_CHAINGUN";
 										break;
 
 									default:
@@ -2789,7 +2911,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							qboolean canBeAirborne = qfalse;
 							qboolean projectileWasAirborne = qfalse;
 							// TODO: Do this for other weapons too, not just mines
-							if (mod == MOD_TRIP_MINE_SPLASH) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
+							if (mod == MOD_TRIP_MINE_SPLASH_GENERAL) { // If it's a trip mine kill, we wanna make sure that the mine that killed the victim was fired after a boost, else we ignore the boost.
 
 								isProjectileBased = qtrue;
 								canBeAirborne = qtrue;
@@ -3051,8 +3173,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							SQLBIND(insertStatement, int, "@isDoomKill", isDoomKill);
 							SQLBIND(insertStatement, int, "@isExplosion", thisKill.isExplosion);
 							SQLBIND(insertStatement, int, "@isSuicide", isSuicide);
-							SQLBIND(insertStatement, int, "@isModSuicide", mod==MOD_SUICIDE);
-							SQLBIND(insertStatement, int, "@meansOfDeath", mod);
+							SQLBIND(insertStatement, int, "@isModSuicide", mod==MOD_SUICIDE_GENERAL);
+							SQLBIND(insertStatement, int, "@meansOfDeath", mod); // Original or generalized? hmm
 							SQLBIND(insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
 							SQLBIND(insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
 							SQLBIND(insertStatement, double, "@positionZ", thisEs->pos.trBase[2]);
@@ -3104,7 +3226,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							SQLBIND(insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
 							SQLBIND(insertAngleStatement, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
 							SQLBIND(insertAngleStatement, int, "@isSuicide", isSuicide);
-							SQLBIND(insertAngleStatement, int, "@isModSuicide", mod == MOD_SUICIDE);
+							SQLBIND(insertAngleStatement, int, "@isModSuicide", mod == MOD_SUICIDE_GENERAL);
 							SQLBIND(insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
 							SQLBIND(insertAngleStatement, int, "@attackerIsFollowed", attackerIsFollowed);
 							SQLBIND(insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);

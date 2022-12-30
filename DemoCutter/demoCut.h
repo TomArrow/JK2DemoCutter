@@ -1903,7 +1903,7 @@ typedef enum {
 
 } entity_event_t;			// There is a maximum of 256 events (8 bits transmission, 2 high bits for uniqueness)
 
-static entity_event_t jk2EntityEventsToGeneral[] = {
+static const int jk2EntityEventsToGeneral[] = {
 	EV_NONE_GENERAL,
 
 	EV_CLIENTJOIN_GENERAL,
@@ -2130,65 +2130,218 @@ typedef enum {
 
 // means of death
 typedef enum {
-	MOD_UNKNOWN,
-	MOD_STUN_BATON,
-	MOD_MELEE,
-	MOD_SABER,
-	MOD_BRYAR_PISTOL,
-	MOD_BRYAR_PISTOL_ALT,
-	MOD_BLASTER,
-	MOD_DISRUPTOR,
-	MOD_DISRUPTOR_SPLASH,
-	MOD_DISRUPTOR_SNIPER,
-	MOD_BOWCASTER,
-	MOD_REPEATER,
-	MOD_REPEATER_ALT,
-	MOD_REPEATER_ALT_SPLASH,
-	MOD_DEMP2,
-	MOD_DEMP2_ALT,
-	MOD_FLECHETTE,
-	MOD_FLECHETTE_ALT_SPLASH,
-	MOD_ROCKET,
-	MOD_ROCKET_SPLASH,
-	MOD_ROCKET_HOMING,
-	MOD_ROCKET_HOMING_SPLASH,
-	MOD_THERMAL,
-	MOD_THERMAL_SPLASH,
-	MOD_TRIP_MINE_SPLASH,
-	MOD_TIMED_MINE_SPLASH,
-	MOD_DET_PACK_SPLASH,
-	MOD_FORCE_DARK,
-	MOD_SENTRY,
-	MOD_WATER,
-	MOD_SLIME,
-	MOD_LAVA,
-	MOD_CRUSH,
-	MOD_TELEFRAG,
-	MOD_FALLING,
-	MOD_SUICIDE,
-	MOD_TARGET_LASER,
-	MOD_TRIGGER_HURT,
-	MOD_MAX
+	MOD_UNKNOWN_GENERAL,
+	MOD_STUN_BATON_GENERAL,
+	MOD_MELEE_GENERAL,
+	MOD_SABER_GENERAL,
+	MOD_BRYAR_PISTOL_GENERAL,
+	MOD_BRYAR_PISTOL_ALT_GENERAL,
+	MOD_BLASTER_GENERAL,
+	MOD_DISRUPTOR_GENERAL,
+	MOD_DISRUPTOR_SPLASH_GENERAL,
+	MOD_DISRUPTOR_SNIPER_GENERAL,
+	MOD_BOWCASTER_GENERAL,
+	MOD_REPEATER_GENERAL,
+	MOD_REPEATER_ALT_GENERAL,
+	MOD_REPEATER_ALT_SPLASH_GENERAL,
+	MOD_DEMP2_GENERAL,
+	MOD_DEMP2_ALT_GENERAL,
+	MOD_FLECHETTE_GENERAL,
+	MOD_FLECHETTE_ALT_SPLASH_GENERAL,
+	MOD_ROCKET_GENERAL,
+	MOD_ROCKET_SPLASH_GENERAL,
+	MOD_ROCKET_HOMING_GENERAL,
+	MOD_ROCKET_HOMING_SPLASH_GENERAL,
+	MOD_THERMAL_GENERAL,
+	MOD_THERMAL_SPLASH_GENERAL,
+	MOD_TRIP_MINE_SPLASH_GENERAL,
+	MOD_TIMED_MINE_SPLASH_GENERAL,
+	MOD_DET_PACK_SPLASH_GENERAL,
+	MOD_FORCE_DARK_GENERAL,
+	MOD_SENTRY_GENERAL,
+	MOD_WATER_GENERAL,
+	MOD_SLIME_GENERAL,
+	MOD_LAVA_GENERAL,
+	MOD_CRUSH_GENERAL,
+	MOD_TELEFRAG_GENERAL,
+	MOD_FALLING_GENERAL,
+	MOD_SUICIDE_GENERAL,
+	MOD_TARGET_LASER_GENERAL,
+	MOD_TRIGGER_HURT_GENERAL,
+
+	// JK3
+	MOD_TURBLAST_GENERAL,
+	MOD_VEHICLE_GENERAL,
+	MOD_CONC_GENERAL,
+	MOD_CONC_ALT_GENERAL,
+	MOD_COLLISION_GENERAL,
+	MOD_VEH_EXPLOSION_GENERAL,
+	MOD_TEAM_CHANGE_GENERAL,
+
+	//q3
+	MOD_SHOTGUN_GENERAL,
+	MOD_GAUNTLET_GENERAL,
+	MOD_MACHINEGUN_GENERAL,
+	MOD_GRENADE_GENERAL,
+	MOD_GRENADE_SPLASH_GENERAL,
+	MOD_PLASMA_GENERAL,
+	MOD_PLASMA_SPLASH_GENERAL,
+	MOD_RAILGUN_GENERAL,
+	MOD_LIGHTNING_GENERAL,
+	MOD_BFG_GENERAL,
+	MOD_BFG_SPLASH_GENERAL,
+//#ifdef MISSIONPACK
+	MOD_NAIL_GENERAL,
+	MOD_CHAINGUN_GENERAL,
+	MOD_PROXIMITY_MINE_GENERAL,
+	MOD_KAMIKAZE_GENERAL,
+	MOD_JUICED_GENERAL,
+//#endif
+	MOD_GRAPPLE_GENERAL,
+	MOD_MAX_GENERAL,
 } meansOfDeath_t;
 
 typedef enum {
-	WP_NONE,
+	MOD_UNKNOWN_JK2,
+	MOD_STUN_BATON_JK2,
+	MOD_MELEE_JK2,
+	MOD_SABER_JK2,
+	MOD_BRYAR_PISTOL_JK2,
+	MOD_BRYAR_PISTOL_ALT_JK2,
+	MOD_BLASTER_JK2,
+	MOD_DISRUPTOR_JK2,
+	MOD_DISRUPTOR_SPLASH_JK2,
+	MOD_DISRUPTOR_SNIPER_JK2,
+	MOD_BOWCASTER_JK2,
+	MOD_REPEATER_JK2,
+	MOD_REPEATER_ALT_JK2,
+	MOD_REPEATER_ALT_SPLASH_JK2,
+	MOD_DEMP2_JK2,
+	MOD_DEMP2_ALT_JK2,
+	MOD_FLECHETTE_JK2,
+	MOD_FLECHETTE_ALT_SPLASH_JK2,
+	MOD_ROCKET_JK2,
+	MOD_ROCKET_SPLASH_JK2,
+	MOD_ROCKET_HOMING_JK2,
+	MOD_ROCKET_HOMING_SPLASH_JK2,
+	MOD_THERMAL_JK2,
+	MOD_THERMAL_SPLASH_JK2,
+	MOD_TRIP_MINE_SPLASH_JK2,
+	MOD_TIMED_MINE_SPLASH_JK2,
+	MOD_DET_PACK_SPLASH_JK2,
+	MOD_FORCE_DARK_JK2,
+	MOD_SENTRY_JK2,
+	MOD_WATER_JK2,
+	MOD_SLIME_JK2,
+	MOD_LAVA_JK2,
+	MOD_CRUSH_JK2,
+	MOD_TELEFRAG_JK2,
+	MOD_FALLING_JK2,
+	MOD_SUICIDE_JK2,
+	MOD_TARGET_LASER_JK2,
+	MOD_TRIGGER_HURT_JK2,
+	MOD_MAX_JK2
+} meansOfDeath_jk2_t;
 
-	WP_STUN_BATON,
-	WP_SABER,				 // NOTE: lots of code assumes this is the first weapon (... which is crap) so be careful -Ste.
-	WP_BRYAR_PISTOL,
-	WP_BLASTER,
-	WP_DISRUPTOR,
-	WP_BOWCASTER,
-	WP_REPEATER,
-	WP_DEMP2,
-	WP_FLECHETTE,
-	WP_ROCKET_LAUNCHER,
-	WP_THERMAL,
-	WP_TRIP_MINE,
-	WP_DET_PACK,
-	WP_EMPLACED_GUN,
-	WP_TURRET,
+static const int jk2modToGeneralMap[] =  {
+	MOD_UNKNOWN_GENERAL,
+	MOD_STUN_BATON_GENERAL,
+	MOD_MELEE_GENERAL,
+	MOD_SABER_GENERAL,
+	MOD_BRYAR_PISTOL_GENERAL,
+	MOD_BRYAR_PISTOL_ALT_GENERAL,
+	MOD_BLASTER_GENERAL,
+	MOD_DISRUPTOR_GENERAL,
+	MOD_DISRUPTOR_SPLASH_GENERAL,
+	MOD_DISRUPTOR_SNIPER_GENERAL,
+	MOD_BOWCASTER_GENERAL,
+	MOD_REPEATER_GENERAL,
+	MOD_REPEATER_ALT_GENERAL,
+	MOD_REPEATER_ALT_SPLASH_GENERAL,
+	MOD_DEMP2_GENERAL,
+	MOD_DEMP2_ALT_GENERAL,
+	MOD_FLECHETTE_GENERAL,
+	MOD_FLECHETTE_ALT_SPLASH_GENERAL,
+	MOD_ROCKET_GENERAL,
+	MOD_ROCKET_SPLASH_GENERAL,
+	MOD_ROCKET_HOMING_GENERAL,
+	MOD_ROCKET_HOMING_SPLASH_GENERAL,
+	MOD_THERMAL_GENERAL,
+	MOD_THERMAL_SPLASH_GENERAL,
+	MOD_TRIP_MINE_SPLASH_GENERAL,
+	MOD_TIMED_MINE_SPLASH_GENERAL,
+	MOD_DET_PACK_SPLASH_GENERAL,
+	MOD_FORCE_DARK_GENERAL,
+	MOD_SENTRY_GENERAL,
+	MOD_WATER_GENERAL,
+	MOD_SLIME_GENERAL,
+	MOD_LAVA_GENERAL,
+	MOD_CRUSH_GENERAL,
+	MOD_TELEFRAG_GENERAL,
+	MOD_FALLING_GENERAL,
+	MOD_SUICIDE_GENERAL,
+	MOD_TARGET_LASER_GENERAL,
+	MOD_TRIGGER_HURT_GENERAL,
+	MOD_MAX_GENERAL
+};
+
+typedef enum {
+	WP_NONE_GENERAL,
+	WP_STUN_BATON_GENERAL,
+	WP_SABER_GENERAL,
+	WP_BRYAR_PISTOL_GENERAL,
+	WP_BLASTER_GENERAL,
+	WP_DISRUPTOR_GENERAL,
+	WP_BOWCASTER_GENERAL,
+	WP_REPEATER_GENERAL,
+	WP_DEMP2_GENERAL,
+	WP_FLECHETTE_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,
+	WP_THERMAL_GENERAL,
+	WP_TRIP_MINE_GENERAL,
+	WP_DET_PACK_GENERAL,
+	WP_EMPLACED_GUN_GENERAL,
+	WP_TURRET_GENERAL,
+	//jk3
+	WP_MELEE_GENERAL,
+	WP_CONCUSSION_GENERAL,
+	WP_BRYAR_OLD_GENERAL,
+	//q3
+	WP_GAUNTLET_GENERAL,
+	WP_MACHINEGUN_GENERAL,
+	WP_SHOTGUN_GENERAL,
+	WP_GRENADE_LAUNCHER_GENERAL,
+	WP_LIGHTNING_GENERAL,
+	WP_RAILGUN_GENERAL,
+	WP_PLASMAGUN_GENERAL,
+	WP_BFG_GENERAL,
+	WP_GRAPPLING_HOOK_GENERAL,
+	WP_NAILGUN_GENERAL,
+	WP_PROX_LAUNCHER_GENERAL,
+	WP_CHAINGUN_GENERAL,
+
+	WP_NUM_WEAPONS_GENERAL,
+} weapon_t;
+
+
+typedef enum {
+	WP_NONE_JK2,
+
+	WP_STUN_BATON_JK2,
+	WP_SABER_JK2,				 // NOTE: lots of code assumes this is the first weapon (... which is crap) so be careful -Ste.
+	WP_BRYAR_PISTOL_JK2,
+	WP_BLASTER_JK2,
+	WP_DISRUPTOR_JK2,
+	WP_BOWCASTER_JK2,
+	WP_REPEATER_JK2,
+	WP_DEMP2_JK2,
+	WP_FLECHETTE_JK2,
+	WP_ROCKET_LAUNCHER_JK2,
+	WP_THERMAL_JK2,
+	WP_TRIP_MINE_JK2,
+	WP_DET_PACK_JK2,
+	WP_EMPLACED_GUN_JK2,
+	WP_TURRET_JK2,
 
 	//	WP_GAUNTLET,
 	//	WP_MACHINEGUN,			// Bryar
@@ -2198,10 +2351,41 @@ typedef enum {
 	//	WP_RAILGUN,				// 
 	//	WP_GRAPPLING_HOOK,
 
-	WP_NUM_WEAPONS
-} weapon_t;
+	WP_NUM_WEAPONS_JK2
+} weapon_jk2_t;
 
-extern int weaponFromMOD[MOD_MAX];
+static const int jk2WeaponsToGeneral[]= {
+	WP_NONE_GENERAL,
+
+	WP_STUN_BATON_GENERAL,
+	WP_SABER_GENERAL,				 // NOTE: lots of code assumes this is the first weapon (... which is crap) so be careful -Ste.
+	WP_BRYAR_PISTOL_GENERAL,
+	WP_BLASTER_GENERAL,
+	WP_DISRUPTOR_GENERAL,
+	WP_BOWCASTER_GENERAL,
+	WP_REPEATER_GENERAL,
+	WP_DEMP2_GENERAL,
+	WP_FLECHETTE_GENERAL,
+	WP_ROCKET_LAUNCHER_GENERAL,
+	WP_THERMAL_GENERAL,
+	WP_TRIP_MINE_GENERAL,
+	WP_DET_PACK_GENERAL,
+	WP_EMPLACED_GUN_GENERAL,
+	WP_TURRET_GENERAL,
+
+	//	WP_GAUNTLET,
+	//	WP_MACHINEGUN,			// Bryar
+	//	WP_SHOTGUN,				// Blaster
+	//	WP_GRENADE_LAUNCHER,	// Thermal
+	//	WP_LIGHTNING,			// 
+	//	WP_RAILGUN,				// 
+	//	WP_GRAPPLING_HOOK,
+
+	WP_NUM_WEAPONS_GENERAL
+};
+
+extern int weaponFromMOD_JK2[MOD_MAX_JK2];
+extern int weaponFromMOD_GENERAL[MOD_MAX_GENERAL];
 
 enum
 {
@@ -2847,7 +3031,7 @@ qboolean BG_SaberInAttack(int move);
 
 
 template<class T>
-qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType)
+qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke support JKA properly? Or too much work...
 {
 
 	int saberMove, torsoAnim, saberHolstered, usingATST, weapon, weaponstate, saberInFlight;
@@ -2902,7 +3086,7 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType)
 		return qfalse;
 	}
 
-	if (weapon != WP_SABER)
+	if (generalizeGameValue<GMAP_WEAPONS>( weapon,demoType) != WP_SABER_GENERAL)
 	{
 		return qfalse;
 	}
@@ -2997,6 +3181,7 @@ struct gameConstantsInfo_t {
 	int cs_sounds;
 	int cs_players;
 	int	et_events;
+	int ef_missile_stick;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -3007,21 +3192,45 @@ struct specializedGameMapping_t {
 	wannabeArray_t<const int> mapping;
 };
 struct specializedGameMappingsContainer_t {
-	wannabeArray_t<const int> eventMapping;
+	wannabeArray_t<const int> mapping;
 };
 
-struct gameMappings_t {
-	specializedGameMapping_t				specializedEventMappings[MAX_SPECIALIZED_MAPPINGS];	// Mapping to a target demo type directly
-	wannabeArray_t<const entity_event_t>	eventMappings;				// Mapping to general
-
-	wannabeArray_t<const int>	eventMappingsReverse;		// Auto-generated. From general events to specific of this game
+struct gameInfoMapping_t {
+	specializedGameMapping_t	specializedMappings[MAX_SPECIALIZED_MAPPINGS];
+	wannabeArray_t<const int>	mapping;
+	wannabeArray_t<const int>	reversedMapping; // auto-filled
 };
+
+enum gameMappingType_t { // When changing this, also update gameMappingTypeGeneralArrayLength array
+	GMAP_EVENTS,
+	GMAP_WEAPONS,
+	GMAP_MEANSOFDEATH,
+	GAMEMAPPINGTYPES_COUNT
+};
+
+static int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
+	EV_ENTITY_EVENT_COUNT_GENERAL+1, //GMAP_EVENTS,
+	WP_NUM_WEAPONS_GENERAL+1,//GMAP_WEAPONS,
+	MOD_MAX_GENERAL+1 //GMAP_MEANSOFDEATH,
+}; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
+
+//struct gameMappings_t {
+	//gameInfoMapping_t	
+	//specializedGameMapping_t				specializedEventMappings[MAX_SPECIALIZED_MAPPINGS];	// Mapping to a target demo type directly
+	//wannabeArray_t<const entity_event_t>	eventMappings;				// Mapping to general
+	//specializedGameMapping_t				specializedWeaponMappings[MAX_SPECIALIZED_MAPPINGS];	// Mapping to a target demo type directly
+	//wannabeArray_t<const weapon_t>			weaponMappings;				// Mapping to general
+
+	//wannabeArray_t<const int>				eventMappingsReverse;		// Auto-generated. From general events to specific of this game
+	//wannabeArray_t<const int>				weaponMappingsReverse;		// Auto-generated. From general events to specific of this game
+//};
 
 // Multi game support related
 struct gameInfo_t {
 	demoType_t						demoType;
 	svc_ops_e_general				opsToGeneral[svc_ops_general_count];
-	gameMappings_t					mappings;
+	//gameMappings_t					mappings;
+	gameInfoMapping_t				mappings[GAMEMAPPINGTYPES_COUNT];
 	gameNetFieldInfo_t				netFieldInfo;
 	int								maxConfigstrings;
 	gameConstantsInfo_t				constants;
@@ -3033,7 +3242,7 @@ struct gameInfo_t {
 };
 
 extern gameInfo_t* gameInfosMapped[DEMOTYPE_COUNT];
-extern specializedGameMappingsContainer_t specializedMappings[DEMOTYPE_COUNT][DEMOTYPE_COUNT];
+extern specializedGameMappingsContainer_t specializedMappings[GAMEMAPPINGTYPES_COUNT][DEMOTYPE_COUNT][DEMOTYPE_COUNT];
 
 //inline svc_ops_e_general generalizeGameSVCOp(int gameOp, demoType_t demoType);
 //inline int specializeGeneralSVCOp(svc_ops_e_general generalOp, demoType_t demoType);
@@ -3077,31 +3286,94 @@ inline int getCS_SOUNDS(demoType_t demoType) {
 inline int getET_EVENTS(demoType_t demoType) {
 		return gameInfosMapped[demoType]->constants.et_events;
 }
+inline int getEF_MISSILE_STICK(demoType_t demoType) {
+		return gameInfosMapped[demoType]->constants.ef_missile_stick;
+}
 inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;
 }
 
 // Tries a specialized mapping (if exists) or falls back to a more standard approach
-inline int convertEvent(int eventValue, demoType_t sourceDemoType, demoType_t targetDemoType) {
-	if (specializedMappings[sourceDemoType][targetDemoType].eventMapping.data) {
-		return specializedMappings[sourceDemoType][targetDemoType].eventMapping.data[eventValue & ~EV_EVENT_BITS] | ((eventValue)&EV_EVENT_BITS);
+template<gameMappingType_t T>
+inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
+	if (specializedMappings[T][sourceDemoType][targetDemoType].mapping.data) {
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.data[value & ~EV_EVENT_BITS] | ((eventValue)&EV_EVENT_BITS);
 	}
 	else {
 		// Use specialized to general mapping of source demotype first, then use reverse general to specialized mapping of target demo type
-		entity_event_t generalValue = gameInfosMapped[sourceDemoType]->mappings.eventMappings.data[eventValue & ~EV_EVENT_BITS];
-		return gameInfosMapped[targetDemoType]->mappings.eventMappingsReverse.data[generalValue] | ((eventValue)&EV_EVENT_BITS);
+		if constexpr (T == GMAP_EVENTS) {
+
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~EV_EVENT_BITS];
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.data[generalValue] | ((value)&EV_EVENT_BITS);
+		}
+		else  {
+
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value];
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.data[generalValue];
+		}
 	}
 }
 
-inline int generalizeEvent(int eventValue, demoType_t sourceDemoType) {
-	// Use specialized to general mapping of source demotype first, then use reverse general to specialized mapping of target demo type
-	return gameInfosMapped[sourceDemoType]->mappings.eventMappings.data[eventValue & ~EV_EVENT_BITS] | ((eventValue)&EV_EVENT_BITS);
+template<gameMappingType_t T>
+inline int generalizeGameValue(int value, demoType_t sourceDemoType) {
+	if constexpr (T == GMAP_EVENTS) {
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+	}
+	else  {
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value];
+	}
+}
+
+template<gameMappingType_t T>
+inline int specializeGameValue(int value, demoType_t sourceDemoType) {
+	if constexpr (T == GMAP_EVENTS) {
+		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping.data[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+	}
+	else  {
+		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping.data[value];
+	}
 }
 
 // Use this in special cases where you know you have created that specialized mapping, otherwise this will crash the software.
-inline int specializedEventMapUnsafe(int eventValue, demoType_t sourceDemoType, demoType_t targetDemoType) {
-	return specializedMappings[sourceDemoType][targetDemoType].eventMapping.data[eventValue & ~EV_EVENT_BITS] | ((eventValue)&EV_EVENT_BITS);
+template<gameMappingType_t T>
+inline int specializedGameValueMapUnsafe(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
+	if constexpr (T == GMAP_EVENTS) {
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.data[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+	}
+	else  {
+
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.data[value];
+	}
 }
+
+/*
+template<gameMappingType_t T>
+inline int getGameValueMaxCount(int value, demoType_t sourceDemoType) {
+	return gameInfosMapped[sourceDemoType]->mappings[T].mapping.count-1; // Since these arrays attach a _COUNT element at the end, the size is actually 1 bigger than the number we want here.
+}*/
+
+/*
+
+// Tries a specialized mapping (if exists) or falls back to a more standard approach
+inline int convertWeapon(int weapon, demoType_t sourceDemoType, demoType_t targetDemoType) {
+	if (specializedMappings[sourceDemoType][targetDemoType].weaponMapping.data) {
+		return specializedMappings[sourceDemoType][targetDemoType].weaponMapping.data[weapon];
+	}
+	else {
+		// Use specialized to general mapping of source demotype first, then use reverse general to specialized mapping of target demo type
+		weapon_t generalValue = gameInfosMapped[sourceDemoType]->mappings[GMAP_WEAPONS].mapping.data[weapon];
+		return gameInfosMapped[targetDemoType]->mappings[GMAP_WEAPONS].mappingReverse.data[generalValue];
+	}
+}
+
+inline int generalizeWeapon(int weapon, demoType_t sourceDemoType) {
+	return gameInfosMapped[sourceDemoType]->mappings[GMAP_WEAPONS].mapping.data[weapon];
+}
+
+// Use this in special cases where you know you have created that specialized mapping, otherwise this will crash the software.
+inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, demoType_t targetDemoType) {
+	return specializedMappings[sourceDemoType][targetDemoType].weaponMapping.data[weapon];
+}*/
 
 
 #endif

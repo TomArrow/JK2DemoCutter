@@ -665,7 +665,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					
 					// EFFECT_EXPLOSION_TRIPMINE (EV_PLAY_EFFECT)
 					// EV_GENERAL_SOUND te->s.trickedentindex = ent->s.number;
-					if (it->second.eType == ET_GENERAL && it->second.weapon == WP_TRIP_MINE && (it->second.eFlags & EF_MISSILE_STICK)) {
+					if (it->second.eType == ET_GENERAL && it->second.weapon == WP_TRIP_MINE_JK2 && (it->second.eFlags & EF_MISSILE_STICK)) { // TODO Make this work with JKA?
 						// It's a trip mine.
 
 						// Ignore this: (might be based on mistake)
