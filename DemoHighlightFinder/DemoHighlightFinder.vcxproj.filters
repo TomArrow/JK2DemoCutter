@@ -203,6 +203,9 @@
     <ClCompile Include="..\shared\zlib\zutil.c">
       <Filter>Common\zlib</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\animMappingTable.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">

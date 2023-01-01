@@ -607,26 +607,32 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 	if (demoType == DM_26 || demoType == DM_25) {
 
-		ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
-		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT;
-		ps->legsAnim = jkaAnimMapping[ps->legsAnim];
-		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;
+		//ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
+		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
+		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT; // Generalize togglebit someday?
+		//ps->legsAnim = jkaAnimMapping[ps->legsAnim];
+		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, demoType, DM_16);
+		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;// Generalize togglebit someday?
 		//ps->weapon = jkaWeaponMap[ps->weapon];
 		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon,demoType,DM_15);
 	} else if (demoType == DM_68) { // TODO Allow other ones too? But idk if anims changed
 
-		ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
-		ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
+		//ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
+		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
+		//ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
+		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, demoType, DM_16);
 		//ps->weapon = q3WeaponMap[ps->weapon];
 		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon, demoType, DM_15);;
 		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	}
-	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) {
+	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
 
 		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
 		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
-		ps->torsoAnim = MV_MapAnimation102(ps->torsoAnim);
-		ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
+		//ps->torsoAnim = MV_MapAnimation102(ps->torsoAnim);
+		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, DM_16, DM_15);
+		//ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
+		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, DM_16, DM_15);
 	}
 }
 

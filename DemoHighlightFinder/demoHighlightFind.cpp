@@ -288,8 +288,8 @@ struct frameInfo_t {
 	qboolean psTeleportBit[MAX_CLIENTS_MAX];
 	int pmFlagTime[MAX_CLIENTS_MAX];
 	int commandTime[MAX_CLIENTS_MAX];
-	int legsAnim[MAX_CLIENTS_MAX];
-	int torsoAnim[MAX_CLIENTS_MAX];
+	int legsAnimGeneral[MAX_CLIENTS_MAX];
+	int torsoAnimGeneral[MAX_CLIENTS_MAX];
 	int groundEntityNum[MAX_CLIENTS_MAX];
 }; 
 
@@ -1117,6 +1117,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	int				lastKnownTime = 0;
 	qboolean		isCompressedFile = qfalse;
 	int				psGeneralSaberMove = 0;
+	int				psGeneralTorsoAnim = 0;
+	int				psGeneralLegsAnim = 0;
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -1748,6 +1750,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				demoOldTime = demoCurrentTime;
 
 				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE>(demo.cut.Cl.snap.ps.saberMove,demoType);
+				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS>(demo.cut.Cl.snap.ps.legsAnim,demoType);
+				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
 
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
@@ -1759,6 +1763,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
 						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE>(thisEs->saberMove,demoType);
+						animNumberGeneral_t thisEsGeneralLegsAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS>(thisEs->legsAnim,demoType);
+						animNumberGeneral_t thisEsGeneralTorsoAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS>(thisEs->torsoAnim,demoType);
 
 						thisFrameInfo.canBlockSimplified[thisEs->number] = WP_SaberCanBlock_Simple(thisEs,demoType);
 
@@ -1799,14 +1805,14 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						}
 
 						thisFrameInfo.commandTime[thisEs->number] = thisEs->pos.trType == TR_LINEAR_STOP ? thisEs->pos.trTime : -1;
-						thisFrameInfo.legsAnim[thisEs->number] = thisEs->legsAnim;
-						thisFrameInfo.torsoAnim[thisEs->number] = thisEs->torsoAnim;
+						thisFrameInfo.legsAnimGeneral[thisEs->number] = thisEsGeneralLegsAnim;
+						thisFrameInfo.torsoAnimGeneral[thisEs->number] = thisEsGeneralTorsoAnim;
 
 						// Backflip detection
 						if (
 							lastFrameInfo.entityExists[thisEs->number] && (
-								(thisEs->legsAnim != lastFrameInfo.legsAnim[thisEs->number] && isBackflip(thisEs->legsAnim, demoType))
-							|| (thisEs->torsoAnim != lastFrameInfo.torsoAnim[thisEs->number] && isBackflip(thisEs->torsoAnim, demoType))
+								(thisEsGeneralLegsAnim != lastFrameInfo.legsAnimGeneral[thisEs->number] && isBackflip<qtrue>(thisEsGeneralLegsAnim, demoType))
+							|| (thisEsGeneralTorsoAnim != lastFrameInfo.torsoAnimGeneral[thisEs->number] && isBackflip<qtrue>(thisEsGeneralTorsoAnim, demoType))
 							)) {
 							lastBackflip[thisEs->number] = demoCurrentTime;
 						}
@@ -1976,14 +1982,14 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					}
 
 					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
-					thisFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.legsAnim;
-					thisFrameInfo.torsoAnim[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.torsoAnim;
+					thisFrameInfo.legsAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralLegsAnim;
+					thisFrameInfo.torsoAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralTorsoAnim;
 
 					// Backflip detection
 					if (
 						lastFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] && (
-							(demo.cut.Cl.snap.ps.legsAnim != lastFrameInfo.legsAnim[demo.cut.Cl.snap.ps.clientNum] && isBackflip(demo.cut.Cl.snap.ps.legsAnim, demoType))
-							|| (demo.cut.Cl.snap.ps.torsoAnim != lastFrameInfo.torsoAnim[demo.cut.Cl.snap.ps.clientNum] && isBackflip(demo.cut.Cl.snap.ps.torsoAnim, demoType))
+							(psGeneralLegsAnim != lastFrameInfo.legsAnimGeneral[demo.cut.Cl.snap.ps.clientNum] && isBackflip<qtrue>(psGeneralLegsAnim, demoType))
+							|| (psGeneralTorsoAnim != lastFrameInfo.torsoAnimGeneral[demo.cut.Cl.snap.ps.clientNum] && isBackflip<qtrue>(psGeneralTorsoAnim, demoType))
 							)) {
 						lastBackflip[demo.cut.Cl.snap.ps.clientNum] = demoCurrentTime;
 					}
@@ -2242,8 +2248,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 							}
 
-							qboolean playerIsDFAing = (qboolean)((thisFrameInfo.legsAnim[i] != lastFrameInfo.legsAnim[i] && isDFA(thisFrameInfo.legsAnim[i], demoType))
-								|| (thisFrameInfo.torsoAnim[i] != lastFrameInfo.torsoAnim[i] && isDFA(thisFrameInfo.torsoAnim[i], demoType)));
+							qboolean playerIsDFAing = (qboolean)((thisFrameInfo.legsAnimGeneral[i] != lastFrameInfo.legsAnimGeneral[i] && isDFA<qtrue>(thisFrameInfo.legsAnimGeneral[i], demoType))
+								|| (thisFrameInfo.torsoAnimGeneral[i] != lastFrameInfo.torsoAnimGeneral[i] && isDFA<qtrue>(thisFrameInfo.torsoAnimGeneral[i], demoType)));
 
 							// Vertical boost detected
 							// TODO: Deal with jumpbug somehow? Not necessary for most maps tho, it will be lower than ordinary jump speed I think.
@@ -2261,8 +2267,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 								// If we are in a backflip, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a backflip
 								//if (isBackflip(thisFrameInfo.legsAnim[i],thisFrameInfo.torsoAnim[i], demoType)){
-								else if ((thisFrameInfo.legsAnim[i] != lastFrameInfo.legsAnim[i] && isBackflip(thisFrameInfo.legsAnim[i],demoType))
-									|| (thisFrameInfo.torsoAnim[i] != lastFrameInfo.torsoAnim[i] && isBackflip(thisFrameInfo.torsoAnim[i], demoType))
+								else if ((thisFrameInfo.legsAnimGeneral[i] != lastFrameInfo.legsAnimGeneral[i] && isBackflip<qtrue>(thisFrameInfo.legsAnimGeneral[i],demoType))
+									|| (thisFrameInfo.torsoAnimGeneral[i] != lastFrameInfo.torsoAnimGeneral[i] && isBackflip<qtrue>(thisFrameInfo.torsoAnimGeneral[i], demoType))
 									){
 									//if (thisFrameInfo.playerVelocities[i][2] > BACKFLIP_MAX_VELOCITY_DELTA_VERT) {
 									if (verticalDeltaNormalized > BACKFLIP_MAX_VELOCITY_DELTA_VERT) {
@@ -2271,8 +2277,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								} 
 								// If we are in a yellow dfa, our vertical velocity delta could exceed a usual jump velocity so make sure our speed upwards is higher than the speed of a yellow dfa
 								//else if (playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_STAB || playerLastSaberMove[i].lastSaberMove == LS_A_FLIP_SLASH){
-								else if ((thisFrameInfo.legsAnim[i] != lastFrameInfo.legsAnim[i] && isYellowDFA(thisFrameInfo.legsAnim[i], demoType))
-									|| (thisFrameInfo.torsoAnim[i] != lastFrameInfo.torsoAnim[i] && isYellowDFA(thisFrameInfo.torsoAnim[i], demoType))
+								else if ((thisFrameInfo.legsAnimGeneral[i] != lastFrameInfo.legsAnimGeneral[i] && isYellowDFA<qtrue>(thisFrameInfo.legsAnimGeneral[i], demoType))
+									|| (thisFrameInfo.torsoAnimGeneral[i] != lastFrameInfo.torsoAnimGeneral[i] && isYellowDFA<qtrue>(thisFrameInfo.torsoAnimGeneral[i], demoType))
 									){
 									//if (thisFrameInfo.playerVelocities[i][2] > YELLOWDFA_MAX_VELOCITY_DELTA_VERT) {
 									if (verticalDeltaNormalized > YELLOWDFA_MAX_VELOCITY_DELTA_VERT) {
@@ -2430,7 +2436,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 #ifdef DEBUGSTATSDB
 				if(generalizeGameValue<GMAP_WEAPONS>( demo.cut.Cl.snap.ps.weapon,demoType)==WP_SABER_GENERAL){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
 					
-					animStanceKey keyHere = { demoType,demo.cut.Cl.snap.ps.saberHolstered,demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT,demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT,demo.cut.Cl.snap.ps.saberMove,demo.cut.Cl.snap.ps.fd.saberAnimLevel };  // torsoAnim,legsAnim,saberMove,stance
+					animStanceKey keyHere = { demoType,demo.cut.Cl.snap.ps.saberHolstered,demo.cut.Cl.snap.ps.torsoAnim & ~getANIM_TOGGLEBIT(demoType),demo.cut.Cl.snap.ps.legsAnim & ~getANIM_TOGGLEBIT(demoType),demo.cut.Cl.snap.ps.saberMove,demo.cut.Cl.snap.ps.fd.saberAnimLevel };  // torsoAnim,legsAnim,saberMove,stance
 					animStanceCounts[keyHere]++;
 					
 				}

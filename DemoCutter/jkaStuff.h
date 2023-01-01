@@ -1196,1848 +1196,3633 @@ const int lsMoveJKAToJK2[] {
 
 
 
-
-
-
-
-// Turned from enum to array, thus reusing the Jedi Outcast animations where they exist. EZ PZ. (idk if this actually works)
-static animNumber_t jkaAnimMapping[] = //# animNumber_e
-{
+static const int jkaAnimToGeneral[]{
+	
 	//=================================================
 	//HEAD ANIMS
 	//=================================================
 	//# #sep Head-only anims
-	(animNumber_t)0,//FACE_TALK0,			//# silent
-	FACE_TALK1,			//# quiet
-	FACE_TALK2,			//# semi-quiet
-	FACE_TALK3,			//# semi-loud
-	FACE_TALK4,			//# loud
-	FACE_ALERT,				//# 
-	FACE_SMILE,				//# 
-	FACE_FROWN,				//# 
-	FACE_DEAD,				//# 
+	FACE_TALK0_GENERAL,			//# silent
+	FACE_TALK1_GENERAL,			//# quiet
+	FACE_TALK2_GENERAL,			//# semi-quiet
+	FACE_TALK3_GENERAL,			//# semi-loud
+	FACE_TALK4_GENERAL,			//# loud
+	FACE_ALERT_GENERAL,				//# 
+	FACE_SMILE_GENERAL,				//# 
+	FACE_FROWN_GENERAL,				//# 
+	FACE_DEAD_GENERAL,				//# 
 
 	//=================================================
 	//ANIMS IN WHICH UPPER AND LOWER OBJECTS ARE IN MD3
 	//=================================================
 	//# #sep BOTH_ DEATHS
-	BOTH_DEATH1,		//# First Death anim
-	BOTH_DEATH2,			//# Second Death anim
-	BOTH_DEATH3,			//# Third Death anim
-	BOTH_DEATH4,			//# Fourth Death anim
-	BOTH_DEATH5,			//# Fifth Death anim
-	BOTH_DEATH6,			//# Sixth Death anim
-	BOTH_DEATH7,			//# Seventh Death anim
-	BOTH_DEATH8,			//# 
-	BOTH_DEATH9,			//# 
-	BOTH_DEATH10,			//# 
-	BOTH_DEATH11,			//#
-	BOTH_DEATH12,			//# 
-	BOTH_DEATH13,			//# 
-	BOTH_DEATH14,			//# 
-	BOTH_DEATH15,			//# 
-	BOTH_DEATH16,			//# 
-	BOTH_DEATH17,			//# 
-	BOTH_DEATH18,			//# 
-	BOTH_DEATH19,			//# 
-	BOTH_DEATH20,			//# 
-	BOTH_DEATH21,			//# 
-	BOTH_DEATH22,			//# 
-	BOTH_DEATH23,			//# 
-	BOTH_DEATH24,			//# 
-	BOTH_DEATH25,			//# 
+	BOTH_DEATH1_GENERAL,		//# First Death anim
+	BOTH_DEATH2_GENERAL,			//# Second Death anim
+	BOTH_DEATH3_GENERAL,			//# Third Death anim
+	BOTH_DEATH4_GENERAL,			//# Fourth Death anim
+	BOTH_DEATH5_GENERAL,			//# Fifth Death anim
+	BOTH_DEATH6_GENERAL,			//# Sixth Death anim
+	BOTH_DEATH7_GENERAL,			//# Seventh Death anim
+	BOTH_DEATH8_GENERAL,			//# 
+	BOTH_DEATH9_GENERAL,			//# 
+	BOTH_DEATH10_GENERAL,			//# 
+	BOTH_DEATH11_GENERAL,			//#
+	BOTH_DEATH12_GENERAL,			//# 
+	BOTH_DEATH13_GENERAL,			//# 
+	BOTH_DEATH14_GENERAL,			//# 
+	BOTH_DEATH15_GENERAL,			//# 
+	BOTH_DEATH16_GENERAL,			//# 
+	BOTH_DEATH17_GENERAL,			//# 
+	BOTH_DEATH18_GENERAL,			//# 
+	BOTH_DEATH19_GENERAL,			//# 
+	BOTH_DEATH20_GENERAL,			//# 
+	BOTH_DEATH21_GENERAL,			//# 
+	BOTH_DEATH22_GENERAL,			//# 
+	BOTH_DEATH23_GENERAL,			//# 
+	BOTH_DEATH24_GENERAL,			//# 
+	BOTH_DEATH25_GENERAL,			//# 
 
-	BOTH_DEATHFORWARD1,		//# First Death in which they get thrown forward
-	BOTH_DEATHFORWARD2,		//# Second Death in which they get thrown forward
-	BOTH_DEATHFORWARD3,		//# Tavion's falling in cin# 23
-	BOTH_DEATHBACKWARD1,	//# First Death in which they get thrown backward
-	BOTH_DEATHBACKWARD2,	//# Second Death in which they get thrown backward
+	BOTH_DEATHFORWARD1_GENERAL,		//# First Death in which they get thrown forward
+	BOTH_DEATHFORWARD2_GENERAL,		//# Second Death in which they get thrown forward
+	BOTH_DEATHFORWARD3_GENERAL,		//# Tavion's falling in cin# 23
+	BOTH_DEATHBACKWARD1_GENERAL,	//# First Death in which they get thrown backward
+	BOTH_DEATHBACKWARD2_GENERAL,	//# Second Death in which they get thrown backward
 
-	BOTH_DEATH1IDLE,		//# Idle while close to death
-	BOTH_LYINGDEATH1,		//# Death to play when killed lying down
-	BOTH_STUMBLEDEATH1,		//# Stumble forward and fall face first death
-	BOTH_FALLDEATH1,		//# Fall forward off a high cliff and splat death - start
-	BOTH_FALLDEATH1INAIR,	//# Fall forward off a high cliff and splat death - loop
-	BOTH_FALLDEATH1LAND,	//# Fall forward off a high cliff and splat death - hit bottom
-	BOTH_DEATH_ROLL,		//# Death anim from a roll
-	BOTH_DEATH_FLIP,		//# Death anim from a flip
-	BOTH_DEATH_SPIN_90_R,	//# Death anim when facing 90 degrees right
-	BOTH_DEATH_SPIN_90_L,	//# Death anim when facing 90 degrees left
-	BOTH_DEATH_SPIN_180,	//# Death anim when facing backwards
-	BOTH_DEATH_LYING_UP,	//# Death anim when lying on back
-	BOTH_DEATH_LYING_DN,	//# Death anim when lying on front
-	BOTH_DEATH_FALLING_DN,	//# Death anim when falling on face
-	BOTH_DEATH_FALLING_UP,	//# Death anim when falling on back
-	BOTH_DEATH_CROUCHED,	//# Death anim when crouched
+	BOTH_DEATH1IDLE_GENERAL,		//# Idle while close to death
+	BOTH_LYINGDEATH1_GENERAL,		//# Death to play when killed lying down
+	BOTH_STUMBLEDEATH1_GENERAL,		//# Stumble forward and fall face first death
+	BOTH_FALLDEATH1_GENERAL,		//# Fall forward off a high cliff and splat death - start
+	BOTH_FALLDEATH1INAIR_GENERAL,	//# Fall forward off a high cliff and splat death - loop
+	BOTH_FALLDEATH1LAND_GENERAL,	//# Fall forward off a high cliff and splat death - hit bottom
+	BOTH_DEATH_ROLL_GENERAL,		//# Death anim from a roll
+	BOTH_DEATH_FLIP_GENERAL,		//# Death anim from a flip
+	BOTH_DEATH_SPIN_90_R_GENERAL,	//# Death anim when facing 90 degrees right
+	BOTH_DEATH_SPIN_90_L_GENERAL,	//# Death anim when facing 90 degrees left
+	BOTH_DEATH_SPIN_180_GENERAL,	//# Death anim when facing backwards
+	BOTH_DEATH_LYING_UP_GENERAL,	//# Death anim when lying on back
+	BOTH_DEATH_LYING_DN_GENERAL,	//# Death anim when lying on front
+	BOTH_DEATH_FALLING_DN_GENERAL,	//# Death anim when falling on face
+	BOTH_DEATH_FALLING_UP_GENERAL,	//# Death anim when falling on back
+	BOTH_DEATH_CROUCHED_GENERAL,	//# Death anim when crouched
 	//# #sep BOTH_ DEAD POSES # Should be last frame of corresponding previous anims
-	BOTH_DEAD1,				//# First Death finished pose
-	BOTH_DEAD2,				//# Second Death finished pose
-	BOTH_DEAD3,				//# Third Death finished pose
-	BOTH_DEAD4,				//# Fourth Death finished pose
-	BOTH_DEAD5,				//# Fifth Death finished pose
-	BOTH_DEAD6,				//# Sixth Death finished pose
-	BOTH_DEAD7,				//# Seventh Death finished pose
-	BOTH_DEAD8,				//# 
-	BOTH_DEAD9,				//# 
-	BOTH_DEAD10,			//# 
-	BOTH_DEAD11,			//#
-	BOTH_DEAD12,			//# 
-	BOTH_DEAD13,			//# 
-	BOTH_DEAD14,			//# 
-	BOTH_DEAD15,			//# 
-	BOTH_DEAD16,			//# 
-	BOTH_DEAD17,			//# 
-	BOTH_DEAD18,			//# 
-	BOTH_DEAD19,			//# 
-	BOTH_DEAD20,			//# 
-	BOTH_DEAD21,			//# 
-	BOTH_DEAD22,			//# 
-	BOTH_DEAD23,			//# 
-	BOTH_DEAD24,			//# 
-	BOTH_DEAD25,			//# 
-	BOTH_DEADFORWARD1,		//# First thrown forward death finished pose
-	BOTH_DEADFORWARD2,		//# Second thrown forward death finished pose
-	BOTH_DEADBACKWARD1,		//# First thrown backward death finished pose
-	BOTH_DEADBACKWARD2,		//# Second thrown backward death finished pose
-	BOTH_LYINGDEAD1,		//# Killed lying down death finished pose
-	BOTH_STUMBLEDEAD1,		//# Stumble forward death finished pose
-	BOTH_FALLDEAD1LAND,		//# Fall forward and splat death finished pose
+	BOTH_DEAD1_GENERAL,				//# First Death finished pose
+	BOTH_DEAD2_GENERAL,				//# Second Death finished pose
+	BOTH_DEAD3_GENERAL,				//# Third Death finished pose
+	BOTH_DEAD4_GENERAL,				//# Fourth Death finished pose
+	BOTH_DEAD5_GENERAL,				//# Fifth Death finished pose
+	BOTH_DEAD6_GENERAL,				//# Sixth Death finished pose
+	BOTH_DEAD7_GENERAL,				//# Seventh Death finished pose
+	BOTH_DEAD8_GENERAL,				//# 
+	BOTH_DEAD9_GENERAL,				//# 
+	BOTH_DEAD10_GENERAL,			//# 
+	BOTH_DEAD11_GENERAL,			//#
+	BOTH_DEAD12_GENERAL,			//# 
+	BOTH_DEAD13_GENERAL,			//# 
+	BOTH_DEAD14_GENERAL,			//# 
+	BOTH_DEAD15_GENERAL,			//# 
+	BOTH_DEAD16_GENERAL,			//# 
+	BOTH_DEAD17_GENERAL,			//# 
+	BOTH_DEAD18_GENERAL,			//# 
+	BOTH_DEAD19_GENERAL,			//# 
+	BOTH_DEAD20_GENERAL,			//# 
+	BOTH_DEAD21_GENERAL,			//# 
+	BOTH_DEAD22_GENERAL,			//# 
+	BOTH_DEAD23_GENERAL,			//# 
+	BOTH_DEAD24_GENERAL,			//# 
+	BOTH_DEAD25_GENERAL,			//# 
+	BOTH_DEADFORWARD1_GENERAL,		//# First thrown forward death finished pose
+	BOTH_DEADFORWARD2_GENERAL,		//# Second thrown forward death finished pose
+	BOTH_DEADBACKWARD1_GENERAL,		//# First thrown backward death finished pose
+	BOTH_DEADBACKWARD2_GENERAL,		//# Second thrown backward death finished pose
+	BOTH_LYINGDEAD1_GENERAL,		//# Killed lying down death finished pose
+	BOTH_STUMBLEDEAD1_GENERAL,		//# Stumble forward death finished pose
+	BOTH_FALLDEAD1LAND_GENERAL,		//# Fall forward and splat death finished pose
 	//# #sep BOTH_ DEAD TWITCH/FLOP # React to being shot from death poses
-	BOTH_DEADFLOP1,		//# React to being shot from First Death finished pose
-	BOTH_DEADFLOP2,		//# React to being shot from Second Death finished pose
-	BOTH_DISMEMBER_HEAD1,	//#
-	BOTH_DISMEMBER_TORSO1,	//#
-	BOTH_DISMEMBER_LLEG,	//#
-	BOTH_DISMEMBER_RLEG,	//#
-	BOTH_DISMEMBER_RARM,	//#
-	BOTH_DISMEMBER_LARM,	//#
+	BOTH_DEADFLOP1_GENERAL,		//# React to being shot from First Death finished pose
+	BOTH_DEADFLOP2_GENERAL,		//# React to being shot from Second Death finished pose
+	BOTH_DISMEMBER_HEAD1_GENERAL,	//#
+	BOTH_DISMEMBER_TORSO1_GENERAL,	//#
+	BOTH_DISMEMBER_LLEG_GENERAL,	//#
+	BOTH_DISMEMBER_RLEG_GENERAL,	//#
+	BOTH_DISMEMBER_RARM_GENERAL,	//#
+	BOTH_DISMEMBER_LARM_GENERAL,	//#
 	//# #sep BOTH_ PAINS
-	BOTH_PAIN1,				//# First take pain anim
-	BOTH_PAIN2,				//# Second take pain anim
-	BOTH_PAIN3,				//# Third take pain anim
-	BOTH_PAIN4,				//# Fourth take pain anim
-	BOTH_PAIN5,				//# Fifth take pain anim - from behind
-	BOTH_PAIN6,				//# Sixth take pain anim - from behind
-	BOTH_PAIN7,				//# Seventh take pain anim - from behind
-	BOTH_PAIN8,				//# Eigth take pain anim - from behind
-	BOTH_PAIN9,				//# 
-	BOTH_PAIN10,			//# 
-	BOTH_PAIN11,			//# 
-	BOTH_PAIN12,			//# 
-	BOTH_PAIN13,			//# 
-	BOTH_PAIN14,			//# 
-	BOTH_PAIN15,			//# 
-	BOTH_PAIN16,			//# 
-	BOTH_PAIN17,			//# 
-	BOTH_PAIN18,			//# 
+	BOTH_PAIN1_GENERAL,				//# First take pain anim
+	BOTH_PAIN2_GENERAL,				//# Second take pain anim
+	BOTH_PAIN3_GENERAL,				//# Third take pain anim
+	BOTH_PAIN4_GENERAL,				//# Fourth take pain anim
+	BOTH_PAIN5_GENERAL,				//# Fifth take pain anim - from behind
+	BOTH_PAIN6_GENERAL,				//# Sixth take pain anim - from behind
+	BOTH_PAIN7_GENERAL,				//# Seventh take pain anim - from behind
+	BOTH_PAIN8_GENERAL,				//# Eigth take pain anim - from behind
+	BOTH_PAIN9_GENERAL,				//# 
+	BOTH_PAIN10_GENERAL,			//# 
+	BOTH_PAIN11_GENERAL,			//# 
+	BOTH_PAIN12_GENERAL,			//# 
+	BOTH_PAIN13_GENERAL,			//# 
+	BOTH_PAIN14_GENERAL,			//# 
+	BOTH_PAIN15_GENERAL,			//# 
+	BOTH_PAIN16_GENERAL,			//# 
+	BOTH_PAIN17_GENERAL,			//# 
+	BOTH_PAIN18_GENERAL,			//# 
 
 	//# #sep BOTH_ ATTACKS
-	BOTH_ATTACK1,			//# Attack with stun baton
-	BOTH_ATTACK2,			//# Attack with one-handed pistol
-	BOTH_ATTACK3,			//# Attack with blaster rifle
-	BOTH_ATTACK4,			//# Attack with disruptor
-	BOTH_ATTACK5,			//# Another Rancor Attack
-	BOTH_ATTACK6,			//# Yet Another Rancor Attack
-	BOTH_ATTACK7,			//# Yet Another Rancor Attack
-	BOTH_ATTACK10,			//# Attack with thermal det
-	BOTH_ATTACK11,			//# "Attack" with tripmine and detpack
-	BOTH_MELEE1,			//# First melee attack
-	BOTH_MELEE2,			//# Second melee attack
-	BOTH_THERMAL_READY,		//# pull back with thermal
-	BOTH_THERMAL_THROW,		//# throw thermal
+	BOTH_ATTACK1_GENERAL,			//# Attack with stun baton
+	BOTH_ATTACK2_GENERAL,			//# Attack with one-handed pistol
+	BOTH_ATTACK3_GENERAL,			//# Attack with blaster rifle
+	BOTH_ATTACK4_GENERAL,			//# Attack with disruptor
+	BOTH_ATTACK5_GENERAL,			//# Another Rancor Attack
+	BOTH_ATTACK6_GENERAL,			//# Yet Another Rancor Attack
+	BOTH_ATTACK7_GENERAL,			//# Yet Another Rancor Attack
+	BOTH_ATTACK10_GENERAL,			//# Attack with thermal det
+	BOTH_ATTACK11_GENERAL,			//# "Attack" with tripmine and detpack
+	BOTH_MELEE1_GENERAL,			//# First melee attack
+	BOTH_MELEE2_GENERAL,			//# Second melee attack
+	BOTH_THERMAL_READY_GENERAL,		//# pull back with thermal
+	BOTH_THERMAL_THROW_GENERAL,		//# throw thermal
 	//* #sep BOTH_ SABER ANIMS
 	//Saber attack anims - power level 1
-	BOTH_A1_T__B_,	//# Fast weak vertical attack top to bottom
-	BOTH_A1__L__R,	//# Fast weak horizontal attack left to right
-	BOTH_A1__R__L,	//# Fast weak horizontal attack right to left
-	BOTH_A1_TL_BR,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A1_BR_TL,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A1_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-	BOTH_A1_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A1_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A1__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A1__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A1_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A1_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A1_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A1_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-	BOTH_T1_BR__R,	//# Fast arc bottom right to right
-	BOTH_T1_BR_TL,	//# Fast weak spin bottom right to top left
-	BOTH_T1_BR__L,	//# Fast weak spin bottom right to left
-	BOTH_T1_BR_BL,	//# Fast weak spin bottom right to bottom left
-	BOTH_T1__R_TR,	//# Fast arc right to top right
-	BOTH_T1__R_TL,	//# Fast arc right to top left
-	BOTH_T1__R__L,	//# Fast weak spin right to left
-	BOTH_T1__R_BL,	//# Fast weak spin right to bottom left
-	BOTH_T1_TR_BR,	//# Fast arc top right to bottom right
-	BOTH_T1_TR_TL,	//# Fast arc top right to top left
-	BOTH_T1_TR__L,	//# Fast arc top right to left
-	BOTH_T1_TR_BL,	//# Fast weak spin top right to bottom left
-	BOTH_T1_T__BR,	//# Fast arc top to bottom right
-	BOTH_T1_T___R,	//# Fast arc top to right
-	BOTH_T1_T__TR,	//# Fast arc top to top right
-	BOTH_T1_T__TL,	//# Fast arc top to top left
-	BOTH_T1_T___L,	//# Fast arc top to left
-	BOTH_T1_T__BL,	//# Fast arc top to bottom left
-	BOTH_T1_TL_BR,	//# Fast weak spin top left to bottom right
-	BOTH_T1_TL_BL,	//# Fast arc top left to bottom left
-	BOTH_T1__L_BR,	//# Fast weak spin left to bottom right
-	BOTH_T1__L__R,	//# Fast weak spin left to right
-	BOTH_T1__L_TL,	//# Fast arc left to top left
-	BOTH_T1_BL_BR,	//# Fast weak spin bottom left to bottom right
-	BOTH_T1_BL__R,	//# Fast weak spin bottom left to right
-	BOTH_T1_BL_TR,	//# Fast weak spin bottom left to top right
-	BOTH_T1_BL__L,	//# Fast arc bottom left to left
+	BOTH_T1_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T1_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T1_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T1_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T1__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T1__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T1__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T1__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T1_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T1_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T1_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T1_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T1_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T1_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T1_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T1_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T1_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T1_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T1_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T1_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T1__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T1__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T1__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T1_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T1_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T1_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T1_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-	BOTH_T1_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T1_TR_BR)
-	BOTH_T1_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T1_T__BR)
-	BOTH_T1__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T1_BR__R)
-	BOTH_T1__R_T_,	//# Fast ar right to top				(use: BOTH_T1_T___R)
-	BOTH_T1_TR__R,	//# Fast arc top right to right			(use: BOTH_T1__R_TR)
-	BOTH_T1_TR_T_,	//# Fast arc top right to top				(use: BOTH_T1_T__TR)
-	BOTH_T1_TL__R,	//# Fast arc top left to right			(use: BOTH_T1__R_TL)
-	BOTH_T1_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T1_TR_TL)
-	BOTH_T1_TL_T_,	//# Fast arc top left to top				(use: BOTH_T1_T__TL)
-	BOTH_T1_TL__L,	//# Fast arc top left to left				(use: BOTH_T1__L_TL)
-	BOTH_T1__L_TR,	//# Fast arc left to top right			(use: BOTH_T1_TR__L)
-	BOTH_T1__L_T_,	//# Fast arc left to top				(use: BOTH_T1_T___L)
-	BOTH_T1__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T1_BL__L)
-	BOTH_T1_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T1_T__BL)
-	BOTH_T1_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T1_TL_BL)
+	BOTH_T1_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T1_TR_BR)
+	BOTH_T1_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T1_T__BR)
+	BOTH_T1__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T1_BR__R)
+	BOTH_T1__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T1_T___R)
+	BOTH_T1_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T1__R_TR)
+	BOTH_T1_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T1_T__TR)
+	BOTH_T1_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T1__R_TL)
+	BOTH_T1_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T1_TR_TL)
+	BOTH_T1_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T1_T__TL)
+	BOTH_T1_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T1__L_TL)
+	BOTH_T1__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T1_TR__L)
+	BOTH_T1__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T1_T___L)
+	BOTH_T1__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T1_BL__L)
+	BOTH_T1_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T1_T__BL)
+	BOTH_T1_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T1_TL_BL)
 	//Saber Attack Start Transitions
-	BOTH_S1_S1_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-	BOTH_S1_S1__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-	BOTH_S1_S1__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-	BOTH_S1_S1_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-	BOTH_S1_S1_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-	BOTH_S1_S1_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-	BOTH_S1_S1_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S1_S1_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S1_S1__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S1_S1__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S1_S1_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S1_S1_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S1_S1_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S1_S1_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-	BOTH_R1_B__S1,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-	BOTH_R1__L_S1,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-	BOTH_R1__R_S1,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-	BOTH_R1_TL_S1,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-	BOTH_R1_BR_S1,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-	BOTH_R1_BL_S1,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-	BOTH_R1_TR_S1,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-	BOTH_B1_BR___,	//# Bounce-back if attack from BR is blocked
-	BOTH_B1__R___,	//# Bounce-back if attack from R is blocked
-	BOTH_B1_TR___,	//# Bounce-back if attack from TR is blocked
-	BOTH_B1_T____,	//# Bounce-back if attack from T is blocked
-	BOTH_B1_TL___,	//# Bounce-back if attack from TL is blocked
-	BOTH_B1__L___,	//# Bounce-back if attack from L is blocked
-	BOTH_B1_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R1_B__S1_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R1__L_S1_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R1__R_S1_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R1_TL_S1_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R1_BR_S1_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R1_BL_S1_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R1_TR_S1_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B1_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B1__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B1_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B1_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B1_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B1__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B1_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-	BOTH_D1_BR___,	//# Deflection toward BR
-	BOTH_D1__R___,	//# Deflection toward R
-	BOTH_D1_TR___,	//# Deflection toward TR
-	BOTH_D1_TL___,	//# Deflection toward TL
-	BOTH_D1__L___,	//# Deflection toward L
-	BOTH_D1_BL___,	//# Deflection toward BL
-	BOTH_D1_B____,	//# Deflection toward B
+	BOTH_D1_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D1__R____GENERAL,	//# Deflection toward R
+	BOTH_D1_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D1_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D1__L____GENERAL,	//# Deflection toward L
+	BOTH_D1_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D1_B_____GENERAL,	//# Deflection toward B
 	//Saber attack anims - power level 2
-	BOTH_A2_T__B_,	//# Fast weak vertical attack top to bottom
-	BOTH_A2__L__R,	//# Fast weak horizontal attack left to right
-	BOTH_A2__R__L,	//# Fast weak horizontal attack right to left
-	BOTH_A2_TL_BR,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A2_BR_TL,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A2_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-	BOTH_A2_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A2_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A2__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A2__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A2_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A2_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A2_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A2_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-	BOTH_T2_BR__R,	//# Fast arc bottom right to right
-	BOTH_T2_BR_TL,	//# Fast weak spin bottom right to top left
-	BOTH_T2_BR__L,	//# Fast weak spin bottom right to left
-	BOTH_T2_BR_BL,	//# Fast weak spin bottom right to bottom left
-	BOTH_T2__R_TR,	//# Fast arc right to top right
-	BOTH_T2__R_TL,	//# Fast arc right to top left
-	BOTH_T2__R__L,	//# Fast weak spin right to left
-	BOTH_T2__R_BL,	//# Fast weak spin right to bottom left
-	BOTH_T2_TR_BR,	//# Fast arc top right to bottom right
-	BOTH_T2_TR_TL,	//# Fast arc top right to top left
-	BOTH_T2_TR__L,	//# Fast arc top right to left
-	BOTH_T2_TR_BL,	//# Fast weak spin top right to bottom left
-	BOTH_T2_T__BR,	//# Fast arc top to bottom right
-	BOTH_T2_T___R,	//# Fast arc top to right
-	BOTH_T2_T__TR,	//# Fast arc top to top right
-	BOTH_T2_T__TL,	//# Fast arc top to top left
-	BOTH_T2_T___L,	//# Fast arc top to left
-	BOTH_T2_T__BL,	//# Fast arc top to bottom left
-	BOTH_T2_TL_BR,	//# Fast weak spin top left to bottom right
-	BOTH_T2_TL_BL,	//# Fast arc top left to bottom left
-	BOTH_T2__L_BR,	//# Fast weak spin left to bottom right
-	BOTH_T2__L__R,	//# Fast weak spin left to right
-	BOTH_T2__L_TL,	//# Fast arc left to top left
-	BOTH_T2_BL_BR,	//# Fast weak spin bottom left to bottom right
-	BOTH_T2_BL__R,	//# Fast weak spin bottom left to right
-	BOTH_T2_BL_TR,	//# Fast weak spin bottom left to top right
-	BOTH_T2_BL__L,	//# Fast arc bottom left to left
+	BOTH_T2_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T2_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T2_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T2_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T2__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T2__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T2__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T2__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T2_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T2_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T2_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T2_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T2_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T2_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T2_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T2_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T2_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T2_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T2_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T2_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T2__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T2__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T2__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T2_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T2_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T2_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T2_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-	BOTH_T2_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T2_TR_BR)
-	BOTH_T2_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T2_T__BR)
-	BOTH_T2__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T2_BR__R)
-	BOTH_T2__R_T_,	//# Fast ar right to top				(use: BOTH_T2_T___R)
-	BOTH_T2_TR__R,	//# Fast arc top right to right			(use: BOTH_T2__R_TR)
-	BOTH_T2_TR_T_,	//# Fast arc top right to top				(use: BOTH_T2_T__TR)
-	BOTH_T2_TL__R,	//# Fast arc top left to right			(use: BOTH_T2__R_TL)
-	BOTH_T2_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T2_TR_TL)
-	BOTH_T2_TL_T_,	//# Fast arc top left to top				(use: BOTH_T2_T__TL)
-	BOTH_T2_TL__L,	//# Fast arc top left to left				(use: BOTH_T2__L_TL)
-	BOTH_T2__L_TR,	//# Fast arc left to top right			(use: BOTH_T2_TR__L)
-	BOTH_T2__L_T_,	//# Fast arc left to top				(use: BOTH_T2_T___L)
-	BOTH_T2__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T2_BL__L)
-	BOTH_T2_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T2_T__BL)
-	BOTH_T2_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T2_TL_BL)
+	BOTH_T2_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T2_TR_BR)
+	BOTH_T2_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T2_T__BR)
+	BOTH_T2__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T2_BR__R)
+	BOTH_T2__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T2_T___R)
+	BOTH_T2_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T2__R_TR)
+	BOTH_T2_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T2_T__TR)
+	BOTH_T2_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T2__R_TL)
+	BOTH_T2_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T2_TR_TL)
+	BOTH_T2_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T2_T__TL)
+	BOTH_T2_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T2__L_TL)
+	BOTH_T2__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T2_TR__L)
+	BOTH_T2__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T2_T___L)
+	BOTH_T2__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T2_BL__L)
+	BOTH_T2_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T2_T__BL)
+	BOTH_T2_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T2_TL_BL)
 	//Saber Attack Start Transitions
-	BOTH_S2_S1_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-	BOTH_S2_S1__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-	BOTH_S2_S1__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-	BOTH_S2_S1_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-	BOTH_S2_S1_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-	BOTH_S2_S1_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-	BOTH_S2_S1_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S2_S1_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S2_S1__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S2_S1__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S2_S1_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S2_S1_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S2_S1_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S2_S1_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-	BOTH_R2_B__S1,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-	BOTH_R2__L_S1,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-	BOTH_R2__R_S1,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-	BOTH_R2_TL_S1,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-	BOTH_R2_BR_S1,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-	BOTH_R2_BL_S1,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-	BOTH_R2_TR_S1,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-	BOTH_B2_BR___,	//# Bounce-back if attack from BR is blocked
-	BOTH_B2__R___,	//# Bounce-back if attack from R is blocked
-	BOTH_B2_TR___,	//# Bounce-back if attack from TR is blocked
-	BOTH_B2_T____,	//# Bounce-back if attack from T is blocked
-	BOTH_B2_TL___,	//# Bounce-back if attack from TL is blocked
-	BOTH_B2__L___,	//# Bounce-back if attack from L is blocked
-	BOTH_B2_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R2_B__S1_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R2__L_S1_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R2__R_S1_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R2_TL_S1_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R2_BR_S1_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R2_BL_S1_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R2_TR_S1_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B2_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B2__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B2_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B2_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B2_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B2__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B2_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-	BOTH_D2_BR___,	//# Deflection toward BR
-	BOTH_D2__R___,	//# Deflection toward R
-	BOTH_D2_TR___,	//# Deflection toward TR
-	BOTH_D2_TL___,	//# Deflection toward TL
-	BOTH_D2__L___,	//# Deflection toward L
-	BOTH_D2_BL___,	//# Deflection toward BL
-	BOTH_D2_B____,	//# Deflection toward B
+	BOTH_D2_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D2__R____GENERAL,	//# Deflection toward R
+	BOTH_D2_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D2_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D2__L____GENERAL,	//# Deflection toward L
+	BOTH_D2_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D2_B_____GENERAL,	//# Deflection toward B
 	//Saber attack anims - power level 3
-	BOTH_A3_T__B_,	//# Fast weak vertical attack top to bottom
-	BOTH_A3__L__R,	//# Fast weak horizontal attack left to right
-	BOTH_A3__R__L,	//# Fast weak horizontal attack right to left
-	BOTH_A3_TL_BR,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A3_BR_TL,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A3_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-	BOTH_A3_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A3_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A3__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A3__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A3_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A3_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A3_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A3_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-	BOTH_T3_BR__R,	//# Fast arc bottom right to right
-	BOTH_T3_BR_TL,	//# Fast weak spin bottom right to top left
-	BOTH_T3_BR__L,	//# Fast weak spin bottom right to left
-	BOTH_T3_BR_BL,	//# Fast weak spin bottom right to bottom left
-	BOTH_T3__R_TR,	//# Fast arc right to top right
-	BOTH_T3__R_TL,	//# Fast arc right to top left
-	BOTH_T3__R__L,	//# Fast weak spin right to left
-	BOTH_T3__R_BL,	//# Fast weak spin right to bottom left
-	BOTH_T3_TR_BR,	//# Fast arc top right to bottom right
-	BOTH_T3_TR_TL,	//# Fast arc top right to top left
-	BOTH_T3_TR__L,	//# Fast arc top right to left
-	BOTH_T3_TR_BL,	//# Fast weak spin top right to bottom left
-	BOTH_T3_T__BR,	//# Fast arc top to bottom right
-	BOTH_T3_T___R,	//# Fast arc top to right
-	BOTH_T3_T__TR,	//# Fast arc top to top right
-	BOTH_T3_T__TL,	//# Fast arc top to top left
-	BOTH_T3_T___L,	//# Fast arc top to left
-	BOTH_T3_T__BL,	//# Fast arc top to bottom left
-	BOTH_T3_TL_BR,	//# Fast weak spin top left to bottom right
-	BOTH_T3_TL_BL,	//# Fast arc top left to bottom left
-	BOTH_T3__L_BR,	//# Fast weak spin left to bottom right
-	BOTH_T3__L__R,	//# Fast weak spin left to right
-	BOTH_T3__L_TL,	//# Fast arc left to top left
-	BOTH_T3_BL_BR,	//# Fast weak spin bottom left to bottom right
-	BOTH_T3_BL__R,	//# Fast weak spin bottom left to right
-	BOTH_T3_BL_TR,	//# Fast weak spin bottom left to top right
-	BOTH_T3_BL__L,	//# Fast arc bottom left to left
+	BOTH_T3_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T3_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T3_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T3_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T3__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T3__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T3__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T3__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T3_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T3_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T3_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T3_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T3_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T3_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T3_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T3_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T3_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T3_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T3_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T3_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T3__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T3__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T3__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T3_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T3_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T3_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T3_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-	BOTH_T3_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T3_TR_BR)
-	BOTH_T3_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T3_T__BR)
-	BOTH_T3__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T3_BR__R)
-	BOTH_T3__R_T_,	//# Fast ar right to top				(use: BOTH_T3_T___R)
-	BOTH_T3_TR__R,	//# Fast arc top right to right			(use: BOTH_T3__R_TR)
-	BOTH_T3_TR_T_,	//# Fast arc top right to top				(use: BOTH_T3_T__TR)
-	BOTH_T3_TL__R,	//# Fast arc top left to right			(use: BOTH_T3__R_TL)
-	BOTH_T3_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T3_TR_TL)
-	BOTH_T3_TL_T_,	//# Fast arc top left to top				(use: BOTH_T3_T__TL)
-	BOTH_T3_TL__L,	//# Fast arc top left to left				(use: BOTH_T3__L_TL)
-	BOTH_T3__L_TR,	//# Fast arc left to top right			(use: BOTH_T3_TR__L)
-	BOTH_T3__L_T_,	//# Fast arc left to top				(use: BOTH_T3_T___L)
-	BOTH_T3__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T3_BL__L)
-	BOTH_T3_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T3_T__BL)
-	BOTH_T3_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T3_TL_BL)
+	BOTH_T3_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T3_TR_BR)
+	BOTH_T3_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T3_T__BR)
+	BOTH_T3__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T3_BR__R)
+	BOTH_T3__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T3_T___R)
+	BOTH_T3_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T3__R_TR)
+	BOTH_T3_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T3_T__TR)
+	BOTH_T3_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T3__R_TL)
+	BOTH_T3_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T3_TR_TL)
+	BOTH_T3_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T3_T__TL)
+	BOTH_T3_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T3__L_TL)
+	BOTH_T3__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T3_TR__L)
+	BOTH_T3__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T3_T___L)
+	BOTH_T3__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T3_BL__L)
+	BOTH_T3_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T3_T__BL)
+	BOTH_T3_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T3_TL_BL)
 	//Saber Attack Start Transitions
-	BOTH_S3_S1_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-	BOTH_S3_S1__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-	BOTH_S3_S1__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-	BOTH_S3_S1_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-	BOTH_S3_S1_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-	BOTH_S3_S1_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-	BOTH_S3_S1_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S3_S1_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S3_S1__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S3_S1__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S3_S1_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S3_S1_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S3_S1_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S3_S1_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-	BOTH_R3_B__S1,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-	BOTH_R3__L_S1,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-	BOTH_R3__R_S1,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-	BOTH_R3_TL_S1,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-	BOTH_R3_BR_S1,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-	BOTH_R3_BL_S1,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-	BOTH_R3_TR_S1,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-	BOTH_B3_BR___,	//# Bounce-back if attack from BR is blocked
-	BOTH_B3__R___,	//# Bounce-back if attack from R is blocked
-	BOTH_B3_TR___,	//# Bounce-back if attack from TR is blocked
-	BOTH_B3_T____,	//# Bounce-back if attack from T is blocked
-	BOTH_B3_TL___,	//# Bounce-back if attack from TL is blocked
-	BOTH_B3__L___,	//# Bounce-back if attack from L is blocked
-	BOTH_B3_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R3_B__S1_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R3__L_S1_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R3__R_S1_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R3_TL_S1_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R3_BR_S1_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R3_BL_S1_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R3_TR_S1_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B3_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B3__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B3_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B3_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B3_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B3__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B3_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-	BOTH_D3_BR___,	//# Deflection toward BR
-	BOTH_D3__R___,	//# Deflection toward R
-	BOTH_D3_TR___,	//# Deflection toward TR
-	BOTH_D3_TL___,	//# Deflection toward TL
-	BOTH_D3__L___,	//# Deflection toward L
-	BOTH_D3_BL___,	//# Deflection toward BL
-	BOTH_D3_B____,	//# Deflection toward B
+	BOTH_D3_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D3__R____GENERAL,	//# Deflection toward R
+	BOTH_D3_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D3_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D3__L____GENERAL,	//# Deflection toward L
+	BOTH_D3_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D3_B_____GENERAL,	//# Deflection toward B
 	//Saber attack anims - power level 4  - Desann's
-	BOTH_A4_T__B_,	//# Fast weak vertical attack top to bottom
-	BOTH_A4__L__R,	//# Fast weak horizontal attack left to right
-	BOTH_A4__R__L,	//# Fast weak horizontal attack right to left
-	BOTH_A4_TL_BR,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A4_BR_TL,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A4_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-	BOTH_A4_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A4_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A4__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A4__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A4_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A4_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A4_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A4_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-	BOTH_T4_BR__R,	//# Fast arc bottom right to right
-	BOTH_T4_BR_TL,	//# Fast weak spin bottom right to top left
-	BOTH_T4_BR__L,	//# Fast weak spin bottom right to left
-	BOTH_T4_BR_BL,	//# Fast weak spin bottom right to bottom left
-	BOTH_T4__R_TR,	//# Fast arc right to top right
-	BOTH_T4__R_TL,	//# Fast arc right to top left
-	BOTH_T4__R__L,	//# Fast weak spin right to left
-	BOTH_T4__R_BL,	//# Fast weak spin right to bottom left
-	BOTH_T4_TR_BR,	//# Fast arc top right to bottom right
-	BOTH_T4_TR_TL,	//# Fast arc top right to top left
-	BOTH_T4_TR__L,	//# Fast arc top right to left
-	BOTH_T4_TR_BL,	//# Fast weak spin top right to bottom left
-	BOTH_T4_T__BR,	//# Fast arc top to bottom right
-	BOTH_T4_T___R,	//# Fast arc top to right
-	BOTH_T4_T__TR,	//# Fast arc top to top right
-	BOTH_T4_T__TL,	//# Fast arc top to top left
-	BOTH_T4_T___L,	//# Fast arc top to left
-	BOTH_T4_T__BL,	//# Fast arc top to bottom left
-	BOTH_T4_TL_BR,	//# Fast weak spin top left to bottom right
-	BOTH_T4_TL_BL,	//# Fast arc top left to bottom left
-	BOTH_T4__L_BR,	//# Fast weak spin left to bottom right
-	BOTH_T4__L__R,	//# Fast weak spin left to right
-	BOTH_T4__L_TL,	//# Fast arc left to top left
-	BOTH_T4_BL_BR,	//# Fast weak spin bottom left to bottom right
-	BOTH_T4_BL__R,	//# Fast weak spin bottom left to right
-	BOTH_T4_BL_TR,	//# Fast weak spin bottom left to top right
-	BOTH_T4_BL__L,	//# Fast arc bottom left to left
+	BOTH_T4_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T4_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T4_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T4_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T4__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T4__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T4__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T4__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T4_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T4_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T4_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T4_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T4_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T4_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T4_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T4_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T4_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T4_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T4_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T4_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T4__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T4__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T4__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T4_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T4_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T4_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T4_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-	BOTH_T4_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T4_TR_BR)
-	BOTH_T4_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T4_T__BR)
-	BOTH_T4__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T4_BR__R)
-	BOTH_T4__R_T_,	//# Fast ar right to top				(use: BOTH_T4_T___R)
-	BOTH_T4_TR__R,	//# Fast arc top right to right			(use: BOTH_T4__R_TR)
-	BOTH_T4_TR_T_,	//# Fast arc top right to top				(use: BOTH_T4_T__TR)
-	BOTH_T4_TL__R,	//# Fast arc top left to right			(use: BOTH_T4__R_TL)
-	BOTH_T4_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T4_TR_TL)
-	BOTH_T4_TL_T_,	//# Fast arc top left to top				(use: BOTH_T4_T__TL)
-	BOTH_T4_TL__L,	//# Fast arc top left to left				(use: BOTH_T4__L_TL)
-	BOTH_T4__L_TR,	//# Fast arc left to top right			(use: BOTH_T4_TR__L)
-	BOTH_T4__L_T_,	//# Fast arc left to top				(use: BOTH_T4_T___L)
-	BOTH_T4__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T4_BL__L)
-	BOTH_T4_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T4_T__BL)
-	BOTH_T4_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T4_TL_BL)
+	BOTH_T4_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T4_TR_BR)
+	BOTH_T4_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T4_T__BR)
+	BOTH_T4__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T4_BR__R)
+	BOTH_T4__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T4_T___R)
+	BOTH_T4_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T4__R_TR)
+	BOTH_T4_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T4_T__TR)
+	BOTH_T4_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T4__R_TL)
+	BOTH_T4_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T4_TR_TL)
+	BOTH_T4_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T4_T__TL)
+	BOTH_T4_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T4__L_TL)
+	BOTH_T4__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T4_TR__L)
+	BOTH_T4__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T4_T___L)
+	BOTH_T4__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T4_BL__L)
+	BOTH_T4_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T4_T__BL)
+	BOTH_T4_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T4_TL_BL)
 	//Saber Attack Start Transitions
-	BOTH_S4_S1_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-	BOTH_S4_S1__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-	BOTH_S4_S1__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-	BOTH_S4_S1_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-	BOTH_S4_S1_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-	BOTH_S4_S1_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-	BOTH_S4_S1_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S4_S1_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S4_S1__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S4_S1__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S4_S1_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S4_S1_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S4_S1_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S4_S1_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-	BOTH_R4_B__S1,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-	BOTH_R4__L_S1,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-	BOTH_R4__R_S1,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-	BOTH_R4_TL_S1,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-	BOTH_R4_BR_S1,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-	BOTH_R4_BL_S1,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-	BOTH_R4_TR_S1,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-	BOTH_B4_BR___,	//# Bounce-back if attack from BR is blocked
-	BOTH_B4__R___,	//# Bounce-back if attack from R is blocked
-	BOTH_B4_TR___,	//# Bounce-back if attack from TR is blocked
-	BOTH_B4_T____,	//# Bounce-back if attack from T is blocked
-	BOTH_B4_TL___,	//# Bounce-back if attack from TL is blocked
-	BOTH_B4__L___,	//# Bounce-back if attack from L is blocked
-	BOTH_B4_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R4_B__S1_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R4__L_S1_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R4__R_S1_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R4_TL_S1_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R4_BR_S1_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R4_BL_S1_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R4_TR_S1_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B4_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B4__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B4_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B4_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B4_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B4__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B4_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-	BOTH_D4_BR___,	//# Deflection toward BR
-	BOTH_D4__R___,	//# Deflection toward R
-	BOTH_D4_TR___,	//# Deflection toward TR
-	BOTH_D4_TL___,	//# Deflection toward TL
-	BOTH_D4__L___,	//# Deflection toward L
-	BOTH_D4_BL___,	//# Deflection toward BL
-	BOTH_D4_B____,	//# Deflection toward B
+	BOTH_D4_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D4__R____GENERAL,	//# Deflection toward R
+	BOTH_D4_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D4_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D4__L____GENERAL,	//# Deflection toward L
+	BOTH_D4_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D4_B_____GENERAL,	//# Deflection toward B
 	//Saber attack anims - power level 5  - Tavion's
-	BOTH_A5_T__B_,	//# Fast weak vertical attack top to bottom
-	BOTH_A5__L__R,	//# Fast weak horizontal attack left to right
-	BOTH_A5__R__L,	//# Fast weak horizontal attack right to left
-	BOTH_A5_TL_BR,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A5_BR_TL,	//# Fast weak diagonal attack top left to botom right
-	BOTH_A5_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-	BOTH_A5_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A5_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A5__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A5__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A5_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A5_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A5_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A5_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-	BOTH_T5_BR__R,	//# Fast arc bottom right to right
-	BOTH_T5_BR_TL,	//# Fast weak spin bottom right to top left
-	BOTH_T5_BR__L,	//# Fast weak spin bottom right to left
-	BOTH_T5_BR_BL,	//# Fast weak spin bottom right to bottom left
-	BOTH_T5__R_TR,	//# Fast arc right to top right
-	BOTH_T5__R_TL,	//# Fast arc right to top left
-	BOTH_T5__R__L,	//# Fast weak spin right to left
-	BOTH_T5__R_BL,	//# Fast weak spin right to bottom left
-	BOTH_T5_TR_BR,	//# Fast arc top right to bottom right
-	BOTH_T5_TR_TL,	//# Fast arc top right to top left
-	BOTH_T5_TR__L,	//# Fast arc top right to left
-	BOTH_T5_TR_BL,	//# Fast weak spin top right to bottom left
-	BOTH_T5_T__BR,	//# Fast arc top to bottom right
-	BOTH_T5_T___R,	//# Fast arc top to right
-	BOTH_T5_T__TR,	//# Fast arc top to top right
-	BOTH_T5_T__TL,	//# Fast arc top to top left
-	BOTH_T5_T___L,	//# Fast arc top to left
-	BOTH_T5_T__BL,	//# Fast arc top to bottom left
-	BOTH_T5_TL_BR,	//# Fast weak spin top left to bottom right
-	BOTH_T5_TL_BL,	//# Fast arc top left to bottom left
-	BOTH_T5__L_BR,	//# Fast weak spin left to bottom right
-	BOTH_T5__L__R,	//# Fast weak spin left to right
-	BOTH_T5__L_TL,	//# Fast arc left to top left
-	BOTH_T5_BL_BR,	//# Fast weak spin bottom left to bottom right
-	BOTH_T5_BL__R,	//# Fast weak spin bottom left to right
-	BOTH_T5_BL_TR,	//# Fast weak spin bottom left to top right
-	BOTH_T5_BL__L,	//# Fast arc bottom left to left
+	BOTH_T5_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T5_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T5_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T5_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T5__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T5__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T5__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T5__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T5_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T5_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T5_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T5_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T5_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T5_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T5_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T5_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T5_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T5_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T5_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T5_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T5__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T5__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T5__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T5_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T5_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T5_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T5_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-	BOTH_T5_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T5_TR_BR)
-	BOTH_T5_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T5_T__BR)
-	BOTH_T5__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T5_BR__R)
-	BOTH_T5__R_T_,	//# Fast ar right to top				(use: BOTH_T5_T___R)
-	BOTH_T5_TR__R,	//# Fast arc top right to right			(use: BOTH_T5__R_TR)
-	BOTH_T5_TR_T_,	//# Fast arc top right to top				(use: BOTH_T5_T__TR)
-	BOTH_T5_TL__R,	//# Fast arc top left to right			(use: BOTH_T5__R_TL)
-	BOTH_T5_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T5_TR_TL)
-	BOTH_T5_TL_T_,	//# Fast arc top left to top				(use: BOTH_T5_T__TL)
-	BOTH_T5_TL__L,	//# Fast arc top left to left				(use: BOTH_T5__L_TL)
-	BOTH_T5__L_TR,	//# Fast arc left to top right			(use: BOTH_T5_TR__L)
-	BOTH_T5__L_T_,	//# Fast arc left to top				(use: BOTH_T5_T___L)
-	BOTH_T5__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T5_BL__L)
-	BOTH_T5_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T5_T__BL)
-	BOTH_T5_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T5_TL_BL)
+	BOTH_T5_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T5_TR_BR)
+	BOTH_T5_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T5_T__BR)
+	BOTH_T5__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T5_BR__R)
+	BOTH_T5__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T5_T___R)
+	BOTH_T5_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T5__R_TR)
+	BOTH_T5_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T5_T__TR)
+	BOTH_T5_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T5__R_TL)
+	BOTH_T5_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T5_TR_TL)
+	BOTH_T5_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T5_T__TL)
+	BOTH_T5_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T5__L_TL)
+	BOTH_T5__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T5_TR__L)
+	BOTH_T5__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T5_T___L)
+	BOTH_T5__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T5_BL__L)
+	BOTH_T5_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T5_T__BL)
+	BOTH_T5_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T5_TL_BL)
 	//Saber Attack Start Transitions
-	BOTH_S5_S1_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-	BOTH_S5_S1__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-	BOTH_S5_S1__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-	BOTH_S5_S1_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-	BOTH_S5_S1_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-	BOTH_S5_S1_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-	BOTH_S5_S1_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S5_S1_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S5_S1__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S5_S1__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S5_S1_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S5_S1_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S5_S1_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S5_S1_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-	BOTH_R5_B__S1,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-	BOTH_R5__L_S1,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-	BOTH_R5__R_S1,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-	BOTH_R5_TL_S1,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-	BOTH_R5_BR_S1,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-	BOTH_R5_BL_S1,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-	BOTH_R5_TR_S1,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-	BOTH_B5_BR___,	//# Bounce-back if attack from BR is blocked
-	BOTH_B5__R___,	//# Bounce-back if attack from R is blocked
-	BOTH_B5_TR___,	//# Bounce-back if attack from TR is blocked
-	BOTH_B5_T____,	//# Bounce-back if attack from T is blocked
-	BOTH_B5_TL___,	//# Bounce-back if attack from TL is blocked
-	BOTH_B5__L___,	//# Bounce-back if attack from L is blocked
-	BOTH_B5_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R5_B__S1_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R5__L_S1_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R5__R_S1_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R5_TL_S1_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R5_BR_S1_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R5_BL_S1_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R5_TR_S1_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B5_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B5__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B5_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B5_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B5_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B5__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B5_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-	BOTH_D5_BR___,	//# Deflection toward BR
-	BOTH_D5__R___,	//# Deflection toward R
-	BOTH_D5_TR___,	//# Deflection toward TR
-	BOTH_D5_TL___,	//# Deflection toward TL
-	BOTH_D5__L___,	//# Deflection toward L
-	BOTH_D5_BL___,	//# Deflection toward BL
-	BOTH_D5_B____,	//# Deflection toward B
+	BOTH_D5_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D5__R____GENERAL,	//# Deflection toward R
+	BOTH_D5_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D5_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D5__L____GENERAL,	//# Deflection toward L
+	BOTH_D5_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D5_B_____GENERAL,	//# Deflection toward B
 	//Saber attack anims - power level 6
-		(animNumber_t)0,//BOTH_A6_T__B_,	//# Fast weak vertical attack top to bottom
-		(animNumber_t)0,//BOTH_A6__L__R,	//# Fast weak horizontal attack left to right
-		(animNumber_t)0,//BOTH_A6__R__L,	//# Fast weak horizontal attack right to left
-		(animNumber_t)0,//BOTH_A6_TL_BR,	//# Fast weak diagonal attack top left to botom right
-		(animNumber_t)0,//BOTH_A6_BR_TL,	//# Fast weak diagonal attack top left to botom right
-		(animNumber_t)0,//BOTH_A6_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-		(animNumber_t)0,//BOTH_A6_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A6_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A6__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A6__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A6_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A6_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A6_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A6_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-		(animNumber_t)0,//BOTH_T6_BR__R,	//# Fast arc bottom right to right
-		(animNumber_t)0,//BOTH_T6_BR_TL,	//# Fast weak spin bottom right to top left
-		(animNumber_t)0,//BOTH_T6_BR__L,	//# Fast weak spin bottom right to left
-		(animNumber_t)0,//BOTH_T6_BR_BL,	//# Fast weak spin bottom right to bottom left
-		(animNumber_t)0,//BOTH_T6__R_TR,	//# Fast arc right to top right
-		(animNumber_t)0,//BOTH_T6__R_TL,	//# Fast arc right to top left
-		(animNumber_t)0,//BOTH_T6__R__L,	//# Fast weak spin right to left
-		(animNumber_t)0,//BOTH_T6__R_BL,	//# Fast weak spin right to bottom left
-		(animNumber_t)0,//BOTH_T6_TR_BR,	//# Fast arc top right to bottom right
-		(animNumber_t)0,//BOTH_T6_TR_TL,	//# Fast arc top right to top left
-		(animNumber_t)0,//BOTH_T6_TR__L,	//# Fast arc top right to left
-		(animNumber_t)0,//BOTH_T6_TR_BL,	//# Fast weak spin top right to bottom left
-		(animNumber_t)0,//BOTH_T6_T__BR,	//# Fast arc top to bottom right
-		(animNumber_t)0,//BOTH_T6_T___R,	//# Fast arc top to right
-		(animNumber_t)0,//BOTH_T6_T__TR,	//# Fast arc top to top right
-		(animNumber_t)0,//BOTH_T6_T__TL,	//# Fast arc top to top left
-		(animNumber_t)0,//BOTH_T6_T___L,	//# Fast arc top to left
-		(animNumber_t)0,//BOTH_T6_T__BL,	//# Fast arc top to bottom left
-		(animNumber_t)0,//BOTH_T6_TL_BR,	//# Fast weak spin top left to bottom right
-		(animNumber_t)0,//BOTH_T6_TL_BL,	//# Fast arc top left to bottom left
-		(animNumber_t)0,//BOTH_T6__L_BR,	//# Fast weak spin left to bottom right
-		(animNumber_t)0,//BOTH_T6__L__R,	//# Fast weak spin left to right
-		(animNumber_t)0,//BOTH_T6__L_TL,	//# Fast arc left to top left
-		(animNumber_t)0,//BOTH_T6_BL_BR,	//# Fast weak spin bottom left to bottom right
-		(animNumber_t)0,//BOTH_T6_BL__R,	//# Fast weak spin bottom left to right
-		(animNumber_t)0,//BOTH_T6_BL_TR,	//# Fast weak spin bottom left to top right
-		(animNumber_t)0,//BOTH_T6_BL__L,	//# Fast arc bottom left to left
+	BOTH_T6_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T6_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T6_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T6_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T6__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T6__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T6__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T6__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T6_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T6_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T6_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T6_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T6_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T6_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T6_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T6_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T6_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T6_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T6_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T6_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T6__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T6__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T6__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T6_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T6_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T6_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T6_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-		(animNumber_t)0,//BOTH_T6_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T6_TR_BR)
-		(animNumber_t)0,//BOTH_T6_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T6_T__BR)
-		(animNumber_t)0,//BOTH_T6__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T6_BR__R)
-		(animNumber_t)0,//BOTH_T6__R_T_,	//# Fast ar right to top				(use: BOTH_T6_T___R)
-		(animNumber_t)0,//BOTH_T6_TR__R,	//# Fast arc top right to right			(use: BOTH_T6__R_TR)
-		(animNumber_t)0,//BOTH_T6_TR_T_,	//# Fast arc top right to top				(use: BOTH_T6_T__TR)
-		(animNumber_t)0,//BOTH_T6_TL__R,	//# Fast arc top left to right			(use: BOTH_T6__R_TL)
-		(animNumber_t)0,//BOTH_T6_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T6_TR_TL)
-		(animNumber_t)0,//BOTH_T6_TL_T_,	//# Fast arc top left to top				(use: BOTH_T6_T__TL)
-		(animNumber_t)0,//BOTH_T6_TL__L,	//# Fast arc top left to left				(use: BOTH_T6__L_TL)
-		(animNumber_t)0,//BOTH_T6__L_TR,	//# Fast arc left to top right			(use: BOTH_T6_TR__L)
-		(animNumber_t)0,//BOTH_T6__L_T_,	//# Fast arc left to top				(use: BOTH_T6_T___L)
-		(animNumber_t)0,//BOTH_T6__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T6_BL__L)
-		(animNumber_t)0,//BOTH_T6_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T6_T__BL)
-		(animNumber_t)0,//BOTH_T6_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T6_TL_BL)
+	BOTH_T6_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T6_TR_BR)
+	BOTH_T6_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T6_T__BR)
+	BOTH_T6__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T6_BR__R)
+	BOTH_T6__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T6_T___R)
+	BOTH_T6_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T6__R_TR)
+	BOTH_T6_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T6_T__TR)
+	BOTH_T6_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T6__R_TL)
+	BOTH_T6_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T6_TR_TL)
+	BOTH_T6_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T6_T__TL)
+	BOTH_T6_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T6__L_TL)
+	BOTH_T6__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T6_TR__L)
+	BOTH_T6__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T6_T___L)
+	BOTH_T6__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T6_BL__L)
+	BOTH_T6_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T6_T__BL)
+	BOTH_T6_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T6_TL_BL)
 	//Saber Attack Start Transitions
-		(animNumber_t)0,//BOTH_S6_S6_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-		(animNumber_t)0,//BOTH_S6_S6__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-		(animNumber_t)0,//BOTH_S6_S6__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-		(animNumber_t)0,//BOTH_S6_S6_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-		(animNumber_t)0,//BOTH_S6_S6_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-		(animNumber_t)0,//BOTH_S6_S6_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-		(animNumber_t)0,//BOTH_S6_S6_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S6_S6_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S6_S6__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S6_S6__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S6_S6_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S6_S6_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S6_S6_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S6_S6_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-		(animNumber_t)0,//BOTH_R6_B__S6,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-		(animNumber_t)0,//BOTH_R6__L_S6,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-		(animNumber_t)0,//BOTH_R6__R_S6,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-		(animNumber_t)0,//BOTH_R6_TL_S6,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-		(animNumber_t)0,//BOTH_R6_BR_S6,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-		(animNumber_t)0,//BOTH_R6_BL_S6,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-		(animNumber_t)0,//BOTH_R6_TR_S6,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-		(animNumber_t)0,//BOTH_B6_BR___,	//# Bounce-back if attack from BR is blocked
-		(animNumber_t)0,//BOTH_B6__R___,	//# Bounce-back if attack from R is blocked
-		(animNumber_t)0,//BOTH_B6_TR___,	//# Bounce-back if attack from TR is blocked
-		(animNumber_t)0,//BOTH_B6_T____,	//# Bounce-back if attack from T is blocked
-		(animNumber_t)0,//BOTH_B6_TL___,	//# Bounce-back if attack from TL is blocked
-		(animNumber_t)0,//BOTH_B6__L___,	//# Bounce-back if attack from L is blocked
-		(animNumber_t)0,//BOTH_B6_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R6_B__S6_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R6__L_S6_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R6__R_S6_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R6_TL_S6_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R6_BR_S6_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R6_BL_S6_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R6_TR_S6_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B6_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B6__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B6_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B6_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B6_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B6__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B6_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-		(animNumber_t)0,//BOTH_D6_BR___,	//# Deflection toward BR
-		(animNumber_t)0,//BOTH_D6__R___,	//# Deflection toward R
-		(animNumber_t)0,//BOTH_D6_TR___,	//# Deflection toward TR
-		(animNumber_t)0,//BOTH_D6_TL___,	//# Deflection toward TL
-		(animNumber_t)0,//BOTH_D6__L___,	//# Deflection toward L
-		(animNumber_t)0,//BOTH_D6_BL___,	//# Deflection toward BL
-		(animNumber_t)0,//BOTH_D6_B____,	//# Deflection toward B
+	BOTH_D6_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D6__R____GENERAL,	//# Deflection toward R
+	BOTH_D6_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D6_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D6__L____GENERAL,	//# Deflection toward L
+	BOTH_D6_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D6_B_____GENERAL,	//# Deflection toward B
 	//Saber attack anims - power level 7
-		(animNumber_t)0,//BOTH_A7_T__B_,	//# Fast weak vertical attack top to bottom
-		(animNumber_t)0,//BOTH_A7__L__R,	//# Fast weak horizontal attack left to right
-		(animNumber_t)0,//BOTH_A7__R__L,	//# Fast weak horizontal attack right to left
-		(animNumber_t)0,//BOTH_A7_TL_BR,	//# Fast weak diagonal attack top left to botom right
-		(animNumber_t)0,//BOTH_A7_BR_TL,	//# Fast weak diagonal attack top left to botom right
-		(animNumber_t)0,//BOTH_A7_BL_TR,	//# Fast weak diagonal attack bottom left to top right
-		(animNumber_t)0,//BOTH_A7_TR_BL,	//# Fast weak diagonal attack bottom left to right
+	BOTH_A7_T__B__GENERAL,	//# Fast weak vertical attack top to bottom
+	BOTH_A7__L__R_GENERAL,	//# Fast weak horizontal attack left to right
+	BOTH_A7__R__L_GENERAL,	//# Fast weak horizontal attack right to left
+	BOTH_A7_TL_BR_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A7_BR_TL_GENERAL,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A7_BL_TR_GENERAL,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A7_TR_BL_GENERAL,	//# Fast weak diagonal attack bottom left to right
 	//Saber Arc and Spin Transitions
-		(animNumber_t)0,//BOTH_T7_BR__R,	//# Fast arc bottom right to right
-		(animNumber_t)0,//BOTH_T7_BR_TL,	//# Fast weak spin bottom right to top left
-		(animNumber_t)0,//BOTH_T7_BR__L,	//# Fast weak spin bottom right to left
-		(animNumber_t)0,//BOTH_T7_BR_BL,	//# Fast weak spin bottom right to bottom left
-		(animNumber_t)0,//BOTH_T7__R_TR,	//# Fast arc right to top right
-		(animNumber_t)0,//BOTH_T7__R_TL,	//# Fast arc right to top left
-		(animNumber_t)0,//BOTH_T7__R__L,	//# Fast weak spin right to left
-		(animNumber_t)0,//BOTH_T7__R_BL,	//# Fast weak spin right to bottom left
-		(animNumber_t)0,//BOTH_T7_TR_BR,	//# Fast arc top right to bottom right
-		(animNumber_t)0,//BOTH_T7_TR_TL,	//# Fast arc top right to top left
-		(animNumber_t)0,//BOTH_T7_TR__L,	//# Fast arc top right to left
-		(animNumber_t)0,//BOTH_T7_TR_BL,	//# Fast weak spin top right to bottom left
-		(animNumber_t)0,//BOTH_T7_T__BR,	//# Fast arc top to bottom right
-			(animNumber_t)0,//BOTH_T7_T___R,	//# Fast arc top to right
-			(animNumber_t)0,//BOTH_T7_T__TR,	//# Fast arc top to top right
-			(animNumber_t)0,//BOTH_T7_T__TL,	//# Fast arc top to top left
-			(animNumber_t)0,//BOTH_T7_T___L,	//# Fast arc top to left
-			(animNumber_t)0,//BOTH_T7_T__BL,	//# Fast arc top to bottom left
-			(animNumber_t)0,//BOTH_T7_TL_BR,	//# Fast weak spin top left to bottom right
-			(animNumber_t)0,//BOTH_T7_TL_BL,	//# Fast arc top left to bottom left
-			(animNumber_t)0,//BOTH_T7__L_BR,	//# Fast weak spin left to bottom right
-			(animNumber_t)0,//BOTH_T7__L__R,	//# Fast weak spin left to right
-			(animNumber_t)0,//BOTH_T7__L_TL,	//# Fast arc left to top left
-			(animNumber_t)0,//BOTH_T7_BL_BR,	//# Fast weak spin bottom left to bottom right
-			(animNumber_t)0,//BOTH_T7_BL__R,	//# Fast weak spin bottom left to right
-			(animNumber_t)0,//BOTH_T7_BL_TR,	//# Fast weak spin bottom left to top right
-			(animNumber_t)0,//BOTH_T7_BL__L,	//# Fast arc bottom left to left
+	BOTH_T7_BR__R_GENERAL,	//# Fast arc bottom right to right
+	BOTH_T7_BR_TL_GENERAL,	//# Fast weak spin bottom right to top left
+	BOTH_T7_BR__L_GENERAL,	//# Fast weak spin bottom right to left
+	BOTH_T7_BR_BL_GENERAL,	//# Fast weak spin bottom right to bottom left
+	BOTH_T7__R_TR_GENERAL,	//# Fast arc right to top right
+	BOTH_T7__R_TL_GENERAL,	//# Fast arc right to top left
+	BOTH_T7__R__L_GENERAL,	//# Fast weak spin right to left
+	BOTH_T7__R_BL_GENERAL,	//# Fast weak spin right to bottom left
+	BOTH_T7_TR_BR_GENERAL,	//# Fast arc top right to bottom right
+	BOTH_T7_TR_TL_GENERAL,	//# Fast arc top right to top left
+	BOTH_T7_TR__L_GENERAL,	//# Fast arc top right to left
+	BOTH_T7_TR_BL_GENERAL,	//# Fast weak spin top right to bottom left
+	BOTH_T7_T__BR_GENERAL,	//# Fast arc top to bottom right
+	BOTH_T7_T___R_GENERAL,	//# Fast arc top to right
+	BOTH_T7_T__TR_GENERAL,	//# Fast arc top to top right
+	BOTH_T7_T__TL_GENERAL,	//# Fast arc top to top left
+	BOTH_T7_T___L_GENERAL,	//# Fast arc top to left
+	BOTH_T7_T__BL_GENERAL,	//# Fast arc top to bottom left
+	BOTH_T7_TL_BR_GENERAL,	//# Fast weak spin top left to bottom right
+	BOTH_T7_TL_BL_GENERAL,	//# Fast arc top left to bottom left
+	BOTH_T7__L_BR_GENERAL,	//# Fast weak spin left to bottom right
+	BOTH_T7__L__R_GENERAL,	//# Fast weak spin left to right
+	BOTH_T7__L_TL_GENERAL,	//# Fast arc left to top left
+	BOTH_T7_BL_BR_GENERAL,	//# Fast weak spin bottom left to bottom right
+	BOTH_T7_BL__R_GENERAL,	//# Fast weak spin bottom left to right
+	BOTH_T7_BL_TR_GENERAL,	//# Fast weak spin bottom left to top right
+	BOTH_T7_BL__L_GENERAL,	//# Fast arc bottom left to left
 	//Saber Arc Transitions that use existing animations played backwards
-			(animNumber_t)0,//BOTH_T7_BR_TR,	//# Fast arc bottom right to top right		(use: BOTH_T7_TR_BR)
-			(animNumber_t)0,//BOTH_T7_BR_T_,	//# Fast arc bottom right to top			(use: BOTH_T7_T__BR)
-			(animNumber_t)0,//BOTH_T7__R_BR,	//# Fast arc right to bottom right			(use: BOTH_T7_BR__R)
-			(animNumber_t)0,//BOTH_T7__R_T_,	//# Fast ar right to top				(use: BOTH_T7_T___R)
-			(animNumber_t)0,//BOTH_T7_TR__R,	//# Fast arc top right to right			(use: BOTH_T7__R_TR)
-			(animNumber_t)0,//BOTH_T7_TR_T_,	//# Fast arc top right to top				(use: BOTH_T7_T__TR)
-			(animNumber_t)0,//BOTH_T7_TL__R,	//# Fast arc top left to right			(use: BOTH_T7__R_TL)
-			(animNumber_t)0,//BOTH_T7_TL_TR,	//# Fast arc top left to top right			(use: BOTH_T7_TR_TL)
-			(animNumber_t)0,//BOTH_T7_TL_T_,	//# Fast arc top left to top				(use: BOTH_T7_T__TL)
-			(animNumber_t)0,//BOTH_T7_TL__L,	//# Fast arc top left to left				(use: BOTH_T7__L_TL)
-			(animNumber_t)0,//BOTH_T7__L_TR,	//# Fast arc left to top right			(use: BOTH_T7_TR__L)
-			(animNumber_t)0,//BOTH_T7__L_T_,	//# Fast arc left to top				(use: BOTH_T7_T___L)
-			(animNumber_t)0,//BOTH_T7__L_BL,	//# Fast arc left to bottom left			(use: BOTH_T7_BL__L)
-			(animNumber_t)0,//BOTH_T7_BL_T_,	//# Fast arc bottom left to top			(use: BOTH_T7_T__BL)
-			(animNumber_t)0,//BOTH_T7_BL_TL,	//# Fast arc bottom left to top left		(use: BOTH_T7_TL_BL)
+	BOTH_T7_BR_TR_GENERAL,	//# Fast arc bottom right to top right		(use: BOTH_T7_TR_BR)
+	BOTH_T7_BR_T__GENERAL,	//# Fast arc bottom right to top			(use: BOTH_T7_T__BR)
+	BOTH_T7__R_BR_GENERAL,	//# Fast arc right to bottom right			(use: BOTH_T7_BR__R)
+	BOTH_T7__R_T__GENERAL,	//# Fast ar right to top				(use: BOTH_T7_T___R)
+	BOTH_T7_TR__R_GENERAL,	//# Fast arc top right to right			(use: BOTH_T7__R_TR)
+	BOTH_T7_TR_T__GENERAL,	//# Fast arc top right to top				(use: BOTH_T7_T__TR)
+	BOTH_T7_TL__R_GENERAL,	//# Fast arc top left to right			(use: BOTH_T7__R_TL)
+	BOTH_T7_TL_TR_GENERAL,	//# Fast arc top left to top right			(use: BOTH_T7_TR_TL)
+	BOTH_T7_TL_T__GENERAL,	//# Fast arc top left to top				(use: BOTH_T7_T__TL)
+	BOTH_T7_TL__L_GENERAL,	//# Fast arc top left to left				(use: BOTH_T7__L_TL)
+	BOTH_T7__L_TR_GENERAL,	//# Fast arc left to top right			(use: BOTH_T7_TR__L)
+	BOTH_T7__L_T__GENERAL,	//# Fast arc left to top				(use: BOTH_T7_T___L)
+	BOTH_T7__L_BL_GENERAL,	//# Fast arc left to bottom left			(use: BOTH_T7_BL__L)
+	BOTH_T7_BL_T__GENERAL,	//# Fast arc bottom left to top			(use: BOTH_T7_T__BL)
+	BOTH_T7_BL_TL_GENERAL,	//# Fast arc bottom left to top left		(use: BOTH_T7_TL_BL)
 	//Saber Attack Start Transitions
-			(animNumber_t)0,//BOTH_S7_S7_T_,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
-			(animNumber_t)0,//BOTH_S7_S7__L,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
-			(animNumber_t)0,//BOTH_S7_S7__R,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
-			(animNumber_t)0,//BOTH_S7_S7_TL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
-			(animNumber_t)0,//BOTH_S7_S7_BR,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
-			(animNumber_t)0,//BOTH_S7_S7_BL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
-			(animNumber_t)0,//BOTH_S7_S7_TR,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	BOTH_S7_S7_T__GENERAL,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S7_S7__L_GENERAL,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S7_S7__R_GENERAL,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S7_S7_TL_GENERAL,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S7_S7_BR_GENERAL,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S7_S7_BL_GENERAL,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S7_S7_TR_GENERAL,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
 	//Saber Attack Return Transitions
-			(animNumber_t)0,//BOTH_R7_B__S7,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
-			(animNumber_t)0,//BOTH_R7__L_S7,	//# Fast plain transition from left-to-right Fast weak attack to stance1
-			(animNumber_t)0,//BOTH_R7__R_S7,	//# Fast plain transition from right-to-left Fast weak attack to stance1
-			(animNumber_t)0,//BOTH_R7_TL_S7,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
-			(animNumber_t)0,//BOTH_R7_BR_S7,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
-			(animNumber_t)0,//BOTH_R7_BL_S7,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
-			(animNumber_t)0,//BOTH_R7_TR_S7,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
-	//Saber Attack Bounces (first 4 frames of an attack, played backwards)
-			(animNumber_t)0,//BOTH_B7_BR___,	//# Bounce-back if attack from BR is blocked
-			(animNumber_t)0,//BOTH_B7__R___,	//# Bounce-back if attack from R is blocked
-			(animNumber_t)0,//BOTH_B7_TR___,	//# Bounce-back if attack from TR is blocked
-			(animNumber_t)0,//BOTH_B7_T____,	//# Bounce-back if attack from T is blocked
-			(animNumber_t)0,//BOTH_B7_TL___,	//# Bounce-back if attack from TL is blocked
-			(animNumber_t)0,//BOTH_B7__L___,	//# Bounce-back if attack from L is blocked
-			(animNumber_t)0,//BOTH_B7_BL___,	//# Bounce-back if attack from BL is blocked
+	BOTH_R7_B__S7_GENERAL,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R7__L_S7_GENERAL,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R7__R_S7_GENERAL,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R7_TL_S7_GENERAL,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R7_BR_S7_GENERAL,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R7_BL_S7_GENERAL,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R7_TR_S7_GENERAL,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_GENERAL, played backwards)
+	BOTH_B7_BR____GENERAL,	//# Bounce-back if attack from BR is blocked
+	BOTH_B7__R____GENERAL,	//# Bounce-back if attack from R is blocked
+	BOTH_B7_TR____GENERAL,	//# Bounce-back if attack from TR is blocked
+	BOTH_B7_T_____GENERAL,	//# Bounce-back if attack from T is blocked
+	BOTH_B7_TL____GENERAL,	//# Bounce-back if attack from TL is blocked
+	BOTH_B7__L____GENERAL,	//# Bounce-back if attack from L is blocked
+	BOTH_B7_BL____GENERAL,	//# Bounce-back if attack from BL is blocked
 	//Saber Attack Deflections (last 4 frames of an attack)
-			(animNumber_t)0,//BOTH_D7_BR___,	//# Deflection toward BR
-			(animNumber_t)0,//BOTH_D7__R___,	//# Deflection toward R
-			(animNumber_t)0,//BOTH_D7_TR___,	//# Deflection toward TR
-			(animNumber_t)0,//BOTH_D7_TL___,	//# Deflection toward TL
-			(animNumber_t)0,//BOTH_D7__L___,	//# Deflection toward L
-			(animNumber_t)0,//BOTH_D7_BL___,	//# Deflection toward BL
-			(animNumber_t)0,//BOTH_D7_B____,	//# Deflection toward B
+	BOTH_D7_BR____GENERAL,	//# Deflection toward BR
+	BOTH_D7__R____GENERAL,	//# Deflection toward R
+	BOTH_D7_TR____GENERAL,	//# Deflection toward TR
+	BOTH_D7_TL____GENERAL,	//# Deflection toward TL
+	BOTH_D7__L____GENERAL,	//# Deflection toward L
+	BOTH_D7_BL____GENERAL,	//# Deflection toward BL
+	BOTH_D7_B_____GENERAL,	//# Deflection toward B
 	//Saber parry anims
-	BOTH_P1_S1_T_,	//# Block shot/saber top
-	BOTH_P1_S1_TR,	//# Block shot/saber top right
-	BOTH_P1_S1_TL,	//# Block shot/saber top left
-	BOTH_P1_S1_BL,	//# Block shot/saber bottom left
-	BOTH_P1_S1_BR,	//# Block shot/saber bottom right
+	BOTH_P1_S1_T__GENERAL,	//# Block shot/saber top
+	BOTH_P1_S1_TR_GENERAL,	//# Block shot/saber top right
+	BOTH_P1_S1_TL_GENERAL,	//# Block shot/saber top left
+	BOTH_P1_S1_BL_GENERAL,	//# Block shot/saber bottom left
+	BOTH_P1_S1_BR_GENERAL,	//# Block shot/saber bottom right
 	//Saber knockaway
-	BOTH_K1_S1_T_,	//# knockaway saber top
-	BOTH_K1_S1_TR,	//# knockaway saber top right
-	BOTH_K1_S1_TL,	//# knockaway saber top left
-	BOTH_K1_S1_BL,	//# knockaway saber bottom left
-	BOTH_K1_S1_B_,	//# knockaway saber bottom
-	BOTH_K1_S1_BR,	//# knockaway saber bottom right
+	BOTH_K1_S1_T__GENERAL,	//# knockaway saber top
+	BOTH_K1_S1_TR_GENERAL,	//# knockaway saber top right
+	BOTH_K1_S1_TL_GENERAL,	//# knockaway saber top left
+	BOTH_K1_S1_BL_GENERAL,	//# knockaway saber bottom left
+	BOTH_K1_S1_B__GENERAL,	//# knockaway saber bottom
+	BOTH_K1_S1_BR_GENERAL,	//# knockaway saber bottom right
 	//Saber attack knocked away
-	BOTH_V1_BR_S1,	//# BR attack knocked away
-	BOTH_V1__R_S1,	//# R attack knocked away
-	BOTH_V1_TR_S1,	//# TR attack knocked away
-	BOTH_V1_T__S1,	//# T attack knocked away
-	BOTH_V1_TL_S1,	//# TL attack knocked away
-	BOTH_V1__L_S1,	//# L attack knocked away
-	BOTH_V1_BL_S1,	//# BL attack knocked away
-	BOTH_V1_B__S1,	//# B attack knocked away
+	BOTH_V1_BR_S1_GENERAL,	//# BR attack knocked away
+	BOTH_V1__R_S1_GENERAL,	//# R attack knocked away
+	BOTH_V1_TR_S1_GENERAL,	//# TR attack knocked away
+	BOTH_V1_T__S1_GENERAL,	//# T attack knocked away
+	BOTH_V1_TL_S1_GENERAL,	//# TL attack knocked away
+	BOTH_V1__L_S1_GENERAL,	//# L attack knocked away
+	BOTH_V1_BL_S1_GENERAL,	//# BL attack knocked away
+	BOTH_V1_B__S1_GENERAL,	//# B attack knocked away
 	//Saber parry broken
-	BOTH_H1_S1_T_,	//# saber knocked down from top parry
-	BOTH_H1_S1_TR,	//# saber knocked down-left from TR parry
-	BOTH_H1_S1_TL,	//# saber knocked down-right from TL parry
-	BOTH_H1_S1_BL,	//# saber knocked up-right from BL parry
-	BOTH_H1_S1_B_,	//# saber knocked up over head from ready?
-	BOTH_H1_S1_BR,	//# saber knocked up-left from BR parry
+	BOTH_H1_S1_T__GENERAL,	//# saber knocked down from top parry
+	BOTH_H1_S1_TR_GENERAL,	//# saber knocked down-left from TR parry
+	BOTH_H1_S1_TL_GENERAL,	//# saber knocked down-right from TL parry
+	BOTH_H1_S1_BL_GENERAL,	//# saber knocked up-right from BL parry
+	BOTH_H1_S1_B__GENERAL,	//# saber knocked up over head from ready?
+	BOTH_H1_S1_BR_GENERAL,	//# saber knocked up-left from BR parry
 	//Dual Saber parry anims
-			(animNumber_t)0,//BOTH_P6_S6_T_,	//# Block shot/saber top
-			(animNumber_t)0,//BOTH_P6_S6_TR,	//# Block shot/saber top right
-			(animNumber_t)0,//BOTH_P6_S6_TL,	//# Block shot/saber top left
-			(animNumber_t)0,//BOTH_P6_S6_BL,	//# Block shot/saber bottom left
-			(animNumber_t)0,//BOTH_P6_S6_BR,	//# Block shot/saber bottom right
+	BOTH_P6_S6_T__GENERAL,	//# Block shot/saber top
+	BOTH_P6_S6_TR_GENERAL,	//# Block shot/saber top right
+	BOTH_P6_S6_TL_GENERAL,	//# Block shot/saber top left
+	BOTH_P6_S6_BL_GENERAL,	//# Block shot/saber bottom left
+	BOTH_P6_S6_BR_GENERAL,	//# Block shot/saber bottom right
 	//Dual Saber knockaway
-			(animNumber_t)0,//BOTH_K6_S6_T_,	//# knockaway saber top
-			(animNumber_t)0,//BOTH_K6_S6_TR,	//# knockaway saber top right
-				(animNumber_t)0,//BOTH_K6_S6_TL,	//# knockaway saber top left
-				(animNumber_t)0,//BOTH_K6_S6_BL,	//# knockaway saber bottom left
-				(animNumber_t)0,//BOTH_K6_S6_B_,	//# knockaway saber bottom
-				(animNumber_t)0,//BOTH_K6_S6_BR,	//# knockaway saber bottom right
+	BOTH_K6_S6_T__GENERAL,	//# knockaway saber top
+	BOTH_K6_S6_TR_GENERAL,	//# knockaway saber top right
+	BOTH_K6_S6_TL_GENERAL,	//# knockaway saber top left
+	BOTH_K6_S6_BL_GENERAL,	//# knockaway saber bottom left
+	BOTH_K6_S6_B__GENERAL,	//# knockaway saber bottom
+	BOTH_K6_S6_BR_GENERAL,	//# knockaway saber bottom right
 	//Dual Saber attack knocked away
-				(animNumber_t)0,//BOTH_V6_BR_S6,	//# BR attack knocked away
-				(animNumber_t)0,//BOTH_V6__R_S6,	//# R attack knocked away
-				(animNumber_t)0,//BOTH_V6_TR_S6,	//# TR attack knocked away
-				(animNumber_t)0,//BOTH_V6_T__S6,	//# T attack knocked away
-				(animNumber_t)0,//BOTH_V6_TL_S6,	//# TL attack knocked away
-				(animNumber_t)0,//BOTH_V6__L_S6,	//# L attack knocked away
-				(animNumber_t)0,//BOTH_V6_BL_S6,	//# BL attack knocked away
-				(animNumber_t)0,//BOTH_V6_B__S6,	//# B attack knocked away
+	BOTH_V6_BR_S6_GENERAL,	//# BR attack knocked away
+	BOTH_V6__R_S6_GENERAL,	//# R attack knocked away
+	BOTH_V6_TR_S6_GENERAL,	//# TR attack knocked away
+	BOTH_V6_T__S6_GENERAL,	//# T attack knocked away
+	BOTH_V6_TL_S6_GENERAL,	//# TL attack knocked away
+	BOTH_V6__L_S6_GENERAL,	//# L attack knocked away
+	BOTH_V6_BL_S6_GENERAL,	//# BL attack knocked away
+	BOTH_V6_B__S6_GENERAL,	//# B attack knocked away
 	//Dual Saber parry broken
-				(animNumber_t)0,//BOTH_H6_S6_T_,	//# saber knocked down from top parry
-				(animNumber_t)0,//BOTH_H6_S6_TR,	//# saber knocked down-left from TR parry
-				(animNumber_t)0,//BOTH_H6_S6_TL,	//# saber knocked down-right from TL parry
-				(animNumber_t)0,//BOTH_H6_S6_BL,	//# saber knocked up-right from BL parry
-				(animNumber_t)0,//BOTH_H6_S6_B_,	//# saber knocked up over head from ready?
-				(animNumber_t)0,//BOTH_H6_S6_BR,	//# saber knocked up-left from BR parry
+	BOTH_H6_S6_T__GENERAL,	//# saber knocked down from top parry
+	BOTH_H6_S6_TR_GENERAL,	//# saber knocked down-left from TR parry
+	BOTH_H6_S6_TL_GENERAL,	//# saber knocked down-right from TL parry
+	BOTH_H6_S6_BL_GENERAL,	//# saber knocked up-right from BL parry
+	BOTH_H6_S6_B__GENERAL,	//# saber knocked up over head from ready?
+	BOTH_H6_S6_BR_GENERAL,	//# saber knocked up-left from BR parry
 	//SaberStaff parry anims
-				(animNumber_t)0,//BOTH_P7_S7_T_,	//# Block shot/saber top
-				(animNumber_t)0,//BOTH_P7_S7_TR,	//# Block shot/saber top right
-				(animNumber_t)0,//BOTH_P7_S7_TL,	//# Block shot/saber top left
-				(animNumber_t)0,//BOTH_P7_S7_BL,	//# Block shot/saber bottom left
-				(animNumber_t)0,//BOTH_P7_S7_BR,	//# Block shot/saber bottom right
+	BOTH_P7_S7_T__GENERAL,	//# Block shot/saber top
+	BOTH_P7_S7_TR_GENERAL,	//# Block shot/saber top right
+	BOTH_P7_S7_TL_GENERAL,	//# Block shot/saber top left
+	BOTH_P7_S7_BL_GENERAL,	//# Block shot/saber bottom left
+	BOTH_P7_S7_BR_GENERAL,	//# Block shot/saber bottom right
 	//SaberStaff knockaway
-				(animNumber_t)0,//BOTH_K7_S7_T_,	//# knockaway saber top
-				(animNumber_t)0,//BOTH_K7_S7_TR,	//# knockaway saber top right
-				(animNumber_t)0,//BOTH_K7_S7_TL,	//# knockaway saber top left
-				(animNumber_t)0,//BOTH_K7_S7_BL,	//# knockaway saber bottom left
-				(animNumber_t)0,//BOTH_K7_S7_B_,	//# knockaway saber bottom
-				(animNumber_t)0,//BOTH_K7_S7_BR,	//# knockaway saber bottom right
+	BOTH_K7_S7_T__GENERAL,	//# knockaway saber top
+	BOTH_K7_S7_TR_GENERAL,	//# knockaway saber top right
+	BOTH_K7_S7_TL_GENERAL,	//# knockaway saber top left
+	BOTH_K7_S7_BL_GENERAL,	//# knockaway saber bottom left
+	BOTH_K7_S7_B__GENERAL,	//# knockaway saber bottom
+	BOTH_K7_S7_BR_GENERAL,	//# knockaway saber bottom right
 	//SaberStaff attack knocked away
-				(animNumber_t)0,//BOTH_V7_BR_S7,	//# BR attack knocked away
-				(animNumber_t)0,//BOTH_V7__R_S7,	//# R attack knocked away
-				(animNumber_t)0,//BOTH_V7_TR_S7,	//# TR attack knocked away
-				(animNumber_t)0,//BOTH_V7_T__S7,	//# T attack knocked away
-				(animNumber_t)0,//BOTH_V7_TL_S7,	//# TL attack knocked away
-				(animNumber_t)0,//BOTH_V7__L_S7,	//# L attack knocked away
-				(animNumber_t)0,//BOTH_V7_BL_S7,	//# BL attack knocked away
-				(animNumber_t)0,//BOTH_V7_B__S7,	//# B attack knocked away
+	BOTH_V7_BR_S7_GENERAL,	//# BR attack knocked away
+	BOTH_V7__R_S7_GENERAL,	//# R attack knocked away
+	BOTH_V7_TR_S7_GENERAL,	//# TR attack knocked away
+	BOTH_V7_T__S7_GENERAL,	//# T attack knocked away
+	BOTH_V7_TL_S7_GENERAL,	//# TL attack knocked away
+	BOTH_V7__L_S7_GENERAL,	//# L attack knocked away
+	BOTH_V7_BL_S7_GENERAL,	//# BL attack knocked away
+	BOTH_V7_B__S7_GENERAL,	//# B attack knocked away
 	//SaberStaff parry broken
-				(animNumber_t)0,//BOTH_H7_S7_T_,	//# saber knocked down from top parry
-				(animNumber_t)0,//BOTH_H7_S7_TR,	//# saber knocked down-left from TR parry
-				(animNumber_t)0,//BOTH_H7_S7_TL,	//# saber knocked down-right from TL parry
-				(animNumber_t)0,//BOTH_H7_S7_BL,	//# saber knocked up-right from BL parry
-				(animNumber_t)0,//BOTH_H7_S7_B_,	//# saber knocked up over head from ready?
-				(animNumber_t)0,//BOTH_H7_S7_BR,	//# saber knocked up-left from BR parry
+	BOTH_H7_S7_T__GENERAL,	//# saber knocked down from top parry
+	BOTH_H7_S7_TR_GENERAL,	//# saber knocked down-left from TR parry
+	BOTH_H7_S7_TL_GENERAL,	//# saber knocked down-right from TL parry
+	BOTH_H7_S7_BL_GENERAL,	//# saber knocked up-right from BL parry
+	BOTH_H7_S7_B__GENERAL,	//# saber knocked up over head from ready?
+	BOTH_H7_S7_BR_GENERAL,	//# saber knocked up-left from BR parry
 	//Sabers locked anims
 	//* #sep BOTH_ SABER LOCKED ANIMS
-	//BOTH_(DL, S, ST)_(DL, S, ST)_(T, S)_(L, B, SB)_1(_W, _L)
+	//BOTH_(DL_GENERAL, S_GENERAL, ST)_(DL_GENERAL, S_GENERAL, ST)_(T_GENERAL, S)_(L_GENERAL, B_GENERAL, SB)_1(_W_GENERAL, _L)
 //===Single locks==================================================================
 //SINGLE vs. DUAL
 	//side locks - I'm using a single and they're using dual
-				(animNumber_t)0,//BOTH_LK_S_DL_S_B_1_L,	//normal break I lost
-				(animNumber_t)0,//BOTH_LK_S_DL_S_B_1_W,	//normal break I won
-				(animNumber_t)0,//BOTH_LK_S_DL_S_L_1,		//lock if I'm using single vs. a dual
-				(animNumber_t)0,//BOTH_LK_S_DL_S_SB_1_L,	//super break I lost
-				(animNumber_t)0,//BOTH_LK_S_DL_S_SB_1_W,	//super break I won
+	BOTH_LK_S_DL_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_S_DL_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_S_DL_S_L_1_GENERAL,		//lock if I'm using single vs. a dual
+	BOTH_LK_S_DL_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_S_DL_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-				(animNumber_t)0,//BOTH_LK_S_DL_T_B_1_L,	//normal break I lost
-		(animNumber_t)0,//BOTH_LK_S_DL_T_B_1_W,	//normal break I won
-		(animNumber_t)0,//BOTH_LK_S_DL_T_L_1,		//lock if I'm using single vs. a dual
-		(animNumber_t)0,//BOTH_LK_S_DL_T_SB_1_L,	//super break I lost
-		(animNumber_t)0,//BOTH_LK_S_DL_T_SB_1_W,	//super break I won
+	BOTH_LK_S_DL_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_S_DL_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_S_DL_T_L_1_GENERAL,		//lock if I'm using single vs. a dual
+	BOTH_LK_S_DL_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_S_DL_T_SB_1_W_GENERAL,	//super break I won
 //SINGLE vs. STAFF
 	//side locks
-		(animNumber_t)0,//BOTH_LK_S_ST_S_B_1_L,	//normal break I lost
-		(animNumber_t)0,//BOTH_LK_S_ST_S_B_1_W,	//normal break I won
-		(animNumber_t)0,//BOTH_LK_S_ST_S_L_1,		//lock if I'm using single vs. a staff
-		(animNumber_t)0,//BOTH_LK_S_ST_S_SB_1_L,	//super break I lost
-		(animNumber_t)0,//BOTH_LK_S_ST_S_SB_1_W,	//super break I won
+	BOTH_LK_S_ST_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_S_ST_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_S_ST_S_L_1_GENERAL,		//lock if I'm using single vs. a staff
+	BOTH_LK_S_ST_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_S_ST_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-		(animNumber_t)0,//BOTH_LK_S_ST_T_B_1_L,	//normal break I lost
-		(animNumber_t)0,//BOTH_LK_S_ST_T_B_1_W,	//normal break I won
-		(animNumber_t)0,//BOTH_LK_S_ST_T_L_1,		//lock if I'm using single vs. a staff
-		(animNumber_t)0,//BOTH_LK_S_ST_T_SB_1_L,	//super break I lost
-		(animNumber_t)0,//BOTH_LK_S_ST_T_SB_1_W,	//super break I won
+	BOTH_LK_S_ST_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_S_ST_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_S_ST_T_L_1_GENERAL,		//lock if I'm using single vs. a staff
+	BOTH_LK_S_ST_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_S_ST_T_SB_1_W_GENERAL,	//super break I won
 //SINGLE vs. SINGLE
 	//side locks
-		(animNumber_t)0,//BOTH_LK_S_S_S_B_1_L,	//normal break I lost
-		(animNumber_t)0,//BOTH_LK_S_S_S_B_1_W,	//normal break I won
-		(animNumber_t)0,//BOTH_LK_S_S_S_L_1,		//lock if I'm using single vs. a single and I initiated
-		(animNumber_t)0,//BOTH_LK_S_S_S_SB_1_L,	//super break I lost
-		(animNumber_t)0,//BOTH_LK_S_S_S_SB_1_W,	//super break I won
+	BOTH_LK_S_S_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_S_S_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_S_S_S_L_1_GENERAL,		//lock if I'm using single vs. a single and I initiated
+	BOTH_LK_S_S_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_S_S_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-		(animNumber_t)0,//BOTH_LK_S_S_T_B_1_L,	//normal break I lost
-		(animNumber_t)0,//BOTH_LK_S_S_T_B_1_W,	//normal break I won
-		(animNumber_t)0,//BOTH_LK_S_S_T_L_1,		//lock if I'm using single vs. a single and I initiated
-		(animNumber_t)0,//BOTH_LK_S_S_T_SB_1_L,	//super break I lost
-				(animNumber_t)0,//BOTH_LK_S_S_T_SB_1_W,	//super break I won
+	BOTH_LK_S_S_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_S_S_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_S_S_T_L_1_GENERAL,		//lock if I'm using single vs. a single and I initiated
+	BOTH_LK_S_S_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_S_S_T_SB_1_W_GENERAL,	//super break I won
 //===Dual Saber locks==================================================================
 //DUAL vs. DUAL	
 	//side locks
-				(animNumber_t)0,//BOTH_LK_DL_DL_S_B_1_L,	//normal break I lost
-				(animNumber_t)0,//BOTH_LK_DL_DL_S_B_1_W,	//normal break I won
-				(animNumber_t)0,//BOTH_LK_DL_DL_S_L_1,	//lock if I'm using dual vs. dual and I initiated
-				(animNumber_t)0,//BOTH_LK_DL_DL_S_SB_1_L,	//super break I lost
-				(animNumber_t)0,//BOTH_LK_DL_DL_S_SB_1_W,	//super break I won
+	BOTH_LK_DL_DL_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_DL_DL_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_DL_DL_S_L_1_GENERAL,	//lock if I'm using dual vs. dual and I initiated
+	BOTH_LK_DL_DL_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_DL_DL_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-					(animNumber_t)0,//BOTH_LK_DL_DL_T_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_DL_DL_T_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_DL_DL_T_L_1,	//lock if I'm using dual vs. dual and I initiated
-					(animNumber_t)0,//BOTH_LK_DL_DL_T_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_DL_DL_T_SB_1_W,	//super break I won
+	BOTH_LK_DL_DL_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_DL_DL_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_DL_DL_T_L_1_GENERAL,	//lock if I'm using dual vs. dual and I initiated
+	BOTH_LK_DL_DL_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_DL_DL_T_SB_1_W_GENERAL,	//super break I won
 //DUAL vs. STAFF
 	//side locks
-					(animNumber_t)0,//BOTH_LK_DL_ST_S_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_DL_ST_S_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_DL_ST_S_L_1,	//lock if I'm using dual vs. a staff
-					(animNumber_t)0,//BOTH_LK_DL_ST_S_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_DL_ST_S_SB_1_W,	//super break I won
+	BOTH_LK_DL_ST_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_DL_ST_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_DL_ST_S_L_1_GENERAL,	//lock if I'm using dual vs. a staff
+	BOTH_LK_DL_ST_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_DL_ST_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-					(animNumber_t)0,//BOTH_LK_DL_ST_T_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_DL_ST_T_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_DL_ST_T_L_1,	//lock if I'm using dual vs. a staff
-					(animNumber_t)0,//BOTH_LK_DL_ST_T_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_DL_ST_T_SB_1_W,	//super break I won
+	BOTH_LK_DL_ST_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_DL_ST_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_DL_ST_T_L_1_GENERAL,	//lock if I'm using dual vs. a staff
+	BOTH_LK_DL_ST_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_DL_ST_T_SB_1_W_GENERAL,	//super break I won
 //DUAL vs. SINGLE
 	//side locks
-					(animNumber_t)0,//BOTH_LK_DL_S_S_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_DL_S_S_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_DL_S_S_L_1,		//lock if I'm using dual vs. a single
-					(animNumber_t)0,//BOTH_LK_DL_S_S_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_DL_S_S_SB_1_W,	//super break I won
+	BOTH_LK_DL_S_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_DL_S_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_DL_S_S_L_1_GENERAL,		//lock if I'm using dual vs. a single
+	BOTH_LK_DL_S_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_DL_S_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-					(animNumber_t)0,//BOTH_LK_DL_S_T_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_DL_S_T_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_DL_S_T_L_1,		//lock if I'm using dual vs. a single
-					(animNumber_t)0,//BOTH_LK_DL_S_T_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_DL_S_T_SB_1_W,	//super break I won
+	BOTH_LK_DL_S_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_DL_S_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_DL_S_T_L_1_GENERAL,		//lock if I'm using dual vs. a single
+	BOTH_LK_DL_S_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_DL_S_T_SB_1_W_GENERAL,	//super break I won
 //===Saber Staff locks==================================================================
 //STAFF vs. DUAL
 	//side locks
-					(animNumber_t)0,//BOTH_LK_ST_DL_S_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_ST_DL_S_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_ST_DL_S_L_1,	//lock if I'm using staff vs. dual
-					(animNumber_t)0,//BOTH_LK_ST_DL_S_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_ST_DL_S_SB_1_W,	//super break I won
+	BOTH_LK_ST_DL_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_ST_DL_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_ST_DL_S_L_1_GENERAL,	//lock if I'm using staff vs. dual
+	BOTH_LK_ST_DL_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_ST_DL_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-					(animNumber_t)0,//BOTH_LK_ST_DL_T_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_ST_DL_T_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_ST_DL_T_L_1,	//lock if I'm using staff vs. dual
-					(animNumber_t)0,//BOTH_LK_ST_DL_T_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_ST_DL_T_SB_1_W,	//super break I won
+	BOTH_LK_ST_DL_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_ST_DL_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_ST_DL_T_L_1_GENERAL,	//lock if I'm using staff vs. dual
+	BOTH_LK_ST_DL_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_ST_DL_T_SB_1_W_GENERAL,	//super break I won
 //STAFF vs. STAFF
 	//side locks
-					(animNumber_t)0,//BOTH_LK_ST_ST_S_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_ST_ST_S_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_ST_ST_S_L_1,	//lock if I'm using staff vs. a staff and I initiated
-					(animNumber_t)0,//BOTH_LK_ST_ST_S_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_ST_ST_S_SB_1_W,	//super break I won
+	BOTH_LK_ST_ST_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_ST_ST_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_ST_ST_S_L_1_GENERAL,	//lock if I'm using staff vs. a staff and I initiated
+	BOTH_LK_ST_ST_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_ST_ST_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-					(animNumber_t)0,//BOTH_LK_ST_ST_T_B_1_L,	//normal break I lost
-					(animNumber_t)0,//BOTH_LK_ST_ST_T_B_1_W,	//normal break I won
-					(animNumber_t)0,//BOTH_LK_ST_ST_T_L_1,	//lock if I'm using staff vs. a staff and I initiated
-					(animNumber_t)0,//BOTH_LK_ST_ST_T_SB_1_L,	//super break I lost
-					(animNumber_t)0,//BOTH_LK_ST_ST_T_SB_1_W,	//super break I won
+	BOTH_LK_ST_ST_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_ST_ST_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_ST_ST_T_L_1_GENERAL,	//lock if I'm using staff vs. a staff and I initiated
+	BOTH_LK_ST_ST_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_ST_ST_T_SB_1_W_GENERAL,	//super break I won
 //STAFF vs. SINGLE
 	//side locks
-					(animNumber_t)0,//BOTH_LK_ST_S_S_B_1_L,	//normal break I lost
-			(animNumber_t)0,//BOTH_LK_ST_S_S_B_1_W,	//normal break I won
-			(animNumber_t)0,//BOTH_LK_ST_S_S_L_1,		//lock if I'm using staff vs. a single
-			(animNumber_t)0,//BOTH_LK_ST_S_S_SB_1_L,	//super break I lost
-			(animNumber_t)0,//BOTH_LK_ST_S_S_SB_1_W,	//super break I won
+	BOTH_LK_ST_S_S_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_ST_S_S_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_ST_S_S_L_1_GENERAL,		//lock if I'm using staff vs. a single
+	BOTH_LK_ST_S_S_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_ST_S_S_SB_1_W_GENERAL,	//super break I won
 	//top locks
-			(animNumber_t)0,//BOTH_LK_ST_S_T_B_1_L,	//normal break I lost
-			(animNumber_t)0,//BOTH_LK_ST_S_T_B_1_W,	//normal break I won
-			(animNumber_t)0,//BOTH_LK_ST_S_T_L_1,		//lock if I'm using staff vs. a single
-			(animNumber_t)0,//BOTH_LK_ST_S_T_SB_1_L,	//super break I lost
-			(animNumber_t)0,//BOTH_LK_ST_S_T_SB_1_W,	//super break I won
+	BOTH_LK_ST_S_T_B_1_L_GENERAL,	//normal break I lost
+	BOTH_LK_ST_S_T_B_1_W_GENERAL,	//normal break I won
+	BOTH_LK_ST_S_T_L_1_GENERAL,		//lock if I'm using staff vs. a single
+	BOTH_LK_ST_S_T_SB_1_L_GENERAL,	//super break I lost
+	BOTH_LK_ST_S_T_SB_1_W_GENERAL,	//super break I won
 //Special cases for same saber style vs. each other (won't fit in nice 5-anim size lists above)
-(animNumber_t)0,//BOTH_LK_S_S_S_L_2,		//lock if I'm using single vs. a single and other intitiated
-(animNumber_t)0,//BOTH_LK_S_S_T_L_2,		//lock if I'm using single vs. a single and other initiated
-(animNumber_t)0,//BOTH_LK_DL_DL_S_L_2,	//lock if I'm using dual vs. dual and other initiated
-(animNumber_t)0,//BOTH_LK_DL_DL_T_L_2,	//lock if I'm using dual vs. dual and other initiated
-(animNumber_t)0,//BOTH_LK_ST_ST_S_L_2,	//lock if I'm using staff vs. a staff and other initiated
-(animNumber_t)0,//BOTH_LK_ST_ST_T_L_2,	//lock if I'm using staff vs. a staff and other initiated
+	BOTH_LK_S_S_S_L_2_GENERAL,		//lock if I'm using single vs. a single and other intitiated
+	BOTH_LK_S_S_T_L_2_GENERAL,		//lock if I'm using single vs. a single and other initiated
+	BOTH_LK_DL_DL_S_L_2_GENERAL,	//lock if I'm using dual vs. dual and other initiated
+	BOTH_LK_DL_DL_T_L_2_GENERAL,	//lock if I'm using dual vs. dual and other initiated
+	BOTH_LK_ST_ST_S_L_2_GENERAL,	//lock if I'm using staff vs. a staff and other initiated
+	BOTH_LK_ST_ST_T_L_2_GENERAL,	//lock if I'm using staff vs. a staff and other initiated
 //===End Saber locks==================================================================
 	//old locks
-	BOTH_BF2RETURN,	//#
-	BOTH_BF2BREAK,	//#
-	BOTH_BF2LOCK,	//#
-	BOTH_BF1RETURN,	//#
-	BOTH_BF1BREAK,	//#
-	BOTH_BF1LOCK,	//#
-	BOTH_CWCIRCLE_R2__R_S1,	//#
-	BOTH_CCWCIRCLE_R2__L_S1,	//#
-	BOTH_CWCIRCLE_A2__L__R,	//#
-	BOTH_CCWCIRCLE_A2__R__L,	//#
-	BOTH_CWCIRCLEBREAK,	//#
-	BOTH_CCWCIRCLEBREAK,	//#
-	BOTH_CWCIRCLELOCK,	//#
-	BOTH_CCWCIRCLELOCK,	//#
+	BOTH_BF2RETURN_GENERAL,	//#
+	BOTH_BF2BREAK_GENERAL,	//#
+	BOTH_BF2LOCK_GENERAL,	//#
+	BOTH_BF1RETURN_GENERAL,	//#
+	BOTH_BF1BREAK_GENERAL,	//#
+	BOTH_BF1LOCK_GENERAL,	//#
+	BOTH_CWCIRCLE_R2__R_S1_GENERAL,	//#
+	BOTH_CCWCIRCLE_R2__L_S1_GENERAL,	//#
+	BOTH_CWCIRCLE_A2__L__R_GENERAL,	//#
+	BOTH_CCWCIRCLE_A2__R__L_GENERAL,	//#
+	BOTH_CWCIRCLEBREAK_GENERAL,	//#
+	BOTH_CCWCIRCLEBREAK_GENERAL,	//#
+	BOTH_CWCIRCLELOCK_GENERAL,	//#
+	BOTH_CCWCIRCLELOCK_GENERAL,	//#
 	//other saber anims
 	//* #sep BOTH_ SABER MISC ANIMS
-	BOTH_SABERFAST_STANCE,
-	BOTH_SABERSLOW_STANCE,
-					(animNumber_t)0,//BOTH_SABERDUAL_STANCE,
-						(animNumber_t)0,//BOTH_SABERSTAFF_STANCE,
-	BOTH_A2_STABBACK1,		//# Stab saber backward
-	BOTH_ATTACK_BACK,		//# Swing around backwards and attack
-	BOTH_JUMPFLIPSLASHDOWN1,//#
-	BOTH_JUMPFLIPSTABDOWN,//#
-	BOTH_FORCELEAP2_T__B_,//#
-	BOTH_LUNGE2_B__T_,//#
-	BOTH_CROUCHATTACKBACK1,//#
+	BOTH_SABERFAST_STANCE_GENERAL,
+	BOTH_SABERSLOW_STANCE_GENERAL,
+	BOTH_SABERDUAL_STANCE_GENERAL,
+	BOTH_SABERSTAFF_STANCE_GENERAL,
+	BOTH_A2_STABBACK1_GENERAL,		//# Stab saber backward
+	BOTH_ATTACK_BACK_GENERAL,		//# Swing around backwards and attack
+	BOTH_JUMPFLIPSLASHDOWN1_GENERAL,//#
+	BOTH_JUMPFLIPSTABDOWN_GENERAL,//#
+	BOTH_FORCELEAP2_T__B__GENERAL,//#
+	BOTH_LUNGE2_B__T__GENERAL,//#
+	BOTH_CROUCHATTACKBACK1_GENERAL,//#
 	//New specials for JKA:
-						(animNumber_t)0,//BOTH_JUMPATTACK6,//#
-						(animNumber_t)0,//BOTH_JUMPATTACK7,//#
-						(animNumber_t)0,//BOTH_SPINATTACK6,//#
-						(animNumber_t)0,//BOTH_SPINATTACK7,//#
-						(animNumber_t)0,//BOTH_S1_S6,//#	From stand1 to saberdual stance - turning on your dual sabers
-						(animNumber_t)0,//BOTH_S6_S1,//#	From dualstaff stance to stand1 - turning off your dual sabers
-						(animNumber_t)0,//BOTH_S1_S7,//#	From stand1 to saberstaff stance - turning on your saberstaff
-						(animNumber_t)0,//BOTH_S7_S1,//#	From saberstaff stance to stand1 - turning off your saberstaff
-						(animNumber_t)0,//BOTH_FORCELONGLEAP_START,
-						(animNumber_t)0,//BOTH_FORCELONGLEAP_ATTACK,
-						(animNumber_t)0,//BOTH_FORCELONGLEAP_LAND,
-						(animNumber_t)0,//BOTH_FORCEWALLRUNFLIP_START,
-						(animNumber_t)0,//BOTH_FORCEWALLRUNFLIP_END,
-						(animNumber_t)0,//BOTH_FORCEWALLRUNFLIP_ALT,
-						(animNumber_t)0,//BOTH_FORCEWALLREBOUND_FORWARD,
-						(animNumber_t)0,//BOTH_FORCEWALLREBOUND_LEFT,
-						(animNumber_t)0,//BOTH_FORCEWALLREBOUND_BACK,
-						(animNumber_t)0,//BOTH_FORCEWALLREBOUND_RIGHT,
-						(animNumber_t)0,//BOTH_FORCEWALLHOLD_FORWARD,
-						(animNumber_t)0,//BOTH_FORCEWALLHOLD_LEFT,
-						(animNumber_t)0,//BOTH_FORCEWALLHOLD_BACK,
-						(animNumber_t)0,//BOTH_FORCEWALLHOLD_RIGHT,
-						(animNumber_t)0,//BOTH_FORCEWALLRELEASE_FORWARD,
-						(animNumber_t)0,//BOTH_FORCEWALLRELEASE_LEFT,
-						(animNumber_t)0,//BOTH_FORCEWALLRELEASE_BACK,
-						(animNumber_t)0,//BOTH_FORCEWALLRELEASE_RIGHT,
-						(animNumber_t)0,//BOTH_A7_KICK_F,
-						(animNumber_t)0,//BOTH_A7_KICK_B,
-						(animNumber_t)0,//BOTH_A7_KICK_R,
-						(animNumber_t)0,//BOTH_A7_KICK_L,
-						(animNumber_t)0,//BOTH_A7_KICK_S,
-						(animNumber_t)0,//BOTH_A7_KICK_BF,
-						(animNumber_t)0,//BOTH_A7_KICK_BF_STOP,
-						(animNumber_t)0,//BOTH_A7_KICK_RL,
-						(animNumber_t)0,//BOTH_A7_KICK_F_AIR,
-						(animNumber_t)0,//BOTH_A7_KICK_B_AIR,
-						(animNumber_t)0,//BOTH_A7_KICK_R_AIR,
-						(animNumber_t)0,//BOTH_A7_KICK_L_AIR,
-						(animNumber_t)0,//BOTH_FLIP_ATTACK7,
-						(animNumber_t)0,//BOTH_FLIP_HOLD7,
-						(animNumber_t)0,//BOTH_FLIP_LAND,
-						(animNumber_t)0,//BOTH_PULL_IMPALE_STAB,
-						(animNumber_t)0,//BOTH_PULL_IMPALE_SWING,
-						(animNumber_t)0,//BOTH_PULLED_INAIR_B,
-						(animNumber_t)0,//BOTH_PULLED_INAIR_F,
-						(animNumber_t)0,//BOTH_STABDOWN,
-						(animNumber_t)0,//BOTH_STABDOWN_STAFF,
-						(animNumber_t)0,//BOTH_STABDOWN_DUAL,
-						(animNumber_t)0,//BOTH_A6_SABERPROTECT,
-						(animNumber_t)0,//BOTH_A7_SOULCAL,
-						(animNumber_t)0,//BOTH_A1_SPECIAL,
-						(animNumber_t)0,//BOTH_A2_SPECIAL,
-						(animNumber_t)0,//BOTH_A3_SPECIAL,
-				(animNumber_t)0,//BOTH_ROLL_STAB,
+	BOTH_JUMPATTACK6_GENERAL,//#
+	BOTH_JUMPATTACK7_GENERAL,//#
+	BOTH_SPINATTACK6_GENERAL,//#
+	BOTH_SPINATTACK7_GENERAL,//#
+	BOTH_S1_S6_GENERAL,//#	From stand1 to saberdual stance - turning on your dual sabers
+	BOTH_S6_S1_GENERAL,//#	From dualstaff stance to stand1 - turning off your dual sabers
+	BOTH_S1_S7_GENERAL,//#	From stand1 to saberstaff stance - turning on your saberstaff
+	BOTH_S7_S1_GENERAL,//#	From saberstaff stance to stand1 - turning off your saberstaff
+	BOTH_FORCELONGLEAP_START_GENERAL,
+	BOTH_FORCELONGLEAP_ATTACK_GENERAL,
+	BOTH_FORCELONGLEAP_LAND_GENERAL,
+	BOTH_FORCEWALLRUNFLIP_START_GENERAL,
+	BOTH_FORCEWALLRUNFLIP_END_GENERAL,
+	BOTH_FORCEWALLRUNFLIP_ALT_GENERAL,
+	BOTH_FORCEWALLREBOUND_FORWARD_GENERAL,
+	BOTH_FORCEWALLREBOUND_LEFT_GENERAL,
+	BOTH_FORCEWALLREBOUND_BACK_GENERAL,
+	BOTH_FORCEWALLREBOUND_RIGHT_GENERAL,
+	BOTH_FORCEWALLHOLD_FORWARD_GENERAL,
+	BOTH_FORCEWALLHOLD_LEFT_GENERAL,
+	BOTH_FORCEWALLHOLD_BACK_GENERAL,
+	BOTH_FORCEWALLHOLD_RIGHT_GENERAL,
+	BOTH_FORCEWALLRELEASE_FORWARD_GENERAL,
+	BOTH_FORCEWALLRELEASE_LEFT_GENERAL,
+	BOTH_FORCEWALLRELEASE_BACK_GENERAL,
+	BOTH_FORCEWALLRELEASE_RIGHT_GENERAL,
+	BOTH_A7_KICK_F_GENERAL,
+	BOTH_A7_KICK_B_GENERAL,
+	BOTH_A7_KICK_R_GENERAL,
+	BOTH_A7_KICK_L_GENERAL,
+	BOTH_A7_KICK_S_GENERAL,
+	BOTH_A7_KICK_BF_GENERAL,
+	BOTH_A7_KICK_BF_STOP_GENERAL,
+	BOTH_A7_KICK_RL_GENERAL,
+	BOTH_A7_KICK_F_AIR_GENERAL,
+	BOTH_A7_KICK_B_AIR_GENERAL,
+	BOTH_A7_KICK_R_AIR_GENERAL,
+	BOTH_A7_KICK_L_AIR_GENERAL,
+	BOTH_FLIP_ATTACK7_GENERAL,
+	BOTH_FLIP_HOLD7_GENERAL,
+	BOTH_FLIP_LAND_GENERAL,
+	BOTH_PULL_IMPALE_STAB_GENERAL,
+	BOTH_PULL_IMPALE_SWING_GENERAL,
+	BOTH_PULLED_INAIR_B_GENERAL,
+	BOTH_PULLED_INAIR_F_GENERAL,
+	BOTH_STABDOWN_GENERAL,
+	BOTH_STABDOWN_STAFF_GENERAL,
+	BOTH_STABDOWN_DUAL_GENERAL,
+	BOTH_A6_SABERPROTECT_GENERAL,
+	BOTH_A7_SOULCAL_GENERAL,
+	BOTH_A1_SPECIAL_GENERAL,
+	BOTH_A2_SPECIAL_GENERAL,
+	BOTH_A3_SPECIAL_GENERAL,
+	BOTH_ROLL_STAB_GENERAL,
 
 	//# #sep BOTH_ STANDING
-	BOTH_STAND1,			//# Standing idle, no weapon, hands down
-	BOTH_STAND1IDLE1,		//# Random standing idle
-	BOTH_STAND2,			//# Standing idle with a saber
-	BOTH_STAND2IDLE1,		//# Random standing idle
-	BOTH_STAND2IDLE2,		//# Random standing idle
-	BOTH_STAND3,			//# Standing idle with 2-handed weapon
-	BOTH_STAND3IDLE1,		//# Random standing idle
-	BOTH_STAND4,			//# hands clasp behind back
-	BOTH_STAND5,			//# standing idle, no weapon, hand down, back straight
-	BOTH_STAND5IDLE1,		//# Random standing idle
-	BOTH_STAND6,			//# one handed, gun at side, relaxed stand
-	BOTH_STAND8,			//# both hands on hips (male)
-	BOTH_STAND1TO2,			//# Transition from stand1 to stand2
-	BOTH_STAND2TO1,			//# Transition from stand2 to stand1
-	BOTH_STAND2TO4,			//# Transition from stand2 to stand4
-	BOTH_STAND4TO2,			//# Transition from stand4 to stand2
-	BOTH_STAND4TOATTACK2,	//# relaxed stand to 1-handed pistol ready
-	BOTH_STANDUP2,			//# Luke standing up from his meditation platform (cin # 37)
-	BOTH_STAND5TOSIT3,		//# transition from stand 5 to sit 3
-	BOTH_STAND1TOSTAND5,	//# Transition from stand1 to stand5
-	BOTH_STAND5TOSTAND1,	//# Transition from stand5 to stand1
-	BOTH_STAND5TOAIM,		//# Transition of Kye aiming his gun at Desann (cin #9) 
-	BOTH_STAND5STARTLEDLOOKLEFT,	//# Kyle turning to watch the bridge drop (cin #9) 
-	BOTH_STARTLEDLOOKLEFTTOSTAND5,	//# Kyle returning to stand 5 from watching the bridge drop (cin #9) 
-	BOTH_STAND5TOSTAND8,	//# Transition from stand5 to stand8
-	BOTH_STAND7TOSTAND8,	//# Tavion putting hands on back of chair (cin #11)
-	BOTH_STAND8TOSTAND5,	//# Transition from stand8 to stand5
-		(animNumber_t)0,//BOTH_STAND9,			//# Kyle's standing idle, no weapon, hands down
-		(animNumber_t)0,//BOTH_STAND9IDLE1,		//# Kyle's random standing idle
-	BOTH_STAND5SHIFTWEIGHT,	//# Weightshift from stand5 to side and back to stand5
-	BOTH_STAND5SHIFTWEIGHTSTART,	//# From stand5 to side
-	BOTH_STAND5SHIFTWEIGHTSTOP,		//# From side to stand5
-	BOTH_STAND5TURNLEFTSTART,		//# Start turning left from stand5
-	BOTH_STAND5TURNLEFTSTOP,		//# Stop turning left from stand5
-	BOTH_STAND5TURNRIGHTSTART,		//# Start turning right from stand5
-	BOTH_STAND5TURNRIGHTSTOP,		//# Stop turning right from stand5
-	BOTH_STAND5LOOK180LEFTSTART,	//# Start looking over left shoulder (cin #17)
-	BOTH_STAND5LOOK180LEFTSTOP,	//# Stop looking over left shoulder (cin #17)
+	BOTH_STAND1_GENERAL,			//# Standing idle_GENERAL, no weapon_GENERAL, hands down
+	BOTH_STAND1IDLE1_GENERAL,		//# Random standing idle
+	BOTH_STAND2_GENERAL,			//# Standing idle with a saber
+	BOTH_STAND2IDLE1_GENERAL,		//# Random standing idle
+	BOTH_STAND2IDLE2_GENERAL,		//# Random standing idle
+	BOTH_STAND3_GENERAL,			//# Standing idle with 2-handed weapon
+	BOTH_STAND3IDLE1_GENERAL,		//# Random standing idle
+	BOTH_STAND4_GENERAL,			//# hands clasp behind back
+	BOTH_STAND5_GENERAL,			//# standing idle_GENERAL, no weapon_GENERAL, hand down_GENERAL, back straight
+	BOTH_STAND5IDLE1_GENERAL,		//# Random standing idle
+	BOTH_STAND6_GENERAL,			//# one handed_GENERAL, gun at side_GENERAL, relaxed stand
+	BOTH_STAND8_GENERAL,			//# both hands on hips (male)
+	BOTH_STAND1TO2_GENERAL,			//# Transition from stand1 to stand2
+	BOTH_STAND2TO1_GENERAL,			//# Transition from stand2 to stand1
+	BOTH_STAND2TO4_GENERAL,			//# Transition from stand2 to stand4
+	BOTH_STAND4TO2_GENERAL,			//# Transition from stand4 to stand2
+	BOTH_STAND4TOATTACK2_GENERAL,	//# relaxed stand to 1-handed pistol ready
+	BOTH_STANDUP2_GENERAL,			//# Luke standing up from his meditation platform (cin # 37)
+	BOTH_STAND5TOSIT3_GENERAL,		//# transition from stand 5 to sit 3
+	BOTH_STAND1TOSTAND5_GENERAL,	//# Transition from stand1 to stand5
+	BOTH_STAND5TOSTAND1_GENERAL,	//# Transition from stand5 to stand1
+	BOTH_STAND5TOAIM_GENERAL,		//# Transition of Kye aiming his gun at Desann (cin #9) 
+	BOTH_STAND5STARTLEDLOOKLEFT_GENERAL,	//# Kyle turning to watch the bridge drop (cin #9) 
+	BOTH_STARTLEDLOOKLEFTTOSTAND5_GENERAL,	//# Kyle returning to stand 5 from watching the bridge drop (cin #9) 
+	BOTH_STAND5TOSTAND8_GENERAL,	//# Transition from stand5 to stand8
+	BOTH_STAND7TOSTAND8_GENERAL,	//# Tavion putting hands on back of chair (cin #11)
+	BOTH_STAND8TOSTAND5_GENERAL,	//# Transition from stand8 to stand5
+	BOTH_STAND9_GENERAL,			//# Kyle's standing idle_GENERAL, no weapon_GENERAL, hands down
+	BOTH_STAND9IDLE1_GENERAL,		//# Kyle's random standing idle
+	BOTH_STAND5SHIFTWEIGHT_GENERAL,	//# Weightshift from stand5 to side and back to stand5
+	BOTH_STAND5SHIFTWEIGHTSTART_GENERAL,	//# From stand5 to side
+	BOTH_STAND5SHIFTWEIGHTSTOP_GENERAL,		//# From side to stand5
+	BOTH_STAND5TURNLEFTSTART_GENERAL,		//# Start turning left from stand5
+	BOTH_STAND5TURNLEFTSTOP_GENERAL,		//# Stop turning left from stand5
+	BOTH_STAND5TURNRIGHTSTART_GENERAL,		//# Start turning right from stand5
+	BOTH_STAND5TURNRIGHTSTOP_GENERAL,		//# Stop turning right from stand5
+	BOTH_STAND5LOOK180LEFTSTART_GENERAL,	//# Start looking over left shoulder (cin #17)
+	BOTH_STAND5LOOK180LEFTSTOP_GENERAL,	//# Stop looking over left shoulder (cin #17)
 
-	BOTH_CONSOLE1START,		//# typing at a console
-	BOTH_CONSOLE1,			//# typing at a console
-	BOTH_CONSOLE1STOP,		//# typing at a console
-	BOTH_CONSOLE2START,		//# typing at a console with comm link in hand (cin #5) 
-	BOTH_CONSOLE2,			//# typing at a console with comm link in hand (cin #5) 
-	BOTH_CONSOLE2STOP,		//# typing at a console with comm link in hand (cin #5) 
-	BOTH_CONSOLE2HOLDCOMSTART,	//# lean in to type at console while holding comm link in hand (cin #5) 
-	BOTH_CONSOLE2HOLDCOMSTOP,	//# lean away after typing at console while holding comm link in hand (cin #5) 
+	BOTH_CONSOLE1START_GENERAL,		//# typing at a console
+	BOTH_CONSOLE1_GENERAL,			//# typing at a console
+	BOTH_CONSOLE1STOP_GENERAL,		//# typing at a console
+	BOTH_CONSOLE2START_GENERAL,		//# typing at a console with comm link in hand (cin #5) 
+	BOTH_CONSOLE2_GENERAL,			//# typing at a console with comm link in hand (cin #5) 
+	BOTH_CONSOLE2STOP_GENERAL,		//# typing at a console with comm link in hand (cin #5) 
+	BOTH_CONSOLE2HOLDCOMSTART_GENERAL,	//# lean in to type at console while holding comm link in hand (cin #5) 
+	BOTH_CONSOLE2HOLDCOMSTOP_GENERAL,	//# lean away after typing at console while holding comm link in hand (cin #5) 
 
-	BOTH_GUARD_LOOKAROUND1,	//# Cradling weapon and looking around
-	BOTH_GUARD_IDLE1,		//# Cradling weapon and standing
-	BOTH_GESTURE1,			//# Generic gesture, non-specific
-	BOTH_GESTURE2,			//# Generic gesture, non-specific
-	BOTH_WALK1TALKCOMM1,	//# Talking into coom link while walking
-	BOTH_TALK1,				//# Generic talk anim
-	BOTH_TALK2,				//# Generic talk anim
-	BOTH_TALKCOMM1START,	//# Start talking into a comm link
-	BOTH_TALKCOMM1,			//# Talking into a comm link
-	BOTH_TALKCOMM1STOP,		//# Stop talking into a comm link
-	BOTH_TALKGESTURE1,		//# Generic talk anim
+	BOTH_GUARD_LOOKAROUND1_GENERAL,	//# Cradling weapon and looking around
+	BOTH_GUARD_IDLE1_GENERAL,		//# Cradling weapon and standing
+	BOTH_GESTURE1_GENERAL,			//# Generic gesture_GENERAL, non-specific
+	BOTH_GESTURE2_GENERAL,			//# Generic gesture_GENERAL, non-specific
+	BOTH_WALK1TALKCOMM1_GENERAL,	//# Talking into coom link while walking
+	BOTH_TALK1_GENERAL,				//# Generic talk anim
+	BOTH_TALK2_GENERAL,				//# Generic talk anim
+	BOTH_TALKCOMM1START_GENERAL,	//# Start talking into a comm link
+	BOTH_TALKCOMM1_GENERAL,			//# Talking into a comm link
+	BOTH_TALKCOMM1STOP_GENERAL,		//# Stop talking into a comm link
+	BOTH_TALKGESTURE1_GENERAL,		//# Generic talk anim
 
-	BOTH_HEADTILTLSTART,		//# Head tilt to left
-	BOTH_HEADTILTLSTOP,			//# Head tilt to left
-	BOTH_HEADTILTRSTART,		//# Head tilt to right
-	BOTH_HEADTILTRSTOP,			//# Head tilt to right
-	BOTH_HEADNOD,				//# Head shake YES
-	BOTH_HEADSHAKE,				//# Head shake NO
-	BOTH_SIT2HEADTILTLSTART,	//# Head tilt to left from seated position 2
-	BOTH_SIT2HEADTILTLSTOP,		//# Head tilt to left from seated position 2
+	BOTH_HEADTILTLSTART_GENERAL,		//# Head tilt to left
+	BOTH_HEADTILTLSTOP_GENERAL,			//# Head tilt to left
+	BOTH_HEADTILTRSTART_GENERAL,		//# Head tilt to right
+	BOTH_HEADTILTRSTOP_GENERAL,			//# Head tilt to right
+	BOTH_HEADNOD_GENERAL,				//# Head shake YES
+	BOTH_HEADSHAKE_GENERAL,				//# Head shake NO
+	BOTH_SIT2HEADTILTLSTART_GENERAL,	//# Head tilt to left from seated position 2
+	BOTH_SIT2HEADTILTLSTOP_GENERAL,		//# Head tilt to left from seated position 2
 
-	BOTH_REACH1START,		//# Monmothma reaching for crystal
-	BOTH_REACH1STOP,		//# Monmothma reaching for crystal
+	BOTH_REACH1START_GENERAL,		//# Monmothma reaching for crystal
+	BOTH_REACH1STOP_GENERAL,		//# Monmothma reaching for crystal
 
-	BOTH_COME_ON1,				//# Jan gesturing to Kyle (cin #32a)
-	BOTH_STEADYSELF1,			//# Jan trying to keep footing (cin #32a)
-	BOTH_STEADYSELF1END,		//# Return hands to side from STEADSELF1 Kyle (cin#5)
-	BOTH_SILENCEGESTURE1,		//# Luke silencing Kyle with a raised hand (cin #37)
-	BOTH_REACHFORSABER1,		//# Luke holding hand out for Kyle's saber (cin #37)
-	BOTH_SABERKILLER1,			//# Tavion about to strike Jan with saber (cin #9)
-	BOTH_SABERKILLEE1,			//# Jan about to be struck by Tavion with saber (cin #9)
-	BOTH_HUGGER1,			//# Kyle hugging Jan (cin #29)
-	BOTH_HUGGERSTOP1,		//# Kyle stop hugging Jan but don't let her go (cin #29)
-	BOTH_HUGGEE1,			//# Jan being hugged (cin #29)
-	BOTH_HUGGEESTOP1,		//# Jan stop being hugged but don't let go (cin #29)
+	BOTH_COME_ON1_GENERAL,				//# Jan gesturing to Kyle (cin #32a)
+	BOTH_STEADYSELF1_GENERAL,			//# Jan trying to keep footing (cin #32a)
+	BOTH_STEADYSELF1END_GENERAL,		//# Return hands to side from STEADSELF1 Kyle (cin#5)
+	BOTH_SILENCEGESTURE1_GENERAL,		//# Luke silencing Kyle with a raised hand (cin #37)
+	BOTH_REACHFORSABER1_GENERAL,		//# Luke holding hand out for Kyle's saber (cin #37)
+	BOTH_SABERKILLER1_GENERAL,			//# Tavion about to strike Jan with saber (cin #9)
+	BOTH_SABERKILLEE1_GENERAL,			//# Jan about to be struck by Tavion with saber (cin #9)
+	BOTH_HUGGER1_GENERAL,			//# Kyle hugging Jan (cin #29)
+	BOTH_HUGGERSTOP1_GENERAL,		//# Kyle stop hugging Jan but don't let her go (cin #29)
+	BOTH_HUGGEE1_GENERAL,			//# Jan being hugged (cin #29)
+	BOTH_HUGGEESTOP1_GENERAL,		//# Jan stop being hugged but don't let go (cin #29)
 
-	BOTH_SABERTHROW1START,		//# Desann throwing his light saber (cin #26)
-	BOTH_SABERTHROW1STOP,		//# Desann throwing his light saber (cin #26)
-	BOTH_SABERTHROW2START,		//# Kyle throwing his light saber (cin #32)
-	BOTH_SABERTHROW2STOP,		//# Kyle throwing his light saber (cin #32)
+	BOTH_SABERTHROW1START_GENERAL,		//# Desann throwing his light saber (cin #26)
+	BOTH_SABERTHROW1STOP_GENERAL,		//# Desann throwing his light saber (cin #26)
+	BOTH_SABERTHROW2START_GENERAL,		//# Kyle throwing his light saber (cin #32)
+	BOTH_SABERTHROW2STOP_GENERAL,		//# Kyle throwing his light saber (cin #32)
 
 	//# #sep BOTH_ SITTING/CROUCHING
-	BOTH_SIT1,				//# Normal chair sit.
-	BOTH_SIT2,				//# Lotus position.
-	BOTH_SIT3,				//# Sitting in tired position, elbows on knees
+	BOTH_SIT1_GENERAL,				//# Normal chair sit.
+	BOTH_SIT2_GENERAL,				//# Lotus position.
+	BOTH_SIT3_GENERAL,				//# Sitting in tired position_GENERAL, elbows on knees
 
-	BOTH_SIT2TOSTAND5,		//# Transition from sit 2 to stand 5
-	BOTH_STAND5TOSIT2,		//# Transition from stand 5 to sit 2
-	BOTH_SIT2TOSIT4,		//# Trans from sit2 to sit4 (cin #12) Luke leaning back from lotus position.
-	BOTH_SIT3TOSTAND5,		//# transition from sit 3 to stand 5
+	BOTH_SIT2TOSTAND5_GENERAL,		//# Transition from sit 2 to stand 5
+	BOTH_STAND5TOSIT2_GENERAL,		//# Transition from stand 5 to sit 2
+	BOTH_SIT2TOSIT4_GENERAL,		//# Trans from sit2 to sit4 (cin #12) Luke leaning back from lotus position.
+	BOTH_SIT3TOSTAND5_GENERAL,		//# transition from sit 3 to stand 5
 
-	BOTH_CROUCH1,			//# Transition from standing to crouch
-	BOTH_CROUCH1IDLE,		//# Crouching idle
-	BOTH_CROUCH1WALK,		//# Walking while crouched
-	BOTH_CROUCH1WALKBACK,	//# Walking while crouched
-	BOTH_UNCROUCH1,			//# Transition from crouch to standing
-	BOTH_CROUCH2TOSTAND1,	//# going from crouch2 to stand1
-	BOTH_CROUCH3,			//# Desann crouching down to Kyle (cin 9)
-	BOTH_UNCROUCH3,			//# Desann uncrouching down to Kyle (cin 9)
-	BOTH_CROUCH4,			//# Slower version of crouch1 for cinematics
-	BOTH_UNCROUCH4,			//# Slower version of uncrouch1 for cinematics
+	BOTH_CROUCH1_GENERAL,			//# Transition from standing to crouch
+	BOTH_CROUCH1IDLE_GENERAL,		//# Crouching idle
+	BOTH_CROUCH1WALK_GENERAL,		//# Walking while crouched
+	BOTH_CROUCH1WALKBACK_GENERAL,	//# Walking while crouched
+	BOTH_UNCROUCH1_GENERAL,			//# Transition from crouch to standing
+	BOTH_CROUCH2TOSTAND1_GENERAL,	//# going from crouch2 to stand1
+	BOTH_CROUCH3_GENERAL,			//# Desann crouching down to Kyle (cin 9)
+	BOTH_UNCROUCH3_GENERAL,			//# Desann uncrouching down to Kyle (cin 9)
+	BOTH_CROUCH4_GENERAL,			//# Slower version of crouch1 for cinematics
+	BOTH_UNCROUCH4_GENERAL,			//# Slower version of uncrouch1 for cinematics
 
-	BOTH_GUNSIT1,			//# sitting on an emplaced gun.
+	BOTH_GUNSIT1_GENERAL,			//# sitting on an emplaced gun.
 
 	// Swoop Vehicle animations.
 	//* #sep BOTH_ SWOOP ANIMS
-		(animNumber_t)0,//BOTH_VS_MOUNT_L,			//# Mount from left		
-		(animNumber_t)0,//BOTH_VS_DISMOUNT_L,			//# Dismount to left		
-		(animNumber_t)0,//BOTH_VS_MOUNT_R,			//# Mount from  right (symmetry)		
-		(animNumber_t)0,//BOTH_VS_DISMOUNT_R,			//# DISMOUNT TO  RIGHT (SYMMETRY)		
+	BOTH_VS_MOUNT_L_GENERAL,			//# Mount from left		
+	BOTH_VS_DISMOUNT_L_GENERAL,			//# Dismount to left		
+	BOTH_VS_MOUNT_R_GENERAL,			//# Mount from  right (symmetry)		
+	BOTH_VS_DISMOUNT_R_GENERAL,			//# DISMOUNT TO  RIGHT (SYMMETRY)		
 
-		(animNumber_t)0,//BOTH_VS_MOUNTJUMP_L,		//#
-		(animNumber_t)0,//BOTH_VS_MOUNTTHROW,			//# Land on an occupied vehicle & throw off current pilot
-		(animNumber_t)0,//BOTH_VS_MOUNTTHROW_L,		//# Land on an occupied vehicle & throw off current pilot
-		(animNumber_t)0,//BOTH_VS_MOUNTTHROW_R,		//# Land on an occupied vehicle & throw off current pilot
-		(animNumber_t)0,//BOTH_VS_MOUNTTHROWEE,		//# Current pilot getting thrown off by another guy
+	BOTH_VS_MOUNTJUMP_L_GENERAL,		//#
+	BOTH_VS_MOUNTTHROW_GENERAL,			//# Land on an occupied vehicle & throw off current pilot
+	BOTH_VS_MOUNTTHROW_L_GENERAL,		//# Land on an occupied vehicle & throw off current pilot
+	BOTH_VS_MOUNTTHROW_R_GENERAL,		//# Land on an occupied vehicle & throw off current pilot
+	BOTH_VS_MOUNTTHROWEE_GENERAL,		//# Current pilot getting thrown off by another guy
 
-		(animNumber_t)0,//BOTH_VS_LOOKLEFT,			//# Turn & Look behind and to the left (no weapon)		
-		(animNumber_t)0,//BOTH_VS_LOOKRIGHT,			//# Turn & Look behind and to the right (no weapon)		
+	BOTH_VS_LOOKLEFT_GENERAL,			//# Turn & Look behind and to the left (no weapon)		
+	BOTH_VS_LOOKRIGHT_GENERAL,			//# Turn & Look behind and to the right (no weapon)		
 
-			(animNumber_t)0,//BOTH_VS_TURBO,				//# Hit The Turbo Button
+	BOTH_VS_TURBO_GENERAL,				//# Hit The Turbo Button
 
-		(animNumber_t)0,//BOTH_VS_REV,				//# Player looks back as swoop reverses		
+	BOTH_VS_REV_GENERAL,				//# Player looks back as swoop reverses		
 
-		(animNumber_t)0,//BOTH_VS_AIR,				//# Player stands up when swoop is airborn		
-		(animNumber_t)0,//BOTH_VS_AIR_G,				//# "" with Gun
-		(animNumber_t)0,//BOTH_VS_AIR_SL,				//# "" with Saber Left
-		(animNumber_t)0,//BOTH_VS_AIR_SR,				//# "" with Saber Right
+	BOTH_VS_AIR_GENERAL,				//# Player stands up when swoop is airborn		
+	BOTH_VS_AIR_G_GENERAL,				//# "" with Gun
+	BOTH_VS_AIR_SL_GENERAL,				//# "" with Saber Left
+	BOTH_VS_AIR_SR_GENERAL,				//# "" with Saber Right
 
-		(animNumber_t)0,//BOTH_VS_LAND,				//# Player bounces down when swoop lands		
-		(animNumber_t)0,//BOTH_VS_LAND_G,				//#  "" with Gun
-		(animNumber_t)0,//BOTH_VS_LAND_SL,			//#  "" with Saber Left
-		(animNumber_t)0,//BOTH_VS_LAND_SR,			//#  "" with Saber Right
+	BOTH_VS_LAND_GENERAL,				//# Player bounces down when swoop lands		
+	BOTH_VS_LAND_G_GENERAL,				//#  "" with Gun
+	BOTH_VS_LAND_SL_GENERAL,			//#  "" with Saber Left
+	BOTH_VS_LAND_SR_GENERAL,			//#  "" with Saber Right
 
-		(animNumber_t)0,//BOTH_VS_IDLE,				//# Sit
-		(animNumber_t)0,//BOTH_VS_IDLE_G,				//# Sit (gun)
-		(animNumber_t)0,//BOTH_VS_IDLE_SL,			//# Sit (saber left)		
-		(animNumber_t)0,//BOTH_VS_IDLE_SR,			//# Sit (saber right)		
+	BOTH_VS_IDLE_GENERAL,				//# Sit
+	BOTH_VS_IDLE_G_GENERAL,				//# Sit (gun)
+	BOTH_VS_IDLE_SL_GENERAL,			//# Sit (saber left)		
+	BOTH_VS_IDLE_SR_GENERAL,			//# Sit (saber right)		
 
-		(animNumber_t)0,//BOTH_VS_LEANL,				//# Lean left
-		(animNumber_t)0,//BOTH_VS_LEANL_G,			//# Lean left (gun)		
-		(animNumber_t)0,//BOTH_VS_LEANL_SL,			//# Lean left (saber left)		
-		(animNumber_t)0,//BOTH_VS_LEANL_SR,			//# Lean left (saber right)		
+	BOTH_VS_LEANL_GENERAL,				//# Lean left
+	BOTH_VS_LEANL_G_GENERAL,			//# Lean left (gun)		
+	BOTH_VS_LEANL_SL_GENERAL,			//# Lean left (saber left)		
+	BOTH_VS_LEANL_SR_GENERAL,			//# Lean left (saber right)		
 
-		(animNumber_t)0,//BOTH_VS_LEANR,				//# Lean right		
-		(animNumber_t)0,//BOTH_VS_LEANR_G,			//# Lean right (gun)		
-		(animNumber_t)0,//BOTH_VS_LEANR_SL,			//# Lean right (saber left)		
-		(animNumber_t)0,//BOTH_VS_LEANR_SR,			//# Lean right (saber right)		
+	BOTH_VS_LEANR_GENERAL,				//# Lean right		
+	BOTH_VS_LEANR_G_GENERAL,			//# Lean right (gun)		
+	BOTH_VS_LEANR_SL_GENERAL,			//# Lean right (saber left)		
+	BOTH_VS_LEANR_SR_GENERAL,			//# Lean right (saber right)		
 
-		(animNumber_t)0,//BOTH_VS_ATL_S,				//# Attack left with saber		
-		(animNumber_t)0,//BOTH_VS_ATR_S,				//# Attack right with saber		
-		(animNumber_t)0,//BOTH_VS_ATR_TO_L_S,			//# Attack toss saber from right to left hand
-		(animNumber_t)0,//BOTH_VS_ATL_TO_R_S,			//# Attack toss saber from left to right hand
-		(animNumber_t)0,//BOTH_VS_ATR_G,				//# Attack right with gun (90)		
-		(animNumber_t)0,//BOTH_VS_ATL_G,				//# Attack left with gun (90)		
-		(animNumber_t)0,//BOTH_VS_ATF_G,				//# Attack forward with gun		
+	BOTH_VS_ATL_S_GENERAL,				//# Attack left with saber		
+	BOTH_VS_ATR_S_GENERAL,				//# Attack right with saber		
+	BOTH_VS_ATR_TO_L_S_GENERAL,			//# Attack toss saber from right to left hand
+	BOTH_VS_ATL_TO_R_S_GENERAL,			//# Attack toss saber from left to right hand
+	BOTH_VS_ATR_G_GENERAL,				//# Attack right with gun (90)		
+	BOTH_VS_ATL_G_GENERAL,				//# Attack left with gun (90)		
+	BOTH_VS_ATF_G_GENERAL,				//# Attack forward with gun		
 
-		(animNumber_t)0,//BOTH_VS_PAIN1,				//# Pain
+	BOTH_VS_PAIN1_GENERAL,				//# Pain
 
 	// Added 12/04/02 by Aurelio.
 	//* #sep BOTH_ TAUNTAUN ANIMS
-		(animNumber_t)0,//BOTH_VT_MOUNT_L,		//# Mount from left	
-		(animNumber_t)0,//BOTH_VT_MOUNT_R,		//# Mount from right
-		(animNumber_t)0,//BOTH_VT_MOUNT_B,		//# Mount from air, behind
-		(animNumber_t)0,//BOTH_VT_DISMOUNT,		//# Dismount for tauntaun
-		(animNumber_t)0,//BOTH_VT_DISMOUNT_L,		//# Dismount to tauntauns left	
-		(animNumber_t)0,//BOTH_VT_DISMOUNT_R,		//# Dismount to tauntauns right (symmetry)	
+	BOTH_VT_MOUNT_L_GENERAL,		//# Mount from left	
+	BOTH_VT_MOUNT_R_GENERAL,		//# Mount from right
+	BOTH_VT_MOUNT_B_GENERAL,		//# Mount from air_GENERAL, behind
+	BOTH_VT_DISMOUNT_GENERAL,		//# Dismount for tauntaun
+	BOTH_VT_DISMOUNT_L_GENERAL,		//# Dismount to tauntauns left	
+	BOTH_VT_DISMOUNT_R_GENERAL,		//# Dismount to tauntauns right (symmetry)	
 
-		(animNumber_t)0,//BOTH_VT_WALK_FWD,		//# Walk forward	
-		(animNumber_t)0,//BOTH_VT_WALK_REV,		//# Walk backward	
-		(animNumber_t)0,//BOTH_VT_WALK_FWD_L,		//# walk lean left
-		(animNumber_t)0,//BOTH_VT_WALK_FWD_R,		//# Walk lean right
-		(animNumber_t)0,//BOTH_VT_RUN_FWD,		//# Run forward	
-		(animNumber_t)0,//BOTH_VT_RUN_REV,		//# Look backwards while running (not weapon specific)	
-		(animNumber_t)0,//BOTH_VT_RUN_FWD_L,		//# Run lean left
-		(animNumber_t)0,//BOTH_VT_RUN_FWD_R,		//# Run lean right
+	BOTH_VT_WALK_FWD_GENERAL,		//# Walk forward	
+	BOTH_VT_WALK_REV_GENERAL,		//# Walk backward	
+	BOTH_VT_WALK_FWD_L_GENERAL,		//# walk lean left
+	BOTH_VT_WALK_FWD_R_GENERAL,		//# Walk lean right
+	BOTH_VT_RUN_FWD_GENERAL,		//# Run forward	
+	BOTH_VT_RUN_REV_GENERAL,		//# Look backwards while running (not weapon specific)	
+	BOTH_VT_RUN_FWD_L_GENERAL,		//# Run lean left
+	BOTH_VT_RUN_FWD_R_GENERAL,		//# Run lean right
 
-		(animNumber_t)0,//BOTH_VT_SLIDEF,			//# Tauntaun slides forward with abrupt stop	
-		(animNumber_t)0,//BOTH_VT_AIR,			//# Tauntaun jump	
-		(animNumber_t)0,//BOTH_VT_ATB,			//# Tauntaun tail swipe	
-		(animNumber_t)0,//BOTH_VT_PAIN1,			//# Pain	
-		(animNumber_t)0,//BOTH_VT_DEATH1,			//# Die	
-		(animNumber_t)0,//BOTH_VT_STAND,			//# Stand still and breath	
-		(animNumber_t)0,//BOTH_VT_BUCK,			//# Tauntaun bucking loop animation	
+	BOTH_VT_SLIDEF_GENERAL,			//# Tauntaun slides forward with abrupt stop	
+	BOTH_VT_AIR_GENERAL,			//# Tauntaun jump	
+	BOTH_VT_ATB_GENERAL,			//# Tauntaun tail swipe	
+	BOTH_VT_PAIN1_GENERAL,			//# Pain	
+	BOTH_VT_DEATH1_GENERAL,			//# Die	
+	BOTH_VT_STAND_GENERAL,			//# Stand still and breath	
+	BOTH_VT_BUCK_GENERAL,			//# Tauntaun bucking loop animation	
 
-		(animNumber_t)0,//BOTH_VT_LAND,			//# Player bounces down when tauntaun lands	
-		(animNumber_t)0,//BOTH_VT_TURBO,			//# Hit The Turbo Button
-		(animNumber_t)0,//BOTH_VT_IDLE_SL,		//# Sit (saber left)		
-		(animNumber_t)0,//BOTH_VT_IDLE_SR,		//# Sit (saber right)		
+	BOTH_VT_LAND_GENERAL,			//# Player bounces down when tauntaun lands	
+	BOTH_VT_TURBO_GENERAL,			//# Hit The Turbo Button
+	BOTH_VT_IDLE_SL_GENERAL,		//# Sit (saber left)		
+	BOTH_VT_IDLE_SR_GENERAL,		//# Sit (saber right)		
 
-		(animNumber_t)0,//BOTH_VT_IDLE,			//# Sit with no weapon selected	
-		(animNumber_t)0,//BOTH_VT_IDLE1,			//# Sit with no weapon selected	
-		(animNumber_t)0,//BOTH_VT_IDLE_S,			//# Sit with saber selected	
-		(animNumber_t)0,//BOTH_VT_IDLE_G,			//# Sit with gun selected	
-		(animNumber_t)0,//BOTH_VT_IDLE_T,			//# Sit with thermal grenade selected
+	BOTH_VT_IDLE_GENERAL,			//# Sit with no weapon selected	
+	BOTH_VT_IDLE1_GENERAL,			//# Sit with no weapon selected	
+	BOTH_VT_IDLE_S_GENERAL,			//# Sit with saber selected	
+	BOTH_VT_IDLE_G_GENERAL,			//# Sit with gun selected	
+	BOTH_VT_IDLE_T_GENERAL,			//# Sit with thermal grenade selected
 
-		(animNumber_t)0,//BOTH_VT_ATL_S,			//# Attack left with saber	
-		(animNumber_t)0,//BOTH_VT_ATR_S,			//# Attack right with saber	
-		(animNumber_t)0,//BOTH_VT_ATR_TO_L_S,		//# Attack toss saber from right to left hand
-		(animNumber_t)0,//BOTH_VT_ATL_TO_R_S,		//# Attack toss saber from left to right hand
-		(animNumber_t)0,//BOTH_VT_ATR_G,			//# Attack right with gun (90)	
-		(animNumber_t)0,//BOTH_VT_ATL_G,			//# Attack left with gun (90)	
-		(animNumber_t)0,//BOTH_VT_ATF_G,			//# Attack forward with gun	
+	BOTH_VT_ATL_S_GENERAL,			//# Attack left with saber	
+	BOTH_VT_ATR_S_GENERAL,			//# Attack right with saber	
+	BOTH_VT_ATR_TO_L_S_GENERAL,		//# Attack toss saber from right to left hand
+	BOTH_VT_ATL_TO_R_S_GENERAL,		//# Attack toss saber from left to right hand
+	BOTH_VT_ATR_G_GENERAL,			//# Attack right with gun (90)	
+	BOTH_VT_ATL_G_GENERAL,			//# Attack left with gun (90)	
+	BOTH_VT_ATF_G_GENERAL,			//# Attack forward with gun	
 
 
 	// Added 2/26/02 by Aurelio.
 	//* #sep BOTH_ FIGHTER ANIMS
-			(animNumber_t)0,//BOTH_GEARS_OPEN,
-			(animNumber_t)0,//BOTH_GEARS_CLOSE,
-			(animNumber_t)0,//BOTH_WINGS_OPEN,
-			(animNumber_t)0,//BOTH_WINGS_CLOSE,
+	BOTH_GEARS_OPEN_GENERAL,
+	BOTH_GEARS_CLOSE_GENERAL,
+	BOTH_WINGS_OPEN_GENERAL,
+	BOTH_WINGS_CLOSE_GENERAL,
 
-	BOTH_DEATH14_UNGRIP,	//# Desann's end death (cin #35)
-	BOTH_DEATH14_SITUP,		//# Tavion sitting up after having been thrown (cin #23)
-	BOTH_KNEES1,			//# Tavion on her knees
-	BOTH_KNEES2,			//# Tavion on her knees looking down
-	BOTH_KNEES2TO1,			//# Transition of KNEES2 to KNEES1
+	BOTH_DEATH14_UNGRIP_GENERAL,	//# Desann's end death (cin #35)
+	BOTH_DEATH14_SITUP_GENERAL,		//# Tavion sitting up after having been thrown (cin #23)
+	BOTH_KNEES1_GENERAL,			//# Tavion on her knees
+	BOTH_KNEES2_GENERAL,			//# Tavion on her knees looking down
+	BOTH_KNEES2TO1_GENERAL,			//# Transition of KNEES2 to KNEES1
 
 	//# #sep BOTH_ MOVING
-	BOTH_WALK1,				//# Normal walk
-	BOTH_WALK2,				//# Normal walk
-			(animNumber_t)0,//BOTH_WALK_STAFF,		//# Walk with saberstaff turned on
-			(animNumber_t)0,//BOTH_WALKBACK_STAFF,	//# Walk backwards with saberstaff turned on
-			(animNumber_t)0,//BOTH_WALK_DUAL,			//# Walk with dual turned on
-			(animNumber_t)0,//BOTH_WALKBACK_DUAL,		//# Walk backwards with dual turned on
-	BOTH_WALK5,				//# Tavion taunting Kyle (cin 22)
-	BOTH_WALK6,				//# Slow walk for Luke (cin 12)
-	BOTH_WALK7,				//# Fast walk
-	BOTH_RUN1,				//# Full run
-	BOTH_RUN1START,			//# Start into full run1
-	BOTH_RUN1STOP,			//# Stop from full run1
-	BOTH_RUN2,				//# Full run
-			(animNumber_t)0,//BOTH_RUN1TORUN2,		//# Wampa run anim transition
-			(animNumber_t)0,//BOTH_RUN2TORUN1,		//# Wampa run anim transition
-			(animNumber_t)0,//BOTH_RUN4,				//# Jawa Run
-			(animNumber_t)0,//BOTH_RUN_STAFF,			//# Run with saberstaff turned on
-			(animNumber_t)0,//BOTH_RUNBACK_STAFF,		//# Run backwards with saberstaff turned on
-			(animNumber_t)0,//BOTH_RUN_DUAL,			//# Run with dual turned on
-			(animNumber_t)0,//BOTH_RUNBACK_DUAL,		//# Run backwards with dual turned on
-	BOTH_STRAFE_LEFT1,		//# Sidestep left, should loop
-	BOTH_STRAFE_RIGHT1,		//# Sidestep right, should loop
-	BOTH_RUNSTRAFE_LEFT1,	//# Sidestep left, should loop
-	BOTH_RUNSTRAFE_RIGHT1,	//# Sidestep right, should loop
-	BOTH_TURN_LEFT1,		//# Turn left, should loop
-	BOTH_TURN_RIGHT1,		//# Turn right, should loop
-	BOTH_TURNSTAND1,		//# Turn from STAND1 position
-	BOTH_TURNSTAND2,		//# Turn from STAND2 position
-	BOTH_TURNSTAND3,		//# Turn from STAND3 position
-	BOTH_TURNSTAND4,		//# Turn from STAND4 position
-	BOTH_TURNSTAND5,		//# Turn from STAND5 position
-	BOTH_TURNCROUCH1,		//# Turn from CROUCH1 position
+	BOTH_WALK1_GENERAL,				//# Normal walk
+	BOTH_WALK2_GENERAL,				//# Normal walk
+	BOTH_WALK_STAFF_GENERAL,		//# Walk with saberstaff turned on
+	BOTH_WALKBACK_STAFF_GENERAL,	//# Walk backwards with saberstaff turned on
+	BOTH_WALK_DUAL_GENERAL,			//# Walk with dual turned on
+	BOTH_WALKBACK_DUAL_GENERAL,		//# Walk backwards with dual turned on
+	BOTH_WALK5_GENERAL,				//# Tavion taunting Kyle (cin 22)
+	BOTH_WALK6_GENERAL,				//# Slow walk for Luke (cin 12)
+	BOTH_WALK7_GENERAL,				//# Fast walk
+	BOTH_RUN1_GENERAL,				//# Full run
+	BOTH_RUN1START_GENERAL,			//# Start into full run1
+	BOTH_RUN1STOP_GENERAL,			//# Stop from full run1
+	BOTH_RUN2_GENERAL,				//# Full run
+	BOTH_RUN1TORUN2_GENERAL,		//# Wampa run anim transition
+	BOTH_RUN2TORUN1_GENERAL,		//# Wampa run anim transition
+	BOTH_RUN4_GENERAL,				//# Jawa Run
+	BOTH_RUN_STAFF_GENERAL,			//# Run with saberstaff turned on
+	BOTH_RUNBACK_STAFF_GENERAL,		//# Run backwards with saberstaff turned on
+	BOTH_RUN_DUAL_GENERAL,			//# Run with dual turned on
+	BOTH_RUNBACK_DUAL_GENERAL,		//# Run backwards with dual turned on
+	BOTH_STRAFE_LEFT1_GENERAL,		//# Sidestep left_GENERAL, should loop
+	BOTH_STRAFE_RIGHT1_GENERAL,		//# Sidestep right_GENERAL, should loop
+	BOTH_RUNSTRAFE_LEFT1_GENERAL,	//# Sidestep left_GENERAL, should loop
+	BOTH_RUNSTRAFE_RIGHT1_GENERAL,	//# Sidestep right_GENERAL, should loop
+	BOTH_TURN_LEFT1_GENERAL,		//# Turn left_GENERAL, should loop
+	BOTH_TURN_RIGHT1_GENERAL,		//# Turn right_GENERAL, should loop
+	BOTH_TURNSTAND1_GENERAL,		//# Turn from STAND1 position
+	BOTH_TURNSTAND2_GENERAL,		//# Turn from STAND2 position
+	BOTH_TURNSTAND3_GENERAL,		//# Turn from STAND3 position
+	BOTH_TURNSTAND4_GENERAL,		//# Turn from STAND4 position
+	BOTH_TURNSTAND5_GENERAL,		//# Turn from STAND5 position
+	BOTH_TURNCROUCH1_GENERAL,		//# Turn from CROUCH1 position
 
-	BOTH_WALKBACK1,			//# Walk1 backwards
-	BOTH_WALKBACK2,			//# Walk2 backwards
-	BOTH_RUNBACK1,			//# Run1 backwards
-	BOTH_RUNBACK2,			//# Run1 backwards
+	BOTH_WALKBACK1_GENERAL,			//# Walk1 backwards
+	BOTH_WALKBACK2_GENERAL,			//# Walk2 backwards
+	BOTH_RUNBACK1_GENERAL,			//# Run1 backwards
+	BOTH_RUNBACK2_GENERAL,			//# Run1 backwards
 
 	//# #sep BOTH_ JUMPING
-	BOTH_JUMP1,				//# Jump - wind-up and leave ground
-	BOTH_INAIR1,			//# In air loop (from jump)
-	BOTH_LAND1,				//# Landing (from in air loop)
-	BOTH_LAND2,				//# Landing Hard (from a great height)
+	BOTH_JUMP1_GENERAL,				//# Jump - wind-up and leave ground
+	BOTH_INAIR1_GENERAL,			//# In air loop (from jump)
+	BOTH_LAND1_GENERAL,				//# Landing (from in air loop)
+	BOTH_LAND2_GENERAL,				//# Landing Hard (from a great height)
 
-	BOTH_JUMPBACK1,			//# Jump backwards - wind-up and leave ground
-	BOTH_INAIRBACK1,		//# In air loop (from jump back)
-	BOTH_LANDBACK1,			//# Landing backwards(from in air loop)
+	BOTH_JUMPBACK1_GENERAL,			//# Jump backwards - wind-up and leave ground
+	BOTH_INAIRBACK1_GENERAL,		//# In air loop (from jump back)
+	BOTH_LANDBACK1_GENERAL,			//# Landing backwards(from in air loop)
 
-	BOTH_JUMPLEFT1,			//# Jump left - wind-up and leave ground
-	BOTH_INAIRLEFT1,		//# In air loop (from jump left)
-	BOTH_LANDLEFT1,			//# Landing left(from in air loop)
+	BOTH_JUMPLEFT1_GENERAL,			//# Jump left - wind-up and leave ground
+	BOTH_INAIRLEFT1_GENERAL,		//# In air loop (from jump left)
+	BOTH_LANDLEFT1_GENERAL,			//# Landing left(from in air loop)
 
-	BOTH_JUMPRIGHT1,		//# Jump right - wind-up and leave ground
-	BOTH_INAIRRIGHT1,		//# In air loop (from jump right)
-	BOTH_LANDRIGHT1,		//# Landing right(from in air loop)
+	BOTH_JUMPRIGHT1_GENERAL,		//# Jump right - wind-up and leave ground
+	BOTH_INAIRRIGHT1_GENERAL,		//# In air loop (from jump right)
+	BOTH_LANDRIGHT1_GENERAL,		//# Landing right(from in air loop)
 
-	BOTH_FORCEJUMP1,		//# Jump - wind-up and leave ground
-	BOTH_FORCEINAIR1,		//# In air loop (from jump)
-	BOTH_FORCELAND1,		//# Landing (from in air loop)
+	BOTH_FORCEJUMP1_GENERAL,		//# Jump - wind-up and leave ground
+	BOTH_FORCEINAIR1_GENERAL,		//# In air loop (from jump)
+	BOTH_FORCELAND1_GENERAL,		//# Landing (from in air loop)
 
-	BOTH_FORCEJUMPBACK1,	//# Jump backwards - wind-up and leave ground
-	BOTH_FORCEINAIRBACK1,	//# In air loop (from jump back)
-	BOTH_FORCELANDBACK1,	//# Landing backwards(from in air loop)
+	BOTH_FORCEJUMPBACK1_GENERAL,	//# Jump backwards - wind-up and leave ground
+	BOTH_FORCEINAIRBACK1_GENERAL,	//# In air loop (from jump back)
+	BOTH_FORCELANDBACK1_GENERAL,	//# Landing backwards(from in air loop)
 
-	BOTH_FORCEJUMPLEFT1,	//# Jump left - wind-up and leave ground
-	BOTH_FORCEINAIRLEFT1,	//# In air loop (from jump left)
-	BOTH_FORCELANDLEFT1,	//# Landing left(from in air loop)
+	BOTH_FORCEJUMPLEFT1_GENERAL,	//# Jump left - wind-up and leave ground
+	BOTH_FORCEINAIRLEFT1_GENERAL,	//# In air loop (from jump left)
+	BOTH_FORCELANDLEFT1_GENERAL,	//# Landing left(from in air loop)
 
-	BOTH_FORCEJUMPRIGHT1,	//# Jump right - wind-up and leave ground
-	BOTH_FORCEINAIRRIGHT1,	//# In air loop (from jump right)
-	BOTH_FORCELANDRIGHT1,	//# Landing right(from in air loop)
+	BOTH_FORCEJUMPRIGHT1_GENERAL,	//# Jump right - wind-up and leave ground
+	BOTH_FORCEINAIRRIGHT1_GENERAL,	//# In air loop (from jump right)
+	BOTH_FORCELANDRIGHT1_GENERAL,	//# Landing right(from in air loop)
 	//# #sep BOTH_ ACROBATICS
-	BOTH_FLIP_F,			//# Flip forward
-	BOTH_FLIP_B,			//# Flip backwards
-	BOTH_FLIP_L,			//# Flip left
-	BOTH_FLIP_R,			//# Flip right
+	BOTH_FLIP_F_GENERAL,			//# Flip forward
+	BOTH_FLIP_B_GENERAL,			//# Flip backwards
+	BOTH_FLIP_L_GENERAL,			//# Flip left
+	BOTH_FLIP_R_GENERAL,			//# Flip right
 
-	BOTH_ROLL_F,			//# Roll forward
-	BOTH_ROLL_B,			//# Roll backward
-	BOTH_ROLL_L,			//# Roll left
-	BOTH_ROLL_R,			//# Roll right
+	BOTH_ROLL_F_GENERAL,			//# Roll forward
+	BOTH_ROLL_B_GENERAL,			//# Roll backward
+	BOTH_ROLL_L_GENERAL,			//# Roll left
+	BOTH_ROLL_R_GENERAL,			//# Roll right
 
-	BOTH_HOP_F,				//# quickstep forward
-	BOTH_HOP_B,				//# quickstep backwards
-	BOTH_HOP_L,				//# quickstep left
-	BOTH_HOP_R,				//# quickstep right
+	BOTH_HOP_F_GENERAL,				//# quickstep forward
+	BOTH_HOP_B_GENERAL,				//# quickstep backwards
+	BOTH_HOP_L_GENERAL,				//# quickstep left
+	BOTH_HOP_R_GENERAL,				//# quickstep right
 
-	BOTH_DODGE_FL,			//# lean-dodge forward left
-	BOTH_DODGE_FR,			//# lean-dodge forward right
-	BOTH_DODGE_BL,			//# lean-dodge backwards left
-	BOTH_DODGE_BR,			//# lean-dodge backwards right
-	BOTH_DODGE_L,			//# lean-dodge left
-	BOTH_DODGE_R,			//# lean-dodge right
-		(animNumber_t)0,//BOTH_DODGE_HOLD_FL,			//# lean-dodge pose forward left
-		(animNumber_t)0,//BOTH_DODGE_HOLD_FR,			//# lean-dodge pose forward right
-		(animNumber_t)0,//BOTH_DODGE_HOLD_BL,			//# lean-dodge pose backwards left
-		(animNumber_t)0,//BOTH_DODGE_HOLD_BR,			//# lean-dodge pose backwards right
-		(animNumber_t)0,//BOTH_DODGE_HOLD_L,			//# lean-dodge pose left
-		(animNumber_t)0,//BOTH_DODGE_HOLD_R,			//# lean-dodge pose right
+	BOTH_DODGE_FL_GENERAL,			//# lean-dodge forward left
+	BOTH_DODGE_FR_GENERAL,			//# lean-dodge forward right
+	BOTH_DODGE_BL_GENERAL,			//# lean-dodge backwards left
+	BOTH_DODGE_BR_GENERAL,			//# lean-dodge backwards right
+	BOTH_DODGE_L_GENERAL,			//# lean-dodge left
+	BOTH_DODGE_R_GENERAL,			//# lean-dodge right
+	BOTH_DODGE_HOLD_FL_GENERAL,			//# lean-dodge pose forward left
+	BOTH_DODGE_HOLD_FR_GENERAL,			//# lean-dodge pose forward right
+	BOTH_DODGE_HOLD_BL_GENERAL,			//# lean-dodge pose backwards left
+	BOTH_DODGE_HOLD_BR_GENERAL,			//# lean-dodge pose backwards right
+	BOTH_DODGE_HOLD_L_GENERAL,			//# lean-dodge pose left
+	BOTH_DODGE_HOLD_R_GENERAL,			//# lean-dodge pose right
 
 	//MP taunt anims
-	BOTH_ENGAGETAUNT,
-				(animNumber_t)0,//BOTH_BOW,
-				(animNumber_t)0,//BOTH_MEDITATE,
-				(animNumber_t)0,//BOTH_MEDITATE_END,
-				(animNumber_t)0,//BOTH_SHOWOFF_FAST,
-		(animNumber_t)0,//BOTH_SHOWOFF_MEDIUM,
-		(animNumber_t)0,//BOTH_SHOWOFF_STRONG,
-		(animNumber_t)0,//BOTH_SHOWOFF_DUAL,
-		(animNumber_t)0,//BOTH_SHOWOFF_STAFF,
-		(animNumber_t)0,//BOTH_VICTORY_FAST,
-		(animNumber_t)0,//BOTH_VICTORY_MEDIUM,
-		(animNumber_t)0,//BOTH_VICTORY_STRONG,
-				(animNumber_t)0,//BOTH_VICTORY_DUAL,
-				(animNumber_t)0,//BOTH_VICTORY_STAFF,
+	BOTH_ENGAGETAUNT_GENERAL,
+	BOTH_BOW_GENERAL,
+	BOTH_MEDITATE_GENERAL,
+	BOTH_MEDITATE_END_GENERAL,
+	BOTH_SHOWOFF_FAST_GENERAL,
+	BOTH_SHOWOFF_MEDIUM_GENERAL,
+	BOTH_SHOWOFF_STRONG_GENERAL,
+	BOTH_SHOWOFF_DUAL_GENERAL,
+	BOTH_SHOWOFF_STAFF_GENERAL,
+	BOTH_VICTORY_FAST_GENERAL,
+	BOTH_VICTORY_MEDIUM_GENERAL,
+	BOTH_VICTORY_STRONG_GENERAL,
+	BOTH_VICTORY_DUAL_GENERAL,
+	BOTH_VICTORY_STAFF_GENERAL,
 	//other saber/acro anims
-	BOTH_ARIAL_LEFT,		//# 
-	BOTH_ARIAL_RIGHT,		//# 
-	BOTH_CARTWHEEL_LEFT,	//# 
-	BOTH_CARTWHEEL_RIGHT,	//# 
-	BOTH_FLIP_LEFT,			//# 
-	BOTH_FLIP_BACK1,		//# 
-	BOTH_FLIP_BACK2,		//# 
-	BOTH_FLIP_BACK3,		//# 
-	BOTH_BUTTERFLY_LEFT,	//# 
-	BOTH_BUTTERFLY_RIGHT,	//# 
-	BOTH_WALL_RUN_RIGHT,	//# 
-	BOTH_WALL_RUN_RIGHT_FLIP,//#
-	BOTH_WALL_RUN_RIGHT_STOP,//# 
-	BOTH_WALL_RUN_LEFT,		//# 
-	BOTH_WALL_RUN_LEFT_FLIP,//#
-	BOTH_WALL_RUN_LEFT_STOP,//# 
-	BOTH_WALL_FLIP_RIGHT,	//# 
-	BOTH_WALL_FLIP_LEFT,	//# 
-	BOTH_KNOCKDOWN1,		//# knocked backwards
-	BOTH_KNOCKDOWN2,		//# knocked backwards hard
-	BOTH_KNOCKDOWN3,		//#	knocked forwards
-	BOTH_KNOCKDOWN4,		//# knocked backwards from crouch
-	BOTH_KNOCKDOWN5,		//# dupe of 3 - will be removed
-	BOTH_GETUP1,			//#
-	BOTH_GETUP2,			//#
-	BOTH_GETUP3,			//#
-	BOTH_GETUP4,			//#
-	BOTH_GETUP5,			//#
-	BOTH_GETUP_CROUCH_F1,	//#
-	BOTH_GETUP_CROUCH_B1,	//#
-	BOTH_FORCE_GETUP_F1,	//#
-	BOTH_FORCE_GETUP_F2,	//#
-	BOTH_FORCE_GETUP_B1,	//#
-	BOTH_FORCE_GETUP_B2,	//#
-	BOTH_FORCE_GETUP_B3,	//#
-	BOTH_FORCE_GETUP_B4,	//#
-	BOTH_FORCE_GETUP_B5,	//#
-	BOTH_FORCE_GETUP_B6,	//#
-		(animNumber_t)0,//BOTH_GETUP_BROLL_B,	//#
-		(animNumber_t)0,//BOTH_GETUP_BROLL_F,	//#
-		(animNumber_t)0,//BOTH_GETUP_BROLL_L,	//#
-		(animNumber_t)0,//BOTH_GETUP_BROLL_R,	//#
-		(animNumber_t)0,//BOTH_GETUP_FROLL_B,	//#
-		(animNumber_t)0,//BOTH_GETUP_FROLL_F,	//#
-		(animNumber_t)0,//BOTH_GETUP_FROLL_L,	//#
-		(animNumber_t)0,//BOTH_GETUP_FROLL_R,	//#
-	BOTH_WALL_FLIP_BACK1,	//#
-	BOTH_WALL_FLIP_BACK2,	//#
-	BOTH_SPIN1,				//#
-	BOTH_CEILING_CLING,		//# clinging to ceiling
-	BOTH_CEILING_DROP,		//# dropping from ceiling cling
+	BOTH_ARIAL_LEFT_GENERAL,		//# 
+	BOTH_ARIAL_RIGHT_GENERAL,		//# 
+	BOTH_CARTWHEEL_LEFT_GENERAL,	//# 
+	BOTH_CARTWHEEL_RIGHT_GENERAL,	//# 
+	BOTH_FLIP_LEFT_GENERAL,			//# 
+	BOTH_FLIP_BACK1_GENERAL,		//# 
+	BOTH_FLIP_BACK2_GENERAL,		//# 
+	BOTH_FLIP_BACK3_GENERAL,		//# 
+	BOTH_BUTTERFLY_LEFT_GENERAL,	//# 
+	BOTH_BUTTERFLY_RIGHT_GENERAL,	//# 
+	BOTH_WALL_RUN_RIGHT_GENERAL,	//# 
+	BOTH_WALL_RUN_RIGHT_FLIP_GENERAL,//#
+	BOTH_WALL_RUN_RIGHT_STOP_GENERAL,//# 
+	BOTH_WALL_RUN_LEFT_GENERAL,		//# 
+	BOTH_WALL_RUN_LEFT_FLIP_GENERAL,//#
+	BOTH_WALL_RUN_LEFT_STOP_GENERAL,//# 
+	BOTH_WALL_FLIP_RIGHT_GENERAL,	//# 
+	BOTH_WALL_FLIP_LEFT_GENERAL,	//# 
+	BOTH_KNOCKDOWN1_GENERAL,		//# knocked backwards
+	BOTH_KNOCKDOWN2_GENERAL,		//# knocked backwards hard
+	BOTH_KNOCKDOWN3_GENERAL,		//#	knocked forwards
+	BOTH_KNOCKDOWN4_GENERAL,		//# knocked backwards from crouch
+	BOTH_KNOCKDOWN5_GENERAL,		//# dupe of 3 - will be removed
+	BOTH_GETUP1_GENERAL,			//#
+	BOTH_GETUP2_GENERAL,			//#
+	BOTH_GETUP3_GENERAL,			//#
+	BOTH_GETUP4_GENERAL,			//#
+	BOTH_GETUP5_GENERAL,			//#
+	BOTH_GETUP_CROUCH_F1_GENERAL,	//#
+	BOTH_GETUP_CROUCH_B1_GENERAL,	//#
+	BOTH_FORCE_GETUP_F1_GENERAL,	//#
+	BOTH_FORCE_GETUP_F2_GENERAL,	//#
+	BOTH_FORCE_GETUP_B1_GENERAL,	//#
+	BOTH_FORCE_GETUP_B2_GENERAL,	//#
+	BOTH_FORCE_GETUP_B3_GENERAL,	//#
+	BOTH_FORCE_GETUP_B4_GENERAL,	//#
+	BOTH_FORCE_GETUP_B5_GENERAL,	//#
+	BOTH_FORCE_GETUP_B6_GENERAL,	//#
+	BOTH_GETUP_BROLL_B_GENERAL,	//#
+	BOTH_GETUP_BROLL_F_GENERAL,	//#
+	BOTH_GETUP_BROLL_L_GENERAL,	//#
+	BOTH_GETUP_BROLL_R_GENERAL,	//#
+	BOTH_GETUP_FROLL_B_GENERAL,	//#
+	BOTH_GETUP_FROLL_F_GENERAL,	//#
+	BOTH_GETUP_FROLL_L_GENERAL,	//#
+	BOTH_GETUP_FROLL_R_GENERAL,	//#
+	BOTH_WALL_FLIP_BACK1_GENERAL,	//#
+	BOTH_WALL_FLIP_BACK2_GENERAL,	//#
+	BOTH_SPIN1_GENERAL,				//#
+	BOTH_CEILING_CLING_GENERAL,		//# clinging to ceiling
+	BOTH_CEILING_DROP_GENERAL,		//# dropping from ceiling cling
 
 	//TESTING
-	BOTH_FJSS_TR_BL,		//# jump spin slash tr to bl
-	BOTH_FJSS_TL_BR,		//# jump spin slash bl to tr
-	BOTH_RIGHTHANDCHOPPEDOFF,//#
-	BOTH_DEFLECTSLASH__R__L_FIN,//#
-	BOTH_BASHED1,//#
-	BOTH_ARIAL_F1,//#
-	BOTH_BUTTERFLY_FR1,//#
-	BOTH_BUTTERFLY_FL1,//#
+	BOTH_FJSS_TR_BL_GENERAL,		//# jump spin slash tr to bl
+	BOTH_FJSS_TL_BR_GENERAL,		//# jump spin slash bl to tr
+	BOTH_RIGHTHANDCHOPPEDOFF_GENERAL,//#
+	BOTH_DEFLECTSLASH__R__L_FIN_GENERAL,//#
+	BOTH_BASHED1_GENERAL,//#
+	BOTH_ARIAL_F1_GENERAL,//#
+	BOTH_BUTTERFLY_FR1_GENERAL,//#
+	BOTH_BUTTERFLY_FL1_GENERAL,//#
 
 	//NEW SABER/JEDI/FORCE ANIMS
-		(animNumber_t)0,//BOTH_BACK_FLIP_UP,	//# back flip up Bonus Animation!!!!	
-		(animNumber_t)0,//BOTH_LOSE_SABER,	//# player losing saber (pulled from hand by force pull 4 - Kyle?)
-		(animNumber_t)0,//BOTH_STAFF_TAUNT,	//# taunt saberstaff			
-		(animNumber_t)0,//BOTH_DUAL_TAUNT,		//# taunt dual
-		(animNumber_t)0,//BOTH_A6_FB,				//# dual attack front/back		
-		(animNumber_t)0,//BOTH_A6_LR,				//# dual attack left/right
-		(animNumber_t)0,//BOTH_A7_HILT,			//# saber knock (alt + stand still)
+	BOTH_BACK_FLIP_UP_GENERAL,	//# back flip up Bonus Animation!!!!	
+	BOTH_LOSE_SABER_GENERAL,	//# player losing saber (pulled from hand by force pull 4 - Kyle?)
+	BOTH_STAFF_TAUNT_GENERAL,	//# taunt saberstaff			
+	BOTH_DUAL_TAUNT_GENERAL,		//# taunt dual
+	BOTH_A6_FB_GENERAL,				//# dual attack front/back		
+	BOTH_A6_LR_GENERAL,				//# dual attack left/right
+	BOTH_A7_HILT_GENERAL,			//# saber knock (alt + stand still)
 	//Alora			
-		(animNumber_t)0,//BOTH_ALORA_SPIN,		//#jump spin attack	death ballet	
-		(animNumber_t)0,//BOTH_ALORA_FLIP_1,		//# gymnast move 1		
-		(animNumber_t)0,//BOTH_ALORA_FLIP_2,		//# gymnast move 2		
-		(animNumber_t)0,//BOTH_ALORA_FLIP_3,		//# gymnast move3		
-		(animNumber_t)0,//BOTH_ALORA_FLIP_B,		//# gymnast move back		
-		(animNumber_t)0,//BOTH_ALORA_SPIN_THROW,	//# dual saber throw		
-			(animNumber_t)0,//BOTH_ALORA_SPIN_SLASH,	//# spin slash	special bonus animation!! :)	
-			(animNumber_t)0,//BOTH_ALORA_TAUNT,		//# special taunt
+	BOTH_ALORA_SPIN_GENERAL,		//#jump spin attack	death ballet	
+	BOTH_ALORA_FLIP_1_GENERAL,		//# gymnast move 1		
+	BOTH_ALORA_FLIP_2_GENERAL,		//# gymnast move 2		
+	BOTH_ALORA_FLIP_3_GENERAL,		//# gymnast move3		
+	BOTH_ALORA_FLIP_B_GENERAL,		//# gymnast move back		
+	BOTH_ALORA_SPIN_THROW_GENERAL,	//# dual saber throw		
+	BOTH_ALORA_SPIN_SLASH_GENERAL,	//# spin slash	special bonus animation!! :)	
+	BOTH_ALORA_TAUNT_GENERAL,		//# special taunt
 	//Rosh (Kothos battle)			
-			(animNumber_t)0,//BOTH_ROSH_PAIN,	//# hurt animation (exhausted)		
-			(animNumber_t)0,//BOTH_ROSH_HEAL,	//# healed/rejuvenated		
+	BOTH_ROSH_PAIN_GENERAL,	//# hurt animation (exhausted)		
+	BOTH_ROSH_HEAL_GENERAL,	//# healed/rejuvenated		
 	//Tavion			
-		(animNumber_t)0,//BOTH_TAVION_SCEPTERGROUND, //# stabbing ground with sith sword shoots electricity everywhere
-		(animNumber_t)0,//BOTH_TAVION_SWORDPOWER,//# Tavion doing the He-Man(tm) thing
-		(animNumber_t)0,//BOTH_SCEPTER_START,	//#Point scepter and attack start
-					(animNumber_t)0,//BOTH_SCEPTER_HOLD,	//#Point scepter and attack hold
-					(animNumber_t)0,//BOTH_SCEPTER_STOP,	//#Point scepter and attack stop
+	BOTH_TAVION_SCEPTERGROUND_GENERAL, //# stabbing ground with sith sword shoots electricity everywhere
+	BOTH_TAVION_SWORDPOWER_GENERAL,//# Tavion doing the He-Man(tm) thing
+	BOTH_SCEPTER_START_GENERAL,	//#Point scepter and attack start
+	BOTH_SCEPTER_HOLD_GENERAL,	//#Point scepter and attack hold
+	BOTH_SCEPTER_STOP_GENERAL,	//#Point scepter and attack stop
 	//Kyle Boss			
-					(animNumber_t)0,//BOTH_KYLE_GRAB,		//# grab
-			(animNumber_t)0,//BOTH_KYLE_MISS,		//# miss
-			(animNumber_t)0,//BOTH_KYLE_PA_1,		//# hold 1
-			(animNumber_t)0,//BOTH_PLAYER_PA_1,	//# player getting held 1
-			(animNumber_t)0,//BOTH_KYLE_PA_2,		//# hold 2
-			(animNumber_t)0,//BOTH_PLAYER_PA_2,	//# player getting held 2
-			(animNumber_t)0,//BOTH_PLAYER_PA_FLY,	//# player getting knocked back from punch at end of hold 1
-			(animNumber_t)0,//BOTH_KYLE_PA_3,		//# hold 3
-					(animNumber_t)0,//BOTH_PLAYER_PA_3,	//# player getting held 3
-					(animNumber_t)0,//BOTH_PLAYER_PA_3_FLY,//# player getting thrown at end of hold 3
+	BOTH_KYLE_GRAB_GENERAL,		//# grab
+	BOTH_KYLE_MISS_GENERAL,		//# miss
+	BOTH_KYLE_PA_1_GENERAL,		//# hold 1
+	BOTH_PLAYER_PA_1_GENERAL,	//# player getting held 1
+	BOTH_KYLE_PA_2_GENERAL,		//# hold 2
+	BOTH_PLAYER_PA_2_GENERAL,	//# player getting held 2
+	BOTH_PLAYER_PA_FLY_GENERAL,	//# player getting knocked back from punch at end of hold 1
+	BOTH_KYLE_PA_3_GENERAL,		//# hold 3
+	BOTH_PLAYER_PA_3_GENERAL,	//# player getting held 3
+	BOTH_PLAYER_PA_3_FLY_GENERAL,//# player getting thrown at end of hold 3
 	//Rancor
-		(animNumber_t)0,//BOTH_BUCK_RIDER,	//# Rancor bucks when someone is on him
+	BOTH_BUCK_RIDER_GENERAL,	//# Rancor bucks when someone is on him
 	//WAMPA Grabbing enemy
-		(animNumber_t)0,//BOTH_HOLD_START,	//#
-		(animNumber_t)0,//BOTH_HOLD_MISS,	//#
-		(animNumber_t)0,//BOTH_HOLD_IDLE,	//#
-		(animNumber_t)0,//BOTH_HOLD_END,	//#
-		(animNumber_t)0,//BOTH_HOLD_ATTACK,	//#
-		(animNumber_t)0,//BOTH_HOLD_SNIFF,	//# Sniff the guy you're holding
-		(animNumber_t)0,//BOTH_HOLD_DROP,		//# just drop 'em
+	BOTH_HOLD_START_GENERAL,	//#
+	BOTH_HOLD_MISS_GENERAL,	//#
+	BOTH_HOLD_IDLE_GENERAL,	//#
+	BOTH_HOLD_END_GENERAL,	//#
+	BOTH_HOLD_ATTACK_GENERAL,	//#
+	BOTH_HOLD_SNIFF_GENERAL,	//# Sniff the guy you're holding
+	BOTH_HOLD_DROP_GENERAL,		//# just drop 'em
 	//BEING GRABBED BY WAMPA
-		(animNumber_t)0,//BOTH_GRABBED,	//#
-		(animNumber_t)0,//BOTH_RELEASED,	//#
-		(animNumber_t)0,//BOTH_HANG_IDLE,	//#
-		(animNumber_t)0,//BOTH_HANG_ATTACK,	//#
-		(animNumber_t)0,//BOTH_HANG_PAIN,	//#
+	BOTH_GRABBED_GENERAL,	//#
+	BOTH_RELEASED_GENERAL,	//#
+	BOTH_HANG_IDLE_GENERAL,	//#
+	BOTH_HANG_ATTACK_GENERAL,	//#
+	BOTH_HANG_PAIN_GENERAL,	//#
 
 	//# #sep BOTH_ MISC MOVEMENT
-	BOTH_HIT1,				//# Kyle hit by crate in cin #9
-	BOTH_LADDER_UP1,		//# Climbing up a ladder with rungs at 16 unit intervals
-	BOTH_LADDER_DWN1,		//# Climbing down a ladder with rungs at 16 unit intervals
-	BOTH_LADDER_IDLE,		//#	Just sitting on the ladder
+	BOTH_HIT1_GENERAL,				//# Kyle hit by crate in cin #9
+	BOTH_LADDER_UP1_GENERAL,		//# Climbing up a ladder with rungs at 16 unit intervals
+	BOTH_LADDER_DWN1_GENERAL,		//# Climbing down a ladder with rungs at 16 unit intervals
+	BOTH_LADDER_IDLE_GENERAL,		//#	Just sitting on the ladder
 
 	//# #sep BOTH_ FLYING IDLE
-	BOTH_FLY_SHIELDED,		//# For sentry droid, shields in
+	BOTH_FLY_SHIELDED_GENERAL,		//# For sentry droid_GENERAL, shields in
 
 	//# #sep BOTH_ SWIMMING
-	BOTH_SWIM_IDLE1,		//# Swimming Idle 1
-	BOTH_SWIMFORWARD,		//# Swim forward loop
-		(animNumber_t)0,//BOTH_SWIMBACKWARD,		//# Swim backward loop
+	BOTH_SWIM_IDLE1_GENERAL,		//# Swimming Idle 1
+	BOTH_SWIMFORWARD_GENERAL,		//# Swim forward loop
+	BOTH_SWIMBACKWARD_GENERAL,		//# Swim backward loop
 
 	//# #sep BOTH_ LYING
-	BOTH_SLEEP1,			//# laying on back-rknee up-rhand on torso
-	BOTH_SLEEP6START,		//# Kyle leaning back to sleep (cin 20)
-	BOTH_SLEEP6STOP,		//# Kyle waking up and shaking his head (cin 21)
-	BOTH_SLEEP1GETUP,		//# alarmed and getting up out of sleep1 pose to stand
-	BOTH_SLEEP1GETUP2,		//# 
+	BOTH_SLEEP1_GENERAL,			//# laying on back-rknee up-rhand on torso
+	BOTH_SLEEP6START_GENERAL,		//# Kyle leaning back to sleep (cin 20)
+	BOTH_SLEEP6STOP_GENERAL,		//# Kyle waking up and shaking his head (cin 21)
+	BOTH_SLEEP1GETUP_GENERAL,		//# alarmed and getting up out of sleep1 pose to stand
+	BOTH_SLEEP1GETUP2_GENERAL,		//# 
 
-	BOTH_CHOKE1START,		//# tavion in force grip choke
-	BOTH_CHOKE1STARTHOLD,	//# loop of tavion in force grip choke
-	BOTH_CHOKE1,			//# tavion in force grip choke
+	BOTH_CHOKE1START_GENERAL,		//# tavion in force grip choke
+	BOTH_CHOKE1STARTHOLD_GENERAL,	//# loop of tavion in force grip choke
+	BOTH_CHOKE1_GENERAL,			//# tavion in force grip choke
 
-	BOTH_CHOKE2,			//# tavion recovering from force grip choke
-	BOTH_CHOKE3,			//# left-handed choke (for people still holding a weapon)
+	BOTH_CHOKE2_GENERAL,			//# tavion recovering from force grip choke
+	BOTH_CHOKE3_GENERAL,			//# left-handed choke (for people still holding a weapon)
 
 	//# #sep BOTH_ HUNTER-SEEKER BOT-SPECIFIC
-	BOTH_POWERUP1,			//# Wakes up
+	BOTH_POWERUP1_GENERAL,			//# Wakes up
 
-	BOTH_TURNON,			//# Protocol Droid wakes up
-	BOTH_TURNOFF,			//# Protocol Droid shuts off
+	BOTH_TURNON_GENERAL,			//# Protocol Droid wakes up
+	BOTH_TURNOFF_GENERAL,			//# Protocol Droid shuts off
 
-	BOTH_BUTTON1,			//# Single button push with right hand
-	BOTH_BUTTON2,			//# Single button push with left finger
-	BOTH_BUTTON_HOLD,		//# Single button hold with left hand
-	BOTH_BUTTON_RELEASE,	//# Single button release with left hand
+	BOTH_BUTTON1_GENERAL,			//# Single button push with right hand
+	BOTH_BUTTON2_GENERAL,			//# Single button push with left finger
+	BOTH_BUTTON_HOLD_GENERAL,		//# Single button hold with left hand
+	BOTH_BUTTON_RELEASE_GENERAL,	//# Single button release with left hand
 
 	//# JEDI-SPECIFIC
 	//# #sep BOTH_ FORCE ANIMS
-	BOTH_RESISTPUSH,		//# plant yourself to resist force push/pulls.
-	BOTH_FORCEPUSH,			//# Use off-hand to do force power.
-	BOTH_FORCEPULL,			//# Use off-hand to do force power.
-	BOTH_MINDTRICK1,			//# Use off-hand to do mind trick
-	BOTH_MINDTRICK2,			//# Use off-hand to do distraction
-	BOTH_FORCELIGHTNING,		//# Use off-hand to do lightning
-	BOTH_FORCELIGHTNING_START,	//# Use off-hand to do lightning - start
-	BOTH_FORCELIGHTNING_HOLD,	//# Use off-hand to do lightning - hold
-	BOTH_FORCELIGHTNING_RELEASE,//# Use off-hand to do lightning - release
-	BOTH_FORCEHEAL_START,		//# Healing meditation pose start
-	BOTH_FORCEHEAL_STOP,		//# Healing meditation pose end
-	BOTH_FORCEHEAL_QUICK,		//# Healing meditation gesture
-	BOTH_SABERPULL,			//# Use off-hand to do force power.
-	BOTH_FORCEGRIP1,		//# force-gripping (no anim?)
-	BOTH_FORCEGRIP3,		//# force-gripping (right hand)
-	BOTH_FORCEGRIP3THROW,	//# throwing while force-gripping (right hand)
-	BOTH_FORCEGRIP_HOLD,	//# Use off-hand to do grip - hold
-	BOTH_FORCEGRIP_RELEASE,//# Use off-hand to do grip - release
-	BOTH_TOSS1,				//# throwing to left after force gripping
-	BOTH_TOSS2,				//# throwing to right after force gripping
+	BOTH_RESISTPUSH_GENERAL,		//# plant yourself to resist force push/pulls.
+	BOTH_FORCEPUSH_GENERAL,			//# Use off-hand to do force power.
+	BOTH_FORCEPULL_GENERAL,			//# Use off-hand to do force power.
+	BOTH_MINDTRICK1_GENERAL,			//# Use off-hand to do mind trick
+	BOTH_MINDTRICK2_GENERAL,			//# Use off-hand to do distraction
+	BOTH_FORCELIGHTNING_GENERAL,		//# Use off-hand to do lightning
+	BOTH_FORCELIGHTNING_START_GENERAL,	//# Use off-hand to do lightning - start
+	BOTH_FORCELIGHTNING_HOLD_GENERAL,	//# Use off-hand to do lightning - hold
+	BOTH_FORCELIGHTNING_RELEASE_GENERAL,//# Use off-hand to do lightning - release
+	BOTH_FORCEHEAL_START_GENERAL,		//# Healing meditation pose start
+	BOTH_FORCEHEAL_STOP_GENERAL,		//# Healing meditation pose end
+	BOTH_FORCEHEAL_QUICK_GENERAL,		//# Healing meditation gesture
+	BOTH_SABERPULL_GENERAL,			//# Use off-hand to do force power.
+	BOTH_FORCEGRIP1_GENERAL,		//# force-gripping (no anim?)
+	BOTH_FORCEGRIP3_GENERAL,		//# force-gripping (right hand)
+	BOTH_FORCEGRIP3THROW_GENERAL,	//# throwing while force-gripping (right hand)
+	BOTH_FORCEGRIP_HOLD_GENERAL,	//# Use off-hand to do grip - hold
+	BOTH_FORCEGRIP_RELEASE_GENERAL,//# Use off-hand to do grip - release
+	BOTH_TOSS1_GENERAL,				//# throwing to left after force gripping
+	BOTH_TOSS2_GENERAL,				//# throwing to right after force gripping
 	//NEW force anims for JKA:
-				(animNumber_t)0,//BOTH_FORCE_RAGE,
-				(animNumber_t)0,//BOTH_FORCE_2HANDEDLIGHTNING,
-				(animNumber_t)0,//BOTH_FORCE_2HANDEDLIGHTNING_START,
-				(animNumber_t)0,//BOTH_FORCE_2HANDEDLIGHTNING_HOLD,
-			(animNumber_t)0,//BOTH_FORCE_2HANDEDLIGHTNING_RELEASE,
-			(animNumber_t)0,//BOTH_FORCE_DRAIN,
-			(animNumber_t)0,//BOTH_FORCE_DRAIN_START,
-			(animNumber_t)0,//BOTH_FORCE_DRAIN_HOLD,
-						(animNumber_t)0,//BOTH_FORCE_DRAIN_RELEASE,
-						(animNumber_t)0,//BOTH_FORCE_DRAIN_GRAB_START,
-						(animNumber_t)0,//BOTH_FORCE_DRAIN_GRAB_HOLD,
-						(animNumber_t)0,//BOTH_FORCE_DRAIN_GRAB_END,
-				(animNumber_t)0,//BOTH_FORCE_DRAIN_GRABBED,
-				(animNumber_t)0,//BOTH_FORCE_ABSORB,
-				(animNumber_t)0,//BOTH_FORCE_ABSORB_START,
-				(animNumber_t)0,//BOTH_FORCE_ABSORB_END,
-				(animNumber_t)0,//BOTH_FORCE_PROTECT,
-				(animNumber_t)0,//BOTH_FORCE_PROTECT_FAST,
+	BOTH_FORCE_RAGE_GENERAL,
+	BOTH_FORCE_2HANDEDLIGHTNING_GENERAL,
+	BOTH_FORCE_2HANDEDLIGHTNING_START_GENERAL,
+	BOTH_FORCE_2HANDEDLIGHTNING_HOLD_GENERAL,
+	BOTH_FORCE_2HANDEDLIGHTNING_RELEASE_GENERAL,
+	BOTH_FORCE_DRAIN_GENERAL,
+	BOTH_FORCE_DRAIN_START_GENERAL,
+	BOTH_FORCE_DRAIN_HOLD_GENERAL,
+	BOTH_FORCE_DRAIN_RELEASE_GENERAL,
+	BOTH_FORCE_DRAIN_GRAB_START_GENERAL,
+	BOTH_FORCE_DRAIN_GRAB_HOLD_GENERAL,
+	BOTH_FORCE_DRAIN_GRAB_END_GENERAL,
+	BOTH_FORCE_DRAIN_GRABBED_GENERAL,
+	BOTH_FORCE_ABSORB_GENERAL,
+	BOTH_FORCE_ABSORB_START_GENERAL,
+	BOTH_FORCE_ABSORB_END_GENERAL,
+	BOTH_FORCE_PROTECT_GENERAL,
+	BOTH_FORCE_PROTECT_FAST_GENERAL,
 
-						(animNumber_t)0,//BOTH_WIND,
+	BOTH_WIND_GENERAL,
 
-			(animNumber_t)0,//BOTH_STAND_TO_KNEEL,
-			(animNumber_t)0,//BOTH_KNEEL_TO_STAND,
+	BOTH_STAND_TO_KNEEL_GENERAL,
+	BOTH_KNEEL_TO_STAND_GENERAL,
 
-			(animNumber_t)0,//BOTH_TUSKENATTACK1,
-			(animNumber_t)0,//BOTH_TUSKENATTACK2,
-			(animNumber_t)0,//BOTH_TUSKENATTACK3,
-			(animNumber_t)0,//BOTH_TUSKENLUNGE1,
-			(animNumber_t)0,//BOTH_TUSKENTAUNT1,
+	BOTH_TUSKENATTACK1_GENERAL,
+	BOTH_TUSKENATTACK2_GENERAL,
+	BOTH_TUSKENATTACK3_GENERAL,
+	BOTH_TUSKENLUNGE1_GENERAL,
+	BOTH_TUSKENTAUNT1_GENERAL,
 
-			(animNumber_t)0,//BOTH_COWER1_START,		//# cower start
-			(animNumber_t)0,//BOTH_COWER1,			//# cower loop
-			(animNumber_t)0,//BOTH_COWER1_STOP,		//# cower stop
-			(animNumber_t)0,//BOTH_SONICPAIN_START,
-			(animNumber_t)0,//BOTH_SONICPAIN_HOLD,
-			(animNumber_t)0,//BOTH_SONICPAIN_END,
+	BOTH_COWER1_START_GENERAL,		//# cower start
+	BOTH_COWER1_GENERAL,			//# cower loop
+	BOTH_COWER1_STOP_GENERAL,		//# cower stop
+	BOTH_SONICPAIN_START_GENERAL,
+	BOTH_SONICPAIN_HOLD_GENERAL,
+	BOTH_SONICPAIN_END_GENERAL,
 
 	//new anim slots per Jarrod's request
-		(animNumber_t)0,//BOTH_STAND10,
-		(animNumber_t)0,//BOTH_STAND10_TALK1,
-		(animNumber_t)0,//BOTH_STAND10_TALK2,
-		(animNumber_t)0,//BOTH_STAND10TOSTAND1,
+	BOTH_STAND10_GENERAL,
+	BOTH_STAND10_TALK1_GENERAL,
+	BOTH_STAND10_TALK2_GENERAL,
+	BOTH_STAND10TOSTAND1_GENERAL,
 
-		(animNumber_t)0,//BOTH_STAND1_TALK1,
-		(animNumber_t)0,//BOTH_STAND1_TALK2,
-		(animNumber_t)0,//BOTH_STAND1_TALK3,
+	BOTH_STAND1_TALK1_GENERAL,
+	BOTH_STAND1_TALK2_GENERAL,
+	BOTH_STAND1_TALK3_GENERAL,
 
-		(animNumber_t)0,//BOTH_SIT4,
-		(animNumber_t)0,//BOTH_SIT5,
-		(animNumber_t)0,//BOTH_SIT5_TALK1,
-			(animNumber_t)0,//BOTH_SIT5_TALK2,
-		(animNumber_t)0,//BOTH_SIT5_TALK3,
+	BOTH_SIT4_GENERAL,
+	BOTH_SIT5_GENERAL,
+	BOTH_SIT5_TALK1_GENERAL,
+	BOTH_SIT5_TALK2_GENERAL,
+	BOTH_SIT5_TALK3_GENERAL,
 
-		(animNumber_t)0,//BOTH_SIT6,
-	BOTH_SIT7,
+	BOTH_SIT6_GENERAL,
+	BOTH_SIT7_GENERAL,
 
 	//=================================================
 	//ANIMS IN WHICH ONLY THE UPPER OBJECTS ARE IN MD3
 	//=================================================
 	//# #sep TORSO_ WEAPON-RELATED
-	TORSO_DROPWEAP1,		//# Put weapon away
-	TORSO_DROPWEAP4,		//# Put weapon away
-	TORSO_RAISEWEAP1,		//# Draw Weapon
-	TORSO_RAISEWEAP4,		//# Draw Weapon
-	TORSO_WEAPONREADY1,		//# Ready to fire stun baton
-	TORSO_WEAPONREADY2,		//# Ready to fire one-handed blaster pistol
-	TORSO_WEAPONREADY3,		//# Ready to fire blaster rifle
-	TORSO_WEAPONREADY4,		//# Ready to fire sniper rifle
-	TORSO_WEAPONREADY10,	//# Ready to fire thermal det
-	TORSO_WEAPONIDLE2,		//# Holding one-handed blaster
-	TORSO_WEAPONIDLE3,		//# Holding blaster rifle
-	TORSO_WEAPONIDLE4,		//# Holding sniper rifle
-	TORSO_WEAPONIDLE10,		//# Holding thermal det
+	TORSO_DROPWEAP1_GENERAL,		//# Put weapon away
+	TORSO_DROPWEAP4_GENERAL,		//# Put weapon away
+	TORSO_RAISEWEAP1_GENERAL,		//# Draw Weapon
+	TORSO_RAISEWEAP4_GENERAL,		//# Draw Weapon
+	TORSO_WEAPONREADY1_GENERAL,		//# Ready to fire stun baton
+	TORSO_WEAPONREADY2_GENERAL,		//# Ready to fire one-handed blaster pistol
+	TORSO_WEAPONREADY3_GENERAL,		//# Ready to fire blaster rifle
+	TORSO_WEAPONREADY4_GENERAL,		//# Ready to fire sniper rifle
+	TORSO_WEAPONREADY10_GENERAL,	//# Ready to fire thermal det
+	TORSO_WEAPONIDLE2_GENERAL,		//# Holding one-handed blaster
+	TORSO_WEAPONIDLE3_GENERAL,		//# Holding blaster rifle
+	TORSO_WEAPONIDLE4_GENERAL,		//# Holding sniper rifle
+	TORSO_WEAPONIDLE10_GENERAL,		//# Holding thermal det
 
 	//# #sep TORSO_ MISC
-	TORSO_SURRENDER_START,	//# arms up
-	TORSO_SURRENDER_STOP,	//# arms back down
+	TORSO_SURRENDER_START_GENERAL,	//# arms up
+	TORSO_SURRENDER_STOP_GENERAL,	//# arms back down
 
-	TORSO_CHOKING1,			//# TEMP
+	TORSO_CHOKING1_GENERAL,			//# TEMP
 
-		(animNumber_t)0,//TORSO_HANDSIGNAL1,
-		(animNumber_t)0,//TORSO_HANDSIGNAL2,
-		(animNumber_t)0,//TORSO_HANDSIGNAL3,
-		(animNumber_t)0,//TORSO_HANDSIGNAL4,
-		(animNumber_t)0,//TORSO_HANDSIGNAL5,
+	TORSO_HANDSIGNAL1_GENERAL,
+	TORSO_HANDSIGNAL2_GENERAL,
+	TORSO_HANDSIGNAL3_GENERAL,
+	TORSO_HANDSIGNAL4_GENERAL,
+	TORSO_HANDSIGNAL5_GENERAL,
 
 
 	//=================================================
 	//ANIMS IN WHICH ONLY THE LOWER OBJECTS ARE IN MD3
 	//=================================================
 	//# #sep Legs-only anims
-	LEGS_TURN1,				//# What legs do when you turn your lower body to match your upper body facing
-	LEGS_TURN2,				//# Leg turning from stand2
-	LEGS_LEAN_LEFT1,		//# Lean left
-	LEGS_LEAN_RIGHT1,		//# Lean Right
-	LEGS_CHOKING1,			//# TEMP
-	LEGS_LEFTUP1,			//# On a slope with left foot 4 higher than right
-	LEGS_LEFTUP2,			//# On a slope with left foot 8 higher than right
-	LEGS_LEFTUP3,			//# On a slope with left foot 12 higher than right
-	LEGS_LEFTUP4,			//# On a slope with left foot 16 higher than right
-	LEGS_LEFTUP5,			//# On a slope with left foot 20 higher than right
-	LEGS_RIGHTUP1,			//# On a slope with RIGHT foot 4 higher than left
-	LEGS_RIGHTUP2,			//# On a slope with RIGHT foot 8 higher than left
-	LEGS_RIGHTUP3,			//# On a slope with RIGHT foot 12 higher than left
-	LEGS_RIGHTUP4,			//# On a slope with RIGHT foot 16 higher than left
-	LEGS_RIGHTUP5,			//# On a slope with RIGHT foot 20 higher than left
-	LEGS_S1_LUP1,
-	LEGS_S1_LUP2,
-	LEGS_S1_LUP3,
-	LEGS_S1_LUP4,
-	LEGS_S1_LUP5,
-	LEGS_S1_RUP1,
-	LEGS_S1_RUP2,
-	LEGS_S1_RUP3,
-	LEGS_S1_RUP4,
-	LEGS_S1_RUP5,
-	LEGS_S3_LUP1,
-	LEGS_S3_LUP2,
-	LEGS_S3_LUP3,
-	LEGS_S3_LUP4,
-	LEGS_S3_LUP5,
-	LEGS_S3_RUP1,
-	LEGS_S3_RUP2,
-	LEGS_S3_RUP3,
-	LEGS_S3_RUP4,
-	LEGS_S3_RUP5,
-	LEGS_S4_LUP1,
-	LEGS_S4_LUP2,
-	LEGS_S4_LUP3,
-	LEGS_S4_LUP4,
-	LEGS_S4_LUP5,
-	LEGS_S4_RUP1,
-	LEGS_S4_RUP2,
-	LEGS_S4_RUP3,
-	LEGS_S4_RUP4,
-	LEGS_S4_RUP5,
-	LEGS_S5_LUP1,
-	LEGS_S5_LUP2,
-	LEGS_S5_LUP3,
-	LEGS_S5_LUP4,
-	LEGS_S5_LUP5,
-	LEGS_S5_RUP1,
-	LEGS_S5_RUP2,
-	LEGS_S5_RUP3,
-	LEGS_S5_RUP4,
-	LEGS_S5_RUP5,
-			(animNumber_t)0,//LEGS_S6_LUP1,
-			(animNumber_t)0,//LEGS_S6_LUP2,
-			(animNumber_t)0,//LEGS_S6_LUP3,
-			(animNumber_t)0,//LEGS_S6_LUP4,
-				(animNumber_t)0,//LEGS_S6_LUP5,
-			(animNumber_t)0,//LEGS_S6_RUP1,
-			(animNumber_t)0,//LEGS_S6_RUP2,
-			(animNumber_t)0,//LEGS_S6_RUP3,
-		(animNumber_t)0,//LEGS_S6_RUP4,
-		(animNumber_t)0,//LEGS_S6_RUP5,
-		(animNumber_t)0,//LEGS_S7_LUP1,
-		(animNumber_t)0,//LEGS_S7_LUP2,
-		(animNumber_t)0,//LEGS_S7_LUP3,
-		(animNumber_t)0,//LEGS_S7_LUP4,
-		(animNumber_t)0,//LEGS_S7_LUP5,
-		(animNumber_t)0,//LEGS_S7_RUP1,
-		(animNumber_t)0,//LEGS_S7_RUP2,
-		(animNumber_t)0,//LEGS_S7_RUP3,
-		(animNumber_t)0,//LEGS_S7_RUP4,
-		(animNumber_t)0,//LEGS_S7_RUP5,
+	LEGS_TURN1_GENERAL,				//# What legs do when you turn your lower body to match your upper body facing
+	LEGS_TURN2_GENERAL,				//# Leg turning from stand2
+	LEGS_LEAN_LEFT1_GENERAL,		//# Lean left
+	LEGS_LEAN_RIGHT1_GENERAL,		//# Lean Right
+	LEGS_CHOKING1_GENERAL,			//# TEMP
+	LEGS_LEFTUP1_GENERAL,			//# On a slope with left foot 4 higher than right
+	LEGS_LEFTUP2_GENERAL,			//# On a slope with left foot 8 higher than right
+	LEGS_LEFTUP3_GENERAL,			//# On a slope with left foot 12 higher than right
+	LEGS_LEFTUP4_GENERAL,			//# On a slope with left foot 16 higher than right
+	LEGS_LEFTUP5_GENERAL,			//# On a slope with left foot 20 higher than right
+	LEGS_RIGHTUP1_GENERAL,			//# On a slope with RIGHT foot 4 higher than left
+	LEGS_RIGHTUP2_GENERAL,			//# On a slope with RIGHT foot 8 higher than left
+	LEGS_RIGHTUP3_GENERAL,			//# On a slope with RIGHT foot 12 higher than left
+	LEGS_RIGHTUP4_GENERAL,			//# On a slope with RIGHT foot 16 higher than left
+	LEGS_RIGHTUP5_GENERAL,			//# On a slope with RIGHT foot 20 higher than left
+	LEGS_S1_LUP1_GENERAL,
+	LEGS_S1_LUP2_GENERAL,
+	LEGS_S1_LUP3_GENERAL,
+	LEGS_S1_LUP4_GENERAL,
+	LEGS_S1_LUP5_GENERAL,
+	LEGS_S1_RUP1_GENERAL,
+	LEGS_S1_RUP2_GENERAL,
+	LEGS_S1_RUP3_GENERAL,
+	LEGS_S1_RUP4_GENERAL,
+	LEGS_S1_RUP5_GENERAL,
+	LEGS_S3_LUP1_GENERAL,
+	LEGS_S3_LUP2_GENERAL,
+	LEGS_S3_LUP3_GENERAL,
+	LEGS_S3_LUP4_GENERAL,
+	LEGS_S3_LUP5_GENERAL,
+	LEGS_S3_RUP1_GENERAL,
+	LEGS_S3_RUP2_GENERAL,
+	LEGS_S3_RUP3_GENERAL,
+	LEGS_S3_RUP4_GENERAL,
+	LEGS_S3_RUP5_GENERAL,
+	LEGS_S4_LUP1_GENERAL,
+	LEGS_S4_LUP2_GENERAL,
+	LEGS_S4_LUP3_GENERAL,
+	LEGS_S4_LUP4_GENERAL,
+	LEGS_S4_LUP5_GENERAL,
+	LEGS_S4_RUP1_GENERAL,
+	LEGS_S4_RUP2_GENERAL,
+	LEGS_S4_RUP3_GENERAL,
+	LEGS_S4_RUP4_GENERAL,
+	LEGS_S4_RUP5_GENERAL,
+	LEGS_S5_LUP1_GENERAL,
+	LEGS_S5_LUP2_GENERAL,
+	LEGS_S5_LUP3_GENERAL,
+	LEGS_S5_LUP4_GENERAL,
+	LEGS_S5_LUP5_GENERAL,
+	LEGS_S5_RUP1_GENERAL,
+	LEGS_S5_RUP2_GENERAL,
+	LEGS_S5_RUP3_GENERAL,
+	LEGS_S5_RUP4_GENERAL,
+	LEGS_S5_RUP5_GENERAL,
+	LEGS_S6_LUP1_GENERAL,
+	LEGS_S6_LUP2_GENERAL,
+	LEGS_S6_LUP3_GENERAL,
+	LEGS_S6_LUP4_GENERAL,
+	LEGS_S6_LUP5_GENERAL,
+	LEGS_S6_RUP1_GENERAL,
+	LEGS_S6_RUP2_GENERAL,
+	LEGS_S6_RUP3_GENERAL,
+	LEGS_S6_RUP4_GENERAL,
+	LEGS_S6_RUP5_GENERAL,
+	LEGS_S7_LUP1_GENERAL,
+	LEGS_S7_LUP2_GENERAL,
+	LEGS_S7_LUP3_GENERAL,
+	LEGS_S7_LUP4_GENERAL,
+	LEGS_S7_LUP5_GENERAL,
+	LEGS_S7_RUP1_GENERAL,
+	LEGS_S7_RUP2_GENERAL,
+	LEGS_S7_RUP3_GENERAL,
+	LEGS_S7_RUP4_GENERAL,
+	LEGS_S7_RUP5_GENERAL,
 
 	//New anim as per Jarrod's request
-		(animNumber_t)0,//LEGS_TURN180,
+	LEGS_TURN180_GENERAL,
+
+	//======================================================
+	//cinematic anims
+	//======================================================
+	//# #sep BOTH_ CINEMATIC-ONLY
+	BOTH_CIN_1_GENERAL,		//# Level specific cinematic 1
+	BOTH_CIN_2_GENERAL,		//# Level specific cinematic 2
+	BOTH_CIN_3_GENERAL,		//# Level specific cinematic 3
+	BOTH_CIN_4_GENERAL,		//# Level specific cinematic 4
+	BOTH_CIN_5_GENERAL,		//# Level specific cinematic 5
+	BOTH_CIN_6_GENERAL,		//# Level specific cinematic 6
+	BOTH_CIN_7_GENERAL,		//# Level specific cinematic 7
+	BOTH_CIN_8_GENERAL,		//# Level specific cinematic 8
+	BOTH_CIN_9_GENERAL,		//# Level specific cinematic 9
+	BOTH_CIN_10_GENERAL,		//# Level specific cinematic 10
+	BOTH_CIN_11_GENERAL,		//# Level specific cinematic 11
+	BOTH_CIN_12_GENERAL,		//# Level specific cinematic 12
+	BOTH_CIN_13_GENERAL,		//# Level specific cinematic 13
+	BOTH_CIN_14_GENERAL,		//# Level specific cinematic 14
+	BOTH_CIN_15_GENERAL,		//# Level specific cinematic 15
+	BOTH_CIN_16_GENERAL,		//# Level specific cinematic 16
+	BOTH_CIN_17_GENERAL,		//# Level specific cinematic 17
+	BOTH_CIN_18_GENERAL,		//# Level specific cinematic 18
+	BOTH_CIN_19_GENERAL,		//# Level specific cinematic 19
+	BOTH_CIN_20_GENERAL,		//# Level specific cinematic 20
+	BOTH_CIN_21_GENERAL,		//# Level specific cinematic 21
+	BOTH_CIN_22_GENERAL,		//# Level specific cinematic 22
+	BOTH_CIN_23_GENERAL,		//# Level specific cinematic 23
+	BOTH_CIN_24_GENERAL,		//# Level specific cinematic 24
+	BOTH_CIN_25_GENERAL,		//# Level specific cinematic 25
+	BOTH_CIN_26_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_27_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_28_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_29_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_30_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_31_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_32_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_33_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_34_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_35_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_36_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_37_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_38_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_39_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_40_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_41_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_42_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_43_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_44_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_45_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_46_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_47_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_48_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_49_GENERAL,		//# Level specific cinematic 
+	BOTH_CIN_50_GENERAL,		//# Level specific cinematic
+
+	//# #eol
+	MAX_ANIMATIONS_GENERAL,
+	MAX_TOTALANIMATIONS_GENERAL,
+};
+
+
+
+// Turned from enum to array, thus reusing the Jedi Outcast animations where they exist. EZ PZ. (idk if this actually works)
+static const int jkaAnimToDM16Mapping[] = //# animNumber_e
+{
+	//=================================================
+	//HEAD ANIMS
+	//=================================================
+	//# #sep Head-only anims
+	0,//FACE_TALK0_DM16,			//# silent
+	FACE_TALK1_DM16,			//# quiet
+	FACE_TALK2_DM16,			//# semi-quiet
+	FACE_TALK3_DM16,			//# semi-loud
+	FACE_TALK4_DM16,			//# loud
+	FACE_ALERT_DM16,				//# 
+	FACE_SMILE_DM16,				//# 
+	FACE_FROWN_DM16,				//# 
+	FACE_DEAD_DM16,				//# 
+
+	//=================================================
+	//ANIMS IN WHICH UPPER AND LOWER OBJECTS ARE IN MD3
+	//=================================================
+	//# #sep BOTH_ DEATHS
+	BOTH_DEATH1_DM16,		//# First Death anim
+	BOTH_DEATH2_DM16,			//# Second Death anim
+	BOTH_DEATH3_DM16,			//# Third Death anim
+	BOTH_DEATH4_DM16,			//# Fourth Death anim
+	BOTH_DEATH5_DM16,			//# Fifth Death anim
+	BOTH_DEATH6_DM16,			//# Sixth Death anim
+	BOTH_DEATH7_DM16,			//# Seventh Death anim
+	BOTH_DEATH8_DM16,			//# 
+	BOTH_DEATH9_DM16,			//# 
+	BOTH_DEATH10_DM16,			//# 
+	BOTH_DEATH11_DM16,			//#
+	BOTH_DEATH12_DM16,			//# 
+	BOTH_DEATH13_DM16,			//# 
+	BOTH_DEATH14_DM16,			//# 
+	BOTH_DEATH15_DM16,			//# 
+	BOTH_DEATH16_DM16,			//# 
+	BOTH_DEATH17_DM16,			//# 
+	BOTH_DEATH18_DM16,			//# 
+	BOTH_DEATH19_DM16,			//# 
+	BOTH_DEATH20_DM16,			//# 
+	BOTH_DEATH21_DM16,			//# 
+	BOTH_DEATH22_DM16,			//# 
+	BOTH_DEATH23_DM16,			//# 
+	BOTH_DEATH24_DM16,			//# 
+	BOTH_DEATH25_DM16,			//# 
+
+	BOTH_DEATHFORWARD1_DM16,		//# First Death in which they get thrown forward
+	BOTH_DEATHFORWARD2_DM16,		//# Second Death in which they get thrown forward
+	BOTH_DEATHFORWARD3_DM16,		//# Tavion's falling in cin# 23
+	BOTH_DEATHBACKWARD1_DM16,	//# First Death in which they get thrown backward
+	BOTH_DEATHBACKWARD2_DM16,	//# Second Death in which they get thrown backward
+
+	BOTH_DEATH1IDLE_DM16,		//# Idle while close to death
+	BOTH_LYINGDEATH1_DM16,		//# Death to play when killed lying down
+	BOTH_STUMBLEDEATH1_DM16,		//# Stumble forward and fall face first death
+	BOTH_FALLDEATH1_DM16,		//# Fall forward off a high cliff and splat death - start
+	BOTH_FALLDEATH1INAIR_DM16,	//# Fall forward off a high cliff and splat death - loop
+	BOTH_FALLDEATH1LAND_DM16,	//# Fall forward off a high cliff and splat death - hit bottom
+	BOTH_DEATH_ROLL_DM16,		//# Death anim from a roll
+	BOTH_DEATH_FLIP_DM16,		//# Death anim from a flip
+	BOTH_DEATH_SPIN_90_R_DM16,	//# Death anim when facing 90 degrees right
+	BOTH_DEATH_SPIN_90_L_DM16,	//# Death anim when facing 90 degrees left
+	BOTH_DEATH_SPIN_180_DM16,	//# Death anim when facing backwards
+	BOTH_DEATH_LYING_UP_DM16,	//# Death anim when lying on back
+	BOTH_DEATH_LYING_DN_DM16,	//# Death anim when lying on front
+	BOTH_DEATH_FALLING_DN_DM16,	//# Death anim when falling on face
+	BOTH_DEATH_FALLING_UP_DM16,	//# Death anim when falling on back
+	BOTH_DEATH_CROUCHED_DM16,	//# Death anim when crouched
+	//# #sep BOTH_ DEAD POSES # Should be last frame of corresponding previous anims
+	BOTH_DEAD1_DM16,				//# First Death finished pose
+	BOTH_DEAD2_DM16,				//# Second Death finished pose
+	BOTH_DEAD3_DM16,				//# Third Death finished pose
+	BOTH_DEAD4_DM16,				//# Fourth Death finished pose
+	BOTH_DEAD5_DM16,				//# Fifth Death finished pose
+	BOTH_DEAD6_DM16,				//# Sixth Death finished pose
+	BOTH_DEAD7_DM16,				//# Seventh Death finished pose
+	BOTH_DEAD8_DM16,				//# 
+	BOTH_DEAD9_DM16,				//# 
+	BOTH_DEAD10_DM16,			//# 
+	BOTH_DEAD11_DM16,			//#
+	BOTH_DEAD12_DM16,			//# 
+	BOTH_DEAD13_DM16,			//# 
+	BOTH_DEAD14_DM16,			//# 
+	BOTH_DEAD15_DM16,			//# 
+	BOTH_DEAD16_DM16,			//# 
+	BOTH_DEAD17_DM16,			//# 
+	BOTH_DEAD18_DM16,			//# 
+	BOTH_DEAD19_DM16,			//# 
+	BOTH_DEAD20_DM16,			//# 
+	BOTH_DEAD21_DM16,			//# 
+	BOTH_DEAD22_DM16,			//# 
+	BOTH_DEAD23_DM16,			//# 
+	BOTH_DEAD24_DM16,			//# 
+	BOTH_DEAD25_DM16,			//# 
+	BOTH_DEADFORWARD1_DM16,		//# First thrown forward death finished pose
+	BOTH_DEADFORWARD2_DM16,		//# Second thrown forward death finished pose
+	BOTH_DEADBACKWARD1_DM16,		//# First thrown backward death finished pose
+	BOTH_DEADBACKWARD2_DM16,		//# Second thrown backward death finished pose
+	BOTH_LYINGDEAD1_DM16,		//# Killed lying down death finished pose
+	BOTH_STUMBLEDEAD1_DM16,		//# Stumble forward death finished pose
+	BOTH_FALLDEAD1LAND_DM16,		//# Fall forward and splat death finished pose
+	//# #sep BOTH_ DEAD TWITCH/FLOP # React to being shot from death poses
+	BOTH_DEADFLOP1_DM16,		//# React to being shot from First Death finished pose
+	BOTH_DEADFLOP2_DM16,		//# React to being shot from Second Death finished pose
+	BOTH_DISMEMBER_HEAD1_DM16,	//#
+	BOTH_DISMEMBER_TORSO1_DM16,	//#
+	BOTH_DISMEMBER_LLEG_DM16,	//#
+	BOTH_DISMEMBER_RLEG_DM16,	//#
+	BOTH_DISMEMBER_RARM_DM16,	//#
+	BOTH_DISMEMBER_LARM_DM16,	//#
+	//# #sep BOTH_ PAINS
+	BOTH_PAIN1_DM16,				//# First take pain anim
+	BOTH_PAIN2_DM16,				//# Second take pain anim
+	BOTH_PAIN3_DM16,				//# Third take pain anim
+	BOTH_PAIN4_DM16,				//# Fourth take pain anim
+	BOTH_PAIN5_DM16,				//# Fifth take pain anim - from behind
+	BOTH_PAIN6_DM16,				//# Sixth take pain anim - from behind
+	BOTH_PAIN7_DM16,				//# Seventh take pain anim - from behind
+	BOTH_PAIN8_DM16,				//# Eigth take pain anim - from behind
+	BOTH_PAIN9_DM16,				//# 
+	BOTH_PAIN10_DM16,			//# 
+	BOTH_PAIN11_DM16,			//# 
+	BOTH_PAIN12_DM16,			//# 
+	BOTH_PAIN13_DM16,			//# 
+	BOTH_PAIN14_DM16,			//# 
+	BOTH_PAIN15_DM16,			//# 
+	BOTH_PAIN16_DM16,			//# 
+	BOTH_PAIN17_DM16,			//# 
+	BOTH_PAIN18_DM16,			//# 
+
+	//# #sep BOTH_ ATTACKS
+	BOTH_ATTACK1_DM16,			//# Attack with stun baton
+	BOTH_ATTACK2_DM16,			//# Attack with one-handed pistol
+	BOTH_ATTACK3_DM16,			//# Attack with blaster rifle
+	BOTH_ATTACK4_DM16,			//# Attack with disruptor
+	BOTH_ATTACK5_DM16,			//# Another Rancor Attack
+	BOTH_ATTACK6_DM16,			//# Yet Another Rancor Attack
+	BOTH_ATTACK7_DM16,			//# Yet Another Rancor Attack
+	BOTH_ATTACK10_DM16,			//# Attack with thermal det
+	BOTH_ATTACK11_DM16,			//# "Attack" with tripmine and detpack
+	BOTH_MELEE1_DM16,			//# First melee attack
+	BOTH_MELEE2_DM16,			//# Second melee attack
+	BOTH_THERMAL_READY_DM16,		//# pull back with thermal
+	BOTH_THERMAL_THROW_DM16,		//# throw thermal
+	//* #sep BOTH_ SABER ANIMS
+	//Saber attack anims - power level 1
+	BOTH_A1_T__B__DM16,	//# Fast weak vertical attack top to bottom
+	BOTH_A1__L__R_DM16,	//# Fast weak horizontal attack left to right
+	BOTH_A1__R__L_DM16,	//# Fast weak horizontal attack right to left
+	BOTH_A1_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A1_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A1_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A1_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+	BOTH_T1_BR__R_DM16,	//# Fast arc bottom right to right
+	BOTH_T1_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+	BOTH_T1_BR__L_DM16,	//# Fast weak spin bottom right to left
+	BOTH_T1_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+	BOTH_T1__R_TR_DM16,	//# Fast arc right to top right
+	BOTH_T1__R_TL_DM16,	//# Fast arc right to top left
+	BOTH_T1__R__L_DM16,	//# Fast weak spin right to left
+	BOTH_T1__R_BL_DM16,	//# Fast weak spin right to bottom left
+	BOTH_T1_TR_BR_DM16,	//# Fast arc top right to bottom right
+	BOTH_T1_TR_TL_DM16,	//# Fast arc top right to top left
+	BOTH_T1_TR__L_DM16,	//# Fast arc top right to left
+	BOTH_T1_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+	BOTH_T1_T__BR_DM16,	//# Fast arc top to bottom right
+	BOTH_T1_T___R_DM16,	//# Fast arc top to right
+	BOTH_T1_T__TR_DM16,	//# Fast arc top to top right
+	BOTH_T1_T__TL_DM16,	//# Fast arc top to top left
+	BOTH_T1_T___L_DM16,	//# Fast arc top to left
+	BOTH_T1_T__BL_DM16,	//# Fast arc top to bottom left
+	BOTH_T1_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+	BOTH_T1_TL_BL_DM16,	//# Fast arc top left to bottom left
+	BOTH_T1__L_BR_DM16,	//# Fast weak spin left to bottom right
+	BOTH_T1__L__R_DM16,	//# Fast weak spin left to right
+	BOTH_T1__L_TL_DM16,	//# Fast arc left to top left
+	BOTH_T1_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+	BOTH_T1_BL__R_DM16,	//# Fast weak spin bottom left to right
+	BOTH_T1_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+	BOTH_T1_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+	BOTH_T1_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T1_TR_BR)
+	BOTH_T1_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T1_T__BR)
+	BOTH_T1__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T1_BR__R)
+	BOTH_T1__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T1_T___R)
+	BOTH_T1_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T1__R_TR)
+	BOTH_T1_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T1_T__TR)
+	BOTH_T1_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T1__R_TL)
+	BOTH_T1_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T1_TR_TL)
+	BOTH_T1_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T1_T__TL)
+	BOTH_T1_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T1__L_TL)
+	BOTH_T1__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T1_TR__L)
+	BOTH_T1__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T1_T___L)
+	BOTH_T1__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T1_BL__L)
+	BOTH_T1_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T1_T__BL)
+	BOTH_T1_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T1_TL_BL)
+	//Saber Attack Start Transitions
+	BOTH_S1_S1_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S1_S1__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S1_S1__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S1_S1_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S1_S1_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S1_S1_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S1_S1_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+	BOTH_R1_B__S1_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R1__L_S1_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R1__R_S1_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R1_TL_S1_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R1_BR_S1_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R1_BL_S1_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R1_TR_S1_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+	BOTH_B1_BR____DM16,	//# Bounce-back if attack from BR is blocked
+	BOTH_B1__R____DM16,	//# Bounce-back if attack from R is blocked
+	BOTH_B1_TR____DM16,	//# Bounce-back if attack from TR is blocked
+	BOTH_B1_T_____DM16,	//# Bounce-back if attack from T is blocked
+	BOTH_B1_TL____DM16,	//# Bounce-back if attack from TL is blocked
+	BOTH_B1__L____DM16,	//# Bounce-back if attack from L is blocked
+	BOTH_B1_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+	BOTH_D1_BR____DM16,	//# Deflection toward BR
+	BOTH_D1__R____DM16,	//# Deflection toward R
+	BOTH_D1_TR____DM16,	//# Deflection toward TR
+	BOTH_D1_TL____DM16,	//# Deflection toward TL
+	BOTH_D1__L____DM16,	//# Deflection toward L
+	BOTH_D1_BL____DM16,	//# Deflection toward BL
+	BOTH_D1_B_____DM16,	//# Deflection toward B
+	//Saber attack anims - power level 2
+	BOTH_A2_T__B__DM16,	//# Fast weak vertical attack top to bottom
+	BOTH_A2__L__R_DM16,	//# Fast weak horizontal attack left to right
+	BOTH_A2__R__L_DM16,	//# Fast weak horizontal attack right to left
+	BOTH_A2_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A2_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A2_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A2_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+	BOTH_T2_BR__R_DM16,	//# Fast arc bottom right to right
+	BOTH_T2_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+	BOTH_T2_BR__L_DM16,	//# Fast weak spin bottom right to left
+	BOTH_T2_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+	BOTH_T2__R_TR_DM16,	//# Fast arc right to top right
+	BOTH_T2__R_TL_DM16,	//# Fast arc right to top left
+	BOTH_T2__R__L_DM16,	//# Fast weak spin right to left
+	BOTH_T2__R_BL_DM16,	//# Fast weak spin right to bottom left
+	BOTH_T2_TR_BR_DM16,	//# Fast arc top right to bottom right
+	BOTH_T2_TR_TL_DM16,	//# Fast arc top right to top left
+	BOTH_T2_TR__L_DM16,	//# Fast arc top right to left
+	BOTH_T2_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+	BOTH_T2_T__BR_DM16,	//# Fast arc top to bottom right
+	BOTH_T2_T___R_DM16,	//# Fast arc top to right
+	BOTH_T2_T__TR_DM16,	//# Fast arc top to top right
+	BOTH_T2_T__TL_DM16,	//# Fast arc top to top left
+	BOTH_T2_T___L_DM16,	//# Fast arc top to left
+	BOTH_T2_T__BL_DM16,	//# Fast arc top to bottom left
+	BOTH_T2_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+	BOTH_T2_TL_BL_DM16,	//# Fast arc top left to bottom left
+	BOTH_T2__L_BR_DM16,	//# Fast weak spin left to bottom right
+	BOTH_T2__L__R_DM16,	//# Fast weak spin left to right
+	BOTH_T2__L_TL_DM16,	//# Fast arc left to top left
+	BOTH_T2_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+	BOTH_T2_BL__R_DM16,	//# Fast weak spin bottom left to right
+	BOTH_T2_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+	BOTH_T2_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+	BOTH_T2_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T2_TR_BR)
+	BOTH_T2_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T2_T__BR)
+	BOTH_T2__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T2_BR__R)
+	BOTH_T2__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T2_T___R)
+	BOTH_T2_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T2__R_TR)
+	BOTH_T2_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T2_T__TR)
+	BOTH_T2_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T2__R_TL)
+	BOTH_T2_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T2_TR_TL)
+	BOTH_T2_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T2_T__TL)
+	BOTH_T2_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T2__L_TL)
+	BOTH_T2__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T2_TR__L)
+	BOTH_T2__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T2_T___L)
+	BOTH_T2__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T2_BL__L)
+	BOTH_T2_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T2_T__BL)
+	BOTH_T2_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T2_TL_BL)
+	//Saber Attack Start Transitions
+	BOTH_S2_S1_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S2_S1__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S2_S1__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S2_S1_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S2_S1_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S2_S1_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S2_S1_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+	BOTH_R2_B__S1_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R2__L_S1_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R2__R_S1_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R2_TL_S1_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R2_BR_S1_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R2_BL_S1_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R2_TR_S1_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+	BOTH_B2_BR____DM16,	//# Bounce-back if attack from BR is blocked
+	BOTH_B2__R____DM16,	//# Bounce-back if attack from R is blocked
+	BOTH_B2_TR____DM16,	//# Bounce-back if attack from TR is blocked
+	BOTH_B2_T_____DM16,	//# Bounce-back if attack from T is blocked
+	BOTH_B2_TL____DM16,	//# Bounce-back if attack from TL is blocked
+	BOTH_B2__L____DM16,	//# Bounce-back if attack from L is blocked
+	BOTH_B2_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+	BOTH_D2_BR____DM16,	//# Deflection toward BR
+	BOTH_D2__R____DM16,	//# Deflection toward R
+	BOTH_D2_TR____DM16,	//# Deflection toward TR
+	BOTH_D2_TL____DM16,	//# Deflection toward TL
+	BOTH_D2__L____DM16,	//# Deflection toward L
+	BOTH_D2_BL____DM16,	//# Deflection toward BL
+	BOTH_D2_B_____DM16,	//# Deflection toward B
+	//Saber attack anims - power level 3
+	BOTH_A3_T__B__DM16,	//# Fast weak vertical attack top to bottom
+	BOTH_A3__L__R_DM16,	//# Fast weak horizontal attack left to right
+	BOTH_A3__R__L_DM16,	//# Fast weak horizontal attack right to left
+	BOTH_A3_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A3_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A3_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A3_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+	BOTH_T3_BR__R_DM16,	//# Fast arc bottom right to right
+	BOTH_T3_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+	BOTH_T3_BR__L_DM16,	//# Fast weak spin bottom right to left
+	BOTH_T3_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+	BOTH_T3__R_TR_DM16,	//# Fast arc right to top right
+	BOTH_T3__R_TL_DM16,	//# Fast arc right to top left
+	BOTH_T3__R__L_DM16,	//# Fast weak spin right to left
+	BOTH_T3__R_BL_DM16,	//# Fast weak spin right to bottom left
+	BOTH_T3_TR_BR_DM16,	//# Fast arc top right to bottom right
+	BOTH_T3_TR_TL_DM16,	//# Fast arc top right to top left
+	BOTH_T3_TR__L_DM16,	//# Fast arc top right to left
+	BOTH_T3_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+	BOTH_T3_T__BR_DM16,	//# Fast arc top to bottom right
+	BOTH_T3_T___R_DM16,	//# Fast arc top to right
+	BOTH_T3_T__TR_DM16,	//# Fast arc top to top right
+	BOTH_T3_T__TL_DM16,	//# Fast arc top to top left
+	BOTH_T3_T___L_DM16,	//# Fast arc top to left
+	BOTH_T3_T__BL_DM16,	//# Fast arc top to bottom left
+	BOTH_T3_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+	BOTH_T3_TL_BL_DM16,	//# Fast arc top left to bottom left
+	BOTH_T3__L_BR_DM16,	//# Fast weak spin left to bottom right
+	BOTH_T3__L__R_DM16,	//# Fast weak spin left to right
+	BOTH_T3__L_TL_DM16,	//# Fast arc left to top left
+	BOTH_T3_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+	BOTH_T3_BL__R_DM16,	//# Fast weak spin bottom left to right
+	BOTH_T3_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+	BOTH_T3_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+	BOTH_T3_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T3_TR_BR)
+	BOTH_T3_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T3_T__BR)
+	BOTH_T3__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T3_BR__R)
+	BOTH_T3__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T3_T___R)
+	BOTH_T3_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T3__R_TR)
+	BOTH_T3_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T3_T__TR)
+	BOTH_T3_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T3__R_TL)
+	BOTH_T3_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T3_TR_TL)
+	BOTH_T3_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T3_T__TL)
+	BOTH_T3_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T3__L_TL)
+	BOTH_T3__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T3_TR__L)
+	BOTH_T3__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T3_T___L)
+	BOTH_T3__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T3_BL__L)
+	BOTH_T3_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T3_T__BL)
+	BOTH_T3_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T3_TL_BL)
+	//Saber Attack Start Transitions
+	BOTH_S3_S1_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S3_S1__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S3_S1__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S3_S1_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S3_S1_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S3_S1_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S3_S1_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+	BOTH_R3_B__S1_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R3__L_S1_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R3__R_S1_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R3_TL_S1_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R3_BR_S1_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R3_BL_S1_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R3_TR_S1_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+	BOTH_B3_BR____DM16,	//# Bounce-back if attack from BR is blocked
+	BOTH_B3__R____DM16,	//# Bounce-back if attack from R is blocked
+	BOTH_B3_TR____DM16,	//# Bounce-back if attack from TR is blocked
+	BOTH_B3_T_____DM16,	//# Bounce-back if attack from T is blocked
+	BOTH_B3_TL____DM16,	//# Bounce-back if attack from TL is blocked
+	BOTH_B3__L____DM16,	//# Bounce-back if attack from L is blocked
+	BOTH_B3_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+	BOTH_D3_BR____DM16,	//# Deflection toward BR
+	BOTH_D3__R____DM16,	//# Deflection toward R
+	BOTH_D3_TR____DM16,	//# Deflection toward TR
+	BOTH_D3_TL____DM16,	//# Deflection toward TL
+	BOTH_D3__L____DM16,	//# Deflection toward L
+	BOTH_D3_BL____DM16,	//# Deflection toward BL
+	BOTH_D3_B_____DM16,	//# Deflection toward B
+	//Saber attack anims - power level 4  - Desann's
+	BOTH_A4_T__B__DM16,	//# Fast weak vertical attack top to bottom
+	BOTH_A4__L__R_DM16,	//# Fast weak horizontal attack left to right
+	BOTH_A4__R__L_DM16,	//# Fast weak horizontal attack right to left
+	BOTH_A4_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A4_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A4_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A4_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+	BOTH_T4_BR__R_DM16,	//# Fast arc bottom right to right
+	BOTH_T4_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+	BOTH_T4_BR__L_DM16,	//# Fast weak spin bottom right to left
+	BOTH_T4_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+	BOTH_T4__R_TR_DM16,	//# Fast arc right to top right
+	BOTH_T4__R_TL_DM16,	//# Fast arc right to top left
+	BOTH_T4__R__L_DM16,	//# Fast weak spin right to left
+	BOTH_T4__R_BL_DM16,	//# Fast weak spin right to bottom left
+	BOTH_T4_TR_BR_DM16,	//# Fast arc top right to bottom right
+	BOTH_T4_TR_TL_DM16,	//# Fast arc top right to top left
+	BOTH_T4_TR__L_DM16,	//# Fast arc top right to left
+	BOTH_T4_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+	BOTH_T4_T__BR_DM16,	//# Fast arc top to bottom right
+	BOTH_T4_T___R_DM16,	//# Fast arc top to right
+	BOTH_T4_T__TR_DM16,	//# Fast arc top to top right
+	BOTH_T4_T__TL_DM16,	//# Fast arc top to top left
+	BOTH_T4_T___L_DM16,	//# Fast arc top to left
+	BOTH_T4_T__BL_DM16,	//# Fast arc top to bottom left
+	BOTH_T4_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+	BOTH_T4_TL_BL_DM16,	//# Fast arc top left to bottom left
+	BOTH_T4__L_BR_DM16,	//# Fast weak spin left to bottom right
+	BOTH_T4__L__R_DM16,	//# Fast weak spin left to right
+	BOTH_T4__L_TL_DM16,	//# Fast arc left to top left
+	BOTH_T4_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+	BOTH_T4_BL__R_DM16,	//# Fast weak spin bottom left to right
+	BOTH_T4_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+	BOTH_T4_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+	BOTH_T4_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T4_TR_BR)
+	BOTH_T4_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T4_T__BR)
+	BOTH_T4__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T4_BR__R)
+	BOTH_T4__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T4_T___R)
+	BOTH_T4_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T4__R_TR)
+	BOTH_T4_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T4_T__TR)
+	BOTH_T4_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T4__R_TL)
+	BOTH_T4_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T4_TR_TL)
+	BOTH_T4_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T4_T__TL)
+	BOTH_T4_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T4__L_TL)
+	BOTH_T4__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T4_TR__L)
+	BOTH_T4__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T4_T___L)
+	BOTH_T4__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T4_BL__L)
+	BOTH_T4_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T4_T__BL)
+	BOTH_T4_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T4_TL_BL)
+	//Saber Attack Start Transitions
+	BOTH_S4_S1_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S4_S1__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S4_S1__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S4_S1_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S4_S1_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S4_S1_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S4_S1_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+	BOTH_R4_B__S1_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R4__L_S1_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R4__R_S1_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R4_TL_S1_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R4_BR_S1_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R4_BL_S1_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R4_TR_S1_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+	BOTH_B4_BR____DM16,	//# Bounce-back if attack from BR is blocked
+	BOTH_B4__R____DM16,	//# Bounce-back if attack from R is blocked
+	BOTH_B4_TR____DM16,	//# Bounce-back if attack from TR is blocked
+	BOTH_B4_T_____DM16,	//# Bounce-back if attack from T is blocked
+	BOTH_B4_TL____DM16,	//# Bounce-back if attack from TL is blocked
+	BOTH_B4__L____DM16,	//# Bounce-back if attack from L is blocked
+	BOTH_B4_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+	BOTH_D4_BR____DM16,	//# Deflection toward BR
+	BOTH_D4__R____DM16,	//# Deflection toward R
+	BOTH_D4_TR____DM16,	//# Deflection toward TR
+	BOTH_D4_TL____DM16,	//# Deflection toward TL
+	BOTH_D4__L____DM16,	//# Deflection toward L
+	BOTH_D4_BL____DM16,	//# Deflection toward BL
+	BOTH_D4_B_____DM16,	//# Deflection toward B
+	//Saber attack anims - power level 5  - Tavion's
+	BOTH_A5_T__B__DM16,	//# Fast weak vertical attack top to bottom
+	BOTH_A5__L__R_DM16,	//# Fast weak horizontal attack left to right
+	BOTH_A5__R__L_DM16,	//# Fast weak horizontal attack right to left
+	BOTH_A5_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A5_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+	BOTH_A5_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+	BOTH_A5_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+	BOTH_T5_BR__R_DM16,	//# Fast arc bottom right to right
+	BOTH_T5_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+	BOTH_T5_BR__L_DM16,	//# Fast weak spin bottom right to left
+	BOTH_T5_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+	BOTH_T5__R_TR_DM16,	//# Fast arc right to top right
+	BOTH_T5__R_TL_DM16,	//# Fast arc right to top left
+	BOTH_T5__R__L_DM16,	//# Fast weak spin right to left
+	BOTH_T5__R_BL_DM16,	//# Fast weak spin right to bottom left
+	BOTH_T5_TR_BR_DM16,	//# Fast arc top right to bottom right
+	BOTH_T5_TR_TL_DM16,	//# Fast arc top right to top left
+	BOTH_T5_TR__L_DM16,	//# Fast arc top right to left
+	BOTH_T5_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+	BOTH_T5_T__BR_DM16,	//# Fast arc top to bottom right
+	BOTH_T5_T___R_DM16,	//# Fast arc top to right
+	BOTH_T5_T__TR_DM16,	//# Fast arc top to top right
+	BOTH_T5_T__TL_DM16,	//# Fast arc top to top left
+	BOTH_T5_T___L_DM16,	//# Fast arc top to left
+	BOTH_T5_T__BL_DM16,	//# Fast arc top to bottom left
+	BOTH_T5_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+	BOTH_T5_TL_BL_DM16,	//# Fast arc top left to bottom left
+	BOTH_T5__L_BR_DM16,	//# Fast weak spin left to bottom right
+	BOTH_T5__L__R_DM16,	//# Fast weak spin left to right
+	BOTH_T5__L_TL_DM16,	//# Fast arc left to top left
+	BOTH_T5_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+	BOTH_T5_BL__R_DM16,	//# Fast weak spin bottom left to right
+	BOTH_T5_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+	BOTH_T5_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+	BOTH_T5_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T5_TR_BR)
+	BOTH_T5_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T5_T__BR)
+	BOTH_T5__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T5_BR__R)
+	BOTH_T5__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T5_T___R)
+	BOTH_T5_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T5__R_TR)
+	BOTH_T5_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T5_T__TR)
+	BOTH_T5_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T5__R_TL)
+	BOTH_T5_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T5_TR_TL)
+	BOTH_T5_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T5_T__TL)
+	BOTH_T5_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T5__L_TL)
+	BOTH_T5__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T5_TR__L)
+	BOTH_T5__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T5_T___L)
+	BOTH_T5__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T5_BL__L)
+	BOTH_T5_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T5_T__BL)
+	BOTH_T5_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T5_TL_BL)
+	//Saber Attack Start Transitions
+	BOTH_S5_S1_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+	BOTH_S5_S1__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+	BOTH_S5_S1__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+	BOTH_S5_S1_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+	BOTH_S5_S1_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+	BOTH_S5_S1_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+	BOTH_S5_S1_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+	BOTH_R5_B__S1_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+	BOTH_R5__L_S1_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+	BOTH_R5__R_S1_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+	BOTH_R5_TL_S1_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+	BOTH_R5_BR_S1_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+	BOTH_R5_BL_S1_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+	BOTH_R5_TR_S1_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+	BOTH_B5_BR____DM16,	//# Bounce-back if attack from BR is blocked
+	BOTH_B5__R____DM16,	//# Bounce-back if attack from R is blocked
+	BOTH_B5_TR____DM16,	//# Bounce-back if attack from TR is blocked
+	BOTH_B5_T_____DM16,	//# Bounce-back if attack from T is blocked
+	BOTH_B5_TL____DM16,	//# Bounce-back if attack from TL is blocked
+	BOTH_B5__L____DM16,	//# Bounce-back if attack from L is blocked
+	BOTH_B5_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+	BOTH_D5_BR____DM16,	//# Deflection toward BR
+	BOTH_D5__R____DM16,	//# Deflection toward R
+	BOTH_D5_TR____DM16,	//# Deflection toward TR
+	BOTH_D5_TL____DM16,	//# Deflection toward TL
+	BOTH_D5__L____DM16,	//# Deflection toward L
+	BOTH_D5_BL____DM16,	//# Deflection toward BL
+	BOTH_D5_B_____DM16,	//# Deflection toward B
+	//Saber attack anims - power level 6
+		0,//BOTH_A6_T__B__DM16,	//# Fast weak vertical attack top to bottom
+		0,//BOTH_A6__L__R_DM16,	//# Fast weak horizontal attack left to right
+		0,//BOTH_A6__R__L_DM16,	//# Fast weak horizontal attack right to left
+		0,//BOTH_A6_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+		0,//BOTH_A6_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+		0,//BOTH_A6_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+		0,//BOTH_A6_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+		0,//BOTH_T6_BR__R_DM16,	//# Fast arc bottom right to right
+		0,//BOTH_T6_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+		0,//BOTH_T6_BR__L_DM16,	//# Fast weak spin bottom right to left
+		0,//BOTH_T6_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+		0,//BOTH_T6__R_TR_DM16,	//# Fast arc right to top right
+		0,//BOTH_T6__R_TL_DM16,	//# Fast arc right to top left
+		0,//BOTH_T6__R__L_DM16,	//# Fast weak spin right to left
+		0,//BOTH_T6__R_BL_DM16,	//# Fast weak spin right to bottom left
+		0,//BOTH_T6_TR_BR_DM16,	//# Fast arc top right to bottom right
+		0,//BOTH_T6_TR_TL_DM16,	//# Fast arc top right to top left
+		0,//BOTH_T6_TR__L_DM16,	//# Fast arc top right to left
+		0,//BOTH_T6_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+		0,//BOTH_T6_T__BR_DM16,	//# Fast arc top to bottom right
+		0,//BOTH_T6_T___R_DM16,	//# Fast arc top to right
+		0,//BOTH_T6_T__TR_DM16,	//# Fast arc top to top right
+		0,//BOTH_T6_T__TL_DM16,	//# Fast arc top to top left
+		0,//BOTH_T6_T___L_DM16,	//# Fast arc top to left
+		0,//BOTH_T6_T__BL_DM16,	//# Fast arc top to bottom left
+		0,//BOTH_T6_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+		0,//BOTH_T6_TL_BL_DM16,	//# Fast arc top left to bottom left
+		0,//BOTH_T6__L_BR_DM16,	//# Fast weak spin left to bottom right
+		0,//BOTH_T6__L__R_DM16,	//# Fast weak spin left to right
+		0,//BOTH_T6__L_TL_DM16,	//# Fast arc left to top left
+		0,//BOTH_T6_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+		0,//BOTH_T6_BL__R_DM16,	//# Fast weak spin bottom left to right
+		0,//BOTH_T6_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+		0,//BOTH_T6_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+		0,//BOTH_T6_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T6_TR_BR)
+		0,//BOTH_T6_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T6_T__BR)
+		0,//BOTH_T6__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T6_BR__R)
+		0,//BOTH_T6__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T6_T___R)
+		0,//BOTH_T6_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T6__R_TR)
+		0,//BOTH_T6_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T6_T__TR)
+		0,//BOTH_T6_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T6__R_TL)
+		0,//BOTH_T6_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T6_TR_TL)
+		0,//BOTH_T6_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T6_T__TL)
+		0,//BOTH_T6_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T6__L_TL)
+		0,//BOTH_T6__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T6_TR__L)
+		0,//BOTH_T6__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T6_T___L)
+		0,//BOTH_T6__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T6_BL__L)
+		0,//BOTH_T6_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T6_T__BL)
+		0,//BOTH_T6_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T6_TL_BL)
+	//Saber Attack Start Transitions
+		0,//BOTH_S6_S6_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+		0,//BOTH_S6_S6__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+		0,//BOTH_S6_S6__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+		0,//BOTH_S6_S6_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+		0,//BOTH_S6_S6_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+		0,//BOTH_S6_S6_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+		0,//BOTH_S6_S6_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+		0,//BOTH_R6_B__S6_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+		0,//BOTH_R6__L_S6_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+		0,//BOTH_R6__R_S6_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+		0,//BOTH_R6_TL_S6_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+		0,//BOTH_R6_BR_S6_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+		0,//BOTH_R6_BL_S6_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+		0,//BOTH_R6_TR_S6_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+		0,//BOTH_B6_BR____DM16,	//# Bounce-back if attack from BR is blocked
+		0,//BOTH_B6__R____DM16,	//# Bounce-back if attack from R is blocked
+		0,//BOTH_B6_TR____DM16,	//# Bounce-back if attack from TR is blocked
+		0,//BOTH_B6_T_____DM16,	//# Bounce-back if attack from T is blocked
+		0,//BOTH_B6_TL____DM16,	//# Bounce-back if attack from TL is blocked
+		0,//BOTH_B6__L____DM16,	//# Bounce-back if attack from L is blocked
+		0,//BOTH_B6_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+		0,//BOTH_D6_BR____DM16,	//# Deflection toward BR
+		0,//BOTH_D6__R____DM16,	//# Deflection toward R
+		0,//BOTH_D6_TR____DM16,	//# Deflection toward TR
+		0,//BOTH_D6_TL____DM16,	//# Deflection toward TL
+		0,//BOTH_D6__L____DM16,	//# Deflection toward L
+		0,//BOTH_D6_BL____DM16,	//# Deflection toward BL
+		0,//BOTH_D6_B_____DM16,	//# Deflection toward B
+	//Saber attack anims - power level 7
+		0,//BOTH_A7_T__B__DM16,	//# Fast weak vertical attack top to bottom
+		0,//BOTH_A7__L__R_DM16,	//# Fast weak horizontal attack left to right
+		0,//BOTH_A7__R__L_DM16,	//# Fast weak horizontal attack right to left
+		0,//BOTH_A7_TL_BR_DM16,	//# Fast weak diagonal attack top left to botom right
+		0,//BOTH_A7_BR_TL_DM16,	//# Fast weak diagonal attack top left to botom right
+		0,//BOTH_A7_BL_TR_DM16,	//# Fast weak diagonal attack bottom left to top right
+		0,//BOTH_A7_TR_BL_DM16,	//# Fast weak diagonal attack bottom left to right
+	//Saber Arc and Spin Transitions
+		0,//BOTH_T7_BR__R_DM16,	//# Fast arc bottom right to right
+		0,//BOTH_T7_BR_TL_DM16,	//# Fast weak spin bottom right to top left
+		0,//BOTH_T7_BR__L_DM16,	//# Fast weak spin bottom right to left
+		0,//BOTH_T7_BR_BL_DM16,	//# Fast weak spin bottom right to bottom left
+		0,//BOTH_T7__R_TR_DM16,	//# Fast arc right to top right
+		0,//BOTH_T7__R_TL_DM16,	//# Fast arc right to top left
+		0,//BOTH_T7__R__L_DM16,	//# Fast weak spin right to left
+		0,//BOTH_T7__R_BL_DM16,	//# Fast weak spin right to bottom left
+		0,//BOTH_T7_TR_BR_DM16,	//# Fast arc top right to bottom right
+		0,//BOTH_T7_TR_TL_DM16,	//# Fast arc top right to top left
+		0,//BOTH_T7_TR__L_DM16,	//# Fast arc top right to left
+		0,//BOTH_T7_TR_BL_DM16,	//# Fast weak spin top right to bottom left
+		0,//BOTH_T7_T__BR_DM16,	//# Fast arc top to bottom right
+			0,//BOTH_T7_T___R_DM16,	//# Fast arc top to right
+			0,//BOTH_T7_T__TR_DM16,	//# Fast arc top to top right
+			0,//BOTH_T7_T__TL_DM16,	//# Fast arc top to top left
+			0,//BOTH_T7_T___L_DM16,	//# Fast arc top to left
+			0,//BOTH_T7_T__BL_DM16,	//# Fast arc top to bottom left
+			0,//BOTH_T7_TL_BR_DM16,	//# Fast weak spin top left to bottom right
+			0,//BOTH_T7_TL_BL_DM16,	//# Fast arc top left to bottom left
+			0,//BOTH_T7__L_BR_DM16,	//# Fast weak spin left to bottom right
+			0,//BOTH_T7__L__R_DM16,	//# Fast weak spin left to right
+			0,//BOTH_T7__L_TL_DM16,	//# Fast arc left to top left
+			0,//BOTH_T7_BL_BR_DM16,	//# Fast weak spin bottom left to bottom right
+			0,//BOTH_T7_BL__R_DM16,	//# Fast weak spin bottom left to right
+			0,//BOTH_T7_BL_TR_DM16,	//# Fast weak spin bottom left to top right
+			0,//BOTH_T7_BL__L_DM16,	//# Fast arc bottom left to left
+	//Saber Arc Transitions that use existing animations played backwards
+			0,//BOTH_T7_BR_TR_DM16,	//# Fast arc bottom right to top right		(use: BOTH_T7_TR_BR)
+			0,//BOTH_T7_BR_T__DM16,	//# Fast arc bottom right to top			(use: BOTH_T7_T__BR)
+			0,//BOTH_T7__R_BR_DM16,	//# Fast arc right to bottom right			(use: BOTH_T7_BR__R)
+			0,//BOTH_T7__R_T__DM16,	//# Fast ar right to top				(use: BOTH_T7_T___R)
+			0,//BOTH_T7_TR__R_DM16,	//# Fast arc top right to right			(use: BOTH_T7__R_TR)
+			0,//BOTH_T7_TR_T__DM16,	//# Fast arc top right to top				(use: BOTH_T7_T__TR)
+			0,//BOTH_T7_TL__R_DM16,	//# Fast arc top left to right			(use: BOTH_T7__R_TL)
+			0,//BOTH_T7_TL_TR_DM16,	//# Fast arc top left to top right			(use: BOTH_T7_TR_TL)
+			0,//BOTH_T7_TL_T__DM16,	//# Fast arc top left to top				(use: BOTH_T7_T__TL)
+			0,//BOTH_T7_TL__L_DM16,	//# Fast arc top left to left				(use: BOTH_T7__L_TL)
+			0,//BOTH_T7__L_TR_DM16,	//# Fast arc left to top right			(use: BOTH_T7_TR__L)
+			0,//BOTH_T7__L_T__DM16,	//# Fast arc left to top				(use: BOTH_T7_T___L)
+			0,//BOTH_T7__L_BL_DM16,	//# Fast arc left to bottom left			(use: BOTH_T7_BL__L)
+			0,//BOTH_T7_BL_T__DM16,	//# Fast arc bottom left to top			(use: BOTH_T7_T__BL)
+			0,//BOTH_T7_BL_TL_DM16,	//# Fast arc bottom left to top left		(use: BOTH_T7_TL_BL)
+	//Saber Attack Start Transitions
+			0,//BOTH_S7_S7_T__DM16,	//# Fast plain transition from stance1 to top-to-bottom Fast weak attack
+			0,//BOTH_S7_S7__L_DM16,	//# Fast plain transition from stance1 to left-to-right Fast weak attack
+			0,//BOTH_S7_S7__R_DM16,	//# Fast plain transition from stance1 to right-to-left Fast weak attack
+			0,//BOTH_S7_S7_TL_DM16,	//# Fast plain transition from stance1 to top-left-to-bottom-right Fast weak attack
+			0,//BOTH_S7_S7_BR_DM16,	//# Fast plain transition from stance1 to bottom-right-to-top-left Fast weak attack
+			0,//BOTH_S7_S7_BL_DM16,	//# Fast plain transition from stance1 to bottom-left-to-top-right Fast weak attack
+			0,//BOTH_S7_S7_TR_DM16,	//# Fast plain transition from stance1 to top-right-to-bottom-left Fast weak attack
+	//Saber Attack Return Transitions
+			0,//BOTH_R7_B__S7_DM16,	//# Fast plain transition from top-to-bottom Fast weak attack to stance1
+			0,//BOTH_R7__L_S7_DM16,	//# Fast plain transition from left-to-right Fast weak attack to stance1
+			0,//BOTH_R7__R_S7_DM16,	//# Fast plain transition from right-to-left Fast weak attack to stance1
+			0,//BOTH_R7_TL_S7_DM16,	//# Fast plain transition from top-left-to-bottom-right Fast weak attack to stance1
+			0,//BOTH_R7_BR_S7_DM16,	//# Fast plain transition from bottom-right-to-top-left Fast weak attack to stance1
+			0,//BOTH_R7_BL_S7_DM16,	//# Fast plain transition from bottom-left-to-top-right Fast weak attack to stance1
+			0,//BOTH_R7_TR_S7_DM16,	//# Fast plain transition from top-right-to-bottom-left Fast weak attack
+	//Saber Attack Bounces (first 4 frames of an attack_DM16, played backwards)
+			0,//BOTH_B7_BR____DM16,	//# Bounce-back if attack from BR is blocked
+			0,//BOTH_B7__R____DM16,	//# Bounce-back if attack from R is blocked
+			0,//BOTH_B7_TR____DM16,	//# Bounce-back if attack from TR is blocked
+			0,//BOTH_B7_T_____DM16,	//# Bounce-back if attack from T is blocked
+			0,//BOTH_B7_TL____DM16,	//# Bounce-back if attack from TL is blocked
+			0,//BOTH_B7__L____DM16,	//# Bounce-back if attack from L is blocked
+			0,//BOTH_B7_BL____DM16,	//# Bounce-back if attack from BL is blocked
+	//Saber Attack Deflections (last 4 frames of an attack)
+			0,//BOTH_D7_BR____DM16,	//# Deflection toward BR
+			0,//BOTH_D7__R____DM16,	//# Deflection toward R
+			0,//BOTH_D7_TR____DM16,	//# Deflection toward TR
+			0,//BOTH_D7_TL____DM16,	//# Deflection toward TL
+			0,//BOTH_D7__L____DM16,	//# Deflection toward L
+			0,//BOTH_D7_BL____DM16,	//# Deflection toward BL
+			0,//BOTH_D7_B_____DM16,	//# Deflection toward B
+	//Saber parry anims
+	BOTH_P1_S1_T__DM16,	//# Block shot/saber top
+	BOTH_P1_S1_TR_DM16,	//# Block shot/saber top right
+	BOTH_P1_S1_TL_DM16,	//# Block shot/saber top left
+	BOTH_P1_S1_BL_DM16,	//# Block shot/saber bottom left
+	BOTH_P1_S1_BR_DM16,	//# Block shot/saber bottom right
+	//Saber knockaway
+	BOTH_K1_S1_T__DM16,	//# knockaway saber top
+	BOTH_K1_S1_TR_DM16,	//# knockaway saber top right
+	BOTH_K1_S1_TL_DM16,	//# knockaway saber top left
+	BOTH_K1_S1_BL_DM16,	//# knockaway saber bottom left
+	BOTH_K1_S1_B__DM16,	//# knockaway saber bottom
+	BOTH_K1_S1_BR_DM16,	//# knockaway saber bottom right
+	//Saber attack knocked away
+	BOTH_V1_BR_S1_DM16,	//# BR attack knocked away
+	BOTH_V1__R_S1_DM16,	//# R attack knocked away
+	BOTH_V1_TR_S1_DM16,	//# TR attack knocked away
+	BOTH_V1_T__S1_DM16,	//# T attack knocked away
+	BOTH_V1_TL_S1_DM16,	//# TL attack knocked away
+	BOTH_V1__L_S1_DM16,	//# L attack knocked away
+	BOTH_V1_BL_S1_DM16,	//# BL attack knocked away
+	BOTH_V1_B__S1_DM16,	//# B attack knocked away
+	//Saber parry broken
+	BOTH_H1_S1_T__DM16,	//# saber knocked down from top parry
+	BOTH_H1_S1_TR_DM16,	//# saber knocked down-left from TR parry
+	BOTH_H1_S1_TL_DM16,	//# saber knocked down-right from TL parry
+	BOTH_H1_S1_BL_DM16,	//# saber knocked up-right from BL parry
+	BOTH_H1_S1_B__DM16,	//# saber knocked up over head from ready?
+	BOTH_H1_S1_BR_DM16,	//# saber knocked up-left from BR parry
+	//Dual Saber parry anims
+			0,//BOTH_P6_S6_T__DM16,	//# Block shot/saber top
+			0,//BOTH_P6_S6_TR_DM16,	//# Block shot/saber top right
+			0,//BOTH_P6_S6_TL_DM16,	//# Block shot/saber top left
+			0,//BOTH_P6_S6_BL_DM16,	//# Block shot/saber bottom left
+			0,//BOTH_P6_S6_BR_DM16,	//# Block shot/saber bottom right
+	//Dual Saber knockaway
+			0,//BOTH_K6_S6_T__DM16,	//# knockaway saber top
+			0,//BOTH_K6_S6_TR_DM16,	//# knockaway saber top right
+				0,//BOTH_K6_S6_TL_DM16,	//# knockaway saber top left
+				0,//BOTH_K6_S6_BL_DM16,	//# knockaway saber bottom left
+				0,//BOTH_K6_S6_B__DM16,	//# knockaway saber bottom
+				0,//BOTH_K6_S6_BR_DM16,	//# knockaway saber bottom right
+	//Dual Saber attack knocked away
+				0,//BOTH_V6_BR_S6_DM16,	//# BR attack knocked away
+				0,//BOTH_V6__R_S6_DM16,	//# R attack knocked away
+				0,//BOTH_V6_TR_S6_DM16,	//# TR attack knocked away
+				0,//BOTH_V6_T__S6_DM16,	//# T attack knocked away
+				0,//BOTH_V6_TL_S6_DM16,	//# TL attack knocked away
+				0,//BOTH_V6__L_S6_DM16,	//# L attack knocked away
+				0,//BOTH_V6_BL_S6_DM16,	//# BL attack knocked away
+				0,//BOTH_V6_B__S6_DM16,	//# B attack knocked away
+	//Dual Saber parry broken
+				0,//BOTH_H6_S6_T__DM16,	//# saber knocked down from top parry
+				0,//BOTH_H6_S6_TR_DM16,	//# saber knocked down-left from TR parry
+				0,//BOTH_H6_S6_TL_DM16,	//# saber knocked down-right from TL parry
+				0,//BOTH_H6_S6_BL_DM16,	//# saber knocked up-right from BL parry
+				0,//BOTH_H6_S6_B__DM16,	//# saber knocked up over head from ready?
+				0,//BOTH_H6_S6_BR_DM16,	//# saber knocked up-left from BR parry
+	//SaberStaff parry anims
+				0,//BOTH_P7_S7_T__DM16,	//# Block shot/saber top
+				0,//BOTH_P7_S7_TR_DM16,	//# Block shot/saber top right
+				0,//BOTH_P7_S7_TL_DM16,	//# Block shot/saber top left
+				0,//BOTH_P7_S7_BL_DM16,	//# Block shot/saber bottom left
+				0,//BOTH_P7_S7_BR_DM16,	//# Block shot/saber bottom right
+	//SaberStaff knockaway
+				0,//BOTH_K7_S7_T__DM16,	//# knockaway saber top
+				0,//BOTH_K7_S7_TR_DM16,	//# knockaway saber top right
+				0,//BOTH_K7_S7_TL_DM16,	//# knockaway saber top left
+				0,//BOTH_K7_S7_BL_DM16,	//# knockaway saber bottom left
+				0,//BOTH_K7_S7_B__DM16,	//# knockaway saber bottom
+				0,//BOTH_K7_S7_BR_DM16,	//# knockaway saber bottom right
+	//SaberStaff attack knocked away
+				0,//BOTH_V7_BR_S7_DM16,	//# BR attack knocked away
+				0,//BOTH_V7__R_S7_DM16,	//# R attack knocked away
+				0,//BOTH_V7_TR_S7_DM16,	//# TR attack knocked away
+				0,//BOTH_V7_T__S7_DM16,	//# T attack knocked away
+				0,//BOTH_V7_TL_S7_DM16,	//# TL attack knocked away
+				0,//BOTH_V7__L_S7_DM16,	//# L attack knocked away
+				0,//BOTH_V7_BL_S7_DM16,	//# BL attack knocked away
+				0,//BOTH_V7_B__S7_DM16,	//# B attack knocked away
+	//SaberStaff parry broken
+				0,//BOTH_H7_S7_T__DM16,	//# saber knocked down from top parry
+				0,//BOTH_H7_S7_TR_DM16,	//# saber knocked down-left from TR parry
+				0,//BOTH_H7_S7_TL_DM16,	//# saber knocked down-right from TL parry
+				0,//BOTH_H7_S7_BL_DM16,	//# saber knocked up-right from BL parry
+				0,//BOTH_H7_S7_B__DM16,	//# saber knocked up over head from ready?
+				0,//BOTH_H7_S7_BR_DM16,	//# saber knocked up-left from BR parry
+	//Sabers locked anims
+	//* #sep BOTH_ SABER LOCKED ANIMS
+	//BOTH_(DL_DM16, S_DM16, ST)_(DL_DM16, S_DM16, ST)_(T_DM16, S)_(L_DM16, B_DM16, SB)_1(_W_DM16, _L)
+//===Single locks==================================================================
+//SINGLE vs. DUAL
+	//side locks - I'm using a single and they're using dual
+				0,//BOTH_LK_S_DL_S_B_1_L_DM16,	//normal break I lost
+				0,//BOTH_LK_S_DL_S_B_1_W_DM16,	//normal break I won
+				0,//BOTH_LK_S_DL_S_L_1_DM16,		//lock if I'm using single vs. a dual
+				0,//BOTH_LK_S_DL_S_SB_1_L_DM16,	//super break I lost
+				0,//BOTH_LK_S_DL_S_SB_1_W_DM16,	//super break I won
+	//top locks
+				0,//BOTH_LK_S_DL_T_B_1_L_DM16,	//normal break I lost
+		0,//BOTH_LK_S_DL_T_B_1_W_DM16,	//normal break I won
+		0,//BOTH_LK_S_DL_T_L_1_DM16,		//lock if I'm using single vs. a dual
+		0,//BOTH_LK_S_DL_T_SB_1_L_DM16,	//super break I lost
+		0,//BOTH_LK_S_DL_T_SB_1_W_DM16,	//super break I won
+//SINGLE vs. STAFF
+	//side locks
+		0,//BOTH_LK_S_ST_S_B_1_L_DM16,	//normal break I lost
+		0,//BOTH_LK_S_ST_S_B_1_W_DM16,	//normal break I won
+		0,//BOTH_LK_S_ST_S_L_1_DM16,		//lock if I'm using single vs. a staff
+		0,//BOTH_LK_S_ST_S_SB_1_L_DM16,	//super break I lost
+		0,//BOTH_LK_S_ST_S_SB_1_W_DM16,	//super break I won
+	//top locks
+		0,//BOTH_LK_S_ST_T_B_1_L_DM16,	//normal break I lost
+		0,//BOTH_LK_S_ST_T_B_1_W_DM16,	//normal break I won
+		0,//BOTH_LK_S_ST_T_L_1_DM16,		//lock if I'm using single vs. a staff
+		0,//BOTH_LK_S_ST_T_SB_1_L_DM16,	//super break I lost
+		0,//BOTH_LK_S_ST_T_SB_1_W_DM16,	//super break I won
+//SINGLE vs. SINGLE
+	//side locks
+		0,//BOTH_LK_S_S_S_B_1_L_DM16,	//normal break I lost
+		0,//BOTH_LK_S_S_S_B_1_W_DM16,	//normal break I won
+		0,//BOTH_LK_S_S_S_L_1_DM16,		//lock if I'm using single vs. a single and I initiated
+		0,//BOTH_LK_S_S_S_SB_1_L_DM16,	//super break I lost
+		0,//BOTH_LK_S_S_S_SB_1_W_DM16,	//super break I won
+	//top locks
+		0,//BOTH_LK_S_S_T_B_1_L_DM16,	//normal break I lost
+		0,//BOTH_LK_S_S_T_B_1_W_DM16,	//normal break I won
+		0,//BOTH_LK_S_S_T_L_1_DM16,		//lock if I'm using single vs. a single and I initiated
+		0,//BOTH_LK_S_S_T_SB_1_L_DM16,	//super break I lost
+				0,//BOTH_LK_S_S_T_SB_1_W_DM16,	//super break I won
+//===Dual Saber locks==================================================================
+//DUAL vs. DUAL	
+	//side locks
+				0,//BOTH_LK_DL_DL_S_B_1_L_DM16,	//normal break I lost
+				0,//BOTH_LK_DL_DL_S_B_1_W_DM16,	//normal break I won
+				0,//BOTH_LK_DL_DL_S_L_1_DM16,	//lock if I'm using dual vs. dual and I initiated
+				0,//BOTH_LK_DL_DL_S_SB_1_L_DM16,	//super break I lost
+				0,//BOTH_LK_DL_DL_S_SB_1_W_DM16,	//super break I won
+	//top locks
+					0,//BOTH_LK_DL_DL_T_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_DL_DL_T_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_DL_DL_T_L_1_DM16,	//lock if I'm using dual vs. dual and I initiated
+					0,//BOTH_LK_DL_DL_T_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_DL_DL_T_SB_1_W_DM16,	//super break I won
+//DUAL vs. STAFF
+	//side locks
+					0,//BOTH_LK_DL_ST_S_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_DL_ST_S_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_DL_ST_S_L_1_DM16,	//lock if I'm using dual vs. a staff
+					0,//BOTH_LK_DL_ST_S_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_DL_ST_S_SB_1_W_DM16,	//super break I won
+	//top locks
+					0,//BOTH_LK_DL_ST_T_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_DL_ST_T_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_DL_ST_T_L_1_DM16,	//lock if I'm using dual vs. a staff
+					0,//BOTH_LK_DL_ST_T_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_DL_ST_T_SB_1_W_DM16,	//super break I won
+//DUAL vs. SINGLE
+	//side locks
+					0,//BOTH_LK_DL_S_S_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_DL_S_S_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_DL_S_S_L_1_DM16,		//lock if I'm using dual vs. a single
+					0,//BOTH_LK_DL_S_S_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_DL_S_S_SB_1_W_DM16,	//super break I won
+	//top locks
+					0,//BOTH_LK_DL_S_T_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_DL_S_T_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_DL_S_T_L_1_DM16,		//lock if I'm using dual vs. a single
+					0,//BOTH_LK_DL_S_T_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_DL_S_T_SB_1_W_DM16,	//super break I won
+//===Saber Staff locks==================================================================
+//STAFF vs. DUAL
+	//side locks
+					0,//BOTH_LK_ST_DL_S_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_ST_DL_S_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_ST_DL_S_L_1_DM16,	//lock if I'm using staff vs. dual
+					0,//BOTH_LK_ST_DL_S_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_ST_DL_S_SB_1_W_DM16,	//super break I won
+	//top locks
+					0,//BOTH_LK_ST_DL_T_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_ST_DL_T_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_ST_DL_T_L_1_DM16,	//lock if I'm using staff vs. dual
+					0,//BOTH_LK_ST_DL_T_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_ST_DL_T_SB_1_W_DM16,	//super break I won
+//STAFF vs. STAFF
+	//side locks
+					0,//BOTH_LK_ST_ST_S_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_ST_ST_S_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_ST_ST_S_L_1_DM16,	//lock if I'm using staff vs. a staff and I initiated
+					0,//BOTH_LK_ST_ST_S_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_ST_ST_S_SB_1_W_DM16,	//super break I won
+	//top locks
+					0,//BOTH_LK_ST_ST_T_B_1_L_DM16,	//normal break I lost
+					0,//BOTH_LK_ST_ST_T_B_1_W_DM16,	//normal break I won
+					0,//BOTH_LK_ST_ST_T_L_1_DM16,	//lock if I'm using staff vs. a staff and I initiated
+					0,//BOTH_LK_ST_ST_T_SB_1_L_DM16,	//super break I lost
+					0,//BOTH_LK_ST_ST_T_SB_1_W_DM16,	//super break I won
+//STAFF vs. SINGLE
+	//side locks
+					0,//BOTH_LK_ST_S_S_B_1_L_DM16,	//normal break I lost
+			0,//BOTH_LK_ST_S_S_B_1_W_DM16,	//normal break I won
+			0,//BOTH_LK_ST_S_S_L_1_DM16,		//lock if I'm using staff vs. a single
+			0,//BOTH_LK_ST_S_S_SB_1_L_DM16,	//super break I lost
+			0,//BOTH_LK_ST_S_S_SB_1_W_DM16,	//super break I won
+	//top locks
+			0,//BOTH_LK_ST_S_T_B_1_L_DM16,	//normal break I lost
+			0,//BOTH_LK_ST_S_T_B_1_W_DM16,	//normal break I won
+			0,//BOTH_LK_ST_S_T_L_1_DM16,		//lock if I'm using staff vs. a single
+			0,//BOTH_LK_ST_S_T_SB_1_L_DM16,	//super break I lost
+			0,//BOTH_LK_ST_S_T_SB_1_W_DM16,	//super break I won
+//Special cases for same saber style vs. each other (won't fit in nice 5-anim size lists above)
+0,//BOTH_LK_S_S_S_L_2_DM16,		//lock if I'm using single vs. a single and other intitiated
+0,//BOTH_LK_S_S_T_L_2_DM16,		//lock if I'm using single vs. a single and other initiated
+0,//BOTH_LK_DL_DL_S_L_2_DM16,	//lock if I'm using dual vs. dual and other initiated
+0,//BOTH_LK_DL_DL_T_L_2_DM16,	//lock if I'm using dual vs. dual and other initiated
+0,//BOTH_LK_ST_ST_S_L_2_DM16,	//lock if I'm using staff vs. a staff and other initiated
+0,//BOTH_LK_ST_ST_T_L_2_DM16,	//lock if I'm using staff vs. a staff and other initiated
+//===End Saber locks==================================================================
+	//old locks
+	BOTH_BF2RETURN_DM16,	//#
+	BOTH_BF2BREAK_DM16,	//#
+	BOTH_BF2LOCK_DM16,	//#
+	BOTH_BF1RETURN_DM16,	//#
+	BOTH_BF1BREAK_DM16,	//#
+	BOTH_BF1LOCK_DM16,	//#
+	BOTH_CWCIRCLE_R2__R_S1_DM16,	//#
+	BOTH_CCWCIRCLE_R2__L_S1_DM16,	//#
+	BOTH_CWCIRCLE_A2__L__R_DM16,	//#
+	BOTH_CCWCIRCLE_A2__R__L_DM16,	//#
+	BOTH_CWCIRCLEBREAK_DM16,	//#
+	BOTH_CCWCIRCLEBREAK_DM16,	//#
+	BOTH_CWCIRCLELOCK_DM16,	//#
+	BOTH_CCWCIRCLELOCK_DM16,	//#
+	//other saber anims
+	//* #sep BOTH_ SABER MISC ANIMS
+	BOTH_SABERFAST_STANCE_DM16,
+	BOTH_SABERSLOW_STANCE_DM16,
+					0,//BOTH_SABERDUAL_STANCE_DM16,
+						0,//BOTH_SABERSTAFF_STANCE_DM16,
+	BOTH_A2_STABBACK1_DM16,		//# Stab saber backward
+	BOTH_ATTACK_BACK_DM16,		//# Swing around backwards and attack
+	BOTH_JUMPFLIPSLASHDOWN1_DM16,//#
+	BOTH_JUMPFLIPSTABDOWN_DM16,//#
+	BOTH_FORCELEAP2_T__B__DM16,//#
+	BOTH_LUNGE2_B__T__DM16,//#
+	BOTH_CROUCHATTACKBACK1_DM16,//#
+	//New specials for JKA:
+						0,//BOTH_JUMPATTACK6_DM16,//#
+						0,//BOTH_JUMPATTACK7_DM16,//#
+						0,//BOTH_SPINATTACK6_DM16,//#
+						0,//BOTH_SPINATTACK7_DM16,//#
+						0,//BOTH_S1_S6_DM16,//#	From stand1 to saberdual stance - turning on your dual sabers
+						0,//BOTH_S6_S1_DM16,//#	From dualstaff stance to stand1 - turning off your dual sabers
+						0,//BOTH_S1_S7_DM16,//#	From stand1 to saberstaff stance - turning on your saberstaff
+						0,//BOTH_S7_S1_DM16,//#	From saberstaff stance to stand1 - turning off your saberstaff
+						0,//BOTH_FORCELONGLEAP_START_DM16,
+						0,//BOTH_FORCELONGLEAP_ATTACK_DM16,
+						0,//BOTH_FORCELONGLEAP_LAND_DM16,
+						0,//BOTH_FORCEWALLRUNFLIP_START_DM16,
+						0,//BOTH_FORCEWALLRUNFLIP_END_DM16,
+						0,//BOTH_FORCEWALLRUNFLIP_ALT_DM16,
+						0,//BOTH_FORCEWALLREBOUND_FORWARD_DM16,
+						0,//BOTH_FORCEWALLREBOUND_LEFT_DM16,
+						0,//BOTH_FORCEWALLREBOUND_BACK_DM16,
+						0,//BOTH_FORCEWALLREBOUND_RIGHT_DM16,
+						0,//BOTH_FORCEWALLHOLD_FORWARD_DM16,
+						0,//BOTH_FORCEWALLHOLD_LEFT_DM16,
+						0,//BOTH_FORCEWALLHOLD_BACK_DM16,
+						0,//BOTH_FORCEWALLHOLD_RIGHT_DM16,
+						0,//BOTH_FORCEWALLRELEASE_FORWARD_DM16,
+						0,//BOTH_FORCEWALLRELEASE_LEFT_DM16,
+						0,//BOTH_FORCEWALLRELEASE_BACK_DM16,
+						0,//BOTH_FORCEWALLRELEASE_RIGHT_DM16,
+						0,//BOTH_A7_KICK_F_DM16,
+						0,//BOTH_A7_KICK_B_DM16,
+						0,//BOTH_A7_KICK_R_DM16,
+						0,//BOTH_A7_KICK_L_DM16,
+						0,//BOTH_A7_KICK_S_DM16,
+						0,//BOTH_A7_KICK_BF_DM16,
+						0,//BOTH_A7_KICK_BF_STOP_DM16,
+						0,//BOTH_A7_KICK_RL_DM16,
+						0,//BOTH_A7_KICK_F_AIR_DM16,
+						0,//BOTH_A7_KICK_B_AIR_DM16,
+						0,//BOTH_A7_KICK_R_AIR_DM16,
+						0,//BOTH_A7_KICK_L_AIR_DM16,
+						0,//BOTH_FLIP_ATTACK7_DM16,
+						0,//BOTH_FLIP_HOLD7_DM16,
+						0,//BOTH_FLIP_LAND_DM16,
+						0,//BOTH_PULL_IMPALE_STAB_DM16,
+						0,//BOTH_PULL_IMPALE_SWING_DM16,
+						0,//BOTH_PULLED_INAIR_B_DM16,
+						0,//BOTH_PULLED_INAIR_F_DM16,
+						0,//BOTH_STABDOWN_DM16,
+						0,//BOTH_STABDOWN_STAFF_DM16,
+						0,//BOTH_STABDOWN_DUAL_DM16,
+						0,//BOTH_A6_SABERPROTECT_DM16,
+						0,//BOTH_A7_SOULCAL_DM16,
+						0,//BOTH_A1_SPECIAL_DM16,
+						0,//BOTH_A2_SPECIAL_DM16,
+						0,//BOTH_A3_SPECIAL_DM16,
+				0,//BOTH_ROLL_STAB_DM16,
+
+	//# #sep BOTH_ STANDING
+	BOTH_STAND1_DM16,			//# Standing idle_DM16, no weapon_DM16, hands down
+	BOTH_STAND1IDLE1_DM16,		//# Random standing idle
+	BOTH_STAND2_DM16,			//# Standing idle with a saber
+	BOTH_STAND2IDLE1_DM16,		//# Random standing idle
+	BOTH_STAND2IDLE2_DM16,		//# Random standing idle
+	BOTH_STAND3_DM16,			//# Standing idle with 2-handed weapon
+	BOTH_STAND3IDLE1_DM16,		//# Random standing idle
+	BOTH_STAND4_DM16,			//# hands clasp behind back
+	BOTH_STAND5_DM16,			//# standing idle_DM16, no weapon_DM16, hand down_DM16, back straight
+	BOTH_STAND5IDLE1_DM16,		//# Random standing idle
+	BOTH_STAND6_DM16,			//# one handed_DM16, gun at side_DM16, relaxed stand
+	BOTH_STAND8_DM16,			//# both hands on hips (male)
+	BOTH_STAND1TO2_DM16,			//# Transition from stand1 to stand2
+	BOTH_STAND2TO1_DM16,			//# Transition from stand2 to stand1
+	BOTH_STAND2TO4_DM16,			//# Transition from stand2 to stand4
+	BOTH_STAND4TO2_DM16,			//# Transition from stand4 to stand2
+	BOTH_STAND4TOATTACK2_DM16,	//# relaxed stand to 1-handed pistol ready
+	BOTH_STANDUP2_DM16,			//# Luke standing up from his meditation platform (cin # 37)
+	BOTH_STAND5TOSIT3_DM16,		//# transition from stand 5 to sit 3
+	BOTH_STAND1TOSTAND5_DM16,	//# Transition from stand1 to stand5
+	BOTH_STAND5TOSTAND1_DM16,	//# Transition from stand5 to stand1
+	BOTH_STAND5TOAIM_DM16,		//# Transition of Kye aiming his gun at Desann (cin #9) 
+	BOTH_STAND5STARTLEDLOOKLEFT_DM16,	//# Kyle turning to watch the bridge drop (cin #9) 
+	BOTH_STARTLEDLOOKLEFTTOSTAND5_DM16,	//# Kyle returning to stand 5 from watching the bridge drop (cin #9) 
+	BOTH_STAND5TOSTAND8_DM16,	//# Transition from stand5 to stand8
+	BOTH_STAND7TOSTAND8_DM16,	//# Tavion putting hands on back of chair (cin #11)
+	BOTH_STAND8TOSTAND5_DM16,	//# Transition from stand8 to stand5
+		0,//BOTH_STAND9_DM16,			//# Kyle's standing idle_DM16, no weapon_DM16, hands down
+		0,//BOTH_STAND9IDLE1_DM16,		//# Kyle's random standing idle
+	BOTH_STAND5SHIFTWEIGHT_DM16,	//# Weightshift from stand5 to side and back to stand5
+	BOTH_STAND5SHIFTWEIGHTSTART_DM16,	//# From stand5 to side
+	BOTH_STAND5SHIFTWEIGHTSTOP_DM16,		//# From side to stand5
+	BOTH_STAND5TURNLEFTSTART_DM16,		//# Start turning left from stand5
+	BOTH_STAND5TURNLEFTSTOP_DM16,		//# Stop turning left from stand5
+	BOTH_STAND5TURNRIGHTSTART_DM16,		//# Start turning right from stand5
+	BOTH_STAND5TURNRIGHTSTOP_DM16,		//# Stop turning right from stand5
+	BOTH_STAND5LOOK180LEFTSTART_DM16,	//# Start looking over left shoulder (cin #17)
+	BOTH_STAND5LOOK180LEFTSTOP_DM16,	//# Stop looking over left shoulder (cin #17)
+
+	BOTH_CONSOLE1START_DM16,		//# typing at a console
+	BOTH_CONSOLE1_DM16,			//# typing at a console
+	BOTH_CONSOLE1STOP_DM16,		//# typing at a console
+	BOTH_CONSOLE2START_DM16,		//# typing at a console with comm link in hand (cin #5) 
+	BOTH_CONSOLE2_DM16,			//# typing at a console with comm link in hand (cin #5) 
+	BOTH_CONSOLE2STOP_DM16,		//# typing at a console with comm link in hand (cin #5) 
+	BOTH_CONSOLE2HOLDCOMSTART_DM16,	//# lean in to type at console while holding comm link in hand (cin #5) 
+	BOTH_CONSOLE2HOLDCOMSTOP_DM16,	//# lean away after typing at console while holding comm link in hand (cin #5) 
+
+	BOTH_GUARD_LOOKAROUND1_DM16,	//# Cradling weapon and looking around
+	BOTH_GUARD_IDLE1_DM16,		//# Cradling weapon and standing
+	BOTH_GESTURE1_DM16,			//# Generic gesture_DM16, non-specific
+	BOTH_GESTURE2_DM16,			//# Generic gesture_DM16, non-specific
+	BOTH_WALK1TALKCOMM1_DM16,	//# Talking into coom link while walking
+	BOTH_TALK1_DM16,				//# Generic talk anim
+	BOTH_TALK2_DM16,				//# Generic talk anim
+	BOTH_TALKCOMM1START_DM16,	//# Start talking into a comm link
+	BOTH_TALKCOMM1_DM16,			//# Talking into a comm link
+	BOTH_TALKCOMM1STOP_DM16,		//# Stop talking into a comm link
+	BOTH_TALKGESTURE1_DM16,		//# Generic talk anim
+
+	BOTH_HEADTILTLSTART_DM16,		//# Head tilt to left
+	BOTH_HEADTILTLSTOP_DM16,			//# Head tilt to left
+	BOTH_HEADTILTRSTART_DM16,		//# Head tilt to right
+	BOTH_HEADTILTRSTOP_DM16,			//# Head tilt to right
+	BOTH_HEADNOD_DM16,				//# Head shake YES
+	BOTH_HEADSHAKE_DM16,				//# Head shake NO
+	BOTH_SIT2HEADTILTLSTART_DM16,	//# Head tilt to left from seated position 2
+	BOTH_SIT2HEADTILTLSTOP_DM16,		//# Head tilt to left from seated position 2
+
+	BOTH_REACH1START_DM16,		//# Monmothma reaching for crystal
+	BOTH_REACH1STOP_DM16,		//# Monmothma reaching for crystal
+
+	BOTH_COME_ON1_DM16,				//# Jan gesturing to Kyle (cin #32a)
+	BOTH_STEADYSELF1_DM16,			//# Jan trying to keep footing (cin #32a)
+	BOTH_STEADYSELF1END_DM16,		//# Return hands to side from STEADSELF1 Kyle (cin#5)
+	BOTH_SILENCEGESTURE1_DM16,		//# Luke silencing Kyle with a raised hand (cin #37)
+	BOTH_REACHFORSABER1_DM16,		//# Luke holding hand out for Kyle's saber (cin #37)
+	BOTH_SABERKILLER1_DM16,			//# Tavion about to strike Jan with saber (cin #9)
+	BOTH_SABERKILLEE1_DM16,			//# Jan about to be struck by Tavion with saber (cin #9)
+	BOTH_HUGGER1_DM16,			//# Kyle hugging Jan (cin #29)
+	BOTH_HUGGERSTOP1_DM16,		//# Kyle stop hugging Jan but don't let her go (cin #29)
+	BOTH_HUGGEE1_DM16,			//# Jan being hugged (cin #29)
+	BOTH_HUGGEESTOP1_DM16,		//# Jan stop being hugged but don't let go (cin #29)
+
+	BOTH_SABERTHROW1START_DM16,		//# Desann throwing his light saber (cin #26)
+	BOTH_SABERTHROW1STOP_DM16,		//# Desann throwing his light saber (cin #26)
+	BOTH_SABERTHROW2START_DM16,		//# Kyle throwing his light saber (cin #32)
+	BOTH_SABERTHROW2STOP_DM16,		//# Kyle throwing his light saber (cin #32)
+
+	//# #sep BOTH_ SITTING/CROUCHING
+	BOTH_SIT1_DM16,				//# Normal chair sit.
+	BOTH_SIT2_DM16,				//# Lotus position.
+	BOTH_SIT3_DM16,				//# Sitting in tired position_DM16, elbows on knees
+
+	BOTH_SIT2TOSTAND5_DM16,		//# Transition from sit 2 to stand 5
+	BOTH_STAND5TOSIT2_DM16,		//# Transition from stand 5 to sit 2
+	BOTH_SIT2TOSIT4_DM16,		//# Trans from sit2 to sit4 (cin #12) Luke leaning back from lotus position.
+	BOTH_SIT3TOSTAND5_DM16,		//# transition from sit 3 to stand 5
+
+	BOTH_CROUCH1_DM16,			//# Transition from standing to crouch
+	BOTH_CROUCH1IDLE_DM16,		//# Crouching idle
+	BOTH_CROUCH1WALK_DM16,		//# Walking while crouched
+	BOTH_CROUCH1WALKBACK_DM16,	//# Walking while crouched
+	BOTH_UNCROUCH1_DM16,			//# Transition from crouch to standing
+	BOTH_CROUCH2TOSTAND1_DM16,	//# going from crouch2 to stand1
+	BOTH_CROUCH3_DM16,			//# Desann crouching down to Kyle (cin 9)
+	BOTH_UNCROUCH3_DM16,			//# Desann uncrouching down to Kyle (cin 9)
+	BOTH_CROUCH4_DM16,			//# Slower version of crouch1 for cinematics
+	BOTH_UNCROUCH4_DM16,			//# Slower version of uncrouch1 for cinematics
+
+	BOTH_GUNSIT1_DM16,			//# sitting on an emplaced gun.
+
+	// Swoop Vehicle animations.
+	//* #sep BOTH_ SWOOP ANIMS
+		0,//BOTH_VS_MOUNT_L_DM16,			//# Mount from left		
+		0,//BOTH_VS_DISMOUNT_L_DM16,			//# Dismount to left		
+		0,//BOTH_VS_MOUNT_R_DM16,			//# Mount from  right (symmetry)		
+		0,//BOTH_VS_DISMOUNT_R_DM16,			//# DISMOUNT TO  RIGHT (SYMMETRY)		
+
+		0,//BOTH_VS_MOUNTJUMP_L_DM16,		//#
+		0,//BOTH_VS_MOUNTTHROW_DM16,			//# Land on an occupied vehicle & throw off current pilot
+		0,//BOTH_VS_MOUNTTHROW_L_DM16,		//# Land on an occupied vehicle & throw off current pilot
+		0,//BOTH_VS_MOUNTTHROW_R_DM16,		//# Land on an occupied vehicle & throw off current pilot
+		0,//BOTH_VS_MOUNTTHROWEE_DM16,		//# Current pilot getting thrown off by another guy
+
+		0,//BOTH_VS_LOOKLEFT_DM16,			//# Turn & Look behind and to the left (no weapon)		
+		0,//BOTH_VS_LOOKRIGHT_DM16,			//# Turn & Look behind and to the right (no weapon)		
+
+			0,//BOTH_VS_TURBO_DM16,				//# Hit The Turbo Button
+
+		0,//BOTH_VS_REV_DM16,				//# Player looks back as swoop reverses		
+
+		0,//BOTH_VS_AIR_DM16,				//# Player stands up when swoop is airborn		
+		0,//BOTH_VS_AIR_G_DM16,				//# "" with Gun
+		0,//BOTH_VS_AIR_SL_DM16,				//# "" with Saber Left
+		0,//BOTH_VS_AIR_SR_DM16,				//# "" with Saber Right
+
+		0,//BOTH_VS_LAND_DM16,				//# Player bounces down when swoop lands		
+		0,//BOTH_VS_LAND_G_DM16,				//#  "" with Gun
+		0,//BOTH_VS_LAND_SL_DM16,			//#  "" with Saber Left
+		0,//BOTH_VS_LAND_SR_DM16,			//#  "" with Saber Right
+
+		0,//BOTH_VS_IDLE_DM16,				//# Sit
+		0,//BOTH_VS_IDLE_G_DM16,				//# Sit (gun)
+		0,//BOTH_VS_IDLE_SL_DM16,			//# Sit (saber left)		
+		0,//BOTH_VS_IDLE_SR_DM16,			//# Sit (saber right)		
+
+		0,//BOTH_VS_LEANL_DM16,				//# Lean left
+		0,//BOTH_VS_LEANL_G_DM16,			//# Lean left (gun)		
+		0,//BOTH_VS_LEANL_SL_DM16,			//# Lean left (saber left)		
+		0,//BOTH_VS_LEANL_SR_DM16,			//# Lean left (saber right)		
+
+		0,//BOTH_VS_LEANR_DM16,				//# Lean right		
+		0,//BOTH_VS_LEANR_G_DM16,			//# Lean right (gun)		
+		0,//BOTH_VS_LEANR_SL_DM16,			//# Lean right (saber left)		
+		0,//BOTH_VS_LEANR_SR_DM16,			//# Lean right (saber right)		
+
+		0,//BOTH_VS_ATL_S_DM16,				//# Attack left with saber		
+		0,//BOTH_VS_ATR_S_DM16,				//# Attack right with saber		
+		0,//BOTH_VS_ATR_TO_L_S_DM16,			//# Attack toss saber from right to left hand
+		0,//BOTH_VS_ATL_TO_R_S_DM16,			//# Attack toss saber from left to right hand
+		0,//BOTH_VS_ATR_G_DM16,				//# Attack right with gun (90)		
+		0,//BOTH_VS_ATL_G_DM16,				//# Attack left with gun (90)		
+		0,//BOTH_VS_ATF_G_DM16,				//# Attack forward with gun		
+
+		0,//BOTH_VS_PAIN1_DM16,				//# Pain
+
+	// Added 12/04/02 by Aurelio.
+	//* #sep BOTH_ TAUNTAUN ANIMS
+		0,//BOTH_VT_MOUNT_L_DM16,		//# Mount from left	
+		0,//BOTH_VT_MOUNT_R_DM16,		//# Mount from right
+		0,//BOTH_VT_MOUNT_B_DM16,		//# Mount from air_DM16, behind
+		0,//BOTH_VT_DISMOUNT_DM16,		//# Dismount for tauntaun
+		0,//BOTH_VT_DISMOUNT_L_DM16,		//# Dismount to tauntauns left	
+		0,//BOTH_VT_DISMOUNT_R_DM16,		//# Dismount to tauntauns right (symmetry)	
+
+		0,//BOTH_VT_WALK_FWD_DM16,		//# Walk forward	
+		0,//BOTH_VT_WALK_REV_DM16,		//# Walk backward	
+		0,//BOTH_VT_WALK_FWD_L_DM16,		//# walk lean left
+		0,//BOTH_VT_WALK_FWD_R_DM16,		//# Walk lean right
+		0,//BOTH_VT_RUN_FWD_DM16,		//# Run forward	
+		0,//BOTH_VT_RUN_REV_DM16,		//# Look backwards while running (not weapon specific)	
+		0,//BOTH_VT_RUN_FWD_L_DM16,		//# Run lean left
+		0,//BOTH_VT_RUN_FWD_R_DM16,		//# Run lean right
+
+		0,//BOTH_VT_SLIDEF_DM16,			//# Tauntaun slides forward with abrupt stop	
+		0,//BOTH_VT_AIR_DM16,			//# Tauntaun jump	
+		0,//BOTH_VT_ATB_DM16,			//# Tauntaun tail swipe	
+		0,//BOTH_VT_PAIN1_DM16,			//# Pain	
+		0,//BOTH_VT_DEATH1_DM16,			//# Die	
+		0,//BOTH_VT_STAND_DM16,			//# Stand still and breath	
+		0,//BOTH_VT_BUCK_DM16,			//# Tauntaun bucking loop animation	
+
+		0,//BOTH_VT_LAND_DM16,			//# Player bounces down when tauntaun lands	
+		0,//BOTH_VT_TURBO_DM16,			//# Hit The Turbo Button
+		0,//BOTH_VT_IDLE_SL_DM16,		//# Sit (saber left)		
+		0,//BOTH_VT_IDLE_SR_DM16,		//# Sit (saber right)		
+
+		0,//BOTH_VT_IDLE_DM16,			//# Sit with no weapon selected	
+		0,//BOTH_VT_IDLE1_DM16,			//# Sit with no weapon selected	
+		0,//BOTH_VT_IDLE_S_DM16,			//# Sit with saber selected	
+		0,//BOTH_VT_IDLE_G_DM16,			//# Sit with gun selected	
+		0,//BOTH_VT_IDLE_T_DM16,			//# Sit with thermal grenade selected
+
+		0,//BOTH_VT_ATL_S_DM16,			//# Attack left with saber	
+		0,//BOTH_VT_ATR_S_DM16,			//# Attack right with saber	
+		0,//BOTH_VT_ATR_TO_L_S_DM16,		//# Attack toss saber from right to left hand
+		0,//BOTH_VT_ATL_TO_R_S_DM16,		//# Attack toss saber from left to right hand
+		0,//BOTH_VT_ATR_G_DM16,			//# Attack right with gun (90)	
+		0,//BOTH_VT_ATL_G_DM16,			//# Attack left with gun (90)	
+		0,//BOTH_VT_ATF_G_DM16,			//# Attack forward with gun	
+
+
+	// Added 2/26/02 by Aurelio.
+	//* #sep BOTH_ FIGHTER ANIMS
+			0,//BOTH_GEARS_OPEN_DM16,
+			0,//BOTH_GEARS_CLOSE_DM16,
+			0,//BOTH_WINGS_OPEN_DM16,
+			0,//BOTH_WINGS_CLOSE_DM16,
+
+	BOTH_DEATH14_UNGRIP_DM16,	//# Desann's end death (cin #35)
+	BOTH_DEATH14_SITUP_DM16,		//# Tavion sitting up after having been thrown (cin #23)
+	BOTH_KNEES1_DM16,			//# Tavion on her knees
+	BOTH_KNEES2_DM16,			//# Tavion on her knees looking down
+	BOTH_KNEES2TO1_DM16,			//# Transition of KNEES2 to KNEES1
+
+	//# #sep BOTH_ MOVING
+	BOTH_WALK1_DM16,				//# Normal walk
+	BOTH_WALK2_DM16,				//# Normal walk
+			0,//BOTH_WALK_STAFF_DM16,		//# Walk with saberstaff turned on
+			0,//BOTH_WALKBACK_STAFF_DM16,	//# Walk backwards with saberstaff turned on
+			0,//BOTH_WALK_DUAL_DM16,			//# Walk with dual turned on
+			0,//BOTH_WALKBACK_DUAL_DM16,		//# Walk backwards with dual turned on
+	BOTH_WALK5_DM16,				//# Tavion taunting Kyle (cin 22)
+	BOTH_WALK6_DM16,				//# Slow walk for Luke (cin 12)
+	BOTH_WALK7_DM16,				//# Fast walk
+	BOTH_RUN1_DM16,				//# Full run
+	BOTH_RUN1START_DM16,			//# Start into full run1
+	BOTH_RUN1STOP_DM16,			//# Stop from full run1
+	BOTH_RUN2_DM16,				//# Full run
+			0,//BOTH_RUN1TORUN2_DM16,		//# Wampa run anim transition
+			0,//BOTH_RUN2TORUN1_DM16,		//# Wampa run anim transition
+			0,//BOTH_RUN4_DM16,				//# Jawa Run
+			0,//BOTH_RUN_STAFF_DM16,			//# Run with saberstaff turned on
+			0,//BOTH_RUNBACK_STAFF_DM16,		//# Run backwards with saberstaff turned on
+			0,//BOTH_RUN_DUAL_DM16,			//# Run with dual turned on
+			0,//BOTH_RUNBACK_DUAL_DM16,		//# Run backwards with dual turned on
+	BOTH_STRAFE_LEFT1_DM16,		//# Sidestep left_DM16, should loop
+	BOTH_STRAFE_RIGHT1_DM16,		//# Sidestep right_DM16, should loop
+	BOTH_RUNSTRAFE_LEFT1_DM16,	//# Sidestep left_DM16, should loop
+	BOTH_RUNSTRAFE_RIGHT1_DM16,	//# Sidestep right_DM16, should loop
+	BOTH_TURN_LEFT1_DM16,		//# Turn left_DM16, should loop
+	BOTH_TURN_RIGHT1_DM16,		//# Turn right_DM16, should loop
+	BOTH_TURNSTAND1_DM16,		//# Turn from STAND1 position
+	BOTH_TURNSTAND2_DM16,		//# Turn from STAND2 position
+	BOTH_TURNSTAND3_DM16,		//# Turn from STAND3 position
+	BOTH_TURNSTAND4_DM16,		//# Turn from STAND4 position
+	BOTH_TURNSTAND5_DM16,		//# Turn from STAND5 position
+	BOTH_TURNCROUCH1_DM16,		//# Turn from CROUCH1 position
+
+	BOTH_WALKBACK1_DM16,			//# Walk1 backwards
+	BOTH_WALKBACK2_DM16,			//# Walk2 backwards
+	BOTH_RUNBACK1_DM16,			//# Run1 backwards
+	BOTH_RUNBACK2_DM16,			//# Run1 backwards
+
+	//# #sep BOTH_ JUMPING
+	BOTH_JUMP1_DM16,				//# Jump - wind-up and leave ground
+	BOTH_INAIR1_DM16,			//# In air loop (from jump)
+	BOTH_LAND1_DM16,				//# Landing (from in air loop)
+	BOTH_LAND2_DM16,				//# Landing Hard (from a great height)
+
+	BOTH_JUMPBACK1_DM16,			//# Jump backwards - wind-up and leave ground
+	BOTH_INAIRBACK1_DM16,		//# In air loop (from jump back)
+	BOTH_LANDBACK1_DM16,			//# Landing backwards(from in air loop)
+
+	BOTH_JUMPLEFT1_DM16,			//# Jump left - wind-up and leave ground
+	BOTH_INAIRLEFT1_DM16,		//# In air loop (from jump left)
+	BOTH_LANDLEFT1_DM16,			//# Landing left(from in air loop)
+
+	BOTH_JUMPRIGHT1_DM16,		//# Jump right - wind-up and leave ground
+	BOTH_INAIRRIGHT1_DM16,		//# In air loop (from jump right)
+	BOTH_LANDRIGHT1_DM16,		//# Landing right(from in air loop)
+
+	BOTH_FORCEJUMP1_DM16,		//# Jump - wind-up and leave ground
+	BOTH_FORCEINAIR1_DM16,		//# In air loop (from jump)
+	BOTH_FORCELAND1_DM16,		//# Landing (from in air loop)
+
+	BOTH_FORCEJUMPBACK1_DM16,	//# Jump backwards - wind-up and leave ground
+	BOTH_FORCEINAIRBACK1_DM16,	//# In air loop (from jump back)
+	BOTH_FORCELANDBACK1_DM16,	//# Landing backwards(from in air loop)
+
+	BOTH_FORCEJUMPLEFT1_DM16,	//# Jump left - wind-up and leave ground
+	BOTH_FORCEINAIRLEFT1_DM16,	//# In air loop (from jump left)
+	BOTH_FORCELANDLEFT1_DM16,	//# Landing left(from in air loop)
+
+	BOTH_FORCEJUMPRIGHT1_DM16,	//# Jump right - wind-up and leave ground
+	BOTH_FORCEINAIRRIGHT1_DM16,	//# In air loop (from jump right)
+	BOTH_FORCELANDRIGHT1_DM16,	//# Landing right(from in air loop)
+	//# #sep BOTH_ ACROBATICS
+	BOTH_FLIP_F_DM16,			//# Flip forward
+	BOTH_FLIP_B_DM16,			//# Flip backwards
+	BOTH_FLIP_L_DM16,			//# Flip left
+	BOTH_FLIP_R_DM16,			//# Flip right
+
+	BOTH_ROLL_F_DM16,			//# Roll forward
+	BOTH_ROLL_B_DM16,			//# Roll backward
+	BOTH_ROLL_L_DM16,			//# Roll left
+	BOTH_ROLL_R_DM16,			//# Roll right
+
+	BOTH_HOP_F_DM16,				//# quickstep forward
+	BOTH_HOP_B_DM16,				//# quickstep backwards
+	BOTH_HOP_L_DM16,				//# quickstep left
+	BOTH_HOP_R_DM16,				//# quickstep right
+
+	BOTH_DODGE_FL_DM16,			//# lean-dodge forward left
+	BOTH_DODGE_FR_DM16,			//# lean-dodge forward right
+	BOTH_DODGE_BL_DM16,			//# lean-dodge backwards left
+	BOTH_DODGE_BR_DM16,			//# lean-dodge backwards right
+	BOTH_DODGE_L_DM16,			//# lean-dodge left
+	BOTH_DODGE_R_DM16,			//# lean-dodge right
+		0,//BOTH_DODGE_HOLD_FL_DM16,			//# lean-dodge pose forward left
+		0,//BOTH_DODGE_HOLD_FR_DM16,			//# lean-dodge pose forward right
+		0,//BOTH_DODGE_HOLD_BL_DM16,			//# lean-dodge pose backwards left
+		0,//BOTH_DODGE_HOLD_BR_DM16,			//# lean-dodge pose backwards right
+		0,//BOTH_DODGE_HOLD_L_DM16,			//# lean-dodge pose left
+		0,//BOTH_DODGE_HOLD_R_DM16,			//# lean-dodge pose right
+
+	//MP taunt anims
+	BOTH_ENGAGETAUNT_DM16,
+				0,//BOTH_BOW_DM16,
+				0,//BOTH_MEDITATE_DM16,
+				0,//BOTH_MEDITATE_END_DM16,
+				0,//BOTH_SHOWOFF_FAST_DM16,
+		0,//BOTH_SHOWOFF_MEDIUM_DM16,
+		0,//BOTH_SHOWOFF_STRONG_DM16,
+		0,//BOTH_SHOWOFF_DUAL_DM16,
+		0,//BOTH_SHOWOFF_STAFF_DM16,
+		0,//BOTH_VICTORY_FAST_DM16,
+		0,//BOTH_VICTORY_MEDIUM_DM16,
+		0,//BOTH_VICTORY_STRONG_DM16,
+				0,//BOTH_VICTORY_DUAL_DM16,
+				0,//BOTH_VICTORY_STAFF_DM16,
+	//other saber/acro anims
+	BOTH_ARIAL_LEFT_DM16,		//# 
+	BOTH_ARIAL_RIGHT_DM16,		//# 
+	BOTH_CARTWHEEL_LEFT_DM16,	//# 
+	BOTH_CARTWHEEL_RIGHT_DM16,	//# 
+	BOTH_FLIP_LEFT_DM16,			//# 
+	BOTH_FLIP_BACK1_DM16,		//# 
+	BOTH_FLIP_BACK2_DM16,		//# 
+	BOTH_FLIP_BACK3_DM16,		//# 
+	BOTH_BUTTERFLY_LEFT_DM16,	//# 
+	BOTH_BUTTERFLY_RIGHT_DM16,	//# 
+	BOTH_WALL_RUN_RIGHT_DM16,	//# 
+	BOTH_WALL_RUN_RIGHT_FLIP_DM16,//#
+	BOTH_WALL_RUN_RIGHT_STOP_DM16,//# 
+	BOTH_WALL_RUN_LEFT_DM16,		//# 
+	BOTH_WALL_RUN_LEFT_FLIP_DM16,//#
+	BOTH_WALL_RUN_LEFT_STOP_DM16,//# 
+	BOTH_WALL_FLIP_RIGHT_DM16,	//# 
+	BOTH_WALL_FLIP_LEFT_DM16,	//# 
+	BOTH_KNOCKDOWN1_DM16,		//# knocked backwards
+	BOTH_KNOCKDOWN2_DM16,		//# knocked backwards hard
+	BOTH_KNOCKDOWN3_DM16,		//#	knocked forwards
+	BOTH_KNOCKDOWN4_DM16,		//# knocked backwards from crouch
+	BOTH_KNOCKDOWN5_DM16,		//# dupe of 3 - will be removed
+	BOTH_GETUP1_DM16,			//#
+	BOTH_GETUP2_DM16,			//#
+	BOTH_GETUP3_DM16,			//#
+	BOTH_GETUP4_DM16,			//#
+	BOTH_GETUP5_DM16,			//#
+	BOTH_GETUP_CROUCH_F1_DM16,	//#
+	BOTH_GETUP_CROUCH_B1_DM16,	//#
+	BOTH_FORCE_GETUP_F1_DM16,	//#
+	BOTH_FORCE_GETUP_F2_DM16,	//#
+	BOTH_FORCE_GETUP_B1_DM16,	//#
+	BOTH_FORCE_GETUP_B2_DM16,	//#
+	BOTH_FORCE_GETUP_B3_DM16,	//#
+	BOTH_FORCE_GETUP_B4_DM16,	//#
+	BOTH_FORCE_GETUP_B5_DM16,	//#
+	BOTH_FORCE_GETUP_B6_DM16,	//#
+		0,//BOTH_GETUP_BROLL_B_DM16,	//#
+		0,//BOTH_GETUP_BROLL_F_DM16,	//#
+		0,//BOTH_GETUP_BROLL_L_DM16,	//#
+		0,//BOTH_GETUP_BROLL_R_DM16,	//#
+		0,//BOTH_GETUP_FROLL_B_DM16,	//#
+		0,//BOTH_GETUP_FROLL_F_DM16,	//#
+		0,//BOTH_GETUP_FROLL_L_DM16,	//#
+		0,//BOTH_GETUP_FROLL_R_DM16,	//#
+	BOTH_WALL_FLIP_BACK1_DM16,	//#
+	BOTH_WALL_FLIP_BACK2_DM16,	//#
+	BOTH_SPIN1_DM16,				//#
+	BOTH_CEILING_CLING_DM16,		//# clinging to ceiling
+	BOTH_CEILING_DROP_DM16,		//# dropping from ceiling cling
+
+	//TESTING
+	BOTH_FJSS_TR_BL_DM16,		//# jump spin slash tr to bl
+	BOTH_FJSS_TL_BR_DM16,		//# jump spin slash bl to tr
+	BOTH_RIGHTHANDCHOPPEDOFF_DM16,//#
+	BOTH_DEFLECTSLASH__R__L_FIN_DM16,//#
+	BOTH_BASHED1_DM16,//#
+	BOTH_ARIAL_F1_DM16,//#
+	BOTH_BUTTERFLY_FR1_DM16,//#
+	BOTH_BUTTERFLY_FL1_DM16,//#
+
+	//NEW SABER/JEDI/FORCE ANIMS
+		0,//BOTH_BACK_FLIP_UP_DM16,	//# back flip up Bonus Animation!!!!	
+		0,//BOTH_LOSE_SABER_DM16,	//# player losing saber (pulled from hand by force pull 4 - Kyle?)
+		0,//BOTH_STAFF_TAUNT_DM16,	//# taunt saberstaff			
+		0,//BOTH_DUAL_TAUNT_DM16,		//# taunt dual
+		0,//BOTH_A6_FB_DM16,				//# dual attack front/back		
+		0,//BOTH_A6_LR_DM16,				//# dual attack left/right
+		0,//BOTH_A7_HILT_DM16,			//# saber knock (alt + stand still)
+	//Alora			
+		0,//BOTH_ALORA_SPIN_DM16,		//#jump spin attack	death ballet	
+		0,//BOTH_ALORA_FLIP_1_DM16,		//# gymnast move 1		
+		0,//BOTH_ALORA_FLIP_2_DM16,		//# gymnast move 2		
+		0,//BOTH_ALORA_FLIP_3_DM16,		//# gymnast move3		
+		0,//BOTH_ALORA_FLIP_B_DM16,		//# gymnast move back		
+		0,//BOTH_ALORA_SPIN_THROW_DM16,	//# dual saber throw		
+			0,//BOTH_ALORA_SPIN_SLASH_DM16,	//# spin slash	special bonus animation!! :)	
+			0,//BOTH_ALORA_TAUNT_DM16,		//# special taunt
+	//Rosh (Kothos battle)			
+			0,//BOTH_ROSH_PAIN_DM16,	//# hurt animation (exhausted)		
+			0,//BOTH_ROSH_HEAL_DM16,	//# healed/rejuvenated		
+	//Tavion			
+		0,//BOTH_TAVION_SCEPTERGROUND_DM16, //# stabbing ground with sith sword shoots electricity everywhere
+		0,//BOTH_TAVION_SWORDPOWER_DM16,//# Tavion doing the He-Man(tm) thing
+		0,//BOTH_SCEPTER_START_DM16,	//#Point scepter and attack start
+					0,//BOTH_SCEPTER_HOLD_DM16,	//#Point scepter and attack hold
+					0,//BOTH_SCEPTER_STOP_DM16,	//#Point scepter and attack stop
+	//Kyle Boss			
+					0,//BOTH_KYLE_GRAB_DM16,		//# grab
+			0,//BOTH_KYLE_MISS_DM16,		//# miss
+			0,//BOTH_KYLE_PA_1_DM16,		//# hold 1
+			0,//BOTH_PLAYER_PA_1_DM16,	//# player getting held 1
+			0,//BOTH_KYLE_PA_2_DM16,		//# hold 2
+			0,//BOTH_PLAYER_PA_2_DM16,	//# player getting held 2
+			0,//BOTH_PLAYER_PA_FLY_DM16,	//# player getting knocked back from punch at end of hold 1
+			0,//BOTH_KYLE_PA_3_DM16,		//# hold 3
+					0,//BOTH_PLAYER_PA_3_DM16,	//# player getting held 3
+					0,//BOTH_PLAYER_PA_3_FLY_DM16,//# player getting thrown at end of hold 3
+	//Rancor
+		0,//BOTH_BUCK_RIDER_DM16,	//# Rancor bucks when someone is on him
+	//WAMPA Grabbing enemy
+		0,//BOTH_HOLD_START_DM16,	//#
+		0,//BOTH_HOLD_MISS_DM16,	//#
+		0,//BOTH_HOLD_IDLE_DM16,	//#
+		0,//BOTH_HOLD_END_DM16,	//#
+		0,//BOTH_HOLD_ATTACK_DM16,	//#
+		0,//BOTH_HOLD_SNIFF_DM16,	//# Sniff the guy you're holding
+		0,//BOTH_HOLD_DROP_DM16,		//# just drop 'em
+	//BEING GRABBED BY WAMPA
+		0,//BOTH_GRABBED_DM16,	//#
+		0,//BOTH_RELEASED_DM16,	//#
+		0,//BOTH_HANG_IDLE_DM16,	//#
+		0,//BOTH_HANG_ATTACK_DM16,	//#
+		0,//BOTH_HANG_PAIN_DM16,	//#
+
+	//# #sep BOTH_ MISC MOVEMENT
+	BOTH_HIT1_DM16,				//# Kyle hit by crate in cin #9
+	BOTH_LADDER_UP1_DM16,		//# Climbing up a ladder with rungs at 16 unit intervals
+	BOTH_LADDER_DWN1_DM16,		//# Climbing down a ladder with rungs at 16 unit intervals
+	BOTH_LADDER_IDLE_DM16,		//#	Just sitting on the ladder
+
+	//# #sep BOTH_ FLYING IDLE
+	BOTH_FLY_SHIELDED_DM16,		//# For sentry droid_DM16, shields in
+
+	//# #sep BOTH_ SWIMMING
+	BOTH_SWIM_IDLE1_DM16,		//# Swimming Idle 1
+	BOTH_SWIMFORWARD_DM16,		//# Swim forward loop
+		0,//BOTH_SWIMBACKWARD_DM16,		//# Swim backward loop
+
+	//# #sep BOTH_ LYING
+	BOTH_SLEEP1_DM16,			//# laying on back-rknee up-rhand on torso
+	BOTH_SLEEP6START_DM16,		//# Kyle leaning back to sleep (cin 20)
+	BOTH_SLEEP6STOP_DM16,		//# Kyle waking up and shaking his head (cin 21)
+	BOTH_SLEEP1GETUP_DM16,		//# alarmed and getting up out of sleep1 pose to stand
+	BOTH_SLEEP1GETUP2_DM16,		//# 
+
+	BOTH_CHOKE1START_DM16,		//# tavion in force grip choke
+	BOTH_CHOKE1STARTHOLD_DM16,	//# loop of tavion in force grip choke
+	BOTH_CHOKE1_DM16,			//# tavion in force grip choke
+
+	BOTH_CHOKE2_DM16,			//# tavion recovering from force grip choke
+	BOTH_CHOKE3_DM16,			//# left-handed choke (for people still holding a weapon)
+
+	//# #sep BOTH_ HUNTER-SEEKER BOT-SPECIFIC
+	BOTH_POWERUP1_DM16,			//# Wakes up
+
+	BOTH_TURNON_DM16,			//# Protocol Droid wakes up
+	BOTH_TURNOFF_DM16,			//# Protocol Droid shuts off
+
+	BOTH_BUTTON1_DM16,			//# Single button push with right hand
+	BOTH_BUTTON2_DM16,			//# Single button push with left finger
+	BOTH_BUTTON_HOLD_DM16,		//# Single button hold with left hand
+	BOTH_BUTTON_RELEASE_DM16,	//# Single button release with left hand
+
+	//# JEDI-SPECIFIC
+	//# #sep BOTH_ FORCE ANIMS
+	BOTH_RESISTPUSH_DM16,		//# plant yourself to resist force push/pulls.
+	BOTH_FORCEPUSH_DM16,			//# Use off-hand to do force power.
+	BOTH_FORCEPULL_DM16,			//# Use off-hand to do force power.
+	BOTH_MINDTRICK1_DM16,			//# Use off-hand to do mind trick
+	BOTH_MINDTRICK2_DM16,			//# Use off-hand to do distraction
+	BOTH_FORCELIGHTNING_DM16,		//# Use off-hand to do lightning
+	BOTH_FORCELIGHTNING_START_DM16,	//# Use off-hand to do lightning - start
+	BOTH_FORCELIGHTNING_HOLD_DM16,	//# Use off-hand to do lightning - hold
+	BOTH_FORCELIGHTNING_RELEASE_DM16,//# Use off-hand to do lightning - release
+	BOTH_FORCEHEAL_START_DM16,		//# Healing meditation pose start
+	BOTH_FORCEHEAL_STOP_DM16,		//# Healing meditation pose end
+	BOTH_FORCEHEAL_QUICK_DM16,		//# Healing meditation gesture
+	BOTH_SABERPULL_DM16,			//# Use off-hand to do force power.
+	BOTH_FORCEGRIP1_DM16,		//# force-gripping (no anim?)
+	BOTH_FORCEGRIP3_DM16,		//# force-gripping (right hand)
+	BOTH_FORCEGRIP3THROW_DM16,	//# throwing while force-gripping (right hand)
+	BOTH_FORCEGRIP_HOLD_DM16,	//# Use off-hand to do grip - hold
+	BOTH_FORCEGRIP_RELEASE_DM16,//# Use off-hand to do grip - release
+	BOTH_TOSS1_DM16,				//# throwing to left after force gripping
+	BOTH_TOSS2_DM16,				//# throwing to right after force gripping
+	//NEW force anims for JKA:
+				0,//BOTH_FORCE_RAGE_DM16,
+				0,//BOTH_FORCE_2HANDEDLIGHTNING_DM16,
+				0,//BOTH_FORCE_2HANDEDLIGHTNING_START_DM16,
+				0,//BOTH_FORCE_2HANDEDLIGHTNING_HOLD_DM16,
+			0,//BOTH_FORCE_2HANDEDLIGHTNING_RELEASE_DM16,
+			0,//BOTH_FORCE_DRAIN_DM16,
+			0,//BOTH_FORCE_DRAIN_START_DM16,
+			0,//BOTH_FORCE_DRAIN_HOLD_DM16,
+						0,//BOTH_FORCE_DRAIN_RELEASE_DM16,
+						0,//BOTH_FORCE_DRAIN_GRAB_START_DM16,
+						0,//BOTH_FORCE_DRAIN_GRAB_HOLD_DM16,
+						0,//BOTH_FORCE_DRAIN_GRAB_END_DM16,
+				0,//BOTH_FORCE_DRAIN_GRABBED_DM16,
+				0,//BOTH_FORCE_ABSORB_DM16,
+				0,//BOTH_FORCE_ABSORB_START_DM16,
+				0,//BOTH_FORCE_ABSORB_END_DM16,
+				0,//BOTH_FORCE_PROTECT_DM16,
+				0,//BOTH_FORCE_PROTECT_FAST_DM16,
+
+						0,//BOTH_WIND_DM16,
+
+			0,//BOTH_STAND_TO_KNEEL_DM16,
+			0,//BOTH_KNEEL_TO_STAND_DM16,
+
+			0,//BOTH_TUSKENATTACK1_DM16,
+			0,//BOTH_TUSKENATTACK2_DM16,
+			0,//BOTH_TUSKENATTACK3_DM16,
+			0,//BOTH_TUSKENLUNGE1_DM16,
+			0,//BOTH_TUSKENTAUNT1_DM16,
+
+			0,//BOTH_COWER1_START_DM16,		//# cower start
+			0,//BOTH_COWER1_DM16,			//# cower loop
+			0,//BOTH_COWER1_STOP_DM16,		//# cower stop
+			0,//BOTH_SONICPAIN_START_DM16,
+			0,//BOTH_SONICPAIN_HOLD_DM16,
+			0,//BOTH_SONICPAIN_END_DM16,
+
+	//new anim slots per Jarrod's request
+		0,//BOTH_STAND10_DM16,
+		0,//BOTH_STAND10_TALK1_DM16,
+		0,//BOTH_STAND10_TALK2_DM16,
+		0,//BOTH_STAND10TOSTAND1_DM16,
+
+		0,//BOTH_STAND1_TALK1_DM16,
+		0,//BOTH_STAND1_TALK2_DM16,
+		0,//BOTH_STAND1_TALK3_DM16,
+
+		0,//BOTH_SIT4_DM16,
+		0,//BOTH_SIT5_DM16,
+		0,//BOTH_SIT5_TALK1_DM16,
+			0,//BOTH_SIT5_TALK2_DM16,
+		0,//BOTH_SIT5_TALK3_DM16,
+
+		0,//BOTH_SIT6_DM16,
+	BOTH_SIT7_DM16,
+
+	//=================================================
+	//ANIMS IN WHICH ONLY THE UPPER OBJECTS ARE IN MD3
+	//=================================================
+	//# #sep TORSO_ WEAPON-RELATED
+	TORSO_DROPWEAP1_DM16,		//# Put weapon away
+	TORSO_DROPWEAP4_DM16,		//# Put weapon away
+	TORSO_RAISEWEAP1_DM16,		//# Draw Weapon
+	TORSO_RAISEWEAP4_DM16,		//# Draw Weapon
+	TORSO_WEAPONREADY1_DM16,		//# Ready to fire stun baton
+	TORSO_WEAPONREADY2_DM16,		//# Ready to fire one-handed blaster pistol
+	TORSO_WEAPONREADY3_DM16,		//# Ready to fire blaster rifle
+	TORSO_WEAPONREADY4_DM16,		//# Ready to fire sniper rifle
+	TORSO_WEAPONREADY10_DM16,	//# Ready to fire thermal det
+	TORSO_WEAPONIDLE2_DM16,		//# Holding one-handed blaster
+	TORSO_WEAPONIDLE3_DM16,		//# Holding blaster rifle
+	TORSO_WEAPONIDLE4_DM16,		//# Holding sniper rifle
+	TORSO_WEAPONIDLE10_DM16,		//# Holding thermal det
+
+	//# #sep TORSO_ MISC
+	TORSO_SURRENDER_START_DM16,	//# arms up
+	TORSO_SURRENDER_STOP_DM16,	//# arms back down
+
+	TORSO_CHOKING1_DM16,			//# TEMP
+
+		0,//TORSO_HANDSIGNAL1_DM16,
+		0,//TORSO_HANDSIGNAL2_DM16,
+		0,//TORSO_HANDSIGNAL3_DM16,
+		0,//TORSO_HANDSIGNAL4_DM16,
+		0,//TORSO_HANDSIGNAL5_DM16,
+
+
+	//=================================================
+	//ANIMS IN WHICH ONLY THE LOWER OBJECTS ARE IN MD3
+	//=================================================
+	//# #sep Legs-only anims
+	LEGS_TURN1_DM16,				//# What legs do when you turn your lower body to match your upper body facing
+	LEGS_TURN2_DM16,				//# Leg turning from stand2
+	LEGS_LEAN_LEFT1_DM16,		//# Lean left
+	LEGS_LEAN_RIGHT1_DM16,		//# Lean Right
+	LEGS_CHOKING1_DM16,			//# TEMP
+	LEGS_LEFTUP1_DM16,			//# On a slope with left foot 4 higher than right
+	LEGS_LEFTUP2_DM16,			//# On a slope with left foot 8 higher than right
+	LEGS_LEFTUP3_DM16,			//# On a slope with left foot 12 higher than right
+	LEGS_LEFTUP4_DM16,			//# On a slope with left foot 16 higher than right
+	LEGS_LEFTUP5_DM16,			//# On a slope with left foot 20 higher than right
+	LEGS_RIGHTUP1_DM16,			//# On a slope with RIGHT foot 4 higher than left
+	LEGS_RIGHTUP2_DM16,			//# On a slope with RIGHT foot 8 higher than left
+	LEGS_RIGHTUP3_DM16,			//# On a slope with RIGHT foot 12 higher than left
+	LEGS_RIGHTUP4_DM16,			//# On a slope with RIGHT foot 16 higher than left
+	LEGS_RIGHTUP5_DM16,			//# On a slope with RIGHT foot 20 higher than left
+	LEGS_S1_LUP1_DM16,
+	LEGS_S1_LUP2_DM16,
+	LEGS_S1_LUP3_DM16,
+	LEGS_S1_LUP4_DM16,
+	LEGS_S1_LUP5_DM16,
+	LEGS_S1_RUP1_DM16,
+	LEGS_S1_RUP2_DM16,
+	LEGS_S1_RUP3_DM16,
+	LEGS_S1_RUP4_DM16,
+	LEGS_S1_RUP5_DM16,
+	LEGS_S3_LUP1_DM16,
+	LEGS_S3_LUP2_DM16,
+	LEGS_S3_LUP3_DM16,
+	LEGS_S3_LUP4_DM16,
+	LEGS_S3_LUP5_DM16,
+	LEGS_S3_RUP1_DM16,
+	LEGS_S3_RUP2_DM16,
+	LEGS_S3_RUP3_DM16,
+	LEGS_S3_RUP4_DM16,
+	LEGS_S3_RUP5_DM16,
+	LEGS_S4_LUP1_DM16,
+	LEGS_S4_LUP2_DM16,
+	LEGS_S4_LUP3_DM16,
+	LEGS_S4_LUP4_DM16,
+	LEGS_S4_LUP5_DM16,
+	LEGS_S4_RUP1_DM16,
+	LEGS_S4_RUP2_DM16,
+	LEGS_S4_RUP3_DM16,
+	LEGS_S4_RUP4_DM16,
+	LEGS_S4_RUP5_DM16,
+	LEGS_S5_LUP1_DM16,
+	LEGS_S5_LUP2_DM16,
+	LEGS_S5_LUP3_DM16,
+	LEGS_S5_LUP4_DM16,
+	LEGS_S5_LUP5_DM16,
+	LEGS_S5_RUP1_DM16,
+	LEGS_S5_RUP2_DM16,
+	LEGS_S5_RUP3_DM16,
+	LEGS_S5_RUP4_DM16,
+	LEGS_S5_RUP5_DM16,
+			0,//LEGS_S6_LUP1_DM16,
+			0,//LEGS_S6_LUP2_DM16,
+			0,//LEGS_S6_LUP3_DM16,
+			0,//LEGS_S6_LUP4_DM16,
+				0,//LEGS_S6_LUP5_DM16,
+			0,//LEGS_S6_RUP1_DM16,
+			0,//LEGS_S6_RUP2_DM16,
+			0,//LEGS_S6_RUP3_DM16,
+		0,//LEGS_S6_RUP4_DM16,
+		0,//LEGS_S6_RUP5_DM16,
+		0,//LEGS_S7_LUP1_DM16,
+		0,//LEGS_S7_LUP2_DM16,
+		0,//LEGS_S7_LUP3_DM16,
+		0,//LEGS_S7_LUP4_DM16,
+		0,//LEGS_S7_LUP5_DM16,
+		0,//LEGS_S7_RUP1_DM16,
+		0,//LEGS_S7_RUP2_DM16,
+		0,//LEGS_S7_RUP3_DM16,
+		0,//LEGS_S7_RUP4_DM16,
+		0,//LEGS_S7_RUP5_DM16,
+
+	//New anim as per Jarrod's request
+		0,//LEGS_TURN180_DM16,
 
 
 	//--------------------------------
 	//JA+ new animations
 	//--------------------------------
 
-		(animNumber_t)0,//BOTH_KISSEE,
-		(animNumber_t)0,//BOTH_KISSER,
-	BOTH_KISSER1STOP,
+		0,//BOTH_KISSEE_DM16,
+		0,//BOTH_KISSER_DM16,
+	BOTH_KISSER1STOP_DM16,
 
-			(animNumber_t)0,//BOTH_LEDGE_GRAB,
-			(animNumber_t)0,//BOTH_LEDGE_HOLD,
-			(animNumber_t)0,//BOTH_LEDGE_LEFT,
-			(animNumber_t)0,//BOTH_LEDGE_RIGHT,
-			(animNumber_t)0,//BOTH_LEDGE_MERCPULL,
+			0,//BOTH_LEDGE_GRAB_DM16,
+			0,//BOTH_LEDGE_HOLD_DM16,
+			0,//BOTH_LEDGE_LEFT_DM16,
+			0,//BOTH_LEDGE_RIGHT_DM16,
+			0,//BOTH_LEDGE_MERCPULL_DM16,
 
-		(animNumber_t)0,//BOTH_MELEE_BACKKICK,
-		(animNumber_t)0,//BOTH_MELEE_SPINKICK,
-		(animNumber_t)0,//TORSO_MAND_FLAME,
+		0,//BOTH_MELEE_BACKKICK_DM16,
+		0,//BOTH_MELEE_SPINKICK_DM16,
+		0,//TORSO_MAND_FLAME_DM16,
 
-		(animNumber_t)0,//BOTH_STAND1TO2_NEW,
-		(animNumber_t)0,//BOTH_STAND2TO1_NEW,
-		(animNumber_t)0,//BOTH_S1_S7_NEW,
-		(animNumber_t)0,//BOTH_S7_S1_NEW,
-		(animNumber_t)0,//BOTH_S6_S1_LARM,
-		(animNumber_t)0,//BOTH_S1_S6_LARM,
-		(animNumber_t)0,//BOTH_S6_S1_2ARMS,
-		(animNumber_t)0,//BOTH_S1_S6_2ARMS,
+		0,//BOTH_STAND1TO2_NEW_DM16,
+		0,//BOTH_STAND2TO1_NEW_DM16,
+		0,//BOTH_S1_S7_NEW_DM16,
+		0,//BOTH_S7_S1_NEW_DM16,
+		0,//BOTH_S6_S1_LARM_DM16,
+		0,//BOTH_S1_S6_LARM_DM16,
+		0,//BOTH_S6_S1_2ARMS_DM16,
+		0,//BOTH_S1_S6_2ARMS_DM16,
 
-		(animNumber_t)0,//BOTH_BACK_FALLING,
-		(animNumber_t)0,//BOTH_BACK_FALLING_GETUP,
-		(animNumber_t)0,//BOTH_BACK_FALLING_GETUP_SLOW,
+		0,//BOTH_BACK_FALLING_DM16,
+		0,//BOTH_BACK_FALLING_GETUP_DM16,
+		0,//BOTH_BACK_FALLING_GETUP_SLOW_DM16,
 
-		(animNumber_t)0,//BOTH_JUMP_BACKKICK_SPIN,
+		0,//BOTH_JUMP_BACKKICK_SPIN_DM16,
 
-		(animNumber_t)0,//BOTH_JUMP_BACKFLIP_ATCK,
-		(animNumber_t)0,//BOTH_JUMP_BACKFLIP_ATCKEE,
-		(animNumber_t)0,//BOTH_JUMP_BACKFLIP_ATCKEE_FALL,
+		0,//BOTH_JUMP_BACKFLIP_ATCK_DM16,
+		0,//BOTH_JUMP_BACKFLIP_ATCKEE_DM16,
+		0,//BOTH_JUMP_BACKFLIP_ATCKEE_FALL_DM16,
 
-		(animNumber_t)0,//BOTH_NEW_STABER,
-		(animNumber_t)0,//BOTH_NEW_STABEE,
+		0,//BOTH_NEW_STABER_DM16,
+		0,//BOTH_NEW_STABEE_DM16,
 
-		(animNumber_t)0,//BOTH_FLIP_STAB,
+		0,//BOTH_FLIP_STAB_DM16,
 
-		(animNumber_t)0,//BOTH_JUMP_BACKFLIP_ATCK_MISSED,
+		0,//BOTH_JUMP_BACKFLIP_ATCK_MISSED_DM16,
 
 
 	//--------------------------------
 	//JA++ new animations
 	//--------------------------------
-		(animNumber_t)0,//BOTH_WORM,
+		0,//BOTH_WORM_DM16,
 
 
 	//======================================================
 	//cinematic anims
 	//======================================================
 	//# #sep BOTH_ CINEMATIC-ONLY
-		(animNumber_t)0,//BOTH_CIN_1,		//# Level specific cinematic 1
-		(animNumber_t)0,//BOTH_CIN_2,		//# Level specific cinematic 2
-		(animNumber_t)0,//BOTH_CIN_3,		//# Level specific cinematic 3
-		(animNumber_t)0,//BOTH_CIN_4,		//# Level specific cinematic 4
-		(animNumber_t)0,//BOTH_CIN_5,		//# Level specific cinematic 5
-		(animNumber_t)0,//BOTH_CIN_6,		//# Level specific cinematic 6
-		(animNumber_t)0,//BOTH_CIN_7,		//# Level specific cinematic 7
-		(animNumber_t)0,//BOTH_CIN_8,		//# Level specific cinematic 8
-		(animNumber_t)0,//BOTH_CIN_9,		//# Level specific cinematic 9
-		(animNumber_t)0,//BOTH_CIN_10,		//# Level specific cinematic 10
-		(animNumber_t)0,//BOTH_CIN_11,		//# Level specific cinematic 11
-		(animNumber_t)0,//BOTH_CIN_12,		//# Level specific cinematic 12
-		(animNumber_t)0,//BOTH_CIN_13,		//# Level specific cinematic 13
-		(animNumber_t)0,//BOTH_CIN_14,		//# Level specific cinematic 14
-		(animNumber_t)0,//BOTH_CIN_15,		//# Level specific cinematic 15
-		(animNumber_t)0,//BOTH_CIN_16,		//# Level specific cinematic 16
-		(animNumber_t)0,//BOTH_CIN_17,		//# Level specific cinematic 17
-		(animNumber_t)0,//BOTH_CIN_18,		//# Level specific cinematic 18
-		(animNumber_t)0,//BOTH_CIN_19,		//# Level specific cinematic 19
-		(animNumber_t)0,//BOTH_CIN_20,		//# Level specific cinematic 20
-				(animNumber_t)0,//BOTH_CIN_21,		//# Level specific cinematic 21
-				(animNumber_t)0,//BOTH_CIN_22,		//# Level specific cinematic 22
-				(animNumber_t)0,//BOTH_CIN_23,		//# Level specific cinematic 23
-				(animNumber_t)0,//BOTH_CIN_24,		//# Level specific cinematic 24
-					(animNumber_t)0,//BOTH_CIN_25,		//# Level specific cinematic 25
-				(animNumber_t)0,//BOTH_CIN_26,		//# Level specific cinematic 
-				(animNumber_t)0,//BOTH_CIN_27,		//# Level specific cinematic 
-				(animNumber_t)0,//BOTH_CIN_28,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_29,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_30,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_31,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_32,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_33,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_34,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_35,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_36,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_37,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_38,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_39,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_40,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_41,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_42,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_43,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_44,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_45,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_46,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_47,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_48,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_49,		//# Level specific cinematic 
-			(animNumber_t)0,//BOTH_CIN_50,		//# Level specific cinematic
+		0,//BOTH_CIN_1_DM16,		//# Level specific cinematic 1
+		0,//BOTH_CIN_2_DM16,		//# Level specific cinematic 2
+		0,//BOTH_CIN_3_DM16,		//# Level specific cinematic 3
+		0,//BOTH_CIN_4_DM16,		//# Level specific cinematic 4
+		0,//BOTH_CIN_5_DM16,		//# Level specific cinematic 5
+		0,//BOTH_CIN_6_DM16,		//# Level specific cinematic 6
+		0,//BOTH_CIN_7_DM16,		//# Level specific cinematic 7
+		0,//BOTH_CIN_8_DM16,		//# Level specific cinematic 8
+		0,//BOTH_CIN_9_DM16,		//# Level specific cinematic 9
+		0,//BOTH_CIN_10_DM16,		//# Level specific cinematic 10
+		0,//BOTH_CIN_11_DM16,		//# Level specific cinematic 11
+		0,//BOTH_CIN_12_DM16,		//# Level specific cinematic 12
+		0,//BOTH_CIN_13_DM16,		//# Level specific cinematic 13
+		0,//BOTH_CIN_14_DM16,		//# Level specific cinematic 14
+		0,//BOTH_CIN_15_DM16,		//# Level specific cinematic 15
+		0,//BOTH_CIN_16_DM16,		//# Level specific cinematic 16
+		0,//BOTH_CIN_17_DM16,		//# Level specific cinematic 17
+		0,//BOTH_CIN_18_DM16,		//# Level specific cinematic 18
+		0,//BOTH_CIN_19_DM16,		//# Level specific cinematic 19
+		0,//BOTH_CIN_20_DM16,		//# Level specific cinematic 20
+				0,//BOTH_CIN_21_DM16,		//# Level specific cinematic 21
+				0,//BOTH_CIN_22_DM16,		//# Level specific cinematic 22
+				0,//BOTH_CIN_23_DM16,		//# Level specific cinematic 23
+				0,//BOTH_CIN_24_DM16,		//# Level specific cinematic 24
+					0,//BOTH_CIN_25_DM16,		//# Level specific cinematic 25
+				0,//BOTH_CIN_26_DM16,		//# Level specific cinematic 
+				0,//BOTH_CIN_27_DM16,		//# Level specific cinematic 
+				0,//BOTH_CIN_28_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_29_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_30_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_31_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_32_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_33_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_34_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_35_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_36_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_37_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_38_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_39_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_40_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_41_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_42_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_43_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_44_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_45_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_46_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_47_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_48_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_49_DM16,		//# Level specific cinematic 
+			0,//BOTH_CIN_50_DM16,		//# Level specific cinematic
 
 	//# #eol
-	MAX_ANIMATIONS,
-	MAX_TOTALANIMATIONS,
+	MAX_ANIMATIONS_DM16,
+	MAX_TOTALANIMATIONS_DM16,
 };
 
 

@@ -2910,7 +2910,7 @@ extern std::map <int, std::string>  saberStyleNames;
 typedef struct
 {
 	char* name;
-	int animToUse; // If you ever use this, fix the animations/generalize them
+	int animToUseGeneral; // If you ever use this, fix the animations/generalize them
 	int	startQuad;
 	int	endQuad;
 	unsigned animSetFlags;
@@ -2924,7 +2924,7 @@ typedef struct
 typedef struct
 {
 	char* name;
-	int animToUse;
+	int animToUseDM16;
 	int	startQuad;
 	int	endQuad;
 	unsigned animSetFlags;
@@ -3315,32 +3315,112 @@ extern const float forceJumpStrength[NUM_FORCE_POWER_LEVELS];
 
 
 
-
+template<qboolean animIsGeneral>
 qboolean inline isBackflip(int anim, demoType_t demoType) {
 
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim,demoType);
+	}
 	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	//return (qboolean)(
+	//	(demoType == DM_15 && animRaw >= BOTH_FLIP_BACK1_15 && animRaw <= BOTH_FLIP_BACK3_15)
+	//	|| (demoType == DM_16 && animRaw >= BOTH_FLIP_BACK1 && animRaw <= BOTH_FLIP_BACK3) // TODO JKA?
+	//	);
 	return (qboolean)(
-		(demoType == DM_15 && animRaw >= BOTH_FLIP_BACK1_15 && animRaw <= BOTH_FLIP_BACK3_15)
-		|| (demoType == DM_16 && animRaw >= BOTH_FLIP_BACK1 && animRaw <= BOTH_FLIP_BACK3) // TODO JKA?
+		(animRaw >= BOTH_FLIP_BACK1_GENERAL && animRaw <= BOTH_FLIP_BACK3_GENERAL)
 		);
 }
+template<qboolean animIsGeneral>
 qboolean inline isYellowDFA(int anim, demoType_t demoType) {
 
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
 	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	//return (qboolean)(
+	//	(demoType == DM_15 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && animRaw <= BOTH_JUMPFLIPSTABDOWN_15)
+	//	|| (demoType == DM_16 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1 && animRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
+	//	);
 	return (qboolean)(
-		(demoType == DM_15 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && animRaw <= BOTH_JUMPFLIPSTABDOWN_15)
-		|| (demoType == DM_16 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1 && animRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
+		(animRaw >= BOTH_JUMPFLIPSLASHDOWN1_GENERAL && animRaw <= BOTH_JUMPFLIPSTABDOWN_GENERAL)
 		);
 }
+template<qboolean animIsGeneral>
 qboolean inline isDFA(int anim, demoType_t demoType) {
 
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
 	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	//return (qboolean)(
+	//	(demoType == DM_15 && animRaw == BOTH_FORCELEAP2_T__B__15)
+	//	|| (demoType == DM_16 && animRaw == BOTH_FORCELEAP2_T__B_) // TODO JKA?
+	//	);
 	return (qboolean)(
-		(demoType == DM_15 && animRaw == BOTH_FORCELEAP2_T__B__15)
-		|| (demoType == DM_16 && animRaw == BOTH_FORCELEAP2_T__B_) // TODO JKA?
+		(animRaw == BOTH_FORCELEAP2_T__B__GENERAL)
 		);
 }
-qboolean BG_SaberInSpecialAttack(int anim);
+template<qboolean animIsGeneral>
+qboolean inline BG_SaberInSpecialAttack(int anim, demoType_t demoType)
+{
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
+	switch (anim & ~ANIM_TOGGLEBIT)
+	{
+	case BOTH_A2_STABBACK1_GENERAL:
+	case BOTH_ATTACK_BACK_GENERAL:
+	case BOTH_CROUCHATTACKBACK1_GENERAL:
+	case BOTH_ROLL_STAB_GENERAL:
+	case BOTH_BUTTERFLY_LEFT_GENERAL:
+	case BOTH_BUTTERFLY_RIGHT_GENERAL:
+	case BOTH_BUTTERFLY_FL1_GENERAL:
+	case BOTH_BUTTERFLY_FR1_GENERAL:
+	case BOTH_FJSS_TR_BL_GENERAL:
+	case BOTH_FJSS_TL_BR_GENERAL:
+	case BOTH_LUNGE2_B__T__GENERAL:
+	case BOTH_FORCELEAP2_T__B__GENERAL:
+	case BOTH_JUMPFLIPSLASHDOWN1_GENERAL://#
+	case BOTH_JUMPFLIPSTABDOWN_GENERAL://#
+	case BOTH_JUMPATTACK6_GENERAL:
+	case BOTH_JUMPATTACK7_GENERAL:
+	case BOTH_SPINATTACK6_GENERAL:
+	case BOTH_SPINATTACK7_GENERAL:
+	case BOTH_FORCELONGLEAP_ATTACK_GENERAL:
+	case BOTH_VS_ATR_S_GENERAL:
+	case BOTH_VS_ATL_S_GENERAL:
+	case BOTH_VT_ATR_S_GENERAL:
+	case BOTH_VT_ATL_S_GENERAL:
+	case BOTH_A7_KICK_F_GENERAL:
+	case BOTH_A7_KICK_B_GENERAL:
+	case BOTH_A7_KICK_R_GENERAL:
+	case BOTH_A7_KICK_L_GENERAL:
+	case BOTH_A7_KICK_S_GENERAL:
+	case BOTH_A7_KICK_BF_GENERAL:
+	case BOTH_A7_KICK_RL_GENERAL:
+	case BOTH_A7_KICK_F_AIR_GENERAL:
+	case BOTH_A7_KICK_B_AIR_GENERAL:
+	case BOTH_A7_KICK_R_AIR_GENERAL:
+	case BOTH_A7_KICK_L_AIR_GENERAL:
+	case BOTH_STABDOWN_GENERAL:
+	case BOTH_STABDOWN_STAFF_GENERAL:
+	case BOTH_STABDOWN_DUAL_GENERAL:
+	case BOTH_A6_SABERPROTECT_GENERAL:
+	case BOTH_A7_SOULCAL_GENERAL:
+	case BOTH_A1_SPECIAL_GENERAL:
+	case BOTH_A2_SPECIAL_GENERAL:
+	case BOTH_A3_SPECIAL_GENERAL:
+	case BOTH_FLIP_ATTACK7_GENERAL:
+	case BOTH_PULL_IMPALE_STAB_GENERAL:
+	case BOTH_PULL_IMPALE_SWING_GENERAL:
+	case BOTH_ALORA_SPIN_SLASH_GENERAL:
+	case BOTH_A6_FB_GENERAL:
+	case BOTH_A6_LR_GENERAL:
+	case BOTH_A7_HILT_GENERAL:
+		return qtrue;
+	}
+	return qfalse;
+}
 
 
 
@@ -3553,10 +3633,108 @@ float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles en
 
 
 
+template<qboolean saberMoveIsGeneralized>
+qboolean inline PM_SaberInBrokenParry(int move, demoType_t demoType)
+{
+	if constexpr (!saberMoveIsGeneralized) {
 
-qboolean PM_SaberInBrokenParry(int move, demoType_t demoType, qboolean saberMoveIsGeneralized);
-qboolean PM_InSaberAnim(int anim, demoType_t demoType);
-qboolean BG_SaberInAttack(int move, demoType_t demoType, qboolean saberMoveIsGeneralized);
+		move = generalizeGameValue<GMAP_LIGHTSABERMOVE>(move, demoType);
+	}
+	if (move >= LS_V1_BR_GENERAL && move <= LS_V1_B__GENERAL && demoType != DM_15) // This should be actually be check for 1.02 specifically TODO
+	{
+		return qtrue;
+	}
+	if (move >= LS_H1_T__GENERAL && move <= LS_H1_BL_GENERAL)
+	{
+		return qtrue;
+	}
+	return qfalse;
+}
+
+template<qboolean animIsGeneral>
+qboolean inline PM_InSaberAnim(int anim, demoType_t demoType)
+{
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
+	//if (demoType == DM_16 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B_ && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR
+	//	|| demoType == DM_15 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__15 && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_15
+	//	)
+	if ((anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__GENERAL && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_GENERAL)
+	{
+		return qtrue;
+	}
+	return qfalse;
+}
+
+template<qboolean saberMoveIsGeneralized>
+qboolean inline BG_SaberInAttack(int move, demoType_t demoType)
+{
+	if constexpr (!saberMoveIsGeneralized) {
+		move = generalizeGameValue<GMAP_LIGHTSABERMOVE>(move, demoType);
+	}
+	if (move >= LS_A_TL2BR_GENERAL && move <= LS_A_T2B_GENERAL)
+	{
+		return qtrue;
+	}
+	switch (move)
+	{
+	case LS_A_BACK_GENERAL:
+	case LS_A_BACK_CR_GENERAL:
+	case LS_A_BACKSTAB_GENERAL:
+	case LS_ROLL_STAB_GENERAL:
+	case LS_A_LUNGE_GENERAL:
+	case LS_A_JUMP_T__B__GENERAL:
+	case LS_A_FLIP_STAB_GENERAL:
+	case LS_A_FLIP_SLASH_GENERAL:
+	case LS_JUMPATTACK_DUAL_GENERAL:
+	case LS_JUMPATTACK_ARIAL_LEFT_GENERAL:
+	case LS_JUMPATTACK_ARIAL_RIGHT_GENERAL:
+	case LS_JUMPATTACK_CART_LEFT_GENERAL:
+	case LS_JUMPATTACK_CART_RIGHT_GENERAL:
+	case LS_JUMPATTACK_STAFF_LEFT_GENERAL:
+	case LS_JUMPATTACK_STAFF_RIGHT_GENERAL:
+	case LS_BUTTERFLY_LEFT_GENERAL:
+	case LS_BUTTERFLY_RIGHT_GENERAL:
+	case LS_A_BACKFLIP_ATK_GENERAL:
+	case LS_SPINATTACK_DUAL_GENERAL:
+	case LS_SPINATTACK_GENERAL:
+	case LS_LEAP_ATTACK_GENERAL:
+	case LS_SWOOP_ATTACK_RIGHT_GENERAL:
+	case LS_SWOOP_ATTACK_LEFT_GENERAL:
+	case LS_TAUNTAUN_ATTACK_RIGHT_GENERAL:
+	case LS_TAUNTAUN_ATTACK_LEFT_GENERAL:
+	case LS_KICK_F_GENERAL:
+	case LS_KICK_B_GENERAL:
+	case LS_KICK_R_GENERAL:
+	case LS_KICK_L_GENERAL:
+	case LS_KICK_S_GENERAL:
+	case LS_KICK_BF_GENERAL:
+	case LS_KICK_RL_GENERAL:
+	case LS_KICK_F_AIR_GENERAL:
+	case LS_KICK_B_AIR_GENERAL:
+	case LS_KICK_R_AIR_GENERAL:
+	case LS_KICK_L_AIR_GENERAL:
+	case LS_STABDOWN_GENERAL:
+	case LS_STABDOWN_STAFF_GENERAL:
+	case LS_STABDOWN_DUAL_GENERAL:
+	case LS_DUAL_SPIN_PROTECT_GENERAL:
+	case LS_STAFF_SOULCAL_GENERAL:
+	case LS_A1_SPECIAL_GENERAL:
+	case LS_A2_SPECIAL_GENERAL:
+	case LS_A3_SPECIAL_GENERAL:
+	case LS_UPSIDE_DOWN_ATTACK_GENERAL:
+	case LS_PULL_ATTACK_STAB_GENERAL:
+	case LS_PULL_ATTACK_SWING_GENERAL:
+	case LS_SPINATTACK_ALORA_GENERAL:
+	case LS_DUAL_FB_GENERAL:
+	case LS_DUAL_LR_GENERAL:
+	case LS_HILT_BASH_GENERAL:
+		return qtrue;
+		break;
+	}
+	return qfalse;
+}
 
 
 
@@ -3588,13 +3766,14 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 	}
 
 	saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE>(saberMove, demoType);
+	torsoAnim = generalizeGameValue<GMAP_ANIMATIONS>(torsoAnim, demoType);
 
-	if (BG_SaberInAttack(saberMove, demoType,qtrue))
+	if (BG_SaberInAttack<qtrue>(saberMove, demoType))
 	{
 		return qfalse;
 	}
 
-	if (PM_InSaberAnim(torsoAnim, demoType) &&
+	if (PM_InSaberAnim<qtrue>(torsoAnim, demoType) &&
 		saberMove != LS_READY_GENERAL && saberMove != LS_NONE_GENERAL)
 	{
 		if (saberMove < LS_PARRY_UP_GENERAL || saberMove > LS_REFLECT_LL_GENERAL)
@@ -3603,7 +3782,7 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 		}
 	}
 
-	if (PM_SaberInBrokenParry(saberMove,demoType,qtrue) && demoType != DM_15) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
+	if (demoType != DM_15 && PM_SaberInBrokenParry<qtrue>(saberMove,demoType)) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
 	{
 		return qfalse;
 	}
@@ -3719,6 +3898,7 @@ struct gameConstantsInfo_t {
 	int cs_players;
 	int	et_events;
 	int ef_missile_stick;
+	int anim_togglebit;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -3744,6 +3924,7 @@ enum gameMappingType_t { // When changing this, also update gameMappingTypeGener
 	GMAP_MEANSOFDEATH,
 	GMAP_LIGHTSABERMOVE,
 	GMAP_ITEMLIST,
+	GMAP_ANIMATIONS,
 	GAMEMAPPINGTYPES_COUNT
 };
 
@@ -3753,6 +3934,7 @@ static const int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
 	MOD_MAX_GENERAL+1, //GMAP_MEANSOFDEATH,
 	LS_MOVE_MAX_GENERAL+2, //GMAP_LIGHTSABERMOVE // Is +2 because it has the value -1 as well. This also needs to have an offset applied!
 	ITEMLIST_NUM_TOTAL_GENERAL+1,
+	MAX_ANIMATIONS_GENERAL+1,
 }; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
 
 static const int gameMappingTypeGeneralValueOffset[GAMEMAPPINGTYPES_COUNT] {
@@ -3837,6 +4019,9 @@ inline int getET_EVENTS(demoType_t demoType) {
 inline int getEF_MISSILE_STICK(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.ef_missile_stick;
 }
+inline int getANIM_TOGGLEBIT(demoType_t demoType) {
+	return gameInfosMapped[demoType]->constants.anim_togglebit;
+}
 inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;
 }
@@ -3854,6 +4039,13 @@ inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t tar
 			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~EV_EVENT_BITS];
 			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value)&EV_EVENT_BITS);
 		}
+		else  if constexpr (T == GMAP_ANIMATIONS) {
+
+			int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
+			int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~sourceAnimToggleBit];
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value&sourceAnimToggleBit)*targetAnimToggleBit/sourceAnimToggleBit);
+		}
 		else  {
 
 			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value];
@@ -3862,10 +4054,16 @@ inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t tar
 	}
 }
 
+//#define MapQ3AnimToJK2(anim) (q3AnimMapping[(anim)&~ANIM_TOGGLEBIT_Q3] | (((anim)&ANIM_TOGGLEBIT_Q3)*ANIM_TOGGLEBIT/ANIM_TOGGLEBIT_Q3))
+
 template<gameMappingType_t T>
 inline int generalizeGameValue(int value, demoType_t sourceDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
 		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+	}
+	else if constexpr (T == GMAP_ANIMATIONS) {
+		int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~sourceAnimToggleBit] | ((value&sourceAnimToggleBit)*ANIM_TOGGLEBIT/sourceAnimToggleBit);
 	}
 	else  {
 		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value];
@@ -3873,12 +4071,16 @@ inline int generalizeGameValue(int value, demoType_t sourceDemoType) {
 }
 
 template<gameMappingType_t T>
-inline int specializeGameValue(int value, demoType_t sourceDemoType) {
+inline int specializeGameValue(int value, demoType_t targetDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
-		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping[(value & ~EV_EVENT_BITS)] | ((value)&EV_EVENT_BITS);
+		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[(value & ~EV_EVENT_BITS)] | ((value)&EV_EVENT_BITS);
+	}
+	else  if constexpr (T == GMAP_ANIMATIONS) {
+		int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
+		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[(value & ~ANIM_TOGGLEBIT)] | ((value& ANIM_TOGGLEBIT)*targetAnimToggleBit/ANIM_TOGGLEBIT);
 	}
 	else  {
-		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping[value];
+		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[value];
 	}
 }
 
@@ -3887,6 +4089,11 @@ template<gameMappingType_t T>
 inline int specializedGameValueMapUnsafe(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
 		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+	}
+	else if constexpr (T == GMAP_ANIMATIONS) {
+		int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
+		int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~sourceAnimToggleBit] | ((value& sourceAnimToggleBit)* targetAnimToggleBit/sourceAnimToggleBit);
 	}
 	else  {
 
