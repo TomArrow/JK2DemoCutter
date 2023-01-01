@@ -3360,7 +3360,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							std::stringstream ss;
 							std::string boostString = ((boostCountAttacker + boostCountVictim) > 0 ?( va("_BST%s%s", boostCountAttacker > 0 ? va("%dA", boostCountAttacker) : "", boostCountVictim > 0 ? va("%dV", boostCountVictim) : "")) : "");
-							ss << mapname << std::setfill('0') << "___RET" << modInfo.str() << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
+							ss << mapname << std::setfill('0') << "___"<< logModString << modInfo.str() << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -3844,6 +3844,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						if (thisEntity->number == p) {
 							clientIsInSnapshot = true;
 
+							// TODO check playerteam bc ghost powerups?
 							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
 								lastKnownRedFlagCarrier = thisEntity->number;
 								VectorCopy(thisEntity->pos.trBase,lastKnownRedFlagCarrierPosition);
