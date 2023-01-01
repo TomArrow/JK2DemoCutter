@@ -2139,7 +2139,8 @@ Gives shield energy when used.
 "chargerate" - rechage 1 point every this many milliseconds (default 3000)
 */
 
-gitem_t	bg_itemlist[] =
+#if 0
+gitem_t	bg_itemlist_UNUSED[] =
 {
 	{
 		NULL,				// classname	
@@ -2903,7 +2904,7 @@ Only in One Flag CTF games
 };
 
 int		bg_numItems = sizeof(bg_itemlist) / sizeof(bg_itemlist[0]) - 1;
-
+#endif
 
 
 int forceMasteryPoints[NUM_FORCE_MASTERY_LEVELS] =
@@ -4251,6 +4252,7 @@ static gameInfo_t gameInfos[] = {
 			{{},{jk2WeaponsToGeneral,sizeof(jk2WeaponsToGeneral) / sizeof(jk2WeaponsToGeneral[0])}},
 			{{},{jk2modToGeneralMap,sizeof(jk2modToGeneralMap) / sizeof(jk2modToGeneralMap[0])}},
 			{{},{saberMoveJK2ToGeneral,sizeof(saberMoveJK2ToGeneral) / sizeof(saberMoveJK2ToGeneral[0]),1}},
+			{{},{jk2ItemListToGeneral,sizeof(jk2ItemListToGeneral) / sizeof(jk2ItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFields15,sizeof(entityStateFields15) / sizeof(entityStateFields15[0]),},
@@ -4275,6 +4277,7 @@ static gameInfo_t gameInfos[] = {
 			{{},{jk2WeaponsToGeneral,sizeof(jk2WeaponsToGeneral) / sizeof(jk2WeaponsToGeneral[0])}},
 			{{},{jk2modToGeneralMap,sizeof(jk2modToGeneralMap) / sizeof(jk2modToGeneralMap[0])}},
 			{{},{saberMoveJK2ToGeneral,sizeof(saberMoveJK2ToGeneral) / sizeof(saberMoveJK2ToGeneral[0]),1}},
+			{{},{jk2ItemListToGeneral,sizeof(jk2ItemListToGeneral) / sizeof(jk2ItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFields,	sizeof(entityStateFields) / sizeof(entityStateFields[0]),},
@@ -4299,6 +4302,7 @@ static gameInfo_t gameInfos[] = {
 			{{},{jk2WeaponsToGeneral,sizeof(jk2WeaponsToGeneral) / sizeof(jk2WeaponsToGeneral[0])}},
 			{{},{jk2modToGeneralMap,sizeof(jk2modToGeneralMap) / sizeof(jk2modToGeneralMap[0])}},
 			{{},{saberMoveJK2ToGeneral,sizeof(saberMoveJK2ToGeneral) / sizeof(saberMoveJK2ToGeneral[0]),1}},
+			{{},{jk2ItemListToGeneral,sizeof(jk2ItemListToGeneral) / sizeof(jk2ItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFields,	sizeof(entityStateFields) / sizeof(entityStateFields[0]),},
@@ -4332,7 +4336,8 @@ static gameInfo_t gameInfos[] = {
 			},{
 				{{{DM_15,DM_15_1_03,DM_16},lsMoveJKAToJK2,sizeof(lsMoveJKAToJK2) / sizeof(lsMoveJKAToJK2[0]),1}}, // last parameter offset 1 because the values start at -1
 				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0]),1},
-			}
+			},
+			{{},{jkaItemListToGeneral,sizeof(jkaItemListToGeneral) / sizeof(jkaItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsJKA,sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),},
@@ -4369,7 +4374,8 @@ static gameInfo_t gameInfos[] = {
 			},{
 				{{{DM_15,DM_15_1_03,DM_16},lsMoveJKAToJK2,sizeof(lsMoveJKAToJK2) / sizeof(lsMoveJKAToJK2[0]),1}}, // last parameter offset 1 because the values start at -1
 				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0]),1},
-			}
+			},
+			{{},{jkaItemListToGeneral,sizeof(jkaItemListToGeneral) / sizeof(jkaItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsJKA,sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),},
@@ -4409,7 +4415,8 @@ static gameInfo_t gameInfos[] = {
 			},{
 				{{{DM_15,DM_15_1_03,DM_16},lsMoveJKAToJK2,sizeof(lsMoveJKAToJK2) / sizeof(lsMoveJKAToJK2[0]),1}}, // last parameter offset 1 because the values start at -1
 				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0]),1},
-			}
+			},
+			{{},{jkaItemListToGeneral,sizeof(jkaItemListToGeneral) / sizeof(jkaItemListToGeneral[0])}},
 		},
 		{},
 		MAX_CONFIGSTRINGS_JKA
@@ -4437,7 +4444,8 @@ static gameInfo_t gameInfos[] = {
 				{},
 				{q3ModToGeneralMap,sizeof(q3ModToGeneralMap) / sizeof(q3ModToGeneralMap[0])},
 			},
-			{{},{lsMoveQ3ToGeneral,sizeof(lsMoveQ3ToGeneral) / sizeof(lsMoveQ3ToGeneral[0]),1}},
+			{{},{lsMoveQ3ToGeneral,sizeof(lsMoveQ3ToGeneral) / sizeof(lsMoveQ3ToGeneral[0])}},
+			{{},{q3ItemListToGeneral,sizeof(q3ItemListToGeneral) / sizeof(q3ItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -4470,7 +4478,8 @@ static gameInfo_t gameInfos[] = {
 				{},
 				{q3ModToGeneralMap,sizeof(q3ModToGeneralMap) / sizeof(q3ModToGeneralMap[0])},
 			},
-			{{},{lsMoveQ3ToGeneral,sizeof(lsMoveQ3ToGeneral) / sizeof(lsMoveQ3ToGeneral[0]),1}},
+			{{},{lsMoveQ3ToGeneral,sizeof(lsMoveQ3ToGeneral) / sizeof(lsMoveQ3ToGeneral[0])}},
+			{{},{q3ItemListToGeneral,sizeof(q3ItemListToGeneral) / sizeof(q3ItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -4503,7 +4512,8 @@ static gameInfo_t gameInfos[] = {
 				{},
 				{q3ModToGeneralMap,sizeof(q3ModToGeneralMap) / sizeof(q3ModToGeneralMap[0])},
 			},
-			{{},{lsMoveQ3ToGeneral,sizeof(lsMoveQ3ToGeneral) / sizeof(lsMoveQ3ToGeneral[0]),1}},
+			{{},{lsMoveQ3ToGeneral,sizeof(lsMoveQ3ToGeneral) / sizeof(lsMoveQ3ToGeneral[0])}},
+			{{},{q3ItemListToGeneral,sizeof(q3ItemListToGeneral) / sizeof(q3ItemListToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},

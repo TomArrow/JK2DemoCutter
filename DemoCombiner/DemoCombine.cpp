@@ -740,7 +740,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					}
 					// Flag
-					else if (it->second.eType == ET_ITEM && it->second.modelindex && bg_itemlist[it->second.modelindex].giType == IT_TEAM && bg_itemlist[it->second.modelindex].giTag >= PW_REDFLAG && bg_itemlist[it->second.modelindex].giTag <= PW_NEUTRALFLAG ) {
+					//else if (it->second.eType == ET_ITEM && it->second.modelindex && bg_itemlist[it->second.modelindex].giType == IT_TEAM && bg_itemlist[it->second.modelindex].giTag >= PW_REDFLAG && bg_itemlist[it->second.modelindex].giTag <= PW_NEUTRALFLAG ) {
+					else if (it->second.eType == ET_ITEM && it->second.modelindex && generalizeGameValue<GMAP_ITEMLIST>(it->second.modelindex,demoReaders[i].reader.getDemoType()) >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL&& generalizeGameValue<GMAP_ITEMLIST>(it->second.modelindex, demoReaders[i].reader.getDemoType()) <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
 						
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)

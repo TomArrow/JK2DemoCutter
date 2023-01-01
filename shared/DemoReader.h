@@ -146,6 +146,7 @@ public:
 	
 	int getMaxClients();
 
+	demoType_t getDemoType();
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();
 	qboolean SeekToTime(double time);

@@ -16,6 +16,9 @@
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
 
+demoType_t DemoReader::getDemoType() {
+	return demoType;
+}
 int DemoReader::getMaxClients() {
 	return maxClientsThisDemo;
 }
