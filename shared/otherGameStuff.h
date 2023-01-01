@@ -87,6 +87,10 @@
 // TODO Idk what to do about the mission pack stuff...
 
 
+const int lsMoveQ3ToGeneral[]{
+	LS_NONE_GENERAL
+};
+
 static int q3ModToGeneralMap[]{
 	MOD_UNKNOWN_GENERAL,
 	MOD_SHOTGUN_GENERAL,

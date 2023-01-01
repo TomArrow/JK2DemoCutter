@@ -54,7 +54,7 @@ public:
 #define PARRY_DFA_DETECT_SLOW_THRESHOLD 350
 #define PARRY_YDFA_DETECT_SLOW_THRESHOLD 600
 struct saberMoveInfo_t {
-	int saberMove;
+	int saberMoveGeneral;
 	int64_t saberMoveChange;
 	float speed;
 };
@@ -1111,6 +1111,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
 	qboolean		isCompressedFile = qfalse;
+	int				psGeneralSaberMove = 0;
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -1736,6 +1737,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				demoOldTime = demoCurrentTime;
 
+				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE>(demo.cut.Cl.snap.ps.saberMove,demoType);
+
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
@@ -1745,6 +1748,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
+						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE>(thisEs->saberMove,demoType);
 
 						thisFrameInfo.canBlockSimplified[thisEs->number] = WP_SaberCanBlock_Simple(thisEs,demoType);
 
@@ -1769,7 +1773,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 
 								// Special strafe value that is only measured when saber is not in any active attack
-								if (thisEs->saberMove >= LS_NONE && thisEs->saberMove <= LS_PUTAWAY) {
+								if (thisEsGeneralSaberMove >= LS_NONE_GENERAL && thisEsGeneralSaberMove <= LS_PUTAWAY_GENERAL) {
 
 									playerDemoStatsPointers[thisEs->number]->everUsedNoSaberMove = qtrue;
 									playerDemoStatsPointers[thisEs->number]->strafeDeviationNoSaberMove.sum += strafeDeviation;
@@ -1887,15 +1891,15 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
-							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMove != thisEs->saberMove) {
-								if (thisEs->saberMove >= LS_PARRY_UP && thisEs->saberMove <= LS_PARRY_LL) {
+							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveGeneral != thisEsGeneralSaberMove) {
+								if (thisEsGeneralSaberMove >= LS_PARRY_UP_GENERAL && thisEsGeneralSaberMove <= LS_PARRY_LL_GENERAL) {
 									hitDetectionData[thisEs->number].newParryDetected = qtrue;
 								}
 								for (int smI = MAX_PAST_SABERMOVE_SAVE -1; smI > 0; smI--) {
 									playerLastSaberMove[thisEs->number].lastSaberMove[smI] = playerLastSaberMove[thisEs->number].lastSaberMove[smI-1];
 								}
 								playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveChange = demoCurrentTime;
-								playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMove= thisEs->saberMove;
+								playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveGeneral= thisEsGeneralSaberMove;
 								playerLastSaberMove[thisEs->number].lastSaberMove[0].speed= speed;
 							}
 						}
@@ -1946,7 +1950,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 
 							// Special strafe value that is only measured when saber is not in any active attack
-							if (demo.cut.Cl.snap.ps.saberMove >= LS_NONE && demo.cut.Cl.snap.ps.saberMove <= LS_PUTAWAY) { 
+							if (psGeneralSaberMove >= LS_NONE_GENERAL && psGeneralSaberMove <= LS_PUTAWAY_GENERAL) {
 
 								playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->everUsedNoSaberMove = qtrue;
 								playerDemoStatsPointers[demo.cut.Cl.snap.ps.clientNum]->strafeDeviationNoSaberMove.sum += playerStateStrafeDeviationThisFrame;
@@ -2068,15 +2072,15 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 #endif
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
-						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMove != demo.cut.Cl.snap.ps.saberMove) {
-							if (demo.cut.Cl.snap.ps.saberMove >= LS_PARRY_UP && demo.cut.Cl.snap.ps.saberMove <= LS_PARRY_LL) {
+						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMoveGeneral != psGeneralSaberMove) {
+							if (psGeneralSaberMove >= LS_PARRY_UP_GENERAL && psGeneralSaberMove <= LS_PARRY_LL_GENERAL) {
 								hitDetectionData[demo.cut.Cl.snap.ps.clientNum].newParryDetected = qtrue;
 							}
 							for (int smI = MAX_PAST_SABERMOVE_SAVE - 1; smI > 0; smI--) {
 								playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[smI] = playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[smI - 1];
 							}
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMoveChange = demoCurrentTime;
-							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMove = demo.cut.Cl.snap.ps.saberMove;
+							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMoveGeneral = psGeneralSaberMove;
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].speed = speed;
 						}
 					}
@@ -2725,7 +2729,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 									case WP_SABER_GENERAL:
 										if (attackerIsFollowed) {
 
-											modInfo << saberMoveNames[demo.cut.Cl.snap.ps.saberMove];
+											modInfo << saberMoveNames_general[psGeneralSaberMove];
 											if (!modInfo.str().size()) {
 												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
 											}
@@ -2739,7 +2743,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 										else {
 
 											if (attackerEntity) {
-												modInfo << saberMoveNames[attackerEntity->saberMove];
+												modInfo << saberMoveNames_general[generalizeGameValue<GMAP_LIGHTSABERMOVE>(attackerEntity->saberMove,demoType)];
 												if (!modInfo.str().size()) {
 													// THIS IS INVALID!
 													int saberStance = attackerEntity->fireflag;
@@ -2772,23 +2776,23 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 										//if ((playerLastSaberMove[attacker].lastLastSaberMove >= LS_K1_T_ && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL)
 										//	|| (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_D1_B_)
 										//	) {
-										if (playerLastSaberMove[attacker].lastSaberMove[1].saberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastSaberMove[1].saberMove <= LS_REFLECT_LL) {
-											if (playerLastSaberMove[attacker].lastSaberMove[0].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[1].saberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove[0].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[1].saberMove].chain_idle) {
+										if (playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral >= LS_B1_BR_GENERAL && playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral <= LS_REFLECT_LL_GENERAL) {
+											if (playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral].chain_attack || playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral].chain_idle) {
 												// yep this is a chain from a parry or such.
 												// not sure if we should include the stuff like broken parry which is followed by idle saber,
 												// but i guess a broken parry followed by a burn kill could be fun to know too
 												modInfo << "_FR";
-												modInfo << saberMoveNames[playerLastSaberMove[attacker].lastSaberMove[1].saberMove];
+												modInfo << saberMoveNames_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral];
 											}
 										}
 										// DFA from parry? If our attack is a DFA or other pre-swing attack resulting from a parry (well basically there's only dfa and yellow dfa I think that qualify)
 										// BUT: This doesnt find them all for some reason. Idk why. Maybe sometimes they arent true parry dfas. Who knows. Often theres nothing in the sabermove history with a saber move above 74, but rather transitions and whatnot
-										else if (playerLastSaberMove[attacker].lastSaberMove[0].saberMove >= LS_A_JUMP_T__B_ && playerLastSaberMove[attacker].lastSaberMove[0].saberMove <= LS_A_FLIP_SLASH) {
-											if (playerLastSaberMove[attacker].lastSaberMove[2].saberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastSaberMove[2].saberMove <= LS_REFLECT_LL) {
-												if (playerLastSaberMove[attacker].lastSaberMove[1].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[2].saberMove].chain_attack || playerLastSaberMove[attacker].lastSaberMove[1].saberMove == saberMoveData[playerLastSaberMove[attacker].lastSaberMove[2].saberMove].chain_idle) {
+										else if (playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral >= LS_A_JUMP_T__B__GENERAL && playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral <= LS_A_FLIP_SLASH_GENERAL) {
+											if (playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral >= LS_B1_BR_GENERAL && playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral <= LS_REFLECT_LL_GENERAL) {
+												if (playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral].chain_attack || playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral].chain_idle) {
 													
-													qboolean isSlowDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMove == LS_A_JUMP_T__B_ && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_DFA_DETECT_SLOW_THRESHOLD);
-													qboolean isSlowYDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMove != LS_A_JUMP_T__B_ && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_YDFA_DETECT_SLOW_THRESHOLD);
+													qboolean isSlowDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == LS_A_JUMP_T__B__GENERAL && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_DFA_DETECT_SLOW_THRESHOLD);
+													qboolean isSlowYDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral != LS_A_JUMP_T__B__GENERAL && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_YDFA_DETECT_SLOW_THRESHOLD);
 													if (isSlowDfa || isSlowYDfa) {
 														// We are interested mostly in those very fast parry DFAs
 														// If its a dfa from a parry that takes a while to connect.. meh
@@ -2800,7 +2804,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 													else {
 														modInfo << "_FR";
 													}
-													modInfo << saberMoveNames[playerLastSaberMove[attacker].lastSaberMove[2].saberMove];
+													modInfo << saberMoveNames_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral];
 
 												}
 											}
@@ -3959,8 +3963,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					}
 					// New attack from parry?
 					if (playerLastSaberMove[playerNum].lastSaberMove[0].saberMoveChange == demoCurrentTime // Happened on this frame, avoid duplicates
-						&& playerLastSaberMove[playerNum].lastSaberMove[1].saberMove >= LS_PARRY_UP && playerLastSaberMove[playerNum].lastSaberMove[1].saberMove <= LS_PARRY_LL // last one was parry
-						&& playerLastSaberMove[playerNum].lastSaberMove[0].saberMove == saberMoveData[playerLastSaberMove[playerNum].lastSaberMove[1].saberMove].chain_attack // this one is the result if you click atack
+						&& playerLastSaberMove[playerNum].lastSaberMove[1].saberMoveGeneral >= LS_PARRY_UP_GENERAL && playerLastSaberMove[playerNum].lastSaberMove[1].saberMoveGeneral <= LS_PARRY_LL_GENERAL // last one was parry
+						&& playerLastSaberMove[playerNum].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[playerNum].lastSaberMove[1].saberMoveGeneral].chain_attack // this one is the result if you click atack
 						) {
 						if (playerDemoStatsPointers[playerNum]) {
 							playerDemoStatsPointers[playerNum]->everUsed = qtrue;

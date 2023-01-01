@@ -2396,161 +2396,521 @@ enum
 	NUM_FORCE_POWER_LEVELS
 };
 
+// This is JKA stuff actually but the constants havent changed from JK2 in terms of values so its ok
+typedef enum
+{
+	SS_NONE = 0,
+	SS_FAST,
+	SS_MEDIUM,
+	SS_STRONG,
+	SS_DESANN,
+	SS_TAVION,
+	SS_DUAL,
+	SS_STAFF,
+	SS_NUM_SABER_STYLES
+} saber_styles_t;
+
 typedef enum {
+	//totally invalid
+	LS_INVALID_GENERAL = -1,
 	// Invalid, or saber not armed
-	LS_NONE = 0,
+	LS_NONE_GENERAL = 0,
 
 	// General movements with saber
-	LS_READY,
-	LS_DRAW,
-	LS_PUTAWAY,
+	LS_READY_GENERAL,
+	LS_DRAW_GENERAL,
+	LS_PUTAWAY_GENERAL,
 
 	// Attacks
-	LS_A_TL2BR,//4
-	LS_A_L2R,
-	LS_A_BL2TR,
-	LS_A_BR2TL,
-	LS_A_R2L,
-	LS_A_TR2BL,
-	LS_A_T2B,
-	LS_A_BACKSTAB,
-	LS_A_BACK,
-	LS_A_BACK_CR,
-	LS_A_LUNGE,
-	LS_A_JUMP_T__B_,
-	LS_A_FLIP_STAB,
-	LS_A_FLIP_SLASH,
+	LS_A_TL2BR_GENERAL,//4
+	LS_A_L2R_GENERAL,
+	LS_A_BL2TR_GENERAL,
+	LS_A_BR2TL_GENERAL,
+	LS_A_R2L_GENERAL,
+	LS_A_TR2BL_GENERAL,
+	LS_A_T2B_GENERAL,
+	LS_A_BACKSTAB_GENERAL,
+	LS_A_BACK_GENERAL,
+	LS_A_BACK_CR_GENERAL,
+	LS_ROLL_STAB_GENERAL,
+	LS_A_LUNGE_GENERAL,
+	LS_A_JUMP_T__B__GENERAL,
+	LS_A_FLIP_STAB_GENERAL,
+	LS_A_FLIP_SLASH_GENERAL,
+	LS_JUMPATTACK_DUAL_GENERAL,
+	LS_JUMPATTACK_ARIAL_LEFT_GENERAL,
+	LS_JUMPATTACK_ARIAL_RIGHT_GENERAL,
+	LS_JUMPATTACK_CART_LEFT_GENERAL,
+	LS_JUMPATTACK_CART_RIGHT_GENERAL,
+	LS_JUMPATTACK_STAFF_LEFT_GENERAL,
+	LS_JUMPATTACK_STAFF_RIGHT_GENERAL,
+	LS_BUTTERFLY_LEFT_GENERAL,
+	LS_BUTTERFLY_RIGHT_GENERAL,
+	LS_A_BACKFLIP_ATK_GENERAL,
+	LS_SPINATTACK_DUAL_GENERAL,
+	LS_SPINATTACK_GENERAL,
+	LS_LEAP_ATTACK_GENERAL,
+	LS_SWOOP_ATTACK_RIGHT_GENERAL,
+	LS_SWOOP_ATTACK_LEFT_GENERAL,
+	LS_TAUNTAUN_ATTACK_RIGHT_GENERAL,
+	LS_TAUNTAUN_ATTACK_LEFT_GENERAL,
+	LS_KICK_F_GENERAL,
+	LS_KICK_B_GENERAL,
+	LS_KICK_R_GENERAL,
+	LS_KICK_L_GENERAL,
+	LS_KICK_S_GENERAL,
+	LS_KICK_BF_GENERAL,
+	LS_KICK_RL_GENERAL,
+	LS_KICK_F_AIR_GENERAL,
+	LS_KICK_B_AIR_GENERAL,
+	LS_KICK_R_AIR_GENERAL,
+	LS_KICK_L_AIR_GENERAL,
+	LS_STABDOWN_GENERAL,
+	LS_STABDOWN_STAFF_GENERAL,
+	LS_STABDOWN_DUAL_GENERAL,
+	LS_DUAL_SPIN_PROTECT_GENERAL,
+	LS_STAFF_SOULCAL_GENERAL,
+	LS_A1_SPECIAL_GENERAL,
+	LS_A2_SPECIAL_GENERAL,
+	LS_A3_SPECIAL_GENERAL,
+	LS_UPSIDE_DOWN_ATTACK_GENERAL,
+	LS_PULL_ATTACK_STAB_GENERAL,
+	LS_PULL_ATTACK_SWING_GENERAL,
+	LS_SPINATTACK_ALORA_GENERAL,
+	LS_DUAL_FB_GENERAL,
+	LS_DUAL_LR_GENERAL,
+	LS_HILT_BASH_GENERAL,
 
 	//starts
-	LS_S_TL2BR,//26
-	LS_S_L2R,
-	LS_S_BL2TR,//# Start of attack chaining to SLASH LR2UL
-	LS_S_BR2TL,//# Start of attack chaining to SLASH LR2UL
-	LS_S_R2L,
-	LS_S_TR2BL,
-	LS_S_T2B,
+	LS_S_TL2BR_GENERAL,//26
+	LS_S_L2R_GENERAL,
+	LS_S_BL2TR_GENERAL,//# Start of attack chaining to SLASH LR2UL
+	LS_S_BR2TL_GENERAL,//# Start of attack chaining to SLASH LR2UL
+	LS_S_R2L_GENERAL,
+	LS_S_TR2BL_GENERAL,
+	LS_S_T2B_GENERAL,
 
 	//returns
-	LS_R_TL2BR,//33
-	LS_R_L2R,
-	LS_R_BL2TR,
-	LS_R_BR2TL,
-	LS_R_R2L,
-	LS_R_TR2BL,
-	LS_R_T2B,
+	LS_R_TL2BR_GENERAL,//33
+	LS_R_L2R_GENERAL,
+	LS_R_BL2TR_GENERAL,
+	LS_R_BR2TL_GENERAL,
+	LS_R_R2L_GENERAL,
+	LS_R_TR2BL_GENERAL,
+	LS_R_T2B_GENERAL,
 
 	//transitions
-	LS_T1_BR__R,//40
-	LS_T1_BR_TR,
-	LS_T1_BR_T_,
-	LS_T1_BR_TL,
-	LS_T1_BR__L,
-	LS_T1_BR_BL,
-	LS_T1__R_BR,//46
-	LS_T1__R_TR,
-	LS_T1__R_T_,
-	LS_T1__R_TL,
-	LS_T1__R__L,
-	LS_T1__R_BL,
-	LS_T1_TR_BR,//52
-	LS_T1_TR__R,
-	LS_T1_TR_T_,
-	LS_T1_TR_TL,
-	LS_T1_TR__L,
-	LS_T1_TR_BL,
-	LS_T1_T__BR,//58
-	LS_T1_T___R,
-	LS_T1_T__TR,
-	LS_T1_T__TL,
-	LS_T1_T___L,
-	LS_T1_T__BL,
-	LS_T1_TL_BR,//64
-	LS_T1_TL__R,
-	LS_T1_TL_TR,
-	LS_T1_TL_T_,
-	LS_T1_TL__L,
-	LS_T1_TL_BL,
-	LS_T1__L_BR,//70
-	LS_T1__L__R,
-	LS_T1__L_TR,
-	LS_T1__L_T_,
-	LS_T1__L_TL,
-	LS_T1__L_BL,
-	LS_T1_BL_BR,//76
-	LS_T1_BL__R,
-	LS_T1_BL_TR,
-	LS_T1_BL_T_,
-	LS_T1_BL_TL,
-	LS_T1_BL__L,
+	LS_T1_BR__R_GENERAL,//40
+	LS_T1_BR_TR_GENERAL,
+	LS_T1_BR_T__GENERAL,
+	LS_T1_BR_TL_GENERAL,
+	LS_T1_BR__L_GENERAL,
+	LS_T1_BR_BL_GENERAL,
+	LS_T1__R_BR_GENERAL,//46
+	LS_T1__R_TR_GENERAL,
+	LS_T1__R_T__GENERAL,
+	LS_T1__R_TL_GENERAL,
+	LS_T1__R__L_GENERAL,
+	LS_T1__R_BL_GENERAL,
+	LS_T1_TR_BR_GENERAL,//52
+	LS_T1_TR__R_GENERAL,
+	LS_T1_TR_T__GENERAL,
+	LS_T1_TR_TL_GENERAL,
+	LS_T1_TR__L_GENERAL,
+	LS_T1_TR_BL_GENERAL,
+	LS_T1_T__BR_GENERAL,//58
+	LS_T1_T___R_GENERAL,
+	LS_T1_T__TR_GENERAL,
+	LS_T1_T__TL_GENERAL,
+	LS_T1_T___L_GENERAL,
+	LS_T1_T__BL_GENERAL,
+	LS_T1_TL_BR_GENERAL,//64
+	LS_T1_TL__R_GENERAL,
+	LS_T1_TL_TR_GENERAL,
+	LS_T1_TL_T__GENERAL,
+	LS_T1_TL__L_GENERAL,
+	LS_T1_TL_BL_GENERAL,
+	LS_T1__L_BR_GENERAL,//70
+	LS_T1__L__R_GENERAL,
+	LS_T1__L_TR_GENERAL,
+	LS_T1__L_T__GENERAL,
+	LS_T1__L_TL_GENERAL,
+	LS_T1__L_BL_GENERAL,
+	LS_T1_BL_BR_GENERAL,//76
+	LS_T1_BL__R_GENERAL,
+	LS_T1_BL_TR_GENERAL,
+	LS_T1_BL_T__GENERAL,
+	LS_T1_BL_TL_GENERAL,
+	LS_T1_BL__L_GENERAL,
 
 	//Bounces
-	LS_B1_BR,
-	LS_B1__R,
-	LS_B1_TR,
-	LS_B1_T_,
-	LS_B1_TL,
-	LS_B1__L,
-	LS_B1_BL,
+	LS_B1_BR_GENERAL,
+	LS_B1__R_GENERAL,
+	LS_B1_TR_GENERAL,
+	LS_B1_T__GENERAL,
+	LS_B1_TL_GENERAL,
+	LS_B1__L_GENERAL,
+	LS_B1_BL_GENERAL,
 
 	//Deflected attacks
-	LS_D1_BR,
-	LS_D1__R,
-	LS_D1_TR,
-	LS_D1_T_,
-	LS_D1_TL,
-	LS_D1__L,
-	LS_D1_BL,
-	LS_D1_B_,
+	LS_D1_BR_GENERAL,
+	LS_D1__R_GENERAL,
+	LS_D1_TR_GENERAL,
+	LS_D1_T__GENERAL,
+	LS_D1_TL_GENERAL,
+	LS_D1__L_GENERAL,
+	LS_D1_BL_GENERAL,
+	LS_D1_B__GENERAL,
 
 	//Reflected attacks
-	LS_V1_BR,
-	LS_V1__R,
-	LS_V1_TR,
-	LS_V1_T_,
-	LS_V1_TL,
-	LS_V1__L,
-	LS_V1_BL,
-	LS_V1_B_,
+	LS_V1_BR_GENERAL,
+	LS_V1__R_GENERAL,
+	LS_V1_TR_GENERAL,
+	LS_V1_T__GENERAL,
+	LS_V1_TL_GENERAL,
+	LS_V1__L_GENERAL,
+	LS_V1_BL_GENERAL,
+	LS_V1_B__GENERAL,
 
 	// Broken parries
-	LS_H1_T_,//
-	LS_H1_TR,
-	LS_H1_TL,
-	LS_H1_BR,
-	LS_H1_B_,
-	LS_H1_BL,
+	LS_H1_T__GENERAL,//
+	LS_H1_TR_GENERAL,
+	LS_H1_TL_GENERAL,
+	LS_H1_BR_GENERAL,
+	LS_H1_B__GENERAL,
+	LS_H1_BL_GENERAL,
 
 	// Knockaways
-	LS_K1_T_,//
-	LS_K1_TR,
-	LS_K1_TL,
-	LS_K1_BR,
-	LS_K1_BL,
+	LS_K1_T__GENERAL,//
+	LS_K1_TR_GENERAL,
+	LS_K1_TL_GENERAL,
+	LS_K1_BR_GENERAL,
+	LS_K1_BL_GENERAL,
 
 	// Parries
-	LS_PARRY_UP,//
-	LS_PARRY_UR,
-	LS_PARRY_UL,
-	LS_PARRY_LR,
-	LS_PARRY_LL,
+	LS_PARRY_UP_GENERAL,//
+	LS_PARRY_UR_GENERAL,
+	LS_PARRY_UL_GENERAL,
+	LS_PARRY_LR_GENERAL,
+	LS_PARRY_LL_GENERAL,
 
 	// Projectile Reflections
-	LS_REFLECT_UP,//
-	LS_REFLECT_UR,
-	LS_REFLECT_UL,
-	LS_REFLECT_LR,
-	LS_REFLECT_LL,
+	LS_REFLECT_UP_GENERAL,//
+	LS_REFLECT_UR_GENERAL,
+	LS_REFLECT_UL_GENERAL,
+	LS_REFLECT_LR_GENERAL,
+	LS_REFLECT_LL_GENERAL,
 
-	LS_MOVE_MAX//
+	LS_MOVE_MAX_GENERAL//
 } saberMoveName_t;
 
-extern std::map <int, std::string>  saberMoveNames;
+
+typedef enum {
+	LS_INVALID = -1,
+	// Invalid_GENERAL, or saber not armed
+	LS_NONE_JK2 = 0,
+
+	// General movements with saber
+	LS_READY_JK2,
+	LS_DRAW_JK2,
+	LS_PUTAWAY_JK2,
+
+	// Attacks
+	LS_A_TL2BR_JK2,//4
+	LS_A_L2R_JK2,
+	LS_A_BL2TR_JK2,
+	LS_A_BR2TL_JK2,
+	LS_A_R2L_JK2,
+	LS_A_TR2BL_JK2,
+	LS_A_T2B_JK2,
+	LS_A_BACKSTAB_JK2,
+	LS_A_BACK_JK2,
+	LS_A_BACK_CR_JK2,
+	LS_A_LUNGE_JK2,
+	LS_A_JUMP_T__B__JK2,
+	LS_A_FLIP_STAB_JK2,
+	LS_A_FLIP_SLASH_JK2,
+
+	//starts
+	LS_S_TL2BR_JK2,//26
+	LS_S_L2R_JK2,
+	LS_S_BL2TR_JK2,//# Start of attack chaining to SLASH LR2UL
+	LS_S_BR2TL_JK2,//# Start of attack chaining to SLASH LR2UL
+	LS_S_R2L_JK2,
+	LS_S_TR2BL_JK2,
+	LS_S_T2B_JK2,
+
+	//returns
+	LS_R_TL2BR_JK2,//33
+	LS_R_L2R_JK2,
+	LS_R_BL2TR_JK2,
+	LS_R_BR2TL_JK2,
+	LS_R_R2L_JK2,
+	LS_R_TR2BL_JK2,
+	LS_R_T2B_JK2,
+
+	//transitions
+	LS_T1_BR__R_JK2,//40
+	LS_T1_BR_TR_JK2,
+	LS_T1_BR_T__JK2,
+	LS_T1_BR_TL_JK2,
+	LS_T1_BR__L_JK2,
+	LS_T1_BR_BL_JK2,
+	LS_T1__R_BR_JK2,//46
+	LS_T1__R_TR_JK2,
+	LS_T1__R_T__JK2,
+	LS_T1__R_TL_JK2,
+	LS_T1__R__L_JK2,
+	LS_T1__R_BL_JK2,
+	LS_T1_TR_BR_JK2,//52
+	LS_T1_TR__R_JK2,
+	LS_T1_TR_T__JK2,
+	LS_T1_TR_TL_JK2,
+	LS_T1_TR__L_JK2,
+	LS_T1_TR_BL_JK2,
+	LS_T1_T__BR_JK2,//58
+	LS_T1_T___R_JK2,
+	LS_T1_T__TR_JK2,
+	LS_T1_T__TL_JK2,
+	LS_T1_T___L_JK2,
+	LS_T1_T__BL_JK2,
+	LS_T1_TL_BR_JK2,//64
+	LS_T1_TL__R_JK2,
+	LS_T1_TL_TR_JK2,
+	LS_T1_TL_T__JK2,
+	LS_T1_TL__L_JK2,
+	LS_T1_TL_BL_JK2,
+	LS_T1__L_BR_JK2,//70
+	LS_T1__L__R_JK2,
+	LS_T1__L_TR_JK2,
+	LS_T1__L_T__JK2,
+	LS_T1__L_TL_JK2,
+	LS_T1__L_BL_JK2,
+	LS_T1_BL_BR_JK2,//76
+	LS_T1_BL__R_JK2,
+	LS_T1_BL_TR_JK2,
+	LS_T1_BL_T__JK2,
+	LS_T1_BL_TL_JK2,
+	LS_T1_BL__L_JK2,
+
+	//Bounces
+	LS_B1_BR_JK2,
+	LS_B1__R_JK2,
+	LS_B1_TR_JK2,
+	LS_B1_T__JK2,
+	LS_B1_TL_JK2,
+	LS_B1__L_JK2,
+	LS_B1_BL_JK2,
+
+	//Deflected attacks
+	LS_D1_BR_JK2,
+	LS_D1__R_JK2,
+	LS_D1_TR_JK2,
+	LS_D1_T__JK2,
+	LS_D1_TL_JK2,
+	LS_D1__L_JK2,
+	LS_D1_BL_JK2,
+	LS_D1_B__JK2,
+
+	//Reflected attacks
+	LS_V1_BR_JK2,
+	LS_V1__R_JK2,
+	LS_V1_TR_JK2,
+	LS_V1_T__JK2,
+	LS_V1_TL_JK2,
+	LS_V1__L_JK2,
+	LS_V1_BL_JK2,
+	LS_V1_B__JK2,
+
+	// Broken parries
+	LS_H1_T__JK2,//
+	LS_H1_TR_JK2,
+	LS_H1_TL_JK2,
+	LS_H1_BR_JK2,
+	LS_H1_B__JK2,
+	LS_H1_BL_JK2,
+
+	// Knockaways
+	LS_K1_T__JK2,//
+	LS_K1_TR_JK2,
+	LS_K1_TL_JK2,
+	LS_K1_BR_JK2,
+	LS_K1_BL_JK2,
+
+	// Parries
+	LS_PARRY_UP_JK2,//
+	LS_PARRY_UR_JK2,
+	LS_PARRY_UL_JK2,
+	LS_PARRY_LR_JK2,
+	LS_PARRY_LL_JK2,
+
+	// Projectile Reflections
+	LS_REFLECT_UP_JK2,//
+	LS_REFLECT_UR_JK2,
+	LS_REFLECT_UL_JK2,
+	LS_REFLECT_LR_JK2,
+	LS_REFLECT_LL_JK2,
+
+	LS_MOVE_MAX_JK2
+} saberMoveName_jk2_t;
+
+static const int saberMoveJK2ToGeneral[] {
+	LS_INVALID_GENERAL,
+
+	// Invalid_GENERAL, or saber not armed
+	LS_NONE_GENERAL,
+
+	// General movements with saber
+	LS_READY_GENERAL,
+	LS_DRAW_GENERAL,
+	LS_PUTAWAY_GENERAL,
+
+	// Attacks
+	LS_A_TL2BR_GENERAL,//4
+	LS_A_L2R_GENERAL,
+	LS_A_BL2TR_GENERAL,
+	LS_A_BR2TL_GENERAL,
+	LS_A_R2L_GENERAL,
+	LS_A_TR2BL_GENERAL,
+	LS_A_T2B_GENERAL,
+	LS_A_BACKSTAB_GENERAL,
+	LS_A_BACK_GENERAL,
+	LS_A_BACK_CR_GENERAL,
+	LS_A_LUNGE_GENERAL,
+	LS_A_JUMP_T__B__GENERAL,
+	LS_A_FLIP_STAB_GENERAL,
+	LS_A_FLIP_SLASH_GENERAL,
+
+	//starts
+	LS_S_TL2BR_GENERAL,//26
+	LS_S_L2R_GENERAL,
+	LS_S_BL2TR_GENERAL,//# Start of attack chaining to SLASH LR2UL
+	LS_S_BR2TL_GENERAL,//# Start of attack chaining to SLASH LR2UL
+	LS_S_R2L_GENERAL,
+	LS_S_TR2BL_GENERAL,
+	LS_S_T2B_GENERAL,
+
+	//returns
+	LS_R_TL2BR_GENERAL,//33
+	LS_R_L2R_GENERAL,
+	LS_R_BL2TR_GENERAL,
+	LS_R_BR2TL_GENERAL,
+	LS_R_R2L_GENERAL,
+	LS_R_TR2BL_GENERAL,
+	LS_R_T2B_GENERAL,
+
+	//transitions
+	LS_T1_BR__R_GENERAL,//40
+	LS_T1_BR_TR_GENERAL,
+	LS_T1_BR_T__GENERAL,
+	LS_T1_BR_TL_GENERAL,
+	LS_T1_BR__L_GENERAL,
+	LS_T1_BR_BL_GENERAL,
+	LS_T1__R_BR_GENERAL,//46
+	LS_T1__R_TR_GENERAL,
+	LS_T1__R_T__GENERAL,
+	LS_T1__R_TL_GENERAL,
+	LS_T1__R__L_GENERAL,
+	LS_T1__R_BL_GENERAL,
+	LS_T1_TR_BR_GENERAL,//52
+	LS_T1_TR__R_GENERAL,
+	LS_T1_TR_T__GENERAL,
+	LS_T1_TR_TL_GENERAL,
+	LS_T1_TR__L_GENERAL,
+	LS_T1_TR_BL_GENERAL,
+	LS_T1_T__BR_GENERAL,//58
+	LS_T1_T___R_GENERAL,
+	LS_T1_T__TR_GENERAL,
+	LS_T1_T__TL_GENERAL,
+	LS_T1_T___L_GENERAL,
+	LS_T1_T__BL_GENERAL,
+	LS_T1_TL_BR_GENERAL,//64
+	LS_T1_TL__R_GENERAL,
+	LS_T1_TL_TR_GENERAL,
+	LS_T1_TL_T__GENERAL,
+	LS_T1_TL__L_GENERAL,
+	LS_T1_TL_BL_GENERAL,
+	LS_T1__L_BR_GENERAL,//70
+	LS_T1__L__R_GENERAL,
+	LS_T1__L_TR_GENERAL,
+	LS_T1__L_T__GENERAL,
+	LS_T1__L_TL_GENERAL,
+	LS_T1__L_BL_GENERAL,
+	LS_T1_BL_BR_GENERAL,//76
+	LS_T1_BL__R_GENERAL,
+	LS_T1_BL_TR_GENERAL,
+	LS_T1_BL_T__GENERAL,
+	LS_T1_BL_TL_GENERAL,
+	LS_T1_BL__L_GENERAL,
+
+	//Bounces
+	LS_B1_BR_GENERAL,
+	LS_B1__R_GENERAL,
+	LS_B1_TR_GENERAL,
+	LS_B1_T__GENERAL,
+	LS_B1_TL_GENERAL,
+	LS_B1__L_GENERAL,
+	LS_B1_BL_GENERAL,
+
+	//Deflected attacks
+	LS_D1_BR_GENERAL,
+	LS_D1__R_GENERAL,
+	LS_D1_TR_GENERAL,
+	LS_D1_T__GENERAL,
+	LS_D1_TL_GENERAL,
+	LS_D1__L_GENERAL,
+	LS_D1_BL_GENERAL,
+	LS_D1_B__GENERAL,
+
+	//Reflected attacks
+	LS_V1_BR_GENERAL,
+	LS_V1__R_GENERAL,
+	LS_V1_TR_GENERAL,
+	LS_V1_T__GENERAL,
+	LS_V1_TL_GENERAL,
+	LS_V1__L_GENERAL,
+	LS_V1_BL_GENERAL,
+	LS_V1_B__GENERAL,
+
+	// Broken parries
+	LS_H1_T__GENERAL,//
+	LS_H1_TR_GENERAL,
+	LS_H1_TL_GENERAL,
+	LS_H1_BR_GENERAL,
+	LS_H1_B__GENERAL,
+	LS_H1_BL_GENERAL,
+
+	// Knockaways
+	LS_K1_T__GENERAL,//
+	LS_K1_TR_GENERAL,
+	LS_K1_TL_GENERAL,
+	LS_K1_BR_GENERAL,
+	LS_K1_BL_GENERAL,
+
+	// Parries
+	LS_PARRY_UP_GENERAL,//
+	LS_PARRY_UR_GENERAL,
+	LS_PARRY_UL_GENERAL,
+	LS_PARRY_LR_GENERAL,
+	LS_PARRY_LL_GENERAL,
+
+	// Projectile Reflections
+	LS_REFLECT_UP_GENERAL,//
+	LS_REFLECT_UR_GENERAL,
+	LS_REFLECT_UL_GENERAL,
+	LS_REFLECT_LR_GENERAL,
+	LS_REFLECT_LL_GENERAL,
+
+	LS_MOVE_MAX_GENERAL//
+};
+
+extern std::map <int, std::string>  saberMoveNames_general;
 extern std::map <int, std::string>  saberStyleNames;
 
 typedef struct
 {
 	char* name;
-	int animToUse;
+	int animToUse; // If you ever use this, fix the animations/generalize them
 	int	startQuad;
 	int	endQuad;
 	unsigned animSetFlags;
@@ -2561,7 +2921,22 @@ typedef struct
 	int trailLength;
 } saberMoveData_t;
 
-extern saberMoveData_t	saberMoveData[LS_MOVE_MAX];
+typedef struct
+{
+	char* name;
+	int animToUse;
+	int	startQuad;
+	int	endQuad;
+	unsigned animSetFlags;
+	int blendTime;
+	int blocking;
+	saberMoveName_jk2_t chain_idle;			// What move to call if the attack button is not pressed at the end of this anim
+	saberMoveName_jk2_t chain_attack;		// What move to call if the attack button (and nothing else) is pressed
+	int trailLength;
+} saberMoveData_jk2_t;
+
+extern saberMoveData_t	saberMoveData_general[LS_MOVE_MAX_GENERAL];
+extern saberMoveData_jk2_t	saberMoveData_jk2[LS_MOVE_MAX_JK2];
 
 
 
@@ -3024,9 +3399,9 @@ float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles en
 
 
 
-qboolean PM_SaberInBrokenParry(int move, demoType_t demoType);
+qboolean PM_SaberInBrokenParry(int move, demoType_t demoType, qboolean saberMoveIsGeneralized);
 qboolean PM_InSaberAnim(int anim, demoType_t demoType);
-qboolean BG_SaberInAttack(int move);
+qboolean BG_SaberInAttack(int move, demoType_t demoType, qboolean saberMoveIsGeneralized);
 
 
 
@@ -3057,21 +3432,23 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 		return qfalse;
 	}
 
-	if (BG_SaberInAttack(saberMove))
+	saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE>(saberMove, demoType);
+
+	if (BG_SaberInAttack(saberMove, demoType,qtrue))
 	{
 		return qfalse;
 	}
 
 	if (PM_InSaberAnim(torsoAnim, demoType) &&
-		saberMove != LS_READY && saberMove != LS_NONE)
+		saberMove != LS_READY_GENERAL && saberMove != LS_NONE_GENERAL)
 	{
-		if (saberMove < LS_PARRY_UP || saberMove > LS_REFLECT_LL)
+		if (saberMove < LS_PARRY_UP_GENERAL || saberMove > LS_REFLECT_LL_GENERAL)
 		{
 			return qfalse;
 		}
 	}
 
-	if (PM_SaberInBrokenParry(saberMove,demoType) && demoType != DM_15) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
+	if (PM_SaberInBrokenParry(saberMove,demoType,qtrue) && demoType != DM_15) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
 	{
 		return qfalse;
 	}
@@ -3163,6 +3540,11 @@ template <class T>
 struct wannabeArray_t {
 	T* data;
 	int count;
+	int offset; // Like when we need to map from something that could be -1. Otherwise not possible.
+	inline T& operator[](const size_t& index)
+	{
+		return data[index+offset];
+	}
 };
 
 
@@ -3205,13 +3587,22 @@ enum gameMappingType_t { // When changing this, also update gameMappingTypeGener
 	GMAP_EVENTS,
 	GMAP_WEAPONS,
 	GMAP_MEANSOFDEATH,
+	GMAP_LIGHTSABERMOVE,
 	GAMEMAPPINGTYPES_COUNT
 };
 
-static int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
+static const int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
 	EV_ENTITY_EVENT_COUNT_GENERAL+1, //GMAP_EVENTS,
 	WP_NUM_WEAPONS_GENERAL+1,//GMAP_WEAPONS,
-	MOD_MAX_GENERAL+1 //GMAP_MEANSOFDEATH,
+	MOD_MAX_GENERAL+1, //GMAP_MEANSOFDEATH,
+	LS_MOVE_MAX_GENERAL+2, //GMAP_LIGHTSABERMOVE // Is +2 because it has the value -1 as well. This also needs to have an offset applied!
+}; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
+
+static const int gameMappingTypeGeneralValueOffset[GAMEMAPPINGTYPES_COUNT] {
+	NULL, //GMAP_EVENTS,
+	NULL,//GMAP_WEAPONS,
+	NULL, //GMAP_MEANSOFDEATH,
+	1, //GMAP_LIGHTSABERMOVE // Offset 1 because the real smallest value is -1 in this enum. We can't index an array with -1!
 }; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
 
 //struct gameMappings_t {
@@ -3281,13 +3672,13 @@ inline int getCS_MODELS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.cs_models;
 }
 inline int getCS_SOUNDS(demoType_t demoType) {
-		return gameInfosMapped[demoType]->constants.cs_sounds;
+	return gameInfosMapped[demoType]->constants.cs_sounds;
 }
 inline int getET_EVENTS(demoType_t demoType) {
-		return gameInfosMapped[demoType]->constants.et_events;
+	return gameInfosMapped[demoType]->constants.et_events;
 }
 inline int getEF_MISSILE_STICK(demoType_t demoType) {
-		return gameInfosMapped[demoType]->constants.ef_missile_stick;
+	return gameInfosMapped[demoType]->constants.ef_missile_stick;
 }
 inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;
@@ -3304,12 +3695,12 @@ inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t tar
 		if constexpr (T == GMAP_EVENTS) {
 
 			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~EV_EVENT_BITS];
-			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.data[generalValue] | ((value)&EV_EVENT_BITS);
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value)&EV_EVENT_BITS);
 		}
 		else  {
 
 			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value];
-			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.data[generalValue];
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue];
 		}
 	}
 }
@@ -3317,20 +3708,20 @@ inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t tar
 template<gameMappingType_t T>
 inline int generalizeGameValue(int value, demoType_t sourceDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
-		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
 	}
 	else  {
-		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value];
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value];
 	}
 }
 
 template<gameMappingType_t T>
 inline int specializeGameValue(int value, demoType_t sourceDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
-		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping.data[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping[(value & ~EV_EVENT_BITS)] | ((value)&EV_EVENT_BITS);
 	}
 	else  {
-		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping.data[value];
+		return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping[value];
 	}
 }
 
@@ -3338,11 +3729,11 @@ inline int specializeGameValue(int value, demoType_t sourceDemoType) {
 template<gameMappingType_t T>
 inline int specializedGameValueMapUnsafe(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.data[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
 	}
 	else  {
 
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.data[value];
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value];
 	}
 }
 
