@@ -4331,7 +4331,7 @@ static gameInfo_t gameInfos[] = {
 				{jkaModToGeneralMap,sizeof(jkaModToGeneralMap) / sizeof(jkaModToGeneralMap[0])},
 			},{
 				{{{DM_15,DM_15_1_03,DM_16},lsMoveJKAToJK2,sizeof(lsMoveJKAToJK2) / sizeof(lsMoveJKAToJK2[0]),1}}, // last parameter offset 1 because the values start at -1
-				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0])},
+				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0]),1},
 			}
 		},
 		{
@@ -4368,7 +4368,7 @@ static gameInfo_t gameInfos[] = {
 				{jkaModToGeneralMap,sizeof(jkaModToGeneralMap) / sizeof(jkaModToGeneralMap[0])},
 			},{
 				{{{DM_15,DM_15_1_03,DM_16},lsMoveJKAToJK2,sizeof(lsMoveJKAToJK2) / sizeof(lsMoveJKAToJK2[0]),1}}, // last parameter offset 1 because the values start at -1
-				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0])},
+				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0]),1},
 			}
 		},
 		{
@@ -4408,7 +4408,7 @@ static gameInfo_t gameInfos[] = {
 				{jkaModToGeneralMap,sizeof(jkaModToGeneralMap) / sizeof(jkaModToGeneralMap[0])},
 			},{
 				{{{DM_15,DM_15_1_03,DM_16},lsMoveJKAToJK2,sizeof(lsMoveJKAToJK2) / sizeof(lsMoveJKAToJK2[0]),1}}, // last parameter offset 1 because the values start at -1
-				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0])},
+				{lsMoveJKAToGeneral,sizeof(lsMoveJKAToGeneral) / sizeof(lsMoveJKAToGeneral[0]),1},
 			}
 		},
 		{},
