@@ -90,6 +90,8 @@ struct strafeDeviationInfo_t {
 	int64_t lastReset;
 };
 
+#define AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD forceJumpHeight[FORCE_LEVEL_1] // Higher than a normal lowest tier force jump could reach.
+
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
 int playerFirstVisible[MAX_CLIENTS_MAX];
 int playerFirstFollowed[MAX_CLIENTS_MAX];
@@ -104,6 +106,7 @@ int playerTeams[MAX_CLIENTS_MAX];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 int lastEventTime[MAX_GENTITIES];
+float lastGroundHeight[MAX_CLIENTS]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
@@ -1134,6 +1137,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
 	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
 	Com_Memset(lastEvent,0,sizeof(lastEvent));
+	Com_Memset(lastGroundHeight,0,sizeof(lastGroundHeight));
 	Com_Memset(lastEventTime,0,sizeof(lastEventTime));
 	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
 	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
@@ -1276,6 +1280,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"probableKillingWeapon	INTEGER NOT NULL,"
+
+		"attackerJumpHeight	REAL,"
+		"victimJumpHeight	REAL,"
+		
 		"directionX	REAL,"
 		"directionY	REAL,"
 		"directionZ	REAL,"
@@ -1456,9 +1464,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -2431,16 +2439,22 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 				// Update player visible frames
 				// For some info like angular velocity, acceleration and jerk we need to know that the past X frames had info about the player, else the value becomes invalid.
+				// 
+				// While we're at it, register z coordinates of players touching the ground.
 				for (int i = 0; i < max_clients;i++) {
 					if (thisFrameInfo.entityExists[i]) {
 						playerVisibleFrames[i]++;
 						if (thisFrameInfo.commandTime[i] != lastFrameInfo.commandTime[i]) {
 							playerVisibleClientFrames[i]++;
 						}
+						if (thisFrameInfo.groundEntityNum[i] == ENTITYNUM_WORLD) {
+							lastGroundHeight[i] = thisFrameInfo.playerPositions[i][2];
+						}
 					}
 					else {
 						playerVisibleFrames[i] = 0;
 						playerVisibleClientFrames[i] = 0;
+						lastGroundHeight[i] = 99999999; // What's the point of remembering the ground height if the player may suddenly appear already in air and we have an old value and wrongly detect Air 2 Air kills?
 					}
 				}
 				
@@ -2566,6 +2580,18 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							bool attackerIsFollowed = demo.cut.Cl.snap.ps.clientNum == attacker;
 							attackerIsVisibleOrFollowed = attackerIsFollowed || attackerIsVisible;
 							targetIsVisibleOrFollowed = targetIsFollowed || targetIsVisible;
+
+							float attackerJumpHeight = 0;
+							float victimJumpHeight = 0;
+
+							if (attackerIsVisibleOrFollowed) {
+								attackerJumpHeight = attackerIsFollowed ? demo.cut.Cl.snap.ps.origin[2] - lastGroundHeight[demo.cut.Cl.snap.ps.clientNum] : attackerEntity->pos.trBase[2] - lastGroundHeight[attackerEntity->number];
+							} 
+							if (targetIsVisibleOrFollowed) {
+								victimJumpHeight = targetIsFollowed ? demo.cut.Cl.snap.ps.origin[2] - lastGroundHeight[demo.cut.Cl.snap.ps.clientNum] : targetEntity->pos.trBase[2] - lastGroundHeight[targetEntity->number];
+							} 
+							if(attackerJumpHeight < 0.0f) attackerJumpHeight = 0.0f;
+							if(victimJumpHeight < 0.0f) victimJumpHeight = 0.0f;
 
 							//targetIsVisible = targetIsVisible && attackerIsVisibleOrFollowed; // Make sure both attacker and victim are visible. Some servers send info
 
@@ -2910,6 +2936,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 									default:
 										break;
 								}
+							}
+
+
+							if (attackerJumpHeight > AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD && victimJumpHeight > AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD) {
+								modInfo << "_A2A";
 							}
 
 							int killerProjectile = -1;
@@ -3276,6 +3307,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							SQLBIND_TEXT(insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
 							SQLBIND(insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
 							SQLBIND(insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
+
+							SQLBIND(insertAngleStatement, double, "@attackerJumpHeight", attackerJumpHeight);
+							SQLBIND(insertAngleStatement, double, "@victimJumpHeight", victimJumpHeight);
+
 							if (attackerIsFollowed) {
 								SQLBIND(insertAngleStatement, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
 								SQLBIND(insertAngleStatement, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);

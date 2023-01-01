@@ -3154,8 +3154,8 @@ extern int forceMasteryPoints[NUM_FORCE_MASTERY_LEVELS];
 
 extern int bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS];
 
-extern float forceJumpHeight[NUM_FORCE_POWER_LEVELS];
-extern float forceJumpStrength[NUM_FORCE_POWER_LEVELS];
+extern const float forceJumpHeight[NUM_FORCE_POWER_LEVELS];
+extern const float forceJumpStrength[NUM_FORCE_POWER_LEVELS];
 
 
 
