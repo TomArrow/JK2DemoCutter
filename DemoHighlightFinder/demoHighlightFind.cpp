@@ -452,6 +452,8 @@ enum highlightSearchMode_t {
 	SEARCH_INTERESTING,
 	SEARCH_MY_CTF_RETURNS,
 	SEARCH_CTF_RETURNS,
+	SEARCH_ALL_MY_KILLS,
+	SEARCH_ALL_KILLS,
 	SEARCH_TOP10_DEFRAG, // Top10 Defrags, even if not number 1.
 	SEARCH_ALL_DEFRAG, // All defrags, even if not top 10
 };
@@ -3314,10 +3316,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 
 							//if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisible) continue; // Not that interesting.
-							if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisibleOrFollowed) continue; // Not that interesting.
+							if (isSuicide || (!victimIsFlagCarrier && searchMode != SEARCH_ALL_KILLS && searchMode != SEARCH_ALL_MY_KILLS) || isWorldKill || !targetIsVisibleOrFollowed) continue; // Not that interesting.
 							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
-							if (!isDoomKill && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
-							if (!attackerIsFollowed && searchMode == SEARCH_MY_CTF_RETURNS) continue; // We are searching for our own kills.
+							if (!isDoomKill && searchMode != SEARCH_ALL_KILLS && searchMode != SEARCH_ALL_MY_KILLS && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
+							if (!attackerIsFollowed && (searchMode == SEARCH_MY_CTF_RETURNS|| searchMode == SEARCH_ALL_MY_KILLS)) continue; // We are searching for our own kills.
 							if (!attackerIsVisibleOrFollowed) continue; // Attacker isn't visible at all. Meh. Leave it.
 
 
@@ -4613,6 +4615,10 @@ int main(int argc, char** argv) {
 			searchMode = SEARCH_TOP10_DEFRAG;
 		}else if (!_stricmp(searchModeText, "alldefrag")) {
 			searchMode = SEARCH_ALL_DEFRAG;
+		}else if (!_stricmp(searchModeText, "allkills")) {
+			searchMode = SEARCH_ALL_KILLS;
+		}else if (!_stricmp(searchModeText, "allmykills")) {
+			searchMode = SEARCH_ALL_MY_KILLS;
 		}
 	}
 
