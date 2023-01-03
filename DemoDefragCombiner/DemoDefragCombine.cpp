@@ -159,9 +159,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
+				demoType_t sourceDemoType = demoReaders[i].getDemoType();
 				std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS = demoReaders[i].GetInterpolatedPlayerState(sourceTime);
+				if (sourceDemoType != DM_15) {
+					demoReaders[i].mapAnimsToDM15(&tmpPS);
+				}
+
 				int originalPlayerstateClientNum = tmpPS.clientNum;
 				tmpPS.clientNum = i;
 				tmpPS.commandTime = time;

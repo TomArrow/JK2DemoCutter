@@ -297,5 +297,8 @@
     <ClInclude Include="..\shared\otherGameStuff.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\jk2spStuff.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

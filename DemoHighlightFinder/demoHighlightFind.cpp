@@ -4592,6 +4592,9 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	demoCutGetDemoType(sourceDemoFile, ext, &demoType, &isCompressedFile);
 	int maxClientsHere = getMAX_CLIENTS(demoType);
 	switch (maxClientsHere) {
+	case 1: // JK 2 SP
+		return demoHighlightFindReal<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
+		break;
 	case 32:
 		return demoHighlightFindReal<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
 		break;

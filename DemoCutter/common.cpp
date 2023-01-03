@@ -3,6 +3,7 @@
 #include <math.h>
 #include <jkaStuff.h>
 #include "otherGameStuff.h"
+#include "jk2spStuff.h"
 #include <stateFields.h>
 #include <sstream>
 
@@ -4054,6 +4055,11 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 		}
 		return qfalse;
 	}
+	else if (!_stricmp(normalizedExt, ".dm_14")) {
+
+		*demoType = DM_14;
+		//strncpy_s(normalizedExt, 7, ".dm_14", 6);
+	}
 	else if (!_stricmp(normalizedExt, ".dm_15")) {
 
 		*demoType = DM_15;
@@ -4129,6 +4135,45 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 
 static gameInfo_t gameInfos[] = {
+	 {
+		DM_14,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general
+		},
+		{
+			{
+				{},
+				{jk2spEventsToGeneral,sizeof(jk2spEventsToGeneral) / sizeof(jk2spEventsToGeneral[0])},
+			},{
+				{},
+				{jk2spWeaponToGeneral,sizeof(jk2spWeaponToGeneral) / sizeof(jk2spWeaponToGeneral[0])},
+			},{
+				{},
+				{jk2spModToGeneral,sizeof(jk2spModToGeneral) / sizeof(jk2spModToGeneral[0])},
+			},
+			{{},{saberMoveJK2ToGeneral + 1,(sizeof(saberMoveJK2ToGeneral) / sizeof(saberMoveJK2ToGeneral[0])) - 1}}, // Same exact thing EXCEPT it has no LS_INVALID, so move 1 forward
+			{{},{jk2spItemListToGeneral,sizeof(jk2spItemListToGeneral) / sizeof(jk2spItemListToGeneral[0])}},
+			{ // Single player anims are identical to DM16 anims
+				{{{DM_15},animMappingTable_1_04_to_1_02,sizeof(animMappingTable_1_04_to_1_02) / sizeof(animMappingTable_1_04_to_1_02[0])}}, // Here we don't subtract 1 becasue the animmappingtable has no entry for MAX_TOTALANIMS anyway
+				{jk2dm16AnimsToGeneral,(sizeof(jk2dm16AnimsToGeneral) / sizeof(jk2dm16AnimsToGeneral[0])) - 1}, //  BUT are mising MAX_TOTALANIMS after MAX_ANIMS. So we subtract 1.
+			},
+		},
+		{
+			{entityStateFields_jk2sp,sizeof(entityStateFields_jk2sp) / sizeof(entityStateFields_jk2sp[0]),},
+			{playerStateFields_jk2sp,sizeof(playerStateFields_jk2sp) / sizeof(playerStateFields_jk2sp[0]),}
+		},
+		MAX_CONFIGSTRINGS_JK2SP,//MAX_CONFIGSTRINGS,
+		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP},
+		1 // Just the main player
+	},
 	{ // First is treated as default.
 		DM_15,
 		{

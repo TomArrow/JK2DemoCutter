@@ -605,7 +605,12 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 }
 
 void DemoReader::mapAnimsToDM15(playerState_t* ps) {
-	if (demoType == DM_26 || demoType == DM_25) {
+	if (demoType == DM_14) {
+
+		ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
+		ps->legsAnim = convertGameValue<GMAP_ANIMATIONS>(ps->legsAnim, demoType, DM_16);
+		ps->weapon = convertGameValue<GMAP_WEAPONS>(ps->weapon,demoType,DM_15);
+	} else if (demoType == DM_26 || demoType == DM_25) {
 
 		//ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
 		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
@@ -625,7 +630,7 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon, demoType, DM_15);;
 		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	}
-	if (demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
+	if (demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
 
 		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
 		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
@@ -633,6 +638,12 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, DM_16, DM_15);
 		//ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
 		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, DM_16, DM_15);
+	}
+
+	if (demoType < DM_15 || demoType > DM_16) {
+		ps->events[0] = convertGameValue<GMAP_EVENTS>(ps->events[0], demoType, DM_15);
+		ps->events[1] = convertGameValue<GMAP_EVENTS>(ps->events[1], demoType, DM_15);
+		ps->externalEvent = convertGameValue<GMAP_EVENTS>(ps->externalEvent, demoType, DM_15);
 	}
 }
 
@@ -663,7 +674,6 @@ playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 
 	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have.
 		retVal = snapshotInfos.begin()->second.playerState;
-		mapAnimsToDM15(&retVal);
 		return retVal;
 	}
 
@@ -675,7 +685,6 @@ playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 	// already at end, nothing we can interpolate.
 	if (lastPastSnapCommandTime >= thisDemo.cut.Clc.lastKnownCommandTime && endReached) {
 		retVal = thisDemo.cut.Cl.snap.ps;
-		mapAnimsToDM15(&retVal);
 		return retVal;
 	}
 
@@ -691,7 +700,6 @@ playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
 	InterpolatePlayerState(time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
 
-	mapAnimsToDM15(&retVal);
 	return retVal;
 }
 
@@ -1078,19 +1086,19 @@ clSnapshot_t DemoReader::GetCurrentSnap() {
 }
 
 const char* DemoReader::GetPlayerConfigString(int playerNum,int* maxLength) {
-	int configStringBaseIndex = (demoType == DM_26 || demoType == DM_25) ? CS_PLAYERS_JKA : CS_PLAYERS;
+	int configStringBaseIndex = getCS_PLAYERS(demoType); // (demoType == DM_26 || demoType == DM_25) ? CS_PLAYERS_JKA : CS_PLAYERS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + playerNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
 const char* DemoReader::GetSoundConfigString(int soundNum,int* maxLength) {
-	int configStringBaseIndex = (demoType == DM_26 || demoType == DM_25) ? CS_SOUNDS_JKA : CS_SOUNDS;
+	int configStringBaseIndex = getCS_SOUNDS(demoType);// (demoType == DM_26 || demoType == DM_25) ? CS_SOUNDS_JKA : CS_SOUNDS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + soundNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
 const char* DemoReader::GetModelConfigString(int modelNum,int* maxLength) {
-	int configStringBaseIndex = (demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
+	int configStringBaseIndex = getCS_MODELS(demoType); //(demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + modelNum];
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
@@ -1302,7 +1310,10 @@ readNext:
 
 				thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
 
-				if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+				if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					thisEvent.eventNumber = convertGameValue<GMAP_EVENTS>(thisEvent.eventNumber,DM_14,DM_15);
+					thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS>(thisEvent.theEvent.event, DM_14, DM_15);
+				}else if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 					thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 					thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
 				} else if (demoType == DM_68) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
@@ -1337,7 +1348,11 @@ readNext:
 					thisEvent.theEvent.eventParm = thisDemo.cut.Cl.snap.ps.eventParms[i & (MAX_PS_EVENTS - 1)];
 
 					thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
-					if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS>(thisEvent.eventNumber, DM_14, DM_15);
+						thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS>(thisEvent.theEvent.event, DM_14, DM_15);
+					}
+					else if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
 					}
@@ -1368,7 +1383,16 @@ readNext:
 					thisEvent.serverTime = thisDemo.cut.Cl.snap.serverTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
-					if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+					if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
+						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS>(thisEvent.eventNumber, DM_14, DM_15);
+						if (thisEvent.theEvent.eType > getET_EVENTS(demoType)) {
+							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType- getET_EVENTS(demoType)] + ET_EVENTS; // I just changed this, but should I? Hmm
+						}
+						else {
+							thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS>(thisEvent.theEvent.event, DM_14, DM_15); 
+						}
+					}
+					else if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						if (thisEvent.theEvent.eType > ET_EVENTS_JKA) {
 							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS; // I just changed this, but should I? Hmm

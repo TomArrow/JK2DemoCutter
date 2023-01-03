@@ -508,6 +508,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				demoReaders[i].reader.SeekToTime(sourceTime-demoReaders[i].sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 
 
+				demoType_t sourceDemoType = demoReaders[i].reader.getDemoType();
 				int maxClientsThisDemo = demoReaders[i].reader.getMaxClients();
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
@@ -539,7 +540,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					bool thisClientIsTargetPlayerState = !asG2AnimEnt && sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
 						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
 						thisFrameIndex++ == 0;
-
+					
 					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
 					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime+demoReaders[i].sourceInfo->delay);
@@ -549,7 +550,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					float translatedTime = 0.0f;
 					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
-
+					if (sourceDemoType != DM_15) {
+						demoReaders[i].reader.mapAnimsToDM15(&tmpPS);
+					}
 
 
 					// Check if oldSnap contains ET_BODY of this client and if so, copy it.

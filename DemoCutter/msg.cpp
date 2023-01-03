@@ -568,6 +568,14 @@ void MSG_WriteShort( msg_t *sb, int c ) {
 
 	MSG_WriteBits( sb, c, 16 );
 }
+void MSG_WriteSShort( msg_t *sb, int c ) {
+#ifdef PARANOID
+	if (c < ((short)0x8000) || c > (short)0x7fff)
+		Com_Error (ERR_FATAL, "MSG_WriteShort: range error");
+#endif
+
+	MSG_WriteBits( sb, c, -16 );
+}
 
 void MSG_WriteLong( msg_t *sb, int c ) {
 	MSG_WriteBits( sb, c, 32 );
@@ -676,6 +684,17 @@ int MSG_ReadShort( msg_t *msg ) {
 	int	c;
 	
 	c = (short)MSG_ReadBits( msg, 16 );
+	if ( msg->readcount > msg->cursize ) {
+		c = -1;
+	}	
+
+	return c;
+}
+
+int MSG_ReadSShort( msg_t *msg ) {
+	int	c;
+	
+	c = (short)MSG_ReadBits( msg, -16 );
 	if ( msg->readcount > msg->cursize ) {
 		c = -1;
 	}	
@@ -1416,6 +1435,7 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	int				persistantbits;
 	int				ammobits;
 	int				powerupbits;
+	int				inventorybits;
 	int				numFields;
 	int				c;
 	const netField_t		*playerStateFieldsHere;
@@ -1561,6 +1581,15 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		}
 	}
 
+	if (demoType == DM_14) {
+		inventorybits = 0;
+		for (i = 0; i < MAX_INVENTORY; i++) {
+			if (to->inventory[i] != from->inventory[i]) {
+				inventorybits |= 1 << i;
+			}
+		}
+	}
+
 	if (!statsbits && !persistantbits && !ammobits && !powerupbits) {
 		MSG_WriteBits( msg, 0, 1 );	// no change
 		oldsize += 4;
@@ -1585,6 +1614,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 						MSG_WriteShort(msg, to->stats[i]);
 					}
 				}
+				else if (demoType == DM_14) {
+					MSG_WriteSShort(msg, to->stats[i]);
+				}
 				else {
 					MSG_WriteShort(msg, to->stats[i]);
 				}
@@ -1598,9 +1630,16 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	if ( persistantbits ) {
 		MSG_WriteBits( msg, 1, 1 );	// changed
 		MSG_WriteShort( msg, persistantbits );
-		for (i=0 ; i<16 ; i++)
-			if (persistantbits & (1<<i) )
-				MSG_WriteShort (msg, to->persistant[i]);
+		for (i = 0; i < 16; i++) {
+			if (persistantbits & (1 << i)) {
+				if (demoType == DM_14) {
+					MSG_WriteSShort(msg, to->persistant[i]);
+				}
+				else {
+					MSG_WriteShort(msg, to->persistant[i]);
+				}
+			}
+		}
 	} else {
 		MSG_WriteBits( msg, 0, 1 );	// no change
 	}
@@ -1609,9 +1648,16 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	if ( ammobits ) {
 		MSG_WriteBits( msg, 1, 1 );	// changed
 		MSG_WriteShort( msg, ammobits );
-		for (i=0 ; i<16 ; i++)
-			if (ammobits & (1<<i) )
-				MSG_WriteShort (msg, to->ammo[i]);
+		for (i = 0; i < 16; i++) {
+			if (ammobits & (1 << i)) {
+				if (demoType == DM_14) {
+					MSG_WriteSShort(msg, to->ammo[i]);
+				}
+				else {
+					MSG_WriteShort(msg, to->ammo[i]);
+				}
+			}
+		}
 	} else {
 		MSG_WriteBits( msg, 0, 1 );	// no change
 	}
@@ -1625,6 +1671,19 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 				MSG_WriteLong( msg, to->powerups[i] );
 	} else {
 		MSG_WriteBits( msg, 0, 1 );	// no change
+	}
+
+	if (demoType == DM_14) {
+		if (inventorybits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteShort(msg, inventorybits);
+			for (i = 0; i < 16; i++)
+				if (inventorybits & (1 << i))
+					MSG_WriteShort(msg, to->inventory[i]);
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
 	}
 }
 
@@ -1796,6 +1855,10 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					{ //ugly.. but we're gonna need it anyway -rww
 						to->stats[i] = MSG_ReadBits(msg, MAX_WEAPONS_JKA);
 					}
+					else if(demoType == DM_14)
+					{
+						to->stats[i] = MSG_ReadSShort(msg); // Signed for some reason. Idk if really needed
+					}
 					else
 					{
 						to->stats[i] = MSG_ReadShort(msg);
@@ -1817,7 +1880,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 			bits = MSG_ReadShort (msg);
 			for (i=0 ; i<16 ; i++) {
 				if (bits & (1<<i) ) {
-					to->persistant[i] = MSG_ReadShort(msg);
+					if (demoType == DM_14) {
+						to->persistant[i] = MSG_ReadSShort(msg); // Signed for some reason. Idk if really needed
+					}
+					else {
+						to->persistant[i] = MSG_ReadShort(msg);
+					}
 				}
 			}
 		}
@@ -1835,7 +1903,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 			bits = MSG_ReadShort (msg);
 			for (i=0 ; i<16 ; i++) {
 				if (bits & (1<<i) ) {
-					to->ammo[i] = MSG_ReadShort(msg);
+					if (demoType == DM_14) {
+						to->ammo[i] = MSG_ReadSShort(msg);
+					}
+					else {
+						to->ammo[i] = MSG_ReadShort(msg);
+					}
 				}
 			}
 		}
@@ -1854,6 +1927,23 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 			for (i=0 ; i<16 ; i++) {
 				if (bits & (1<<i) ) {
 					to->powerups[i] = MSG_ReadLong(msg);
+				}
+			}
+		}
+		
+		if (demoType == DM_14) {
+
+			// parse inventory (jk2 sp only)
+#ifdef _DONETPROFILE_
+			startBytes = msg->readcount;
+#endif
+			if (MSG_ReadBits(msg, 1)) {
+				//LOG("PS_INVENTORY");
+				bits = MSG_ReadShort(msg);
+				for (i = 0; i < 16; i++) { // Should only go to 15 technically (MAX_INVENTORY) but it's not like the bits are ever gonna contain more anyway...
+					if (bits & (1 << i)) {
+						to->inventory[i] = MSG_ReadShort(msg);
+					}
 				}
 			}
 		}

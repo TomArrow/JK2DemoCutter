@@ -28,6 +28,7 @@
 
 enum demoType_t {
 	DEMOTYPE_NONE,
+	DM_14, // My JK2 Single Player demo work-in-progress
 	DM_15,
 	DM_15_1_03,
 	DM_16,
@@ -67,7 +68,8 @@ typedef struct _iobuf
 //#define	MAX_FILE_HANDLES	64
 #define	MAX_FILE_HANDLES	1024
 
-#define	MAX_MSGLEN				16384			// max length of a message, which may
+#define	MAX_MSGLEN_JK2SP				(3*16384)		// max length of a message, which may
+#define	MAX_MSGLEN		MAX_MSGLEN_JK2SP		//16384	 (make it long enough for any game)		// max length of a message, which may
 #define	MAX_MSGLEN_RAW			MAX_MSGLEN*10	// max length of a message, which may
 // be fragmented into multiple packets
 
@@ -466,6 +468,23 @@ typedef enum {
 	PERS_CAPTURES					// captures
 } persEnum_t;
 
+
+
+// Jk2 SP stuff
+typedef enum
+{
+	SABER_RED,
+	SABER_ORANGE,
+	SABER_YELLOW,
+	SABER_GREEN,
+	SABER_BLUE,
+	SABER_PURPLE
+
+} saber_colors_t;
+
+#define MAX_INVENTORY			15		// See INV_MAX
+// JK2 SP stuff end
+
 typedef struct playerState_s {
 	int			commandTime;	// cmd->serverTime of last executed command
 	int			pm_type;
@@ -777,6 +796,18 @@ typedef struct playerState_s {
 	int rightmove;
 	int upmove;
 
+	// JK2 SP stuff
+	int			leanofs;
+	int			batteryCharge;
+	saber_colors_t	saberColor;
+	float		saberLength;
+	float		saberLengthMax;
+	int			forcePowersActive;	//prediction needs to know this
+	int			vehicleModel;	// For overriding your playermodel with a drivable vehicle
+	int			viewEntity;		// For overriding player movement controls and vieworg
+	vec3_t		serverViewOrg;
+	int			inventory[MAX_INVENTORY];
+
 } playerState_t;
 
 typedef struct {
@@ -1004,6 +1035,23 @@ typedef struct entityState_s {
 	//int health; // Already exists through jka
 	int armor;
 	int location;
+
+
+	// JK2 SP Stuff
+	int		modelindex3;
+	int		legsAnimTimer;	// don't change low priority animations on legs until this runs out
+	int		torsoAnimTimer;	// don't change low priority animations on torso until this runs out
+	int		scale;			//Scale players
+	qboolean	saberActive;
+	int		vehicleModel;	// For overriding your playermodel with a drivable vehicle
+	vec3_t	modelScale;		// used to scale models in any axis
+	//Ghoul2 stuff for jk2sp:
+	int		radius;			// used for culling all the ghoul models attached to this ent NOTE - this is automatically scaled by Ghoul2 if/when you scale the model. This is a 100% size value
+	int		boltInfo;		// info used for bolting entities to Ghoul2 models - NOT used for bolting ghoul2 models to themselves, more for stuff like bolting effects to ghoul2 models
+
+
+
+
 } entityState_t;
 
 typedef struct {
@@ -1266,6 +1314,7 @@ void MSG_WriteBits(msg_t* msg, int value, int bits);
 void MSG_WriteChar(msg_t* sb, int c);
 void MSG_WriteByte(msg_t* sb, int c);
 void MSG_WriteShort(msg_t* sb, int c);
+void MSG_WriteSShort(msg_t* sb, int c);
 void MSG_WriteLong(msg_t* sb, int c);
 void MSG_WriteFloat(msg_t* sb, float f);
 void MSG_WriteString(msg_t* sb, const char* s);
@@ -1280,6 +1329,7 @@ int		MSG_ReadBits(msg_t* msg, int bits);
 int		MSG_ReadChar(msg_t* sb);
 int		MSG_ReadByte(msg_t* sb);
 int		MSG_ReadShort(msg_t* sb);
+int		MSG_ReadSShort(msg_t* sb);
 int		MSG_ReadLong(msg_t* sb);
 float	MSG_ReadFloat(msg_t* sb);
 char* MSG_ReadString(msg_t* sb);
@@ -1899,6 +1949,31 @@ typedef enum {
 	EV_LIGHTNINGBOLT_GENERAL,
 	EV_TAUNT_PATROL,
 
+	// JK2SP specific:
+	EV_WATER_GURP1_GENERAL,	// need air 1
+	EV_WATER_GURP2_GENERAL,	// need air 2
+	EV_WATER_DROWN_GENERAL,	// drowned
+	EV_POWERUP_SEEKER_FIRE_GENERAL,
+	EV_REPLICATOR_GENERAL,
+	EV_BATTERIES_CHARGED_GENERAL,
+	EV_ENTITY_FORCE_GENERAL,
+	EV_AREA_FORCE_GENERAL,
+	EV_GLOBAL_FORCE_GENERAL,
+	EV_FORCE_STOP_GENERAL,
+	EV_PLAY_MUZZLE_EFFECT_GENERAL,
+	EV_TARGET_BEAM_DRAW_GENERAL,
+	EV_DEMP2_ALT_IMPACT_GENERAL,
+	EV_DISINTEGRATION_GENERAL,
+	EV_USE_ITEM_GENERAL,
+	EV_USE_INV_BINOCULARS_GENERAL,
+	EV_USE_INV_BACTA_GENERAL,
+	EV_USE_INV_SEEKER_GENERAL,
+	EV_USE_INV_LIGHTAMP_GOGGLES_GENERAL,
+	EV_USE_INV_SENTRY_GENERAL,
+	EV_USE_FORCE_GENERAL,
+	EV_DRUGGED_GENERAL,		// hit by an interrogator
+
+
 	EV_ENTITY_EVENT_COUNT_GENERAL
 
 } entity_event_t;			// There is a maximum of 256 events (8 bits transmission, 2 high bits for uniqueness)
@@ -2198,6 +2273,22 @@ typedef enum {
 	MOD_JUICED_GENERAL,
 //#endif
 	MOD_GRAPPLE_GENERAL,
+
+	//jk2sp:
+	MOD_BLASTER_ALT_GENERAL,
+	MOD_SNIPER_GENERAL, // this is when energy crackle kills yu?!?
+	MOD_BOWCASTER_ALT_GENERAL,
+	MOD_SEEKER_GENERAL,
+	MOD_FORCE_GRIP_GENERAL,
+	MOD_EMPLACED_GENERAL,
+	MOD_ELECTROCUTE_GENERAL,
+	MOD_EXPLOSIVE_GENERAL,
+	MOD_EXPLOSIVE_SPLASH_GENERAL,
+	MOD_KNOCKOUT_GENERAL,
+	MOD_ENERGY_GENERAL,
+	MOD_ENERGY_SPLASH_GENERAL,
+	MOD_IMPACT_GENERAL,
+
 	MOD_MAX_GENERAL,
 } meansOfDeath_t;
 
@@ -2319,6 +2410,14 @@ typedef enum {
 	WP_NAILGUN_GENERAL,
 	WP_PROX_LAUNCHER_GENERAL,
 	WP_CHAINGUN_GENERAL,
+
+	// Jk2sp
+	WP_BOT_LASER_GENERAL,		// Probe droid	- Laser blast
+	WP_ATST_MAIN_GENERAL,
+	WP_ATST_SIDE_GENERAL,
+	WP_TIE_FIGHTER_GENERAL,
+	WP_RAPID_FIRE_CONC_GENERAL,
+	WP_BLASTER_PISTOL_GENERAL,	// apparently some enemy only version of the blaster
 
 	WP_NUM_WEAPONS_GENERAL,
 } weapon_t;
@@ -3218,6 +3317,26 @@ typedef enum {
 	ITEMLIST_WEAPON_NAILGUN_GENERAL,
 	ITEMLIST_WEAPON_PROX_LAUNCHER_GENERAL,
 	ITEMLIST_WEAPON_CHAINGUN_GENERAL,
+	ITEMLIST_ITEM_BATTERY_GENERAL,
+	// JK2 SP:
+	ITEMLIST_WEAPON_ATST_MAIN_GENERAL,
+	ITEMLIST_WEAPON_ATST_SIDE_GENERAL,
+	ITEMLIST_WEAPON_TIE_FIGHTER_GENERAL,
+	ITEMLIST_WEAPON_RAPID_CONCUSSION_GENERAL,
+	ITEMLIST_WEAPON_BOTWELDER_GENERAL,
+	ITEMLIST_ITEM_GOODIE_KEY_GENERAL,
+	ITEMLIST_ITEM_SECURITY_KEY_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_HEAL_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_LEVITATION_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_SPEED_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_PUSH_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_PULL_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_TELEPATHY_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_GRIP_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_LIGHTNING_GENERAL,
+	ITEMLIST_HOLOCRON_FORCE_SABERTHROW_GENERAL,
+	ITEMLIST_AMMO_EMPLACED_GENERAL,
+	
 	ITEMLIST_NUM_TOTAL_GENERAL,
 } itemList_t;
 
@@ -4030,25 +4149,25 @@ inline int getMAX_CLIENTS(demoType_t demoType) {
 template<gameMappingType_t T>
 inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
 	if (specializedMappings[T][sourceDemoType][targetDemoType].mapping.data) {
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.data[value & ~EV_EVENT_BITS] | ((eventValue)&EV_EVENT_BITS);
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
 	}
 	else {
 		// Use specialized to general mapping of source demotype first, then use reverse general to specialized mapping of target demo type
 		if constexpr (T == GMAP_EVENTS) {
 
-			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~EV_EVENT_BITS];
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~EV_EVENT_BITS];
 			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value)&EV_EVENT_BITS);
 		}
 		else  if constexpr (T == GMAP_ANIMATIONS) {
 
 			int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
 			int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
-			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value & ~sourceAnimToggleBit];
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~sourceAnimToggleBit];
 			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value&sourceAnimToggleBit)*targetAnimToggleBit/sourceAnimToggleBit);
 		}
 		else  {
 
-			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.data[value];
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping[value];
 			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue];
 		}
 	}
