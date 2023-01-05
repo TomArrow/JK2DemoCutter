@@ -163,9 +163,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS = demoReaders[i].GetInterpolatedPlayerState(sourceTime);
-				if (sourceDemoType != DM_15) {
-					demoReaders[i].mapAnimsToDM15(&tmpPS);
-				}
+
+				demoReaders[i].convertPSTo(&tmpPS,demoType);
 
 				int originalPlayerstateClientNum = tmpPS.clientNum;
 				tmpPS.clientNum = i;

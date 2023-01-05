@@ -140,7 +140,7 @@ class DemoReader {
 
 public:
 
-	void mapAnimsToDM15(playerState_t* ps);
+	void convertPSTo(playerState_t* ps, demoType_t targetDemoType);
 
 	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
 	};
@@ -184,6 +184,9 @@ public:
 	int getCurrentDemoTime();
 	int getDemoRecorderClientNum();
 };
+
+
+
 
 
 void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType);

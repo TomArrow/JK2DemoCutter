@@ -550,9 +550,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					float translatedTime = 0.0f;
 					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
-					if (sourceDemoType != DM_15) {
-						demoReaders[i].reader.mapAnimsToDM15(&tmpPS);
-					}
+					
+					demoReaders[i].reader.convertPSTo(&tmpPS,demoType);
 
 
 					// Check if oldSnap contains ET_BODY of this client and if so, copy it.
@@ -583,7 +582,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 											retimeEntity(&tmpEntity, realTranslatedTime, time);
 											//tmpEntity.pos.trTime = time;
 											if (EV_BODY_QUEUE_COPY_GENERAL == (generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType) & ~EV_EVENT_BITS)) {
-												tmpEntity.eventParm = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event & ~EV_EVENT_BITS,sourceDemoType, DM_15);
+												tmpEntity.eventParm = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event & ~EV_EVENT_BITS,sourceDemoType, demoType);
 												tmpEntity.eventParm = targetClientNum;
 											}
 											targetEntities[targetEntitySlot] = tmpEntity;
@@ -620,7 +619,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					else {
 						Com_Memset(&tmpES, 0, sizeof(tmpES));
-						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, DM_15, qtrue); // DM_15 because BG_PlayerStateToEntityState only needs it for output eType and that's DM_15 for us. If that changes in the future.. we'll see. I'll probably accidentally forget about it and get bugs, gg.
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue); // DM_15 because BG_PlayerStateToEntityState only needs it for output eType and that's DM_15 for us. If that changes in the future.. we'll see. I'll probably accidentally forget about it and get bugs, gg.
 						if (asG2AnimEnt) {
 							// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
 							tmpES.eType = ET_GRAPPLE_JK2;
@@ -762,7 +761,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							entityState_t tmpEntity = it->second;
 							tmpEntity.eType = ET_ITEM_JK2;
-							tmpEntity.modelindex = convertGameValue<GMAP_ITEMLIST,UNSAFE>(it->second.modelindex, sourceDemoType,DM_15);
+							tmpEntity.modelindex = convertGameValue<GMAP_ITEMLIST,UNSAFE>(it->second.modelindex, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
 							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
@@ -794,7 +793,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							entityState_t tmpEntity = it->second;
 							tmpEntity.eType = ET_MISSILE_JK2;
-							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, DM_15);
+							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
 							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse, demoType);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
@@ -812,11 +811,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qtrue, qfalse, demoType);
 							tmpEntity.modelindex = tmpEntity.modelindex ? tmpEntity.modelindex : G_ModelIndex(va("models/players/stormtrooper/model.glm"), &demo.cut.Cl, &commandsToAdd, demoType); // By unmodded default these don't contain a modelIndex as that is sent directly between server and client in SP.
 							tmpEntity.number = targetEntitySlot;
-							tmpEntity.legsAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.legsAnim,sourceDemoType,DM_15);
-							tmpEntity.torsoAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.torsoAnim,sourceDemoType,DM_15);
-							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS,SAFE>(tmpEntity.weapon,sourceDemoType,DM_15);
-							tmpEntity.event = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType,DM_15);
-							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.saberMove,sourceDemoType,DM_15);
+							tmpEntity.legsAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.legsAnim,sourceDemoType, demoType);
+							tmpEntity.torsoAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.torsoAnim,sourceDemoType, demoType);
+							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS,SAFE>(tmpEntity.weapon,sourceDemoType, demoType);
+							tmpEntity.event = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType, demoType);
+							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.saberMove,sourceDemoType, demoType);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}

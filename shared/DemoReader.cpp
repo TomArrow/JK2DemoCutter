@@ -603,49 +603,71 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 
 	
 }
+void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) {
 
-void DemoReader::mapAnimsToDM15(playerState_t* ps) {
-	if (demoType == DM_14) {
-
-		ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
-		ps->legsAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
-		ps->weapon = convertGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon,demoType,DM_15);
-		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
-	} else if (demoType == DM_26 || demoType == DM_25) {
-
-		//ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
-		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
-		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT; // Generalize togglebit someday?
-		//ps->legsAnim = jkaAnimMapping[ps->legsAnim];
-		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
-		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;// Generalize togglebit someday?
-		//ps->weapon = jkaWeaponMap[ps->weapon];
-		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon,demoType,DM_15);
-	} else if (demoType == DM_68) { // TODO Allow other ones too? But idk if anims changed
-
-		//ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
-		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
-		//ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
-		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
-		//ps->weapon = q3WeaponMap[ps->weapon];
-		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, DM_15);
-		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
-	}
-	if (demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
-
-		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
-		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
-		//ps->torsoAnim = MV_MapAnimation102(ps->torsoAnim);
-		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, DM_16, DM_15);
-		//ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
-		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, DM_16, DM_15);
+	if (targetDemoType == demoType)
+	{
+		return; // Nothing to do.
 	}
 
-	if (demoType < DM_15 || demoType > DM_16) {
-		ps->events[0] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[0], demoType, DM_15);
-		ps->events[1] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[1], demoType, DM_15);
-		ps->externalEvent = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->externalEvent, demoType, DM_15);
+	if (targetDemoType <= DM_16 && targetDemoType >= DM_15) {
+		if (demoType == DM_14) {
+
+			ps->saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(ps->saberMove, demoType, DM_16);
+			ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
+			ps->legsAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
+			ps->weapon = convertGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, DM_15);
+			ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
+		}
+		else if (demoType == DM_26 || demoType == DM_25) {
+
+			//ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
+			ps->saberMove = specializedGameValueMapUnsafe<GMAP_LIGHTSABERMOVE, UNSAFE>(ps->saberMove, demoType, targetDemoType);
+			ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
+			if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT; // Generalize togglebit someday?
+			//ps->legsAnim = jkaAnimMapping[ps->legsAnim];
+			ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
+			if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;// Generalize togglebit someday?
+			//ps->weapon = jkaWeaponMap[ps->weapon];
+			ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, targetDemoType);
+		}
+		else if (demoType == DM_68) { // TODO Allow other ones too? But idk if anims changed
+
+		 //ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
+			ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
+			//ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
+			ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
+			//ps->weapon = q3WeaponMap[ps->weapon];
+			ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, targetDemoType);
+			ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
+		}
+		if (demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
+
+			//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
+			//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
+			//ps->torsoAnim = MV_MapAnimation102(ps->torsoAnim);
+			ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, DM_16, DM_15);
+			//ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
+			ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, DM_16, DM_15);
+		}
+
+		if (demoType < DM_15 || demoType > DM_16) {
+			ps->events[0] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[0], demoType, targetDemoType);
+			ps->events[1] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[1], demoType, targetDemoType);
+			ps->externalEvent = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->externalEvent, demoType, targetDemoType);
+		}
 	}
+	else {
+		// Generic handling if output isn't DM_15 to DM_16 (not really supported... dont do it or dont cry xd)
+		ps->saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(ps->saberMove, demoType, targetDemoType);
+		ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, targetDemoType);
+		ps->legsAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, targetDemoType);
+		ps->weapon = convertGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, targetDemoType);
+		ps->events[0] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[0], demoType, targetDemoType);
+		ps->events[1] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[1], demoType, targetDemoType);
+		ps->externalEvent = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->externalEvent, demoType, targetDemoType);
+	}
+
 }
 
 playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
