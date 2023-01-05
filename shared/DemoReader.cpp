@@ -610,6 +610,7 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
 		ps->legsAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
 		ps->weapon = convertGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon,demoType,DM_15);
+		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	} else if (demoType == DM_26 || demoType == DM_25) {
 
 		//ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
@@ -627,7 +628,7 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		//ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
 		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
 		//ps->weapon = q3WeaponMap[ps->weapon];
-		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, DM_15);;
+		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, DM_15);
 		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	}
 	if (demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?

@@ -786,6 +786,22 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 
 					}
+					// Shots, rockets etc
+					// We can't really tell who they belong to. Just copy them.
+					else if (generalizedEntityType == ET_MISSILE_GENERAL) {
+						
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							entityState_t tmpEntity = it->second;
+							tmpEntity.eType = ET_MISSILE_JK2;
+							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, DM_15);
+							tmpEntity.number = targetEntitySlot;
+							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse, demoType);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							targetEntities[targetEntitySlot] = tmpEntity;
+						}
+
+					}
 					// Single player NPCs
 					else if (generalizedEntityType == ET_PLAYER_GENERAL && sourceDemoType == DM_14) {
 						
