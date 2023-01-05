@@ -493,6 +493,28 @@ static const int q3dm68EventToJk2Map[] = {
 #define MapQ3DM68EventJK2(ev) (q3dm68EventToJk2Map[(ev)&~EV_EVENT_BITS] | ((ev)&EV_EVENT_BITS))
 
 
+static const int q3EntityTypeToGeneral [] {
+	ET_GENERAL_GENERAL,
+	ET_PLAYER_GENERAL,
+	ET_ITEM_GENERAL,
+	ET_MISSILE_GENERAL,
+	ET_MOVER_GENERAL,
+	ET_BEAM_GENERAL,
+	ET_PORTAL_GENERAL,
+	ET_SPEAKER_GENERAL,
+	ET_PUSH_TRIGGER_GENERAL,
+	ET_TELEPORT_TRIGGER_GENERAL,
+	ET_INVISIBLE_GENERAL,
+	ET_GRAPPLE_GENERAL,				// grapple hooked on wall
+	ET_TEAM_GENERAL,
+
+	ET_EVENTS_GENERAL
+							// by setting eType to ET_EVENTS + eventNum
+							// this avoids having to set eFlags and eventNum
+};
+
+
+
 typedef enum {
 	ET_GENERAL_Q3,
 	ET_PLAYER_Q3,

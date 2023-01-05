@@ -255,7 +255,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					mainPlayerServerTime = snapInfoHere->serverTime;
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
+					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue);
 					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || (entityIsInterpolated[tmpPS.clientNum] && (!snapIsInterpolated || entityServerTime[tmpPS.clientNum] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;
 						entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;

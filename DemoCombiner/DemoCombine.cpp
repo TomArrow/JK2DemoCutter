@@ -571,17 +571,19 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							//if (it->first >= MAX_CLIENTS) {
 							if (it->first >= maxClientsThisDemo) {
 								// Is this a corpse?
-								if (it->second.eType == ET_BODY && it->second.clientNum == clientNumHere) {
+								if (generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(it->second.eType,sourceDemoType) == ET_BODY_GENERAL && it->second.clientNum == clientNumHere) {
 									// Check if we are tracking this player
 									if (targetClientNum != -1) {
 										int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 										if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 											entityState_t tmpEntity = it->second;
+											tmpEntity.eType = ET_BODY_JK2;
 											tmpEntity.clientNum = targetClientNum;
 											tmpEntity.number = targetEntitySlot;
 											retimeEntity(&tmpEntity, realTranslatedTime, time);
 											//tmpEntity.pos.trTime = time;
-											if (EV_BODY_QUEUE_COPY_JK2 == (tmpEntity.event & ~EV_EVENT_BITS)) {
+											if (EV_BODY_QUEUE_COPY_GENERAL == (generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType) & ~EV_EVENT_BITS)) {
+												tmpEntity.eventParm = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event & ~EV_EVENT_BITS,sourceDemoType, DM_15);
 												tmpEntity.eventParm = targetClientNum;
 											}
 											targetEntities[targetEntitySlot] = tmpEntity;
@@ -618,10 +620,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					else {
 						Com_Memset(&tmpES, 0, sizeof(tmpES));
-						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, DM_15, qtrue); // DM_15 because BG_PlayerStateToEntityState only needs it for output eType and that's DM_15 for us. If that changes in the future.. we'll see. I'll probably accidentally forget about it and get bugs, gg.
 						if (asG2AnimEnt) {
 							// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
-							tmpES.eType = ET_GRAPPLE;
+							tmpES.eType = ET_GRAPPLE_JK2;
 							// We don't have a player model. So instead get a ModelIndex for this playermodel
 							{	// TODO It's kinda wasteful to do this on every frame. Maybe figure out way to do it only when the model changes.
 								int maxLength;
@@ -666,9 +668,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					
+					int generalizedEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(it->second.eType,sourceDemoType);
+
+
+
+
 					// EFFECT_EXPLOSION_TRIPMINE (EV_PLAY_EFFECT)
 					// EV_GENERAL_SOUND te->s.trickedentindex = ent->s.number;
-					if (it->second.eType == ET_GENERAL && it->second.weapon == WP_TRIP_MINE_JK2 && (it->second.eFlags & EF_MISSILE_STICK)) { // TODO Make this work with JKA?
+					if (generalizedEntityType == ET_GENERAL_GENERAL && generalizeGameValue<GMAP_WEAPONS,SAFE>(it->second.weapon,sourceDemoType) == WP_TRIP_MINE_GENERAL && (it->second.eFlags & getEF_MISSILE_STICK(sourceDemoType))) { // TODO Make this work with JKA?
 						// It's a trip mine.
 
 						// Ignore this: (might be based on mistake)
@@ -701,6 +708,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 							if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 								entityState_t tmpEntity = it->second;
+								tmpEntity.eFlags &= ~getEF_MISSILE_STICK(sourceDemoType);
+								tmpEntity.eFlags |= EF_MISSILE_STICK;
+								tmpEntity.eType = ET_GENERAL_JK2;
+								tmpEntity.weapon = WP_TRIP_MINE_JK2;
 								tmpEntity.genericenemyindex = ownerSlot >= MAX_CLIENTS? 0: ownerSlot + 1024;
 								tmpEntity.number = targetEntitySlot;
 								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse,demoType);
@@ -716,7 +727,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					
 					// Sentry
 					//else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetConfigString(CS_MODELS+ it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
-					else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetModelConfigString(it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
+					else if (generalizedEntityType == ET_GENERAL_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetModelConfigString(it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
 						// It's a sentry
 
 
@@ -730,6 +741,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 							if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 								entityState_t tmpEntity = it->second;
+								tmpEntity.eType = ET_GENERAL_JK2;
 								tmpEntity.owner = ownerSlot;
 								tmpEntity.number = targetEntitySlot;
 								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse, demoType);
@@ -744,11 +756,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					// Flag
 					//else if (it->second.eType == ET_ITEM && it->second.modelindex && bg_itemlist[it->second.modelindex].giType == IT_TEAM && bg_itemlist[it->second.modelindex].giTag >= PW_REDFLAG && bg_itemlist[it->second.modelindex].giTag <= PW_NEUTRALFLAG ) {
-					else if (it->second.eType == ET_ITEM && it->second.modelindex && generalizeGameValue<GMAP_ITEMLIST>(it->second.modelindex,demoReaders[i].reader.getDemoType()) >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL&& generalizeGameValue<GMAP_ITEMLIST>(it->second.modelindex, demoReaders[i].reader.getDemoType()) <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
+					else if (generalizedEntityType == ET_ITEM_GENERAL && it->second.modelindex && generalizeGameValue<GMAP_ITEMLIST,SAFE>(it->second.modelindex,demoReaders[i].reader.getDemoType()) >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL&& generalizeGameValue<GMAP_ITEMLIST,SAFE>(it->second.modelindex, demoReaders[i].reader.getDemoType()) <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
 						
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							entityState_t tmpEntity = it->second;
+							tmpEntity.eType = ET_ITEM_JK2;
+							tmpEntity.modelindex = convertGameValue<GMAP_ITEMLIST,UNSAFE>(it->second.modelindex, sourceDemoType,DM_15);
 							tmpEntity.number = targetEntitySlot;
 							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
@@ -757,15 +771,36 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					}
 					// Force shield
-					else if (it->second.eType == ET_SPECIAL && it->second.modelindex == HI_SHIELD) {
+					else if (generalizedEntityType == ET_SPECIAL_GENERAL && it->second.modelindex == HI_SHIELD) {
 						
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							entityState_t tmpEntity = it->second;
+							tmpEntity.eType = ET_SPECIAL_JK2;
 							tmpEntity.number = targetEntitySlot;
 							int mappedOwner = slotManager.getNormalPlayerSlotIfExists(i, it->second.owner);
 							tmpEntity.owner = mappedOwner == -1 ? 0 : mappedOwner; // We want force shields always no matter who made them. For now.
 							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse, demoType);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							targetEntities[targetEntitySlot] = tmpEntity;
+						}
+
+					}
+					// Single player NPCs
+					else if (generalizedEntityType == ET_PLAYER_GENERAL && sourceDemoType == DM_14) {
+						
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							entityState_t tmpEntity = it->second;
+							tmpEntity.eType = ET_GRAPPLE_JK2;
+							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qtrue, qfalse, demoType);
+							tmpEntity.modelindex = tmpEntity.modelindex ? tmpEntity.modelindex : G_ModelIndex(va("models/players/stormtrooper/model.glm"), &demo.cut.Cl, &commandsToAdd, demoType); // By unmodded default these don't contain a modelIndex as that is sent directly between server and client in SP.
+							tmpEntity.number = targetEntitySlot;
+							tmpEntity.legsAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.legsAnim,sourceDemoType,DM_15);
+							tmpEntity.torsoAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.torsoAnim,sourceDemoType,DM_15);
+							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS,SAFE>(tmpEntity.weapon,sourceDemoType,DM_15);
+							tmpEntity.event = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType,DM_15);
+							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.saberMove,sourceDemoType,DM_15);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
@@ -877,7 +912,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 						addThisEvent = qtrue;
 					}
-					else if (eventNumber == EV_GENERAL_SOUND_JK2 && thisEvent->theEvent.eType > ET_EVENTS) { // Only copy event entities. Not players with the event or sth.
+					else if (eventNumber == EV_GENERAL_SOUND_JK2 && thisEvent->theEvent.eType > ET_EVENTS_JK2) { // Only copy event entities. Not players with the event or sth.
 
 						// Are we tracking the entity that generated this sound? Actually: This doesnt work bc it only remembers that information if it was a player.
 						if (thisEvent->theEvent.eFlags == EF_SOUNDTRACKER) {

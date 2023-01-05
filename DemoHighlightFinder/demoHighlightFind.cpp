@@ -1749,9 +1749,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				demoOldTime = demoCurrentTime;
 
-				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE>(demo.cut.Cl.snap.ps.saberMove,demoType);
-				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS>(demo.cut.Cl.snap.ps.legsAnim,demoType);
-				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
+				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(demo.cut.Cl.snap.ps.saberMove,demoType);
+				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.legsAnim,demoType);
+				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
 
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
@@ -1762,9 +1762,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
-						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE>(thisEs->saberMove,demoType);
-						animNumberGeneral_t thisEsGeneralLegsAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS>(thisEs->legsAnim,demoType);
-						animNumberGeneral_t thisEsGeneralTorsoAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS>(thisEs->torsoAnim,demoType);
+						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(thisEs->saberMove,demoType);
+						animNumberGeneral_t thisEsGeneralLegsAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->legsAnim,demoType);
+						animNumberGeneral_t thisEsGeneralTorsoAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->torsoAnim,demoType);
 
 						thisFrameInfo.canBlockSimplified[thisEs->number] = WP_SaberCanBlock_Simple(thisEs,demoType);
 
@@ -1922,10 +1922,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					}
 					// Track trip mine owners and the first time they were seen.
 					// Careful: The current way it is handled is blocked if the mine is temporarily not visible. The detection will think it appeared later.
-					else if (thisEs->eType == ET_GENERAL && generalizeGameValue<GMAP_WEAPONS>( thisEs->weapon,demoType) == WP_TRIP_MINE_GENERAL && (thisEs->eFlags & getEF_MISSILE_STICK(demoType))) { // tripmine
+					else if (generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType,demoType) == ET_GENERAL_GENERAL && generalizeGameValue<GMAP_WEAPONS,SAFE>( thisEs->weapon,demoType) == WP_TRIP_MINE_GENERAL && (thisEs->eFlags & getEF_MISSILE_STICK(demoType))) { // tripmine
 						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->genericenemyindex - 1024;
 						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_TRIPMINE;
-						if (generalizeGameValue<GMAP_EVENTS>(thisEs->event & ~EV_EVENT_BITS,demoType) == EV_MISSILE_MISS_GENERAL) {
+						if ((generalizeGameValue<GMAP_EVENTS, UNSAFE>(thisEs->event,demoType) & ~EV_EVENT_BITS) == EV_MISSILE_MISS_GENERAL) {
 							// This mine is exploding right now
 							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_EXPLODED;
 						}
@@ -2434,7 +2434,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				}
 
 #ifdef DEBUGSTATSDB
-				if(generalizeGameValue<GMAP_WEAPONS>( demo.cut.Cl.snap.ps.weapon,demoType)==WP_SABER_GENERAL){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
+				if(generalizeGameValue<GMAP_WEAPONS, UNSAFE>( demo.cut.Cl.snap.ps.weapon,demoType)==WP_SABER_GENERAL){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
 					
 					animStanceKey keyHere = { demoType,demo.cut.Cl.snap.ps.saberHolstered,demo.cut.Cl.snap.ps.torsoAnim & ~getANIM_TOGGLEBIT(demoType),demo.cut.Cl.snap.ps.legsAnim & ~getANIM_TOGGLEBIT(demoType),demo.cut.Cl.snap.ps.saberMove,demo.cut.Cl.snap.ps.fd.saberAnimLevel };  // torsoAnim,legsAnim,saberMove,stance
 					animStanceCounts[keyHere]++;
@@ -2468,9 +2468,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					psEventData_t psEventData = demoCutGetEvent(&demo.cut.Cl.snap.ps, &demo.cut.Cl.oldSnap.ps,demoCurrentTime);
 
 					// Ok this confirms he took damage.
-					int generalEvent = generalizeGameValue<GMAP_EVENTS>(psEventData.externalEvent.event, demoType);
-					int generalEventPred0 = generalizeGameValue<GMAP_EVENTS>(psEventData.predictableEvents[0].event, demoType);
-					int generalEventPred1 = generalizeGameValue<GMAP_EVENTS>(psEventData.predictableEvents[1].event, demoType);
+					int generalEvent = generalizeGameValue<GMAP_EVENTS, UNSAFE>(psEventData.externalEvent.event, demoType);
+					int generalEventPred0 = generalizeGameValue<GMAP_EVENTS, UNSAFE>(psEventData.predictableEvents[0].event, demoType);
+					int generalEventPred1 = generalizeGameValue<GMAP_EVENTS, UNSAFE>(psEventData.predictableEvents[1].event, demoType);
 					if (generalEvent >= EV_PAIN_GENERAL && generalEvent <= EV_DEATH3_GENERAL
 						|| generalEventPred0 >= EV_PAIN_GENERAL && generalEventPred0 <= EV_DEATH3_GENERAL
 						|| generalEventPred1 >= EV_PAIN_GENERAL && generalEventPred1 <= EV_DEATH3_GENERAL
@@ -2484,7 +2484,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 					int eventNumber = demoCutGetEvent(thisEs,demoCurrentTime,demoType);
-					eventNumber = generalizeGameValue<GMAP_EVENTS>(eventNumber,demoType);
+					eventNumber = generalizeGameValue<GMAP_EVENTS, UNSAFE>(eventNumber,demoType);
 					if (eventNumber) {
 						
 
@@ -2512,7 +2512,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								isWorldKill = true;
 							}
 							
-							mod = generalizeGameValue<GMAP_MEANSOFDEATH>(mod,demoType);
+							mod = generalizeGameValue<GMAP_MEANSOFDEATH,SAFE>(mod,demoType);
 
 							entityState_t* targetEntity = findEntity(target);
 							if (targetEntity) {
@@ -2703,7 +2703,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 										break;
 									case MOD_VEHICLE_GENERAL:
 										// Do special handling
-										probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS>(thisEs->generic1,demoType);
+										probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS, UNSAFE>(thisEs->generic1,demoType);
 										switch (probableKillingWeapon)
 										{
 											case WP_BLASTER_GENERAL://primary blasters
@@ -2752,10 +2752,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								if(needMoreInfo)
 									modInfo << "_~";
 								if (attackerIsFollowed) {
-									probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS>(demo.cut.Cl.snap.ps.weapon, demoType);
+									probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS, UNSAFE>(demo.cut.Cl.snap.ps.weapon, demoType);
 								}
 								else if (attackerEntity) {
-									probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS>(attackerEntity->weapon, demoType);
+									probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS, SAFE>(attackerEntity->weapon, demoType); // Safe just in case theres some weird killer entity with weird values. Not a big deal inside this kill analysis part, wont be huge perfrmance impact
 								}
 							}
 							if (needMoreInfo) {
@@ -2777,7 +2777,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 										else {
 
 											if (attackerEntity) {
-												modInfo << saberMoveNames_general[generalizeGameValue<GMAP_LIGHTSABERMOVE>(attackerEntity->saberMove,demoType)];
+												modInfo << saberMoveNames_general[generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(attackerEntity->saberMove,demoType)];
 												if (!modInfo.str().size()) {
 													// THIS IS INVALID!
 													int saberStance = attackerEntity->fireflag;

@@ -1513,27 +1513,80 @@ void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char*
 // entityState_t->eType
 //
 typedef enum {
-	ET_GENERAL,
-	ET_PLAYER,
-	ET_ITEM,
-	ET_MISSILE,
-	ET_SPECIAL,				// rww - force fields
-	ET_HOLOCRON,			// rww - holocron icon displays
-	ET_MOVER,
-	ET_BEAM,
-	ET_PORTAL,
-	ET_SPEAKER,
-	ET_PUSH_TRIGGER,
-	ET_TELEPORT_TRIGGER,
-	ET_INVISIBLE,
-	ET_GRAPPLE,				// grapple hooked on wall
-	ET_TEAM,
-	ET_BODY,
+	ET_GENERAL_GENERAL,
+	ET_PLAYER_GENERAL,
+	ET_ITEM_GENERAL,
+	ET_MISSILE_GENERAL,
+	ET_SPECIAL_GENERAL,
+	ET_HOLOCRON_GENERAL,
+	ET_MOVER_GENERAL,
+	ET_BEAM_GENERAL,
+	ET_PORTAL_GENERAL,
+	ET_SPEAKER_GENERAL,
+	ET_PUSH_TRIGGER_GENERAL,
+	ET_TELEPORT_TRIGGER_GENERAL,
+	ET_INVISIBLE_GENERAL,
+	ET_GRAPPLE_GENERAL,
+	ET_TEAM_GENERAL,
+	ET_BODY_GENERAL,
 
-	ET_EVENTS				// any of the EV_* events can be added freestanding
+	// JKA
+	ET_NPC_GENERAL,
+	ET_TERRAIN_GENERAL,
+	ET_FX_GENERAL,
+
+	// JK2SP
+	ET_THINKER_GENERAL,
+	ET_CLOUD_GENERAL,
+
+	ET_EVENTS_GENERAL
+} entityType_general_t;
+
+static const int jk2EntityTypeToGeneral[] {
+	ET_GENERAL_GENERAL,
+	ET_PLAYER_GENERAL,
+	ET_ITEM_GENERAL,
+	ET_MISSILE_GENERAL,
+	ET_SPECIAL_GENERAL,				// rww - force fields
+	ET_HOLOCRON_GENERAL,			// rww - holocron icon displays
+	ET_MOVER_GENERAL,
+	ET_BEAM_GENERAL,
+	ET_PORTAL_GENERAL,
+	ET_SPEAKER_GENERAL,
+	ET_PUSH_TRIGGER_GENERAL,
+	ET_TELEPORT_TRIGGER_GENERAL,
+	ET_INVISIBLE_GENERAL,
+	ET_GRAPPLE_GENERAL,				// grapple hooked on wall
+	ET_TEAM_GENERAL,
+	ET_BODY_GENERAL,
+
+	ET_EVENTS_GENERAL				// any of the EV_* events can be added freestanding
 							// by setting eType to ET_EVENTS + eventNum
 							// this avoids having to set eFlags and eventNum
-} entityType_t;
+};
+
+typedef enum {
+	ET_GENERAL_JK2,
+	ET_PLAYER_JK2,
+	ET_ITEM_JK2,
+	ET_MISSILE_JK2,
+	ET_SPECIAL_JK2,				// rww - force fields
+	ET_HOLOCRON_JK2,			// rww - holocron icon displays
+	ET_MOVER_JK2,
+	ET_BEAM_JK2,
+	ET_PORTAL_JK2,
+	ET_SPEAKER_JK2,
+	ET_PUSH_TRIGGER_JK2,
+	ET_TELEPORT_TRIGGER_JK2,
+	ET_INVISIBLE_JK2,
+	ET_GRAPPLE_JK2,				// grapple hooked on wall
+	ET_TEAM_JK2,
+	ET_BODY_JK2,
+
+	ET_EVENTS_JK2				// any of the EV_* events can be added freestanding
+							// by setting eType to ET_EVENTS + eventNum
+							// this avoids having to set eFlags and eventNum
+} entityType_jk2_t;
 
 
 typedef enum {
@@ -3039,7 +3092,7 @@ extern saberMoveData_jk2_t	saberMoveData_jk2[LS_MOVE_MAX_JK2];
 
 
 
-void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, qboolean writeCommandTime=qtrue, qboolean clientSideStyleEventConversion=qfalse);
+void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime = qtrue, qboolean clientSideStyleEventConversion=qfalse);
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues=qtrue, playerState_t* baseState=NULL, qboolean enhanceOnly=qfalse);
 
 float LerpAngle(float from, float to, float frac);
@@ -3884,8 +3937,8 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 		return qfalse;
 	}
 
-	saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE>(saberMove, demoType);
-	torsoAnim = generalizeGameValue<GMAP_ANIMATIONS>(torsoAnim, demoType);
+	saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE,UNSAFE>(saberMove, demoType);
+	torsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(torsoAnim, demoType);
 
 	if (BG_SaberInAttack<qtrue>(saberMove, demoType))
 	{
@@ -3916,7 +3969,7 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 		return qfalse;
 	}
 
-	if (generalizeGameValue<GMAP_WEAPONS>( weapon,demoType) != WP_SABER_GENERAL)
+	if (generalizeGameValue<GMAP_WEAPONS, UNSAFE>( weapon,demoType) != WP_SABER_GENERAL)
 	{
 		return qfalse;
 	}
@@ -3985,7 +4038,10 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 
 
-
+typedef enum {
+	UNSAFE,
+	SAFE
+} arrayAccessType_t;
 
 extern void initializeGameInfos();
 
@@ -3994,9 +4050,25 @@ struct wannabeArray_t {
 	T* data;
 	int count;
 	int offset; // Like when we need to map from something that could be -1. Otherwise not possible.
-	inline T& operator[](const size_t& index)
+	//inline T& operator[](const size_t& index)
+	//{
+	//	return data[index+offset];
+	//}
+	template<arrayAccessType_t A>
+	inline T& get(const size_t& index)
 	{
-		return data[index+offset];
+		if constexpr (A == SAFE) { // Somtimes entity values might be used for random stuff and have weird values. For those we call safe.
+
+			if ((index + offset) >= count || (index + offset) < 0) {
+				return NULL;
+			}
+			else {
+				return data[index + offset];
+			}
+		}
+		else {
+			return data[index + offset];
+		}
 	}
 };
 
@@ -4044,6 +4116,7 @@ enum gameMappingType_t { // When changing this, also update gameMappingTypeGener
 	GMAP_LIGHTSABERMOVE,
 	GMAP_ITEMLIST,
 	GMAP_ANIMATIONS,
+	GMAP_ENTITYTYPE,
 	GAMEMAPPINGTYPES_COUNT
 };
 
@@ -4054,6 +4127,7 @@ static const int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
 	LS_MOVE_MAX_GENERAL+2, //GMAP_LIGHTSABERMOVE // Is +2 because it has the value -1 as well. This also needs to have an offset applied!
 	ITEMLIST_NUM_TOTAL_GENERAL+1,
 	MAX_ANIMATIONS_GENERAL+1,
+	ET_EVENTS_GENERAL+1,
 }; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
 
 static const int gameMappingTypeGeneralValueOffset[GAMEMAPPINGTYPES_COUNT] {
@@ -4145,80 +4219,117 @@ inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;
 }
 
+
+
+// Use this in special cases where you know you have created that specialized mapping, otherwise this will crash the software.
+template<gameMappingType_t T, arrayAccessType_t A>
+inline int specializedGameValueMapUnsafe(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
+	if constexpr (T == GMAP_EVENTS) {
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.get<A>(value & ~EV_EVENT_BITS) | ((value)&EV_EVENT_BITS);
+	}
+	else if constexpr (T == GMAP_ANIMATIONS) {
+		int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
+		int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.get<A>(value & ~sourceAnimToggleBit) | ((value & sourceAnimToggleBit) * targetAnimToggleBit / sourceAnimToggleBit);
+	}
+	else if constexpr (T == GMAP_ENTITYTYPE) {
+		throw std::exception("GMAP_ENTITYTYPE specialized map not implemented");
+		return 0;
+	}
+	else {
+
+		return specializedMappings[T][sourceDemoType][targetDemoType].mapping.get<A>(value);
+	}
+}
+
+
+
 // Tries a specialized mapping (if exists) or falls back to a more standard approach
-template<gameMappingType_t T>
+template<gameMappingType_t T, arrayAccessType_t A>
 inline int convertGameValue(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
 	if (specializedMappings[T][sourceDemoType][targetDemoType].mapping.data) {
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+		return specializedGameValueMapUnsafe<T,A>(value,sourceDemoType,targetDemoType);
 	}
 	else {
 		// Use specialized to general mapping of source demotype first, then use reverse general to specialized mapping of target demo type
 		if constexpr (T == GMAP_EVENTS) {
 
-			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~EV_EVENT_BITS];
-			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value)&EV_EVENT_BITS);
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value & ~EV_EVENT_BITS);
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(generalValue) | ((value)&EV_EVENT_BITS);
+		}
+		else  if constexpr (T == GMAP_ENTITYTYPE) {
+			if (value >= gameInfosMapped[sourceDemoType]->constants.et_events) {
+				int generalEvent = gameInfosMapped[sourceDemoType]->mappings[GMAP_EVENTS].mapping.get<A>(value - gameInfosMapped[sourceDemoType]->constants.et_events);
+				return gameInfosMapped[targetDemoType]->constants.et_events + gameInfosMapped[targetDemoType]->mappings[GMAP_EVENTS].reversedMapping.get<A>(generalEvent);
+			}
+			else {
+				int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value);
+				return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(generalValue);
+			}
 		}
 		else  if constexpr (T == GMAP_ANIMATIONS) {
 
 			int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
 			int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
-			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~sourceAnimToggleBit];
-			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue] | ((value&sourceAnimToggleBit)*targetAnimToggleBit/sourceAnimToggleBit);
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value & ~sourceAnimToggleBit);
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(generalValue) | ((value&sourceAnimToggleBit)*targetAnimToggleBit/sourceAnimToggleBit);
 		}
 		else  {
 
-			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping[value];
-			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[generalValue];
+			int generalValue = gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value);
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(generalValue);
 		}
 	}
 }
 
 //#define MapQ3AnimToJK2(anim) (q3AnimMapping[(anim)&~ANIM_TOGGLEBIT_Q3] | (((anim)&ANIM_TOGGLEBIT_Q3)*ANIM_TOGGLEBIT/ANIM_TOGGLEBIT_Q3))
 
-template<gameMappingType_t T>
+
+// TODO Make safe variant for stuff like .weapon that could be random stuff
+template<gameMappingType_t T, arrayAccessType_t A>
 inline int generalizeGameValue(int value, demoType_t sourceDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
-		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value & ~EV_EVENT_BITS) | ((value)&EV_EVENT_BITS);
+	}
+	else  if constexpr (T == GMAP_ENTITYTYPE) {
+		if (value >= gameInfosMapped[sourceDemoType]->constants.et_events) {
+			return ET_EVENTS_GENERAL + gameInfosMapped[sourceDemoType]->mappings[GMAP_EVENTS].mapping.get<A>(value - gameInfosMapped[sourceDemoType]->constants.et_events);
+		}
+		else {
+			return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping.get<A>(value);
+		}
 	}
 	else if constexpr (T == GMAP_ANIMATIONS) {
 		int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
-		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value & ~sourceAnimToggleBit] | ((value&sourceAnimToggleBit)*ANIM_TOGGLEBIT/sourceAnimToggleBit);
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value & ~sourceAnimToggleBit) | ((value&sourceAnimToggleBit)*ANIM_TOGGLEBIT/sourceAnimToggleBit);
 	}
 	else  {
-		return gameInfosMapped[sourceDemoType]->mappings[T].mapping[value];
+		return gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value);
 	}
 }
 
-template<gameMappingType_t T>
+template<gameMappingType_t T, arrayAccessType_t A>
 inline int specializeGameValue(int value, demoType_t targetDemoType) {
 	if constexpr (T == GMAP_EVENTS) {
-		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[(value & ~EV_EVENT_BITS)] | ((value)&EV_EVENT_BITS);
+		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>((value & ~EV_EVENT_BITS)) | ((value)&EV_EVENT_BITS);
+	}
+	else  if constexpr (T == GMAP_ENTITYTYPE) {
+		if (value >= ET_EVENTS_GENERAL) {
+			return gameInfosMapped[targetDemoType]->constants.et_events + gameInfosMapped[targetDemoType]->mappings[GMAP_EVENTS].reversedMapping.get<A>(value - ET_EVENTS_GENERAL);
+		}
+		else {
+			return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(value);
+		}
 	}
 	else  if constexpr (T == GMAP_ANIMATIONS) {
 		int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
-		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[(value & ~ANIM_TOGGLEBIT)] | ((value& ANIM_TOGGLEBIT)*targetAnimToggleBit/ANIM_TOGGLEBIT);
+		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>((value & ~ANIM_TOGGLEBIT)) | ((value& ANIM_TOGGLEBIT)*targetAnimToggleBit/ANIM_TOGGLEBIT);
 	}
 	else  {
-		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping[value];
+		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(value);
 	}
 }
 
-// Use this in special cases where you know you have created that specialized mapping, otherwise this will crash the software.
-template<gameMappingType_t T>
-inline int specializedGameValueMapUnsafe(int value, demoType_t sourceDemoType, demoType_t targetDemoType) {
-	if constexpr (T == GMAP_EVENTS) {
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~EV_EVENT_BITS] | ((value)&EV_EVENT_BITS);
-	}
-	else if constexpr (T == GMAP_ANIMATIONS) {
-		int& sourceAnimToggleBit = gameInfosMapped[sourceDemoType]->constants.anim_togglebit;
-		int& targetAnimToggleBit = gameInfosMapped[targetDemoType]->constants.anim_togglebit;
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value & ~sourceAnimToggleBit] | ((value& sourceAnimToggleBit)* targetAnimToggleBit/sourceAnimToggleBit);
-	}
-	else  {
-
-		return specializedMappings[T][sourceDemoType][targetDemoType].mapping[value];
-	}
-}
 
 /*
 template<gameMappingType_t T>

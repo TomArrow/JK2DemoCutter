@@ -189,10 +189,10 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					mainPlayerPS = tmpPS;
 				}
 				else {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, qtrue);
+					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, sourceDemoType, qtrue);
 					if (i >= MAX_CLIENTS) {
 						// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
-						tmpES.eType = ET_GRAPPLE;
+						tmpES.eType = ET_GRAPPLE_JK2;
 						// We don't have a player model. So instead get a ModelIndex for this playermodel
 						{
 							int maxLength;

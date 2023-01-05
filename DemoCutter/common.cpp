@@ -1336,17 +1336,17 @@ std::map <int, std::string>  saberStyleNames
 };
 
 
-void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap,qboolean writeCommandTime, qboolean clientSideStyleEventConversion) {
+void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime, qboolean clientSideStyleEventConversion) {
 	int		i;
 
 	if (ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR) {
-		s->eType = ET_INVISIBLE;
+		s->eType = specializeGameValue<GMAP_ENTITYTYPE,UNSAFE>(ET_INVISIBLE_GENERAL,demoType);
 	}
-	else if (ps->stats[STAT_HEALTH] <= GIB_HEALTH) {
-		s->eType = ET_INVISIBLE;
+	else if (ps->stats[STAT_HEALTH] <= GIB_HEALTH) { // Hmm should I be really doing this?
+		s->eType = specializeGameValue<GMAP_ENTITYTYPE, UNSAFE>(ET_INVISIBLE_GENERAL, demoType);;
 	}
 	else {
-		s->eType = ET_PLAYER;
+		s->eType = specializeGameValue<GMAP_ENTITYTYPE, UNSAFE>(ET_PLAYER_GENERAL, demoType);;
 	}
 
 	s->number = ps->clientNum;
@@ -1671,12 +1671,12 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		ps->holocronBits = s->time2;
 
 		if (!enhanceOnly) { // This stuff is kinda guesswork so... eh. Not use that if we are enhancing
-			if (s->weapon < specializeGameValue<GMAP_WEAPONS>( WP_NUM_WEAPONS_GENERAL,demoType)) {
+			if (s->weapon < specializeGameValue<GMAP_WEAPONS, UNSAFE>( WP_NUM_WEAPONS_GENERAL,demoType)) {
 
 				ps->stats[STAT_WEAPONS] |= 1 << s->weapon; // To make weapon select wheel look correct
 			}
 
-			if (generalizeGameValue<GMAP_WEAPONS>( s->weapon,demoType) == WP_SABER_GENERAL && s->fireflag == 0) {
+			if (generalizeGameValue<GMAP_WEAPONS, UNSAFE>( s->weapon,demoType) == WP_SABER_GENERAL && s->fireflag == 0) {
 				// Server disabled sending fireflag saber style. We must deduce from animations (ugh)
 				byte probability;
 				ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = getLikelyStanceFromTorsoAnim(s->torsoAnim, demoType, &probability);
@@ -1685,7 +1685,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 				ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = s->fireflag;
 			}
 
-			int generalizedLegsAnim = generalizeGameValue<GMAP_ANIMATIONS>(s->legsAnim,demoType);
+			int generalizedLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(s->legsAnim,demoType);
 
 			// This is my own stuff: (restoring viewheight)
 			if (s->eFlags & EF_DEAD) {
@@ -4165,6 +4165,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15},animMappingTable_1_04_to_1_02,sizeof(animMappingTable_1_04_to_1_02) / sizeof(animMappingTable_1_04_to_1_02[0])}}, // Here we don't subtract 1 becasue the animmappingtable has no entry for MAX_TOTALANIMS anyway
 				{jk2dm16AnimsToGeneral,(sizeof(jk2dm16AnimsToGeneral) / sizeof(jk2dm16AnimsToGeneral[0])) - 1}, //  BUT are mising MAX_TOTALANIMS after MAX_ANIMS. So we subtract 1.
 			},
+			{{},{jk2spEntityTypeToGeneral,sizeof(jk2spEntityTypeToGeneral) / sizeof(jk2spEntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields_jk2sp,sizeof(entityStateFields_jk2sp) / sizeof(entityStateFields_jk2sp[0]),},
@@ -4198,6 +4199,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},animMappingTable_1_02_to_1_04,sizeof(animMappingTable_1_02_to_1_04) / sizeof(animMappingTable_1_02_to_1_04[0])}},
 				{jk2dm15AnimsToGeneral,sizeof(jk2dm15AnimsToGeneral) / sizeof(jk2dm15AnimsToGeneral[0])},
 			},
+			{{},{jk2EntityTypeToGeneral,sizeof(jk2EntityTypeToGeneral) / sizeof(jk2EntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields15,sizeof(entityStateFields15) / sizeof(entityStateFields15[0]),},
@@ -4227,6 +4229,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15},animMappingTable_1_04_to_1_02,sizeof(animMappingTable_1_04_to_1_02) / sizeof(animMappingTable_1_04_to_1_02[0])}},
 				{jk2dm16AnimsToGeneral,sizeof(jk2dm16AnimsToGeneral) / sizeof(jk2dm16AnimsToGeneral[0])},
 			},
+			{{},{jk2EntityTypeToGeneral,sizeof(jk2EntityTypeToGeneral) / sizeof(jk2EntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields,	sizeof(entityStateFields) / sizeof(entityStateFields[0]),},
@@ -4256,6 +4259,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15},animMappingTable_1_04_to_1_02,sizeof(animMappingTable_1_04_to_1_02) / sizeof(animMappingTable_1_04_to_1_02[0])}},
 				{jk2dm16AnimsToGeneral,sizeof(jk2dm16AnimsToGeneral) / sizeof(jk2dm16AnimsToGeneral[0])},
 			},
+			{{},{jk2EntityTypeToGeneral,sizeof(jk2EntityTypeToGeneral) / sizeof(jk2EntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields,	sizeof(entityStateFields) / sizeof(entityStateFields[0]),},
@@ -4295,6 +4299,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},jkaAnimToDM16Mapping,sizeof(jkaAnimToDM16Mapping) / sizeof(jkaAnimToDM16Mapping[0])}},
 				{jkaAnimToGeneral,sizeof(jkaAnimToGeneral) / sizeof(jkaAnimToGeneral[0])},
 			},
+			{{},{jkaEntityTypeToGeneral,sizeof(jkaEntityTypeToGeneral) / sizeof(jkaEntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsJKA,sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),},
@@ -4337,6 +4342,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},jkaAnimToDM16Mapping,sizeof(jkaAnimToDM16Mapping) / sizeof(jkaAnimToDM16Mapping[0])}},
 				{jkaAnimToGeneral,sizeof(jkaAnimToGeneral) / sizeof(jkaAnimToGeneral[0])},
 			},
+			{{},{jkaEntityTypeToGeneral,sizeof(jkaEntityTypeToGeneral) / sizeof(jkaEntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsJKA,sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),},
@@ -4382,6 +4388,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},jkaAnimToDM16Mapping,sizeof(jkaAnimToDM16Mapping) / sizeof(jkaAnimToDM16Mapping[0])}},
 				{jkaAnimToGeneral,sizeof(jkaAnimToGeneral) / sizeof(jkaAnimToGeneral[0])},
 			},
+			{{},{jkaEntityTypeToGeneral,sizeof(jkaEntityTypeToGeneral) / sizeof(jkaEntityTypeToGeneral[0])}},
 		},
 		{},
 		MAX_CONFIGSTRINGS_JKA
@@ -4415,6 +4422,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},q3AnimToDM16,sizeof(q3AnimToDM16) / sizeof(q3AnimToDM16[0])}},
 				{q3AnimsToGeneral,sizeof(q3AnimsToGeneral) / sizeof(q3AnimsToGeneral[0])},
 			},
+			{{},{q3EntityTypeToGeneral,sizeof(q3EntityTypeToGeneral) / sizeof(q3EntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -4453,6 +4461,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},q3AnimToDM16,sizeof(q3AnimToDM16) / sizeof(q3AnimToDM16[0])}},
 				{q3AnimsToGeneral,sizeof(q3AnimsToGeneral) / sizeof(q3AnimsToGeneral[0])},
 			},
+			{{},{q3EntityTypeToGeneral,sizeof(q3EntityTypeToGeneral) / sizeof(q3EntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -4491,6 +4500,7 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},q3AnimToDM16,sizeof(q3AnimToDM16) / sizeof(q3AnimToDM16[0])}},
 				{q3AnimsToGeneral,sizeof(q3AnimsToGeneral) / sizeof(q3AnimsToGeneral[0])},
 			},
+			{{},{q3EntityTypeToGeneral,sizeof(q3EntityTypeToGeneral) / sizeof(q3EntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -4510,6 +4520,8 @@ static qboolean gameInfosInitialized = qfalse;
 
 void initializeGameInfos() {
 
+	constexpr arrayAccessType_t A = UNSAFE;
+
 	if (!gameInfosInitialized) {
 		constexpr int countGameMappings = sizeof(gameInfos) / sizeof(gameInfo_t);
 		for (int i = 0; i < countGameMappings; i++) {
@@ -4524,7 +4536,7 @@ void initializeGameInfos() {
 			if (!gameInfos[i].constants.cs_models) gameInfos[i].constants.cs_models = CS_MODELS;
 			if (!gameInfos[i].constants.cs_sounds) gameInfos[i].constants.cs_sounds = CS_SOUNDS;
 			if (!gameInfos[i].constants.cs_players) gameInfos[i].constants.cs_players = CS_PLAYERS;
-			if (!gameInfos[i].constants.et_events) gameInfos[i].constants.et_events = ET_EVENTS;
+			if (!gameInfos[i].constants.et_events) gameInfos[i].constants.et_events = ET_EVENTS_JK2;
 			if (!gameInfos[i].constants.ef_missile_stick) gameInfos[i].constants.ef_missile_stick = EF_MISSILE_STICK;
 			if (gameInfos[i].constants.ef_missile_stick == -1) gameInfos[i].constants.ef_missile_stick = NULL; // Q3 for example doesn't have mixxile stick at all.
 			if (!gameInfos[i].constants.anim_togglebit) gameInfos[i].constants.anim_togglebit = ANIM_TOGGLEBIT;
@@ -4536,8 +4548,8 @@ void initializeGameInfos() {
 				if (!gameInfos[i].mappings[gmapType].reversedMapping.data) {
 					gameInfos[i].mappings[gmapType].reversedMapping = { new const int[gameMappingTypeGeneralArrayLength[gmapType]] {}, gameMappingTypeGeneralArrayLength[gmapType], gameMappingTypeGeneralValueOffset[gmapType] }; // we add +1 because we wanna map the Max_ thing too and not cause writing to some random memory location, damaging it and causing crashes
 					for (int gameValue = gameInfos[i].mappings[gmapType].mapping.count - 1 - gameInfos[i].mappings[gmapType].mapping.offset; gameValue >= 0- gameInfos[i].mappings[gmapType].mapping.offset; gameValue--) { // We do this in reverse so that svc_bad always ends up 0 in the reverse lookup. Prolly irrelevant because it's ... not supposed to be really used, but its neater.
-						int generalValue = gameInfos[i].mappings[gmapType].mapping[gameValue];
-						*(int*)&gameInfos[i].mappings[gmapType].reversedMapping[generalValue] = gameValue; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
+						int generalValue = gameInfos[i].mappings[gmapType].mapping.get<A>(gameValue);
+						*(int*)&gameInfos[i].mappings[gmapType].reversedMapping.get<A>(generalValue) = gameValue; // We cast the const int to int. We wanna be able to change it here to give it the correct values. It's just not supposed to be modified elsewhere
 					}
 				}
 

@@ -607,27 +607,27 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 	if (demoType == DM_14) {
 
-		ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
-		ps->legsAnim = convertGameValue<GMAP_ANIMATIONS>(ps->legsAnim, demoType, DM_16);
-		ps->weapon = convertGameValue<GMAP_WEAPONS>(ps->weapon,demoType,DM_15);
+		ps->torsoAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
+		ps->legsAnim = convertGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
+		ps->weapon = convertGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon,demoType,DM_15);
 	} else if (demoType == DM_26 || demoType == DM_25) {
 
 		//ps->torsoAnim = jkaAnimMapping[ps->torsoAnim];
-		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
+		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
 		if (ps->torsoFlip) ps->torsoAnim |= ANIM_TOGGLEBIT; // Generalize togglebit someday?
 		//ps->legsAnim = jkaAnimMapping[ps->legsAnim];
-		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, demoType, DM_16);
+		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
 		if (ps->legsFlip) ps->legsAnim |= ANIM_TOGGLEBIT;// Generalize togglebit someday?
 		//ps->weapon = jkaWeaponMap[ps->weapon];
-		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon,demoType,DM_15);
+		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon,demoType,DM_15);
 	} else if (demoType == DM_68) { // TODO Allow other ones too? But idk if anims changed
 
 		//ps->torsoAnim = MapQ3AnimToJK2(ps->torsoAnim);
-		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, demoType, DM_16);
+		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType, DM_16);
 		//ps->legsAnim = MapQ3AnimToJK2(ps->legsAnim);
-		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, demoType, DM_16);
+		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType, DM_16);
 		//ps->weapon = q3WeaponMap[ps->weapon];
-		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS>(ps->weapon, demoType, DM_15);;
+		ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, DM_15);;
 		ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 	}
 	if (demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
@@ -635,15 +635,15 @@ void DemoReader::mapAnimsToDM15(playerState_t* ps) {
 		//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
 		//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
 		//ps->torsoAnim = MV_MapAnimation102(ps->torsoAnim);
-		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->torsoAnim, DM_16, DM_15);
+		ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, DM_16, DM_15);
 		//ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
-		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS>(ps->legsAnim, DM_16, DM_15);
+		ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, DM_16, DM_15);
 	}
 
 	if (demoType < DM_15 || demoType > DM_16) {
-		ps->events[0] = convertGameValue<GMAP_EVENTS>(ps->events[0], demoType, DM_15);
-		ps->events[1] = convertGameValue<GMAP_EVENTS>(ps->events[1], demoType, DM_15);
-		ps->externalEvent = convertGameValue<GMAP_EVENTS>(ps->externalEvent, demoType, DM_15);
+		ps->events[0] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[0], demoType, DM_15);
+		ps->events[1] = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->events[1], demoType, DM_15);
+		ps->externalEvent = convertGameValue<GMAP_EVENTS, UNSAFE>(ps->externalEvent, demoType, DM_15);
 	}
 }
 
@@ -1011,7 +1011,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 				std::map<int, entityState_t> retVal = it->second.entities;
 				entityState_t psEnt;
 				Com_Memset(&psEnt, 0, sizeof(psEnt));
-				BG_PlayerStateToEntityState(&it->second.playerState, &psEnt,qfalse,qtrue);
+				BG_PlayerStateToEntityState(&it->second.playerState, &psEnt,qfalse,demoType,qtrue);
 				retVal[it->second.playerState.clientNum] = psEnt;
 				return retVal;
 			}
@@ -1311,8 +1311,8 @@ readNext:
 				thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
 
 				if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
-					thisEvent.eventNumber = convertGameValue<GMAP_EVENTS>(thisEvent.eventNumber,DM_14,DM_15);
-					thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS>(thisEvent.theEvent.event, DM_14, DM_15);
+					thisEvent.eventNumber = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber,DM_14,DM_15);
+					thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.theEvent.event, DM_14, DM_15);
 				}else if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 					thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 					thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
@@ -1349,8 +1349,8 @@ readNext:
 
 					thisEvent.eventNumber = thisEvent.theEvent.event & ~EV_EVENT_BITS;
 					if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
-						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS>(thisEvent.eventNumber, DM_14, DM_15);
-						thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS>(thisEvent.theEvent.event, DM_14, DM_15);
+						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber, DM_14, DM_15);
+						thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.theEvent.event, DM_14, DM_15);
 					}
 					else if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
@@ -1384,18 +1384,18 @@ readNext:
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
 					if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
-						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS>(thisEvent.eventNumber, DM_14, DM_15);
+						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber, DM_14, DM_15);
 						if (thisEvent.theEvent.eType > getET_EVENTS(demoType)) {
-							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType- getET_EVENTS(demoType)] + ET_EVENTS; // I just changed this, but should I? Hmm
+							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType- getET_EVENTS(demoType)] + ET_EVENTS_JK2; // I just changed this, but should I? Hmm
 						}
 						else {
-							thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS>(thisEvent.theEvent.event, DM_14, DM_15); 
+							thisEvent.theEvent.event = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.theEvent.event, DM_14, DM_15);
 						}
 					}
 					else if (demoType == DM_26 || demoType == DM_25) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = jkaEventToJk2Map[thisEvent.eventNumber];
 						if (thisEvent.theEvent.eType > ET_EVENTS_JKA) {
-							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS; // I just changed this, but should I? Hmm
+							thisEvent.theEvent.eType = jkaEventToJk2Map[thisEvent.theEvent.eType-ET_EVENTS_JKA] + ET_EVENTS_JK2; // I just changed this, but should I? Hmm
 						}
 						else {
 							thisEvent.theEvent.event = MapJKAEventJK2(thisEvent.theEvent.event);
@@ -1404,7 +1404,7 @@ readNext:
 					else if (demoType == DM_68) {
 						thisEvent.eventNumber = q3dm68EventToJk2Map[thisEvent.eventNumber];
 						if (thisEvent.theEvent.eType > ET_EVENTS_Q3) {
-							thisEvent.theEvent.eType = q3dm68EventToJk2Map[thisEvent.theEvent.eType - ET_EVENTS_Q3] + ET_EVENTS;
+							thisEvent.theEvent.eType = q3dm68EventToJk2Map[thisEvent.theEvent.eType - ET_EVENTS_Q3] + ET_EVENTS_JK2;
 						}
 						else {
 							thisEvent.theEvent.event = MapQ3DM68EventJK2(thisEvent.theEvent.event);
@@ -1678,7 +1678,7 @@ int main(int argc, char** argv) {
 
 
 void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
-	int eventHere = generalizeGameValue<GMAP_EVENTS>(tmpEntity->event & ~EV_EVENT_BITS,demoType);
+	int eventHere = generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity->event & ~EV_EVENT_BITS,demoType);
 	int maxLength = 0;
 	if (eventHere == EV_GENERAL_SOUND_GENERAL) {
 		int soundIndex = tmpEntity->eventParm;

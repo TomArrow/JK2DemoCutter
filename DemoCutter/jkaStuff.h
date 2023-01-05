@@ -797,6 +797,32 @@ typedef enum {
 } entityTypeJKA_t;
 
 
+static const int jkaEntityTypeToGeneral[] {
+	ET_GENERAL_GENERAL,
+	ET_PLAYER_GENERAL,
+	ET_ITEM_GENERAL,
+	ET_MISSILE_GENERAL,
+	ET_SPECIAL_GENERAL,				// rww - force fields
+	ET_HOLOCRON_GENERAL,			// rww - holocron icon displays
+	ET_MOVER_GENERAL,
+	ET_BEAM_GENERAL,
+	ET_PORTAL_GENERAL,
+	ET_SPEAKER_GENERAL,
+	ET_PUSH_TRIGGER_GENERAL,
+	ET_TELEPORT_TRIGGER_GENERAL,
+	ET_INVISIBLE_GENERAL,
+	ET_NPC_GENERAL,					// ghoul2 player-like entity
+	ET_TEAM_GENERAL,
+	ET_BODY_GENERAL,
+	ET_TERRAIN_GENERAL,
+	ET_FX_GENERAL,
+
+	ET_EVENTS_GENERAL				// any of the EV_* events can be added freestanding
+							// by setting eType to ET_EVENTS + eventNum
+							// this avoids having to set eFlags and eventNum
+} ;
+
+
 
 
 const int lsMoveJKAToGeneral[] {
