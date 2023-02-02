@@ -27,6 +27,8 @@ public:
 	qboolean copyAllPlayers = qfalse;
 	qboolean copyRemainingPlayersAsG2AnimEnts = qfalse;
 	qboolean isFinished = qfalse;
+	qboolean copySubmodels = qfalse;
+	qboolean copyModels = qfalse;
 };
 
 struct SourcePlayerInfo {
@@ -48,10 +50,13 @@ class SlotManager {
 	struct sourceDemoMapping {
 		int demoIndex;
 		int entityNum;
+		qboolean isModel;
 	};
 
+	int availableSlots = MAX_GENTITIES - 2;
 	std::map<int, sourceDemoMapping> mappings;
 	typedef std::map<int, sourceDemoMapping>::iterator mappingIterator;
+	vec3_t modelDistanceOrigin{};
 public:
 	int getPlayerSlot(int demoIndex, int clientNum,qboolean* wasNewPlayer) {
 		// Check if mapping already exists
@@ -64,7 +69,8 @@ public:
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			if (mappings.find(i) == mappings.end()) {
 				// Free slot!
-				mappings[i] = { demoIndex,clientNum };
+				mappings[i] = { demoIndex,clientNum,qfalse };
+				availableSlots--;
 				if (wasNewPlayer) {
 					*wasNewPlayer = qtrue;
 				}
@@ -82,10 +88,34 @@ public:
 			}
 		}
 		// Else, create new mapping in free slot.
-		for (int i = MAX_CLIENTS; i < MAX_GENTITIES-1; i++) {
+		for (int i = MAX_CLIENTS; i < MAX_GENTITIES-2; i++) {
 			if (mappings.find(i) == mappings.end()) {
 				// Free slot!
-				mappings[i] = { demoIndex,entityNum };
+				mappings[i] = { demoIndex,entityNum,qfalse };
+				availableSlots--;
+				return i;
+			}
+		}
+		// Error: No free slot found
+		return -1;
+	}
+	void setModelDistanceOrigin(vec_t* originA) {
+		VectorCopy(originA, modelDistanceOrigin);
+	}
+	// These are released as soon as they disappear from the demo. We don't need consistency from frame to frame on them. It's just random models/movers etc., they only need to be visible.
+	int getModelSlot(int demoIndex, int entityNum) {
+		// Check if mapping already exists
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
+				return it->first;
+			}
+		}
+		// Else, create new mapping in free slot.
+		for (int i = MAX_CLIENTS; i < MAX_GENTITIES-2; i++) {
+			if (mappings.find(i) == mappings.end()) {
+				// Free slot!
+				mappings[i] = { demoIndex,entityNum,qtrue };
+				availableSlots--;
 				return i;
 			}
 		}
@@ -120,22 +150,31 @@ public:
 			if (iteratorHere->second.demoIndex == demoIndex) {
 				erasedSlots.push_back(iteratorHere->first);
 				mappings.erase(iteratorHere);
+				availableSlots++;
 				countErased++;
 			}
 		}
 		return erasedSlots;
 	}
-	int freeSlot(int demoIndex, int entityNum) {
-		int countErased = 0;
-		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
-			mappingIterator iteratorHere = it;
-			it++;
-			if (iteratorHere->second.demoIndex == demoIndex && iteratorHere->second.entityNum == entityNum) {
-				mappings.erase(iteratorHere);
-				countErased++;
+	/*std::vector<int> getModelMappings(int demoIndex) { // Returns the erased slots
+		std::vector<int> modelSlots;
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++; ) {
+			
+			if (it->second.demoIndex == demoIndex && it->second.isModel) {
+				modelSlots.push_back(it->first);
 			}
 		}
-		return countErased;
+		return modelSlots;
+	}*/
+	int freeSlot(int demoIndex, int entityNum) {
+		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++ ) {
+			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
+				mappings.erase(it);
+				availableSlots++;
+				return 1;
+			}
+		}
+		return 0;
 	}
 	qboolean isSlotFree(int slotNum) {
 		for (mappingIterator it = mappings.begin(); it != mappings.end();it++ ) {
@@ -815,7 +854,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.torsoAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.torsoAnim,sourceDemoType, demoType);
 							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS,SAFE>(tmpEntity.weapon,sourceDemoType, demoType);
 							tmpEntity.event = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType, demoType);
-							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.saberMove,sourceDemoType, demoType);
+							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.boltInfo,sourceDemoType, demoType);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
@@ -1042,7 +1081,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 		// Find empty places in entities and add events.
 		for (int i = 0; i < eventsToAdd.size(); i++) {
-			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-1; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
+			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-2; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
 				if (targetEntities.find(e) == targetEntities.end() && (blockedEntities[e]+EVENT_VALID_MSEC+100.0f) < time && slotManager.isSlotFree(e)) { // Events won't get recognized if they happen on the same entity in a short timeframe. Give it EVENT_VALID_MSEC so the client resets it, and add 100 on top for good measure.
 					// Let's add it!
 					eventsToAdd[i].theEvent.number = e;
@@ -1164,6 +1203,12 @@ int main(int argc, char** argv) {
 		
 		demoSource.copyAllPlayers = (qboolean)atoi(collection.get("allPlayers").c_str());
 		std::cout << "allPlayers: " << demoSource.copyAllPlayers << std::endl;
+
+		demoSource.copySubmodels = (qboolean)atoi(collection.get("submodels").c_str());
+		std::cout << "submodels: " << demoSource.copySubmodels << std::endl;
+
+		demoSource.copyModels = (qboolean)atoi(collection.get("models").c_str());
+		std::cout << "models: " << demoSource.copyModels << std::endl;
 
 		float delay = atof(collection.get("delay").c_str());
 		std::cout << "delay: " << delay <<" ms" << std::endl;

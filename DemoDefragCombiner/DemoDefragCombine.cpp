@@ -268,7 +268,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 		// Find empty places in entities and add events.
 		for (int i = 0; i < eventsToAdd.size(); i++) {
-			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-1; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
+			for (int e = MAX_CLIENTS; e < MAX_GENTITIES-2; e++) { // Can I use full MAX_GENTITIES amount? Isn't MAX_GENTITIES -1 reserved for world and stuff like that?
 				if (playerEntities.find(e) == playerEntities.end()) {
 					// Let's add it!
 					eventsToAdd[i].theEvent.number = e;
