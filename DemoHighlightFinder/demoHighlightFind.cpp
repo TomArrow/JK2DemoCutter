@@ -239,6 +239,7 @@ std::map<int, int> timeCheckedForKillStreaks;
 #define KILLSTREAK_MAX_INTERVAL 3000
 #define SLOW_KILLSTREAK_MAX_INTERVAL 5000
 #define VERYSLOW_KILLSTREAK_MAX_INTERVAL 7000
+#define VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL 9000
 #define OLDER_SPEEDS_STORE_LIMIT 2000 // Any speeds older than 2000ms are removed.
 #define MAX_ASSUMED_SERVER_FPS 200
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
@@ -3721,7 +3722,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
 
-					static const int killStreakSpeedTypes[] = { KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL };
+					static const int killStreakSpeedTypes[] = { KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL };
 					constexpr int spCount = sizeof(killStreakSpeedTypes) / sizeof(int);
 
 					int clientNumAttacker = clientIt->first;
