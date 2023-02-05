@@ -236,6 +236,7 @@ std::map<int, std::vector<Kill>> kills;
 std::map<int, int> timeCheckedForKillStreaks;
 
 #define KILLSTREAK_MIN_KILLS 3
+#define KILLSTREAK_SUPERFAST_MAX_INTERVAL 1000
 #define KILLSTREAK_MAX_INTERVAL 3000
 #define SLOW_KILLSTREAK_MAX_INTERVAL 5000
 #define VERYSLOW_KILLSTREAK_MAX_INTERVAL 7000
@@ -862,8 +863,10 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 template<unsigned int max_clients>
 void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType) {
 
-	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
+		int maxDelayActual = 0;
+		int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 		const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
@@ -888,12 +891,20 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
 		}*/
 		int lastKillTime = 0;
+		std::set<std::string> killTypes;
 		std::set<int> nearbyPlayers;
 		for (int i = 0; i < killsOfThisSpree->size(); i++) {
 			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + (*victims)[i]];
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
-			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? ((*killsOfThisSpree)[i].time-lastKillTime) :0)<<")" << "\n";
+			int timeSinceLastKill = (*killsOfThisSpree)[i].time - lastKillTime;
+			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
+			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
+
+			killTypes.insert((*killsOfThisSpree)[i].modInfoString);
+			//killTypesSS << (*killsOfThisSpree)[i].modInfoString << "\n";
+			if (i > 0) {
+				maxDelayActual = std::max(maxDelayActual, timeSinceLastKill);
+			}
 			lastKillTime = (*killsOfThisSpree)[i].time;
 			victimsNumsSS << (i==0? "" :",") << (*victims)[i];
 			for (int n = 0; n < (*killsOfThisSpree)[i].nearbyPlayers.size(); n++) {
@@ -919,6 +930,14 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		std::string nearbyPlayersString = nearbyPlayersSS.str();
 
 
+		std::stringstream killTypesSS;
+		int killTypeCount = 0;
+		for (auto it = killTypes.begin(); it != killTypes.end(); it++) {
+			killTypesSS << (killTypeCount++ == 0 ? "" : ",") << *it;
+		}
+		std::string killTypesString = killTypesSS.str();
+
+
 		std::stringstream killHashesSS;
 		for (int i = 0; i < killHashes->size(); i++) {
 			killHashesSS << (i == 0 ? "" : "\n") << (*killHashes)[i];
@@ -938,12 +957,15 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_TEXT(insertSpreeStatement, "@hash", hash_hex_string.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@shorthash", shorthash.c_str());
 		SQLBIND(insertSpreeStatement, int, "@maxDelay", maxDelay);
+		SQLBIND(insertSpreeStatement, int, "@maxDelayActual", maxDelayActual);
 		SQLBIND_TEXT(insertSpreeStatement, "@map", mapname.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@killerName", playername.c_str());
 		std::string playernameStripped = Q_StripColorAll(playername);
 		SQLBIND_TEXT(insertSpreeStatement, "@killerNameStripped", playernameStripped.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@victimNames", victimsString.c_str());
 		SQLBIND_TEXT(insertSpreeStatement, "@victimNamesStripped", victimsStringStripped.c_str());
+		SQLBIND_TEXT(insertSpreeStatement, "@killTypes", killTypesString.c_str());
+		SQLBIND(insertSpreeStatement, int, "@killTypesCount", killTypeCount);
 		SQLBIND_TEXT(insertSpreeStatement, "@killHashes", killHashesString.c_str());
 		SQLBIND(insertSpreeStatement, int, "@killerClientNum", clientNumAttacker);
 		SQLBIND_TEXT(insertSpreeStatement, "@victimClientNums", victimsNumsString.c_str());
@@ -1395,11 +1417,14 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"hash	TEXT,"
 		"shorthash	TEXT,"
 		"maxDelay	INTEGER NOT NULL,"
+		"maxDelayActual	INTEGER NOT NULL,"
 		"map	TEXT NOT NULL,"
 		"killerName	TEXT NOT NULL,"
 		"killerNameStripped	TEXT NOT NULL,"
 		"victimNames	TEXT NOT NULL,"
 		"victimNamesStripped	TEXT NOT NULL,"
+		"killTypes	TEXT NOT NULL,"
+		"killTypesCount	INTEGER NOT NULL,"
 		"killHashes	TEXT NOT NULL,"
 		"killerClientNum	INTEGER NOT NULL,"
 		"victimClientNums	TEXT NOT NULL,"
@@ -1491,10 +1516,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	sqlite3_stmt* insertLaughsStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertLaughsStatement,NULL);
 	preparedStatementText = "INSERT INTO killSprees "
-		"( hash, shorthash,maxDelay, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
+		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
-		"( @hash, @shorthash, @maxDelay,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
+		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
@@ -3722,7 +3747,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
 
-					static const int killStreakSpeedTypes[] = { KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL };
+					static const int killStreakSpeedTypes[] = { KILLSTREAK_SUPERFAST_MAX_INTERVAL,KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL };
 					constexpr int spCount = sizeof(killStreakSpeedTypes) / sizeof(int);
 
 					int clientNumAttacker = clientIt->first;
