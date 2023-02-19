@@ -3050,6 +3050,18 @@ float	AngleSubtract(float a1, float a2) {
 	float	a;
 
 	a = a1 - a2;
+
+	// Improved variant. Same results for most values but it's more correct for extremely high values (and more performant as well I guess)
+	// The reason I do this: Some demos end up having (or being read as having) nonsensically high  float values.
+	// This results in the old code entering an endless loop because subtracting 360 no longer does  anything  to float  values that are that  high.
+	a = fmodf(a, 360.0f); 
+	if (a > 180) {
+		a -= 360;
+	}
+	if (a < -180) {
+		a += 360;
+	}
+#if 0
 	assert(fabs(a) < 3600);
 	while (a > 180) {
 		a -= 360;
@@ -3057,6 +3069,7 @@ float	AngleSubtract(float a1, float a2) {
 	while (a < -180) {
 		a += 360;
 	}
+#endif
 	return a;
 }
 
