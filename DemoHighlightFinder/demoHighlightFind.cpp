@@ -106,6 +106,8 @@ struct strafeDeviationInfo_t {
 
 #define AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD forceJumpHeight[FORCE_LEVEL_1] // Higher than a normal lowest tier force jump could reach.
 
+bool gameIsSaberOnlyIsh = false; // Saber only-ish. The basic question this answers is: Does this gamemode allow normal weapons? Or only saber (and maybe mines)? Basically I'm trying to question whether this demo contains mostly saber combat. Aka if blasters and such are banned. So I can early cancel analyzing some demos.
+
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
 int playerFirstVisible[MAX_CLIENTS_MAX];
 int playerFirstFollowed[MAX_CLIENTS_MAX];
@@ -570,7 +572,7 @@ qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
 }
 
 
-void updateForcePowersInfo(clientActive_t* clCut) {
+void updateForcePowersInfo(clientActive_t* clCut) { // TODO: make this adapt to JKA
 	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
 	const char* playerInfo = clCut->gameState.stringData + stringOffset;
 
@@ -601,6 +603,44 @@ void updateForcePowersInfo(clientActive_t* clCut) {
 	// Now calculate maximum vertical speed delta
 	int curHeight = 0;
 	forcePowersInfo.maxForceJumpVelocityDelta = (forceJumpHeight[forcePowersInfo.maxForceJumpLevel] - curHeight) / forceJumpHeight[forcePowersInfo.maxForceJumpLevel] * forceJumpStrength[forcePowersInfo.maxForceJumpLevel];
+}
+
+void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make this adapt to JKA
+	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
+	const char* playerInfo = clCut->gameState.stringData + stringOffset;
+
+	int g_weaponDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
+
+	int i = 0;
+	int numWeapons = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NUM_WEAPONS_GENERAL,demoType);
+	int allowedSaberIshWeapons[] = { 
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NONE_GENERAL, demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_SABER_GENERAL,demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_MELEE_GENERAL,demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_THERMAL_GENERAL,demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TRIP_MINE_GENERAL,demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_DET_PACK_GENERAL,demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TURRET_GENERAL,demoType)
+	};
+	int allowedSaberIshWeaponsCount = sizeof(allowedSaberIshWeapons) / sizeof(allowedSaberIshWeapons[0]);
+	gameIsSaberOnlyIsh = true;
+	while (i < numWeapons)
+	{
+		if (!(g_weaponDisable & (1 << i))) // Is this particular weapon allowed?
+		{
+			// Check if it is one of the allowed weapons
+			bool thisWeaponIsOk = false;
+			for (int b = 0; b < allowedSaberIshWeaponsCount; b++) {
+				if (i == allowedSaberIshWeapons[b]) thisWeaponIsOk = true;
+			}
+			if (!thisWeaponIsOk) {
+				gameIsSaberOnlyIsh = false;
+				break;
+			}
+		}
+
+		i++;
+	}
 }
 
 
@@ -1771,6 +1811,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				CheckForNameChanges<max_clients>(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement,demoType);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				updateForcePowersInfo(&demo.cut.Cl);
+				updateGameInfo(&demo.cut.Cl, demoType);
+				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
+					std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
+					goto cutcomplete;
+				}
 				updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
@@ -4424,6 +4469,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 			CheckForNameChanges<max_clients>(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement, demoType);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			updateForcePowersInfo(&demo.cut.Cl);
+			updateGameInfo(&demo.cut.Cl,demoType);
+			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
+				std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
+				goto cutcomplete;
+			}
 			updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
 		}
 
@@ -4721,7 +4771,7 @@ int main(int argcO, char** argvO) {
 	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");
 	auto S = op.add<popl::Switch>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat)");
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
-	//auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber and tripmines/detpacks, immediately skip it");
+	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -4740,6 +4790,7 @@ int main(int argcO, char** argvO) {
 		std::cout << "third optional argument: myctfreturns, ctfreturns, top10defrag, alldefrag, allkills or allmykills\n";
 		std::cout << "Extra options:\n";
 		std::cout << op << "\n";
+		return 0;
 	}
 	initializeGameInfos();
 
@@ -4748,7 +4799,7 @@ int main(int argcO, char** argvO) {
 	opts.onlyLogSaberKills = s->is_set();
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set();
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
-	//opts.quickSkipNonSaberExclusive =  qSNSE->value();
+	opts.quickSkipNonSaberExclusive =  q->value();
 
 
 	//char* demoName = argv[1];
