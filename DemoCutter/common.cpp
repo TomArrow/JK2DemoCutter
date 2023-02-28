@@ -4615,3 +4615,17 @@ void initializeGameInfos() {
 		gameInfosInitialized = qtrue;
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

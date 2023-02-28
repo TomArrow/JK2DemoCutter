@@ -15,7 +15,20 @@
 #include <iso646.h>
 #include "picosha3.h"
 
+#include "popl.hpp"
+
 #define DEBUGSTATSDB
+
+
+class ExtraSearchOptions {
+public:
+	bool quickSkipNonSaberExclusive = false; // Not implemented (yet). Skip demoss that aren't saber only
+	bool onlyLogSaberKills = false;
+	bool onlyLogKillSpreesWithSaberKills = false;
+	bool onlyLogCapturesWithSaberKills = false;
+};
+
+
 
 
 
@@ -72,6 +85,7 @@ struct CapperKillsInfo {
 	int lastKillDemoTime; // Will reset if the last kill time is before the flag hold.
 	int kills;
 	int rets;
+	int saberkills;
 };
 
 struct EnemyNearbyInfo {
@@ -207,6 +221,7 @@ public:
 	bool isExplosion;
 	bool isVisible;
 	bool isFollowed;
+	bool isSaberKill;
 	int timeSinceSaberMoveChange;
 	int timeSinceBackflip;
 	float speedatSaberMoveChange;
@@ -861,10 +876,11 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 }
 
 template<unsigned int max_clients>
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, ExtraSearchOptions opts) {
 
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
+		bool hasAtLeastOneSaberKill = false;
 		int maxDelayActual = 0;
 		int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -894,6 +910,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		std::set<std::string> killTypes;
 		std::set<int> nearbyPlayers;
 		for (int i = 0; i < killsOfThisSpree->size(); i++) {
+			if ((*killsOfThisSpree)[i].isSaberKill) {
+				hasAtLeastOneSaberKill = true;
+			}
 			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + (*victims)[i]];
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			int timeSinceLastKill = (*killsOfThisSpree)[i].time - lastKillTime;
@@ -911,6 +930,11 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 				nearbyPlayers.insert((*killsOfThisSpree)[i].nearbyPlayers[n].clientNum);
 			}
 		}
+
+		if (opts.onlyLogKillSpreesWithSaberKills && !hasAtLeastOneSaberKill) {
+			return;
+		}
+
 		std::string victimsString = victimsSS.str();
 		std::string victimsStringStripped = victimsStrippedSS.str();
 		std::string victimsNumsString = victimsNumsSS.str();
@@ -1113,7 +1137,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 
 template<unsigned int max_clients>
-qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, highlightSearchMode_t searchMode) {
+qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, highlightSearchMode_t searchMode, ExtraSearchOptions opts) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -2529,6 +2553,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							bool			attackerIsVisibleOrFollowed = false;
 							bool			targetIsVisibleOrFollowed = false;
 							bool			attackerIsVisible = false;
+							bool			isSaberKill = false; // In case we want to avoid non-saber kills to save space with huge demo collections
 							if (target < 0 || target >= max_clients) {
 								std::cout << "CG_Obituary: target out of range. This should never happen really.";
 							}
@@ -2787,6 +2812,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							if (needMoreInfo) {
 								switch (probableKillingWeapon) {
 									case WP_SABER_GENERAL:
+										isSaberKill = true;
 										if (attackerIsFollowed) {
 
 											modInfo << saberMoveNames_general[psGeneralSaberMove];
@@ -2830,6 +2856,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 													// Save speed at which it was executed.
 													modInfo <<"_" << (int)thisKill.speedatSaberMoveChange<<"u";
 												}
+											}
+											else {
+												modInfo << "_SABER";
 											}
 										}
 										// Is the current saber move the follow up move of a bounce, deflect, parry, deflect, knockaway etc?
@@ -2970,6 +2999,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 							}
 
+							thisKill.isSaberKill = isSaberKill;
+							if (isSaberKill /* && !isWorldKill*/ && attackerIsFlagCarrier) {
+								recentKillsDuringFlagHold[attacker].saberkills++; // I wanted to do this above with the rest of the recentKillsDuringFlagHold stuff, but up there I don't know if it was a saber kill yet
+							}
+
 
 							if (attackerJumpHeight > AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD && victimJumpHeight > AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD) {
 								modInfo << "_A2A";
@@ -3076,6 +3110,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 
 							kills[attacker].push_back(thisKill);
+
+							if (opts.onlyLogSaberKills && !isSaberKill) {
+								continue;
+							}
 
 
 
@@ -3498,6 +3536,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 							int flagCarrierKillCount = recentKillsDuringFlagHold[playerNum].kills;
 							int flagCarrierRetCount = recentKillsDuringFlagHold[playerNum].rets;
+							int flagCarrierSaberKillCount = recentKillsDuringFlagHold[playerNum].saberkills;
+
 
 							vec3_t currentPos;
 							vec3_t currentDir;
@@ -3613,6 +3653,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 									victimCarrierLastPickupOrigin = cgs.blueFlagLastPickupOrigin;
 									break;
 							}
+
+							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
 
 							SQLBIND_TEXT(insertCaptureStatement, "@map", mapname.c_str());
 							SQLBIND_TEXT(insertCaptureStatement, "@serverName", serverName.c_str());
@@ -3812,7 +3854,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								// This kill is not part of a killspree. Reset.
 								// But first, check if this concludes an existing killspree that we can now save.
 								if (countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType);
+									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType,opts);
 								}
 
 								// Reset.
@@ -3825,7 +3867,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 						}
 						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType);
+							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType,opts);
 						}
 
 					}
@@ -4611,7 +4653,7 @@ cuterror:
 
 
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, highlightSearchMode_t searchMode) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, highlightSearchMode_t searchMode, ExtraSearchOptions opts) {
 	char			ext[7]{};
 	demoType_t		demoType;
 	qboolean		isCompressedFile = qfalse;
@@ -4619,13 +4661,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int maxClientsHere = getMAX_CLIENTS(demoType);
 	switch (maxClientsHere) {
 	case 1: // JK 2 SP
-		return demoHighlightFindReal<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
+		return demoHighlightFindReal<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
 		break;
 	case 32:
-		return demoHighlightFindReal<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
+		return demoHighlightFindReal<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
 		break;
 	case 64:
-		return demoHighlightFindReal<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode);
+		return demoHighlightFindReal<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
 		break;
 	default:
 		throw std::exception("unsupported MAX_CLIENTS count.");
@@ -4662,22 +4704,58 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 }*/
 
 
-int main(int argc, char** argv) {
-	if (argc < 3) {
-		std::cout << "need 2 arguments at least: demoname and buffer (before and after highlight) in milliseconds";
+
+
+
+int main(int argcO, char** argvO) {
+
+
+	popl::OptionParser op("Allowed options");
+	auto h = op.add<popl::Switch>("h", "help", "Show help");
+	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");
+	auto S = op.add<popl::Switch>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat)");
+	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
+	//auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber and tripmines/detpacks, immediately skip it");
+	op.parse(argcO, argvO);
+	auto args = op.non_option_args();
+
+
+	//if (argc < 3) {
+	if (args.size() < 2) {
+		std::cout << "need 2 arguments at least: demoname and buffer (before and after highlight) in milliseconds\n";
+		std::cout << "third optional argument: myctfreturns, ctfreturns, top10defrag, alldefrag, allkills or allmykills\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
 		std::cin.get();
 		return 1;
+	}
+	else if (h->is_set()) {
+		std::cout << "need 2 arguments at least: demoname and buffer (before and after highlight) in milliseconds\n";
+		std::cout << "third optional argument: myctfreturns, ctfreturns, top10defrag, alldefrag, allkills or allmykills\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
 	}
 	initializeGameInfos();
 
 
-	char* demoName = argv[1];
-	float bufferTime = atof(argv[2]);
+	ExtraSearchOptions opts;
+	opts.onlyLogSaberKills = s->is_set();
+	opts.onlyLogKillSpreesWithSaberKills = S->is_set();
+	opts.onlyLogCapturesWithSaberKills = c->is_set();
+	//opts.quickSkipNonSaberExclusive =  qSNSE->value();
+
+
+	//char* demoName = argv[1];
+	const char* demoName = args[0].c_str();
+	//float bufferTime = atof(argv[2]);
+	float bufferTime = atof(args[1].c_str());
 
 	highlightSearchMode_t searchMode = SEARCH_INTERESTING;
-	if (argc > 3) {
+	//if (argc > 3) {
+	if (args.size() > 2) {
 		// Searchmode specified
-		char* searchModeText = argv[3];
+		//char* searchModeText = argv[3];
+		const char* searchModeText = args[2].c_str();
 		if (!_stricmp(searchModeText, "myctfreturns")) {
 			searchMode = SEARCH_MY_CTF_RETURNS;
 		}else if (!_stricmp(searchModeText, "ctfreturns")) {
@@ -4695,7 +4773,7 @@ int main(int argc, char** argv) {
 
 	Com_Printf("Looking at %s.\n", demoName); 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat", searchMode)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat", searchMode, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Highlights successfully found in %.5f seconds.\n",seconds);

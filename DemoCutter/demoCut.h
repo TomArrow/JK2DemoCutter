@@ -26,6 +26,47 @@
 
 
 
+#ifdef _WIN32
+#define WINDOWS // For popl library
+#endif
+
+
+
+/*
+struct parsedArguments_t {
+	std::vector<std::string> mainArgs;
+	std::map<std::string, std::string> extraArgs;
+};
+
+inline parsedArguments_t parseArguments(char** argv, int argc) {
+	parsedArguments_t retVal;
+
+	for (int i = 0; i < argc; i++) {
+		char* thisArg = argv[i];
+		int thisArgLength = strlen(thisArg);
+
+	}
+}*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 enum demoType_t {
 	DEMOTYPE_NONE,
 	DM_14, // My JK2 Single Player demo work-in-progress
