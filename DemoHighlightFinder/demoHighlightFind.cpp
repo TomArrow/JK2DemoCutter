@@ -2999,7 +2999,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 							}
 
-							if (mod = MOD_SUICIDE_GENERAL) {
+							if (mod = MOD_SUICIDE_GENERAL && attacker == target) { 
+								// attacker == target is a special condition I added because of JKA. JKA can attribute suicides to other players.
+								// TODO: It's not perfect tho. Might misattribute force pulls/pushes where the attacker had saber equipped.
 								isSaberKill = false;
 							}
 
