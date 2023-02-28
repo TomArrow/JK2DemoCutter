@@ -2999,6 +2999,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								}
 							}
 
+							if (mod = MOD_SUICIDE_GENERAL) {
+								isSaberKill = false;
+							}
+
 							thisKill.isSaberKill = isSaberKill;
 							if (isSaberKill /* && !isWorldKill*/ && attackerIsFlagCarrier) {
 								recentKillsDuringFlagHold[attacker].saberkills++; // I wanted to do this above with the rest of the recentKillsDuringFlagHold stuff, but up there I don't know if it was a saber kill yet
