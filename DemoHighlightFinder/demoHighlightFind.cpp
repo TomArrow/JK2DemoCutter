@@ -441,6 +441,9 @@ std::vector<boost_t> boosts;
 
 int64_t lastBackflip[MAX_CLIENTS_MAX];
 
+int headJumpCount[MAX_CLIENTS_MAX]; // Jumps over player heads
+int specialJumpCount[MAX_CLIENTS_MAX]; // Jumps over items in certain situations (over top of forcefield or midair sentry for example). Not yet implemented.
+
 //int64_t walkDetectedTime[max_clients];
 std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS_MAX];
 
@@ -1246,6 +1249,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	for (int i = 0; i < max_clients; i++) {
 		lastBackflip[i] = -1;
 	}
+	Com_Memset(&specialJumpCount, 0, sizeof(specialJumpCount));
+	Com_Memset(&headJumpCount, 0, sizeof(headJumpCount));
 	//for (int i = 0; i < max_clients; i++) {
 	//	walkDetectedTime[i] = -1;
 	//}
@@ -1355,6 +1360,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"projectileWasAirborne	BOOLEAN,"
 
 		"baseFlagDistance	REAL,"
+		"headJumps	INTEGER,"
 
 		"maxAngularSpeedAttacker	REAL,"
 		"maxAngularAccelerationAttacker	REAL,"
@@ -1559,9 +1565,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -2577,6 +2583,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				// For some info like angular velocity, acceleration and jerk we need to know that the past X frames had info about the player, else the value becomes invalid.
 				// 
 				// While we're at it, register z coordinates of players touching the ground.
+				//
+				// Also while we're at it, manage special jumps (over player heads for now)
 				for (int i = 0; i < max_clients;i++) {
 					if (thisFrameInfo.entityExists[i]) {
 						playerVisibleFrames[i]++;
@@ -2585,12 +2593,25 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						}
 						if (thisFrameInfo.groundEntityNum[i] == ENTITYNUM_WORLD) {
 							lastGroundHeight[i] = thisFrameInfo.playerPositions[i][2];
+							specialJumpCount[i] = 0; 
+							headJumpCount[i] = 0;
+						}
+						else if (lastFrameInfo.entityExists[i]) {
+							if (lastFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && thisFrameInfo.groundEntityNum[i] >= 0 && thisFrameInfo.groundEntityNum[i] < max_clients) {
+								headJumpCount[i]++;
+							}
+							// TODO:
+							//if (something...) {
+							//	specialJumpCount[i]++;
+							//}
 						}
 					}
 					else {
 						playerVisibleFrames[i] = 0;
 						playerVisibleClientFrames[i] = 0;
 						lastGroundHeight[i] = 99999999; // What's the point of remembering the ground height if the player may suddenly appear already in air and we have an old value and wrongly detect Air 2 Air kills?
+						specialJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
+						headJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
 					}
 				}
 				
@@ -3140,6 +3161,16 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							if (projectileWasAirborne) {
 								modInfo << "_AIR";
 							}
+
+
+							int headJumpCountAttacker = 0;
+							if (attacker >= 0 && attacker < max_clients) {
+								headJumpCountAttacker = headJumpCount[attacker];
+							}
+							if (headJumpCountAttacker > 0) {
+								modInfo << "_HJ"<< headJumpCountAttacker;
+							}
+
 							
 							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 							const char* info = demo.cut.Cl.gameState.stringData + offset;
@@ -3461,6 +3492,13 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 							else {
 								SQLBIND_NULL(insertAngleStatement, "@projectileWasAirborne");
+							}
+
+							if (attacker >= 0 && attacker < max_clients) {
+								SQLBIND(insertAngleStatement, int, "@headJumps", headJumpCountAttacker);
+							}
+							else {
+								SQLBIND_NULL(insertAngleStatement, "@headJumps");
 							}
 
 							if (baseFlagDistanceKnownAndApplicable) {
