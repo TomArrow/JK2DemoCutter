@@ -105,6 +105,7 @@ struct strafeDeviationInfo_t {
 };
 
 #define AIR_TO_AIR_DETECTION_HEIGHT_THRESHOLD forceJumpHeight[FORCE_LEVEL_1] // Higher than a normal lowest tier force jump could reach.
+#define ALMOST_CAPTURE_DISTANCE 200
 
 bool gameIsSaberOnlyIsh = false; // Saber only-ish. The basic question this answers is: Does this gamemode allow normal weapons? Or only saber (and maybe mines)? Basically I'm trying to question whether this demo contains mostly saber combat. Aka if blasters and such are banned. So I can early cancel analyzing some demos.
 
@@ -1353,6 +1354,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 		"projectileWasAirborne	BOOLEAN,"
 
+		"baseFlagDistance	REAL,"
+
 		"maxAngularSpeedAttacker	REAL,"
 		"maxAngularAccelerationAttacker	REAL,"
 		"maxAngularJerkAttacker	REAL,"
@@ -1556,9 +1559,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1717,6 +1720,12 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	float jerkMultiplier = derivativeMagnitudeCompensate ? 1.0f / 10000.0f : 1.0f;
 	float snapMultiplier = derivativeMagnitudeCompensate ? 1.0f / 1000000.0f : 1.0f;
 
+	// If dropped or base flag entities exist, we track them so we can detect "almost captures"
+	// Array is sized for teams, with the number corresponding to clientinfo string TEAM_FREE, TEAM_RED, TEAM_BLUE, TEAM_SPECTATOR enum values.
+	// I was using NUM_TEAMS_MAX first but I'm not sure if some mods might not assign too high team values for random reasons. So this is safer.
+	entityState_t* droppedFlagEntities[MAX_TEAMS]{};
+	entityState_t* baseFlagEntities[MAX_TEAMS]{};
+
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
 
@@ -1848,12 +1857,17 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.legsAnim,demoType);
 				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
 
+				Com_Memset(droppedFlagEntities, 0, sizeof(droppedFlagEntities));
+				Com_Memset(baseFlagEntities, 0, sizeof(baseFlagEntities));
+
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
 					entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
 					thisFrameInfo.entityExists[thisEs->number] = qtrue;
+
+					int tmpItemListGeneralValue = 0; // Not needed for all circumstances, just for 1 place atm (maybe more in future, might forget to update comment)
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
@@ -2036,6 +2050,27 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						}
 						else {
 							thisFrameInfo.entityOwnerInfo[thisEs->number].firstSeen = demoCurrentTime;
+						}
+					}
+					// Track dropped flags and flags on post
+					else if ((demoType < DM_25 || demoType > DM_26_XBOX) && // We can't do this rn in JKA because JKA doesn't set EF_BOUNCE_HALF for dropped flags, so we can't distinguish dropped and normal flags. so would get misdetections
+						generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType, demoType) == ET_ITEM_GENERAL /* && thisEs->modelindex*/ &&
+						(tmpItemListGeneralValue = generalizeGameValue<GMAP_ITEMLIST, SAFE>(thisEs->modelindex, demoType)) &&
+						tmpItemListGeneralValue >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL &&
+						tmpItemListGeneralValue <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
+						
+						bool isDroppedFlag = thisEs->eFlags & EF_BOUNCE_HALF; // This does NOT work in JKA. EF_BOUNCE_HALF doesn't even exist there. It does work in Q3. (or ought to)
+						entityState_t** relevantArray = isDroppedFlag ? droppedFlagEntities : baseFlagEntities;
+						switch (tmpItemListGeneralValue) {
+							case ITEMLIST_TEAM_CTF_REDFLAG_GENERAL:
+								relevantArray[TEAM_RED] = thisEs;
+								break;
+							case ITEMLIST_TEAM_CTF_BLUEFLAG_GENERAL:
+								relevantArray[TEAM_BLUE] = thisEs;
+								break;
+							case ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL:
+								relevantArray[TEAM_FREE] = thisEs;
+								break;
 						}
 					}
 				}
@@ -2695,6 +2730,17 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							if(attackerJumpHeight < 0.0f) attackerJumpHeight = 0.0f;
 							if(victimJumpHeight < 0.0f) victimJumpHeight = 0.0f;
 
+
+							// See if flag carrier's flag was at base and we know its position & distance
+							bool baseFlagDistanceKnownAndApplicable = false;
+							float baseFlagDistance = 0.0f;
+							entityState_t* baseFlagEntity = baseFlagEntities[playerTeams[target]];
+							if (victimIsFlagCarrier && targetIsVisibleOrFollowed && baseFlagEntity) {
+								baseFlagDistance = VectorDistance(baseFlagEntity->pos.trBase, targetIsFollowed ? demo.cut.Cl.snap.ps.origin : targetEntity->pos.trBase);
+								baseFlagDistanceKnownAndApplicable = true;
+							}
+
+
 							//targetIsVisible = targetIsVisible && attackerIsVisibleOrFollowed; // Make sure both attacker and victim are visible. Some servers send info
 
 							float maxSpeedTargetFloat = getMaxSpeedForClientinTimeFrame(target, demoCurrentTime - 1000, demoCurrentTime);
@@ -3060,6 +3106,12 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								modInfo << "_A2A";
 							}
 
+
+							if (baseFlagDistanceKnownAndApplicable && baseFlagDistance < ALMOST_CAPTURE_DISTANCE) {
+								modInfo << "_AC" << (int)baseFlagDistance;
+							}
+
+
 							int killerProjectile = -1;
 							qboolean isProjectileBased = qfalse;
 							qboolean canBeAirborne = qfalse;
@@ -3405,6 +3457,13 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 							else {
 								SQLBIND_NULL(insertAngleStatement, "@projectileWasAirborne");
+							}
+
+							if (baseFlagDistanceKnownAndApplicable) {
+								SQLBIND(insertAngleStatement, double, "@baseFlagDistance", baseFlagDistance);
+							}
+							else {
+								SQLBIND_NULL(insertAngleStatement, "@baseFlagDistance");
 							}
 
 
