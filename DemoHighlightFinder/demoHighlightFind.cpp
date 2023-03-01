@@ -3111,6 +3111,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								modInfo << "_AC" << (int)baseFlagDistance;
 							}
 
+							if (isSaberKill && attackerIsFollowed && !targetIsVisibleOrFollowed) {
+								modInfo << "_TW"; // Through wall. Meh, not very universal. But decent?
+							}
+
 
 							int killerProjectile = -1;
 							qboolean isProjectileBased = qfalse;
