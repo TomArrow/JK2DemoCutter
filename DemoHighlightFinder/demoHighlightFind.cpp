@@ -3644,7 +3644,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 
 							//if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisible) continue; // Not that interesting.
-							if (isSuicide || (!victimIsFlagCarrier && searchMode != SEARCH_ALL_KILLS && searchMode != SEARCH_ALL_MY_KILLS) || isWorldKill || !targetIsVisibleOrFollowed) continue; // Not that interesting.
+							if (isSuicide || (!victimIsFlagCarrier && searchMode != SEARCH_ALL_KILLS && searchMode != SEARCH_ALL_MY_KILLS) || isWorldKill || (!targetIsVisibleOrFollowed && !attackerIsVisibleOrFollowed)) continue; // Not that interesting.
 							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
 							if (!isDoomKill && searchMode != SEARCH_ALL_KILLS && searchMode != SEARCH_ALL_MY_KILLS && searchMode != SEARCH_ALL && searchMode != SEARCH_MY_CTF_RETURNS && searchMode != SEARCH_CTF_RETURNS) continue;
 							if (!attackerIsFollowed && (searchMode == SEARCH_MY_CTF_RETURNS|| searchMode == SEARCH_ALL_MY_KILLS)) continue; // We are searching for our own kills.
@@ -3653,7 +3653,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							std::stringstream ss;
 							std::string boostString = ((boostCountAttacker + boostCountVictim) > 0 ?( va("_BST%s%s", boostCountAttacker > 0 ? va("%dA", boostCountAttacker) : "", boostCountVictim > 0 ? va("%dV", boostCountVictim) : "")) : "");
-							ss << mapname << std::setfill('0') << "___"<< logModString << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
+							ss << mapname << std::setfill('0') << "___"<< logModString << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << targetIsVisibleOrFollowed ? "" : "_targetInvis" << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 							std::string targetFilename = ss.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
