@@ -109,6 +109,8 @@ struct strafeDeviationInfo_t {
 
 bool gameIsSaberOnlyIsh = false; // Saber only-ish. The basic question this answers is: Does this gamemode allow normal weapons? Or only saber (and maybe mines)? Basically I'm trying to question whether this demo contains mostly saber combat. Aka if blasters and such are banned. So I can early cancel analyzing some demos.
 
+int sentryModelIndex = -1; // Model index of sentry, so we don't have to do string comparison all the time
+
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
 int playerFirstVisible[MAX_CLIENTS_MAX];
 int playerFirstFollowed[MAX_CLIENTS_MAX];
@@ -266,7 +268,9 @@ std::map<int, int> timeCheckedForKillStreaks;
 
 enum trackedEntityType_t {
 	TET_NONE,
-	TET_TRIPMINE
+	TET_TRIPMINE,
+	TET_SENTRY,
+	TET_FORCEFIELD
 };
 
 #define TETFLAG_EXPLODED 1
@@ -316,6 +320,19 @@ struct frameInfo_t {
 frameInfo_t lastFrameInfo;
 
 frameInfo_t thisFrameInfo;
+
+
+inline void TET_LastSeenUpdate(int entityNum, int demoCurrentTime) {
+	if (lastFrameInfo.entityExists[entityNum] &&
+		thisFrameInfo.entityOwnerInfo[entityNum].type == lastFrameInfo.entityOwnerInfo[entityNum].type &&
+		thisFrameInfo.entityOwnerInfo[entityNum].owner == lastFrameInfo.entityOwnerInfo[entityNum].owner) {
+
+		thisFrameInfo.entityOwnerInfo[entityNum].firstSeen = lastFrameInfo.entityOwnerInfo[entityNum].firstSeen;
+	}
+	else {
+		thisFrameInfo.entityOwnerInfo[entityNum].firstSeen = demoCurrentTime;
+	}
+}
 
 
 enum BoostDetectionType {
@@ -440,6 +457,7 @@ std::vector<boost_t> boosts;
 
 
 int64_t lastBackflip[MAX_CLIENTS_MAX];
+int64_t lastSelfSentryJump[MAX_CLIENTS_MAX];
 
 int headJumpCount[MAX_CLIENTS_MAX]; // Jumps over player heads
 int specialJumpCount[MAX_CLIENTS_MAX]; // Jumps over items in certain situations (over top of forcefield or midair sentry for example). Not yet implemented.
@@ -644,6 +662,11 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 		}
 
 		i++;
+	}
+
+	if (sentryModelIndex == -1) {
+		sentryModelIndex = G_ModelIndex_NoAdd("models/items/psgun.glm", clCut, NULL, demoType);
+		if (!sentryModelIndex) sentryModelIndex = -1;
 	}
 }
 
@@ -1248,6 +1271,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < max_clients; i++) {
 		lastBackflip[i] = -1;
+		lastSelfSentryJump[i] = -1;
 	}
 	Com_Memset(&specialJumpCount, 0, sizeof(specialJumpCount));
 	Com_Memset(&headJumpCount, 0, sizeof(headJumpCount));
@@ -1361,6 +1385,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 		"baseFlagDistance	REAL,"
 		"headJumps	INTEGER,"
+		"specialJumps	INTEGER,"
+		"timeSinceLastSelfSentryJump	INTEGER,"
 
 		"maxAngularSpeedAttacker	REAL,"
 		"maxAngularAccelerationAttacker	REAL,"
@@ -1565,9 +1591,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	sqlite3_stmt* insertStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1823,6 +1849,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					goto cuterror;
 				}
 
+				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
+
 				CheckForNameChanges<max_clients>(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement,demoType);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				updateForcePowersInfo(&demo.cut.Cl);
@@ -1874,6 +1902,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					thisFrameInfo.entityExists[thisEs->number] = qtrue;
 
 					int tmpItemListGeneralValue = 0; // Not needed for all circumstances, just for 1 place atm (maybe more in future, might forget to update comment)
+
+					int generalizedEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType, demoType);
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
@@ -2037,7 +2067,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					}
 					// Track trip mine owners and the first time they were seen.
 					// Careful: The current way it is handled is blocked if the mine is temporarily not visible. The detection will think it appeared later.
-					else if (generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType,demoType) == ET_GENERAL_GENERAL && generalizeGameValue<GMAP_WEAPONS,SAFE>( thisEs->weapon,demoType) == WP_TRIP_MINE_GENERAL && (thisEs->eFlags & getEF_MISSILE_STICK(demoType))) { // tripmine
+					else if (generalizedEntityType == ET_GENERAL_GENERAL && generalizeGameValue<GMAP_WEAPONS,SAFE>( thisEs->weapon,demoType) == WP_TRIP_MINE_GENERAL && (thisEs->eFlags & getEF_MISSILE_STICK(demoType))) { // tripmine
 						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->genericenemyindex - 1024;
 						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_TRIPMINE;
 						if ((generalizeGameValue<GMAP_EVENTS, UNSAFE>(thisEs->event,demoType) & ~EV_EVENT_BITS) == EV_MISSILE_MISS_GENERAL) {
@@ -2048,7 +2078,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							// This mine is airborne
 							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_AIRBORNE;
 						}
-						if (lastFrameInfo.entityExists[thisEs->number] && 
+						/*if (lastFrameInfo.entityExists[thisEs->number] &&
 							thisFrameInfo.entityOwnerInfo[thisEs->number].type == lastFrameInfo.entityOwnerInfo[thisEs->number].type && 
 							thisFrameInfo.entityOwnerInfo[thisEs->number].owner == lastFrameInfo.entityOwnerInfo[thisEs->number].owner) {
 
@@ -2056,11 +2086,28 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						}
 						else {
 							thisFrameInfo.entityOwnerInfo[thisEs->number].firstSeen = demoCurrentTime;
+						}*/
+						TET_LastSeenUpdate(thisEs->number, demoCurrentTime);
+					}
+					// Track sentries
+					else if (generalizedEntityType == ET_GENERAL_GENERAL && thisEs->modelindex == sentryModelIndex && sentryModelIndex != -1) {
+						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->owner;
+						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_SENTRY;
+						if (thisEs->pos.trType == TR_GRAVITY) {
+							// This sentry is airborne (I hope!)
+							thisFrameInfo.entityOwnerInfo[thisEs->number].flags |= TETFLAG_AIRBORNE;
 						}
+						TET_LastSeenUpdate(thisEs->number,demoCurrentTime);
+					}
+					// Track force fields
+					else if (generalizedEntityType == ET_SPECIAL_GENERAL && thisEs->modelindex == HI_SHIELD) {
+						thisFrameInfo.entityOwnerInfo[thisEs->number].owner = thisEs->owner;
+						thisFrameInfo.entityOwnerInfo[thisEs->number].type = TET_FORCEFIELD;
+						TET_LastSeenUpdate(thisEs->number,demoCurrentTime);
 					}
 					// Track dropped flags and flags on post
 					else if ((demoType < DM_25 || demoType > DM_26_XBOX) && // We can't do this rn in JKA because JKA doesn't set EF_BOUNCE_HALF for dropped flags, so we can't distinguish dropped and normal flags. so would get misdetections
-						generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType, demoType) == ET_ITEM_GENERAL /* && thisEs->modelindex*/ &&
+						generalizedEntityType == ET_ITEM_GENERAL /* && thisEs->modelindex*/ &&
 						(tmpItemListGeneralValue = generalizeGameValue<GMAP_ITEMLIST, SAFE>(thisEs->modelindex, demoType)) &&
 						tmpItemListGeneralValue >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL &&
 						tmpItemListGeneralValue <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
@@ -2596,14 +2643,19 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							specialJumpCount[i] = 0; 
 							headJumpCount[i] = 0;
 						}
-						else if (lastFrameInfo.entityExists[i]) {
-							if (lastFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && thisFrameInfo.groundEntityNum[i] >= 0 && thisFrameInfo.groundEntityNum[i] < max_clients) {
+						else if (lastFrameInfo.entityExists[i] && lastFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE) {
+							if (thisFrameInfo.groundEntityNum[i] >= 0 && thisFrameInfo.groundEntityNum[i] < max_clients) {
 								headJumpCount[i]++;
 							}
 							// TODO:
-							//if (something...) {
-							//	specialJumpCount[i]++;
-							//}
+							else if (thisFrameInfo.entityOwnerInfo[thisFrameInfo.groundEntityNum[i]].type == TET_FORCEFIELD || 
+								(thisFrameInfo.entityOwnerInfo[thisFrameInfo.groundEntityNum[i]].type == TET_SENTRY && thisFrameInfo.entityOwnerInfo[thisFrameInfo.groundEntityNum[i]].flags & TETFLAG_AIRBORNE)) {
+								specialJumpCount[i]++;
+								if (thisFrameInfo.entityOwnerInfo[thisFrameInfo.groundEntityNum[i]].type == TET_SENTRY && thisFrameInfo.entityOwnerInfo[thisFrameInfo.groundEntityNum[i]].owner == i) {
+									// Self-sentry jump. Giga rare. Could be accident or giga thing
+									lastSelfSentryJump[i] = demoCurrentTime;
+								}
+							}
 						}
 					}
 					else {
@@ -2809,6 +2861,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							thisKill.timeSinceBackflip = isWorldKill ? -1 : (lastBackflip[attacker] >= 0?(demoCurrentTime-lastBackflip[attacker]):-1);
 							thisKill.speedatSaberMoveChange = isWorldKill ? -1 : (playerLastSaberMove[attacker].lastSaberMove[0].speed);
 
+							int64_t timeSinceLastSelfSentryJump = isWorldKill ? -1 : (lastSelfSentryJump[attacker] >= 0 ? (demoCurrentTime - lastSelfSentryJump[attacker]) : -1);
 
 							// This is the place that had all the continues originally.
 							
@@ -3164,11 +3217,19 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 
 							int headJumpCountAttacker = 0;
+							int specialJumpCountAttacker = 0;
 							if (attacker >= 0 && attacker < max_clients) {
 								headJumpCountAttacker = headJumpCount[attacker];
+								specialJumpCountAttacker = specialJumpCount[attacker];
 							}
 							if (headJumpCountAttacker > 0) {
 								modInfo << "_HJ"<< headJumpCountAttacker;
+							}
+							if (specialJumpCountAttacker > 0) {
+								modInfo << "_SJ"<< specialJumpCountAttacker;
+							}
+							if (timeSinceLastSelfSentryJump != -1 && timeSinceLastSelfSentryJump < 5000) {
+								modInfo << "_SELFSENTRYJUMP"<< (int)timeSinceLastSelfSentryJump; // this is so rare that i'd rather just find all and decide if its worth keeping later
 							}
 
 							
@@ -3496,9 +3557,13 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							if (attacker >= 0 && attacker < max_clients) {
 								SQLBIND(insertAngleStatement, int, "@headJumps", headJumpCountAttacker);
+								SQLBIND(insertAngleStatement, int, "@specialJumps", specialJumpCountAttacker);
+								SQLBIND(insertAngleStatement, int, "@timeSinceLastSelfSentryJump", timeSinceLastSelfSentryJump);
 							}
 							else {
 								SQLBIND_NULL(insertAngleStatement, "@headJumps");
+								SQLBIND_NULL(insertAngleStatement, "@specialJumps");
+								SQLBIND_NULL(insertAngleStatement, "@timeSinceLastSelfSentryJump");
 							}
 
 							if (baseFlagDistanceKnownAndApplicable) {

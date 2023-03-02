@@ -809,7 +809,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					}
 					// Force shield
-					else if (generalizedEntityType == ET_SPECIAL_GENERAL && it->second.modelindex == HI_SHIELD) {
+					else if (generalizedEntityType == ET_SPECIAL_GENERAL && it->second.modelindex == HI_SHIELD) { // TODO: Make work with JKA?
 						
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)

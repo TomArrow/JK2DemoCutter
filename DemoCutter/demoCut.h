@@ -4073,6 +4073,7 @@ std::string makeConfigStringCommand(int index, std::string value);
 int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t* demoType, qboolean* isCompressed, qboolean* checkFor103 = NULL);

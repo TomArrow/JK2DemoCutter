@@ -4013,10 +4013,13 @@ int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, cli
 
 
 int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
-	return G_FindConfigstringIndex(name, CS_SOUNDS, MAX_SOUNDS, qtrue, clCut, commandsToAdd, demoType);
+	return G_FindConfigstringIndex(name, getCS_SOUNDS(demoType), MAX_SOUNDS, qtrue, clCut, commandsToAdd, demoType);
 }
 int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
-	return G_FindConfigstringIndex(name, CS_MODELS, MAX_MODELS, qtrue, clCut, commandsToAdd, demoType);
+	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qtrue, clCut, commandsToAdd, demoType);
+}
+int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qfalse, clCut, commandsToAdd, demoType);
 }
 
 
