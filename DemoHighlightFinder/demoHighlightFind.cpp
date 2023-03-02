@@ -26,6 +26,7 @@ public:
 	bool onlyLogSaberKills = false;
 	bool onlyLogKillSpreesWithSaberKills = false;
 	bool onlyLogCapturesWithSaberKills = false;
+	bool findSuperSlowKillStreaks = false;
 };
 
 
@@ -261,6 +262,7 @@ std::map<int, int> timeCheckedForKillStreaks;
 #define SLOW_KILLSTREAK_MAX_INTERVAL 5000
 #define VERYSLOW_KILLSTREAK_MAX_INTERVAL 7000
 #define VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL 9000
+#define GIGASUPERVERYVERYSLOW_OPTIONAL_KILLSTREAK_MAX_INTERVAL 18000
 #define OLDER_SPEEDS_STORE_LIMIT 2000 // Any speeds older than 2000ms are removed.
 #define MAX_ASSUMED_SERVER_FPS 200
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
@@ -1204,7 +1206,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 
 template<unsigned int max_clients>
-qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, highlightSearchMode_t searchMode, ExtraSearchOptions opts) {
+qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -1233,6 +1235,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	int				psGeneralSaberMove = 0;
 	int				psGeneralTorsoAnim = 0;
 	int				psGeneralLegsAnim = 0;
+	const int		speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // The different max delays between kills for killstreaks are in an array. Normally we skip the last one (veeery long 18 seconds), but some ppl might wanna activate those too.
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -3487,7 +3490,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							int queryResult = sqlite3_step(insertStatement);
 							if (queryResult != SQLITE_DONE) {
-								std::cout << "Error inserting kill into database: " << sqlite3_errmsg(killDb) << " (" << queryResult << ")" << "\n";
+#ifndef DEBUG
+								if (queryResult != SQLITE_CONSTRAINT)
+#endif
+									std::cout << "Error inserting kill into database: " << sqlite3_errmsg(killDb) << " (" << queryResult << ")" << "\n";
 							}
 							sqlite3_reset(insertStatement);
 
@@ -4006,15 +4012,17 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
 
-					static const int killStreakSpeedTypes[] = { KILLSTREAK_SUPERFAST_MAX_INTERVAL,KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL };
+					static const int killStreakSpeedTypes[] = { KILLSTREAK_SUPERFAST_MAX_INTERVAL,KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL,GIGASUPERVERYVERYSLOW_OPTIONAL_KILLSTREAK_MAX_INTERVAL };
 					constexpr int spCount = sizeof(killStreakSpeedTypes) / sizeof(int);
+
+					//const int speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // Moved to start of function.
 
 					int clientNumAttacker = clientIt->first;
 
-					if (clientIt->second.size() == 0 || (clientIt->second.back().time + killStreakSpeedTypes[spCount-1]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
+					if (clientIt->second.size() == 0 || (clientIt->second.back().time + killStreakSpeedTypes[spCount-1-speedTypesSkip]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
 
 
-					for (int sp = 0; sp < spCount; sp++) { // We do this twice, for every killstreak duration type.
+					for (int sp = 0; sp < (spCount- speedTypesSkip); sp++) { // We do this twice, for every killstreak duration type.
 
 						int maxTimeHere = killStreakSpeedTypes[sp];
 						int maxTimeLast = sp == 0 ? -1 : killStreakSpeedTypes[sp-1];
@@ -4938,6 +4946,7 @@ int main(int argcO, char** argvO) {
 	auto S = op.add<popl::Switch>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat)");
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
+	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -4966,6 +4975,7 @@ int main(int argcO, char** argvO) {
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set();
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
 	opts.quickSkipNonSaberExclusive =  q->value();
+	opts.findSuperSlowKillStreaks = l->value();
 
 
 	//char* demoName = argv[1];
