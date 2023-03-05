@@ -24,7 +24,7 @@ class ExtraSearchOptions {
 public:
 	bool quickSkipNonSaberExclusive = false; // Not implemented (yet). Skip demoss that aren't saber only
 	bool onlyLogSaberKills = false;
-	bool onlyLogKillSpreesWithSaberKills = false;
+	int onlyLogKillSpreesWithSaberKills = 0;
 	bool onlyLogCapturesWithSaberKills = false;
 	bool findSuperSlowKillStreaks = false;
 };
@@ -949,7 +949,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
-		bool hasAtLeastOneSaberKill = false;
+		int countSaberKills = 0;
 		int maxDelayActual = 0;
 		int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -980,7 +980,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		std::set<int> nearbyPlayers;
 		for (int i = 0; i < killsOfThisSpree->size(); i++) {
 			if ((*killsOfThisSpree)[i].isSaberKill) {
-				hasAtLeastOneSaberKill = true;
+				countSaberKills++;
 			}
 			//stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + (*victims)[i]];
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
@@ -1000,7 +1000,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			}
 		}
 
-		if (opts.onlyLogKillSpreesWithSaberKills && !hasAtLeastOneSaberKill) {
+		if (countSaberKills < opts.onlyLogKillSpreesWithSaberKills) {
 			return;
 		}
 
@@ -4943,7 +4943,7 @@ int main(int argcO, char** argvO) {
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");
-	auto S = op.add<popl::Switch>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat)");
+	auto S = op.add<popl::Implicit<int>>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat). Optional: Provide number of needed saber kills in killspree.",1);
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
@@ -4972,7 +4972,7 @@ int main(int argcO, char** argvO) {
 
 	ExtraSearchOptions opts;
 	opts.onlyLogSaberKills = s->is_set();
-	opts.onlyLogKillSpreesWithSaberKills = S->is_set();
+	opts.onlyLogKillSpreesWithSaberKills = S->is_set() ? S->value() : 0;
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
 	opts.quickSkipNonSaberExclusive =  q->value();
 	opts.findSuperSlowKillStreaks = l->value();

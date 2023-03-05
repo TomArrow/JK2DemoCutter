@@ -121,8 +121,22 @@ detect airborne mine kills as separate. also timed mines vs planted ones.
 detect teamkills
 
 
+- lots of SDs/ssaberblocks/hits 
+- for these jumps... add a bit of timeout. so even if u quickly land somewhere it still counts
+- do boost detection for caps too - and maybe some other stuff?
+- saberonly gamemode detection: do stats about common weapondisable and forcedisable modes.
+- offer to put some tables/stats in extra .db file
+- option to stop detecting dooms and or restrict them when variouus force powwers are active (aka dont detect saber doom if player was nowhere near other player as its likely a force puill or sth).
+- make killspree parameter accept number to say how many kills must be saber kills to accept it
+- bc leading to cap
+
+
 DONE: 
 
+- make optional ultralong (18 second) killspree detection for fetchd DONE
+- jumps over people's heads DONE
+- clutch save DONE
+- through wall DONE
 include cleaned up name in name parts
 laugh detector: find moments with lots of laughter. or laughter sprees. where multiple people laugh a lot. or ppl say "rofl" etc in general. to find funny moments.
 For trimmed cuts, include offset
