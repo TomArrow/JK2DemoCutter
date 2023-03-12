@@ -109,7 +109,7 @@ struct strafeDeviationInfo_t {
 #define ALMOST_CAPTURE_DISTANCE 200
 
 bool gameIsSaberOnlyIsh = false; // Saber only-ish. The basic question this answers is: Does this gamemode allow normal weapons? Or only saber (and maybe mines)? Basically I'm trying to question whether this demo contains mostly saber combat. Aka if blasters and such are banned. So I can early cancel analyzing some demos.
-
+bool gameAllowsDoomingForcePowers = false; // Stuff like push/pull is allowed in this game. Hence if we are detecting saber kills that lead to dooms/suic, we need to try to exclude a few kills that might just be push/pull/grip etc
 int sentryModelIndex = -1; // Model index of sentry, so we don't have to do string comparison all the time
 
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
@@ -635,6 +635,7 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 
 	int g_weaponDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
 
+
 	int i = 0;
 	int numWeapons = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NUM_WEAPONS_GENERAL,demoType);
 	int allowedSaberIshWeapons[] = { 
@@ -670,6 +671,29 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 		sentryModelIndex = G_ModelIndex_NoAdd("models/items/psgun.glm", clCut, NULL, demoType);
 		if (!sentryModelIndex) sentryModelIndex = -1;
 	}
+
+
+	// Check if any "moving" force powers (that could result in a doom/suic) are present
+	// IF they are, we must use some guesses to see if a doom/suic kill is actually a saber kill, because it might 
+	// just be someone force pulling someone or such
+	// Force powers luckily are same for JK2 and JKA so no specialization needed atm (but might change if we ever support some mods?)
+
+	int g_forcePowerDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
+
+	gameAllowsDoomingForcePowers = false;
+	// These are the powers that I think POTENTIALLY can result in dooms?
+	if (
+		!(g_forcePowerDisable & (1 << FP_PUSH)) ||
+		!(g_forcePowerDisable & (1 << FP_PULL)) ||
+		!(g_forcePowerDisable & (1 << FP_GRIP)) ||
+		!(g_forcePowerDisable & (1 << FP_LIGHTNING)) || // I'm not sure about this one. Edit: Yeah we checked. It can doom u.
+		(!(g_forcePowerDisable & (1 << FP_DRAIN)) && demoType >= DM_25 && demoType <= DM_26_XBOX)|| // In JKA drain can eat at health too i think? But not in jk2, drain cant doom u in jk2 thats for sure.
+		!(g_forcePowerDisable & (1 << FP_SABERTHROW))
+		) {
+		gameAllowsDoomingForcePowers = true;
+	}
+
+
 }
 
 
@@ -928,6 +952,10 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 		if (variantExists) {
 			SQLBIND_TEXT(insertPlayerModelStatement, "@variant", variant.c_str());
 			SQLBIND_TEXT(updatePlayerModelCountStatement, "@variant", variant.c_str());
+		}
+		else {
+			SQLBIND_NULL(insertPlayerModelStatement, "@variant");
+			SQLBIND_NULL(updatePlayerModelCountStatement, "@variant");
 		}
 
 		int queryResult = sqlite3_step(insertPlayerModelStatement);
