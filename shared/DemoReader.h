@@ -76,7 +76,9 @@ class DemoReader {
 
 
 	int firstPacketWithPlayer[MAX_CLIENTS_MAX];
+	int lastKnownPacketWithPlayer[MAX_CLIENTS_MAX];
 	int firstPacketWithPlayerState[MAX_CLIENTS_MAX];
+	int lastKnownPacketWithPlayerState[MAX_CLIENTS_MAX];
 
 
 	SnapshotInfoMap snapshotInfos;
