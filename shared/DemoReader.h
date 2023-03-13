@@ -71,8 +71,10 @@ class DemoReader {
 	//std::map<int, int> playerFirstVisible;
 	//std::map<int, int> playerFirstFollowed;
 	//std::map<int, int> playerFirstFollowedOrVisible;
-	std::map<int, int> lastEventTime;
-	std::map<int, int> lastEvent;
+	//std::map<int, int> lastEventTime;
+	int lastEventTime[MAX_GENTITIES]{};
+	//std::map<int, int> lastEvent;
+	int lastEvent[MAX_GENTITIES]{};
 
 
 	int firstPacketWithPlayer[MAX_CLIENTS_MAX];
@@ -153,7 +155,13 @@ public:
 
 	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
 	};
-	
+
+#ifdef DEBUG
+	~DemoReader() {
+		std::cout << "DemoReader being destroyed.";
+	}
+#endif
+
 	int getMaxClients();
 
 	demoType_t getDemoType();

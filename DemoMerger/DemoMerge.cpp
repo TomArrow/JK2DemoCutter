@@ -56,6 +56,7 @@ public:
 	DemoReader reader;
 	int packetsUsed = 0;
 	std::vector<std::string> commandDupesToFilter;
+	SnapshotInfoMapIterator currentSnapIt, nextSnapIt, nullIt;
 };
 
 
@@ -112,10 +113,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	std::vector<DemoReaderTrackingWrapper> demoReaders;
 	std::cout << "loading up demos...";
 	int startTime = INT_MAX;
+	demoReaders.reserve(inputFiles->size()); // This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
 		demoReaders.emplace_back();
 		demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
+		demoReaders.back().currentSnapIt = demoReaders.back().nextSnapIt = demoReaders.back().nullIt = demoReaders.back().reader.SnapNullIt();
 		startTime = std::min(startTime, demoReaders.back().reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
 	}
 	std::cout << "done.";
@@ -195,6 +198,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	qboolean isFirstSnapshot = qtrue;
 	std::stringstream ss;
 	int framesWritten = 0;
+
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -226,19 +230,51 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
-				SnapshotInfo* snapInfoHere = demoReaders[i].reader.GetSnapshotInfoAtServerTime(time);
+				SnapshotInfoMapIterator snapInfoHereIterator = demoReaders[i].nullIt;
+				if (demoReaders[i].nextSnapIt != demoReaders[i].nullIt){
+					if (demoReaders[i].nextSnapIt->second.serverTime == time) {
+						snapInfoHereIterator = demoReaders[i].nextSnapIt;
+					}
+				}
+				else {
+					snapInfoHereIterator = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(time);
+				}
+				SnapshotInfo* snapInfoHere = snapInfoHereIterator == demoReaders[i].nullIt ? NULL : &snapInfoHereIterator->second;
 				qboolean snapIsInterpolated = qfalse;
 				if (!snapInfoHere) {
-					int thisDemoLastServerTime = demoReaders[i].reader.GetLastServerTimeBeforeServerTime(time);
-					int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(time);
-					if (thisDemoLastServerTime == -1 || thisDemoNextServerTime == -1)continue;
+					SnapshotInfoMapIterator thisDemoLastSnapshotIt = demoReaders[i].nullIt;
+					SnapshotInfoMapIterator thisDemoNextSnapshotIt = demoReaders[i].nullIt;
 
-					snapInfoHere = demoReaders[i].reader.GetSnapshotInfoAtServerTime(thisDemoLastServerTime);
+					// Find last
+					if (demoReaders[i].currentSnapIt != demoReaders[i].nullIt) {
+						thisDemoLastSnapshotIt = demoReaders[i].currentSnapIt;
+					}
+					else {
+
+						int thisDemoLastServerTime = demoReaders[i].reader.GetLastServerTimeBeforeServerTime(time);
+						thisDemoLastSnapshotIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoLastServerTime);
+					}
+
+					// Find next
+					if (demoReaders[i].nextSnapIt != demoReaders[i].nullIt) {
+						thisDemoNextSnapshotIt = demoReaders[i].nextSnapIt;
+					}
+					else {
+
+						int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(time);
+						thisDemoNextSnapshotIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
+					}
+
+					
+					if (thisDemoLastSnapshotIt == demoReaders[i].nullIt || thisDemoNextSnapshotIt == demoReaders[i].nullIt)continue;
+
+					snapInfoHere = &thisDemoLastSnapshotIt->second;
 					// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
 					snapIsInterpolated = qtrue;
 				}
 				else {
 					demoReaders[i].packetsUsed++;
+					demoReaders[i].currentSnapIt = snapInfoHereIterator;
 				}
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
@@ -412,11 +448,13 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 			// First, clear event data in actual entities/playerstate
 			if (playerEntities.find(i) != playerEntities.end()) { // Main player entity
+				playerEntities[i].eType = getET_EVENTS(demoType);
 				playerEntities[i].event = 0;
 				playerEntities[i].eventParm = 0;
 			}
 			for (auto it = extraPlayerEventEntities[i].begin(); it != extraPlayerEventEntities[i].end(); it++) {
 				if (playerEntities.find(*it) != playerEntities.end()) {
+					playerEntities[*it].eType = getET_EVENTS(demoType);
 					playerEntities[*it].event = 0;
 					playerEntities[*it].eventParm = 0;
 				}
@@ -524,6 +562,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					else if(thisPlayerEventData->events[e].isAssignedEntity) {
 						// We write the stuff to entities (if they are available)
 						if (playerEntities.find(thisPlayerEventData->events[e].assignedEntityNum) != playerEntities.end()) {
+							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eFlags |= EF_PLAYER_EVENT;
+							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].otherEntityNum = i;
+							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eType = thisPlayerEventData->events[e].eventValue + getET_EVENTS(demoType);
 							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].event = thisPlayerEventData->events[e].eventValue;
 							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eventParm = thisPlayerEventData->events[e].eventParm;
 						}
@@ -554,8 +595,17 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		int oldTime = time;
 		time = INT_MAX;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			int nextTimeThisDemo = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
-			if (nextTimeThisDemo != -1) {
+			if (demoReaders[i].currentSnapIt != demoReaders[i].nullIt) {
+
+				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetFirstSnapshotAfterSnapshotIterator(demoReaders[i].currentSnapIt);
+			}
+			else {
+				int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
+				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
+			}
+			if (demoReaders[i].nextSnapIt != demoReaders[i].nullIt) {
+
+				int nextTimeThisDemo = demoReaders[i].nextSnapIt->second.serverTime;
 				time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 			}
 		}
@@ -563,10 +613,11 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		demo.cut.Clc.serverMessageSequence++;
 
 		mainPlayerPSOld = mainPlayerPS;
-		playerEntitiesOld.clear();
-		for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
-			playerEntitiesOld[it->first] = it->second;
-		}
+		//playerEntitiesOld.clear();
+		//for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
+		//	playerEntitiesOld[it->first] = it->second;
+		//}
+		playerEntitiesOld = playerEntities; // Faster?
 
 		if (allSourceDemosFinished || time == INT_MAX) break;
 	}

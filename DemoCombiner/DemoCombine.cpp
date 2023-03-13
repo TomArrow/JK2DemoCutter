@@ -387,6 +387,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	std::vector<DemoReaderLight> pingDemoReaders;
 	std::vector<DemoReaderWrapper> demoReaders;
+	demoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
+	pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
 		demoReaders.emplace_back();
 		pingDemoReaders.emplace_back();

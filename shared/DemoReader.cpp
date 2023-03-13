@@ -380,10 +380,19 @@ int DemoReader::GetLastServerTimeBeforeServerTime(int serverTime) {
 
 	if (!SeekToServerTime(serverTime)) return -1;
 
-	int lastServerTime = -1;
-	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-		if (it->second.serverTime >= serverTime) return lastServerTime;
-		lastServerTime = it->second.serverTime;
+	if (demoBaseTime) { // Continuity not guaranteed. Do slow linear search
+		int lastServerTime = -1;
+		for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+			if (it->second.serverTime >= serverTime) return lastServerTime;
+			lastServerTime = it->second.serverTime;
+		}
+	}
+	else {
+		// Do fast binary search
+		auto lower = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), serverTime, snapshotInfosServerTimeSmallerPredicate); // Should be first one that has greater server time.
+		if (lower != snapshotInfos.end() && lower != snapshotInfos.begin()) {
+			return (--lower)->second.serverTime; // ? untested, but should work? 
+		}
 	}
 	return -1; // Shouldn't happen really but whatever
 }
@@ -1245,30 +1254,52 @@ std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime) 
 	lastGottenCommandsServerTime = serverTime;
 	return retVal;
 }
+
+inline bool EventTimeGreaterPredicate(const double& time,const Event& it) {
+	return time < it.demoTime;
+}
+
 std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind) {
 	std::vector<Event> retVal;
 	SeekToTime(time);
-	for (int i = 0; i < readEvents.size(); i++) {
-		if (readEvents[i].demoTime <= time && readEvents[i].demoTime > lastGottenEventsTime[kind] && (kind == EK_ALL || readEvents[i].kind == kind)) {
+	auto startIt = readEvents.begin();
+
+	// Fast forward a bit using binary search
+	startIt = std::upper_bound(readEvents.begin(),readEvents.end(),lastGottenEventsTime[kind], EventTimeGreaterPredicate);
+		
+	for (auto it = startIt; it != readEvents.end(); it++) {
+		if (it->demoTime <= time /* && it->demoTime > lastGottenEventsTime[kind]*/ && (kind == EK_ALL || it->kind == kind)) {
 #ifdef DEBUG
-			readEvents[i].countGiven++;
+			it->countGiven++;
 #endif
-			retVal.push_back(readEvents[i]);
+			retVal.push_back(*it);
 		}
 	}
 	lastGottenEventsTime[kind] = time;
 	return retVal;
 }
 
+inline bool EventServerTimeGreaterPredicate(const int& serverTime, const Event& it) {
+	return serverTime < it.serverTime;
+}
+
 std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind) {
 	std::vector<Event> retVal;
 	SeekToServerTime(serverTime);
-	for (int i = 0; i < readEvents.size(); i++) {
-		if (readEvents[i].serverTime <= serverTime && readEvents[i].serverTime > lastGottenEventsServerTime[kind] && (kind == EK_ALL || readEvents[i].kind == kind)) {
+
+	auto startIt = readEvents.begin();
+
+	// Fast forward a bit using binary search if there was no server time reset (bc continuity in binary search is needed)
+	if (!demoBaseTime) {
+		startIt = std::upper_bound(readEvents.begin(), readEvents.end(), lastGottenEventsServerTime[kind], EventServerTimeGreaterPredicate);
+	}
+
+	for (auto it = startIt; it != readEvents.end(); it++) {
+		if (it->serverTime <= serverTime /* && it->serverTime > lastGottenEventsServerTime[kind]*/ && (kind == EK_ALL || it->kind == kind)) {
 #ifdef DEBUG
-			readEvents[i].countGiven++;
+			it->countGiven++;
 #endif
-			retVal.push_back(readEvents[i]);
+			retVal.push_back(*it);
 		}
 	}
 	lastGottenEventsServerTime[kind] = serverTime;

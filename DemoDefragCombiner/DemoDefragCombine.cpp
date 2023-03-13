@@ -68,6 +68,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	std::vector<DemoReader> demoReaders;
 	std::cout << "loading up demos...";
+	demoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
 		demoReaders.emplace_back();
