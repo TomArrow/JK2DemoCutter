@@ -7,7 +7,7 @@
 #include <demoCut.h>
 
 
-#define PLAYERSTATE_FUTURE_SEEK 10000
+#define PLAYERSTATE_FUTURE_SEEK 60000
 
 typedef jpcre2::select<char> jp;
 
