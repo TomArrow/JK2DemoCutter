@@ -55,7 +55,8 @@ public:
 	int clientNum;
 };
 
-
+typedef std::map<int, SnapshotInfo> SnapshotInfoMap;
+typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 
 class DemoReader {
 
@@ -78,7 +79,7 @@ class DemoReader {
 	int firstPacketWithPlayerState[MAX_CLIENTS_MAX];
 
 
-	std::map<int, SnapshotInfo> snapshotInfos;
+	SnapshotInfoMap snapshotInfos;
 	std::vector<Command> readCommands;
 	std::vector<Event> readEvents;
 
@@ -138,6 +139,7 @@ class DemoReader {
 
 	qboolean ReadMessageReal();
 	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS = qfalse);
+	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, qboolean detailedPS = qfalse);
 
 
 
@@ -157,8 +159,11 @@ public:
 	int GetFirstSnapServerTime();
 	qboolean SeekToTime(double time);
 	int GetFirstServerTimeAfterServerTime(int serverTime);
+	SnapshotInfoMapIterator SnapNullIt();
+	SnapshotInfoMapIterator GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator& oldSnapInfoIt);
 	int GetLastServerTimeBeforeServerTime(int serverTime);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
+	SnapshotInfoMapIterator GetSnapshotInfoAtServerTimeIterator(int serverTime);
 	qboolean SeekToServerTime(int serverTime);
 	qboolean SeekToCommandTime(int serverTime);
 	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
@@ -168,7 +173,7 @@ public:
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(double time);
-	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, SnapshotInfo* referenceSnap = NULL);
+	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL);
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);

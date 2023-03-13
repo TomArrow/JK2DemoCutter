@@ -162,6 +162,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	qboolean isFirstSnapshot = qtrue;
 	std::stringstream ss;
 	int framesWritten = 0;
+	SnapshotInfoMapIterator nullIt = demoReader->reader.SnapNullIt();
+	SnapshotInfoMapIterator nextSnapInfoHereIt = nullIt;
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -172,9 +174,12 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		//Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
 		//qboolean mainPlayerPSIsInterpolated = qfalse;
 		//for (int i = 0; i < demoReaders.size(); i++) {
+		SnapshotInfoMapIterator sourceSnap = nullIt; // snap that actually contains the player so we can use its areamask.
+		SnapshotInfoMapIterator snapInfoHereIt = nullIt;
 			if (demoReader->reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
-				SnapshotInfo* snapInfoHere = demoReader->reader.GetSnapshotInfoAtServerTime(time);
+				sourceSnap = snapInfoHereIt = nextSnapInfoHereIt != nullIt ? nextSnapInfoHereIt : demoReader->reader.GetSnapshotInfoAtServerTimeIterator(time);
+				SnapshotInfo* snapInfoHere = &snapInfoHereIt->second;
 				//qboolean snapIsInterpolated = qfalse;
 				//if (!snapInfoHere) {
 				//	int thisDemoLastServerTime = demoReader.reader.GetLastServerTimeBeforeServerTime(time);
@@ -205,7 +210,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
 
-					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, NULL, NULL, qtrue,snapInfoHere);
+					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, &sourceSnap, qtrue,&snapInfoHereIt);
 					/*BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;
@@ -266,12 +271,16 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		clSnapshot_t mainPlayerSnapshot = demoReader->reader.GetCurrentSnap();
-		if (visAll) {
+		if (visAll || sourceSnap == nullIt) {
 			Com_Memset(demo.cut.Cl.snap.areamask, 0, sizeof(demo.cut.Cl.snap.areamask));
 		}
 		else {
-			Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask, sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
+			byte	areamasHere[MAX_MAP_AREA_BYTES];
+			// We combine tmpPS and source snap playerstate
+			for (int amb = 0; amb < MAX_MAP_AREA_BYTES; amb++) {
+				areamasHere[amb] = sourceSnap->second.areamask[amb] & snapInfoHereIt->second.areamask[amb];
+			}
+			Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
 		}
 		
 		if (isFirstSnapshot) {
@@ -286,7 +295,12 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 		int oldTime = time;
 		time = INT_MAX;
-		int nextTimeThisDemo = demoReader->reader.GetFirstServerTimeAfterServerTime(oldTime);
+		//int nextTimeThisDemo = demoReader->reader.GetFirstServerTimeAfterServerTime(oldTime);
+		int nextTimeThisDemo = -1;
+		nextSnapInfoHereIt = demoReader->reader.GetFirstSnapshotAfterSnapshotIterator(snapInfoHereIt);
+		if (nextSnapInfoHereIt != nullIt) {
+			nextTimeThisDemo = nextSnapInfoHereIt->second.serverTime;
+		}
 		if (nextTimeThisDemo != -1) {
 			time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 		}
@@ -299,7 +313,9 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 			playerEntitiesOld[it->first] = it->second;
 		}
 
-		if (allSourceDemosFinished || time == INT_MAX) break;
+		if (allSourceDemosFinished || time == INT_MAX) {
+			break;
+		}
 	}
 
 cutcomplete:

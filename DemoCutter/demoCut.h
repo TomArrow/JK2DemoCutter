@@ -4052,6 +4052,7 @@ public:
 	qboolean hasPlayer[MAX_CLIENTS_MAX]{};
 	playerState_t playerState;
 	int serverTime;
+	byte areamask[MAX_MAP_AREA_BYTES];
 	qboolean playerStateTeleport;
 	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
 };

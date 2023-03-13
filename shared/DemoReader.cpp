@@ -364,6 +364,16 @@ int DemoReader::GetFirstServerTimeAfterServerTime(int serverTime) {
 	}
 	return -1; // Shouldn't happen really but whatever
 }
+SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator& oldSnapInfoIt) {
+	int serverTime = oldSnapInfoIt->second.serverTime;
+	while (lastKnownTime <= serverTime && !endReached) {
+		ReadMessage();
+	}
+	return ++oldSnapInfoIt;
+}
+SnapshotInfoMapIterator DemoReader::SnapNullIt() {
+	return snapshotInfos.end();
+}
 int DemoReader::GetLastServerTimeBeforeServerTime(int serverTime) {
 
 	if (!SeekToServerTime(serverTime)) return -1;
@@ -375,23 +385,27 @@ int DemoReader::GetLastServerTimeBeforeServerTime(int serverTime) {
 	}
 	return -1; // Shouldn't happen really but whatever
 }
-SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
+SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtServerTimeIterator(int serverTime) {
 	if (SeekToServerTime(serverTime)) {
 		if (demoBaseTime) { // demoBaseTime should be 0 for any regular demo BUT some demos might include a serverTime reset, in which case demoBaseTime is increased. At this point there is no more serverTime regularity guaranteed hence we cannot use binary search and have to do a slow linear search
 			for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-				if (it->second.serverTime == serverTime) return &it->second;
+				if (it->second.serverTime == serverTime) return it;
 			}
 		}
 		else { // Binary search
 			auto lower = std::lower_bound(snapshotInfos.begin(),snapshotInfos.end(),serverTime, snapshotInfosServerTimeSmallerPredicate);
-			if (lower != snapshotInfos.end() && lower->second.serverTime == serverTime) return &lower->second;
+			if (lower != snapshotInfos.end() && lower->second.serverTime == serverTime) return lower;
 		}
-		return NULL; // Can happen if that particular time's snapshot is missing from the demo.
+		return snapshotInfos.end(); // Can happen if that particular time's snapshot is missing from the demo.
 	}
 	else {
-		return NULL;
+		return snapshotInfos.end();
 	}
 
+}
+SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
+	SnapshotInfoMapIterator it = GetSnapshotInfoAtServerTimeIterator(serverTime);
+	return it!= snapshotInfos.end() ? &it->second : NULL;
 }
 qboolean DemoReader::SeekToCommandTime(int serverTime) {
 	while (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && !endReached) {
@@ -424,9 +438,14 @@ qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
 playerState_t DemoReader::GetCurrentPlayerState() {
 	return thisDemo.cut.Cl.snap.ps;
 }
-
+// Don't call if you're not sure if the snapnum exists.
 playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS) {
-	SnapshotInfo* snap = &snapshotInfos[snapNum];
+	SnapshotInfoMapIterator snapIt = snapshotInfos.find(snapNum);
+	return GetPlayerFromSnapshot(clientNum, snapIt, detailedPS);
+}
+
+playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, qboolean detailedPS) {
+	SnapshotInfo* snap = &snapInfoIterator->second;
 	if (snap->playerState.clientNum == clientNum) {
 		return snap->playerState;
 	}
@@ -443,7 +462,49 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboo
 			SeekToServerTime(snap->serverTime+ PLAYERSTATE_FUTURE_SEEK);
 			int firstPacketWithPlayerStateOfThisPlayer = firstPacketWithPlayerState[clientNum];
 			if (firstPacketWithPlayerStateOfThisPlayer != -1) { // We don't have  any playerstate of this player at all. Don't bother trying to find the last and next, what for? Waste of resources.
-				if (demoBaseTime) { // Linearity not guaranteed, do linear search. (TODO This is prolly pointless anyway because DemoReader likely doesn't deal well with resetted serverTimes etc)
+				
+				// Linear search forwards and backwaards from current time (find current time via fast binary search)
+
+				// Past:
+				// Get the current snapshot quickly. TODO Maybe pass iterator straight in here for even faster?
+				//auto itStart = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), firstPacketWithPlayerStateOfThisPlayer < snapNum ? snapNum : firstPacketWithPlayerStateOfThisPlayer, snapshotInfosSnapNumPredicate);
+				auto itStart = snapInfoIterator;
+				if (itStart != snapshotInfos.end()) { // Just to be safe.
+
+					auto it = itStart;
+
+					if (firstPacketWithPlayerStateOfThisPlayer < itStart->first) {
+
+						while (pastSnap == -1 && it->first >= firstPacketWithPlayerStateOfThisPlayer) { // To explain the second condition: If we know that the FIRST playerstate ever of this player was snap 2356, there is no need to search snaps 0 to 2355.
+							if (it->first < itStart->first && it->second.playerState.clientNum == clientNum) {
+								pastSnap = it->first;
+								break;
+							}
+							if (it == snapshotInfos.begin()) {
+								break;
+							}
+							it--;
+						}
+
+					}
+
+					// Future:
+					it = itStart;
+
+					while (futureSnap == -1) { // To explain the second condition: If we know that the FIRST playerstate ever of this player was snap 2356, there is no need to search snaps 0 to 2355.
+						if (it->first > itStart->first && it->second.playerState.clientNum == clientNum) {
+							futureSnap = it->first;
+							break;
+						}
+						it++;
+						if (it == snapshotInfos.end()) {
+							break;
+						}
+					}
+
+				}
+				
+				/*if (demoBaseTime) { // Linearity not guaranteed, do linear search. (TODO This is prolly pointless anyway because DemoReader likely doesn't deal well with resetted serverTimes etc)
 
 					for (auto snapIt = snapshotInfos.begin(); snapIt != snapshotInfos.end(); snapIt++) {
 						if (snapIt->first < snapNum && snapIt->second.playerState.clientNum == clientNum) {
@@ -495,7 +556,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, qboo
 						}
 
 					}
-				}
+				}*/
 			}
 			baseSnap = pastSnap != -1 ? pastSnap : futureSnap;
 		}
@@ -624,12 +685,12 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 // It's like a cheaper version of GetInterpolatedPlayer. We don't interpolate anything. We just return the last player state or the next one if no last one exists.
 // It ignores command times and is based purely on server time.
 // arguments oldSnap and newSnap do nothing atm.
-playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap, SnapshotInfo** newSnap, qboolean detailedPS, SnapshotInfo* referenceSnap) {
+// Function name seems a misnomer btw. It doesn't really search into the future? Oh wait it does, nvm.
+playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap, qboolean detailedPS, const SnapshotInfoMapIterator* referenceSnapIt) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 
-	if (oldSnap) *oldSnap = NULL;
-	if (newSnap) *newSnap = NULL;
+	if (usedSourceSnap) *usedSourceSnap = snapshotInfos.end();
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToServerTime(serverTime);
@@ -640,6 +701,7 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 
 	//  Avoid searching around forever if we already know the player is in this snapshot
 	//if (referenceSnap && referenceSnap->playerCommandOrServerTimes.find(clientNum) != referenceSnap->playerCommandOrServerTimes.end()) {
+	SnapshotInfo* referenceSnap =&(*referenceSnapIt)->second;
 	if (referenceSnap && referenceSnap->hasPlayer[clientNum]) {
 		return GetPlayerFromSnapshot(clientNum, referenceSnap->snapNum, detailedPS);
 	}
@@ -647,7 +709,7 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 	// Ok now we are sure we have at least one snapshot. Good.
 	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
 
-	int lastPastSnap = -1;
+	SnapshotInfoMapIterator lastPastSnap = snapshotInfos.end();
 	int lastPastSnapServerTime = -1;
 	int firstPacketWithPlayerInIt = firstPacketWithPlayer[clientNum];
 	/*int firstPacketWithPlayerInIt = -1;*/
@@ -661,18 +723,18 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 			//if (firstPacketWithPlayerInIt == -1) firstPacketWithPlayerInIt = it->first;
 
 			if (it->second.serverTime <= serverTime) {
-				lastPastSnap = it->first;
+				lastPastSnap = it;
 				lastPastSnapServerTime = it->second.serverTime;
 			}
 		}
 	}
 	else {
 		// K let's do this a quicker way. We search in reverse from requested current time which we find via binary search.
-		auto it = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), serverTime, snapshotInfosServerTimeSmallerPredicate);
+		auto it = *referenceSnapIt;
 		if (it != snapshotInfos.end()) {
-			while (lastPastSnap == -1) {
+			while (lastPastSnap == snapshotInfos.end()) {
 				if (it->second.serverTime <= serverTime && it->second.hasPlayer[clientNum]) {
-					lastPastSnap = it->first;
+					lastPastSnap = it;
 					lastPastSnapServerTime = it->second.serverTime;
 					break;
 				}
@@ -684,18 +746,21 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 		}
 
 	}
-	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
+	if (lastPastSnap == snapshotInfos.end()) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
 		if (firstPacketWithPlayerInIt == -1) {
 			// Uhm. Ok. Maybe handle this better at some later time but for now we just return that empty playerState.
 			// We should probably keep seeking then or sth.
 			return retVal;
 		}
 		else {
-			return GetPlayerFromSnapshot(clientNum,firstPacketWithPlayerInIt, detailedPS);
+			SnapshotInfoMapIterator firstPacketIt = snapshotInfos.find(firstPacketWithPlayerInIt);
+			if (usedSourceSnap) *usedSourceSnap = firstPacketIt;
+			return GetPlayerFromSnapshot(clientNum, firstPacketIt, detailedPS);
 			
 		}
 	}
 	else {
+		if (usedSourceSnap) *usedSourceSnap = lastPastSnap;
 		return GetPlayerFromSnapshot(clientNum, lastPastSnap, detailedPS);
 	}
 
@@ -1391,6 +1456,7 @@ readNext:
 						snapshotInfo.hasPlayer[thisEntity->number] = qtrue;
 					}
 				}
+				Com_Memcpy(snapshotInfo.areamask, thisDemo.cut.Cl.snap.areamask, sizeof(thisDemo.cut.Cl.snap.areamask));
 				snapshotInfo.snapNum = thisDemo.cut.Cl.snap.messageNum;
 				snapshotInfo.playerState = thisDemo.cut.Cl.snap.ps;
 				snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&thisDemo.cut.Cl.oldSnap, &thisDemo.cut.Cl.snap);
