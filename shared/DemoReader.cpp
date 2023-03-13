@@ -366,9 +366,15 @@ int DemoReader::GetFirstServerTimeAfterServerTime(int serverTime) {
 	}
 	return -1; // Shouldn't happen really but whatever
 }
-SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator& oldSnapInfoIt) {
+SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt) {
 	int serverTime = oldSnapInfoIt->second.serverTime;
 	while (lastKnownTime <= serverTime && !endReached) {
+		ReadMessage();
+	}
+	return ++oldSnapInfoIt;
+}
+SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt, int pastServerTime) {
+	while (lastKnownTime <= pastServerTime && !endReached) {
 		ReadMessage();
 	}
 	return ++oldSnapInfoIt;

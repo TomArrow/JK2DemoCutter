@@ -444,17 +444,18 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		memset(&mainPlayerPS.eventParms, 0, sizeof(mainPlayerPS.eventParms));
 
 		// Step 2: Clear player entity events and rewrite them.
-		for (int i = 0; i < MAX_CLIENTS; i++) {
+		for (int i = 0; i < getMAX_CLIENTS(demoType); i++) {
 
 			// First, clear event data in actual entities/playerstate
 			if (playerEntities.find(i) != playerEntities.end()) { // Main player entity
-				playerEntities[i].eType = getET_EVENTS(demoType);
 				playerEntities[i].event = 0;
 				playerEntities[i].eventParm = 0;
 			}
 			for (auto it = extraPlayerEventEntities[i].begin(); it != extraPlayerEventEntities[i].end(); it++) {
 				if (playerEntities.find(*it) != playerEntities.end()) {
-					playerEntities[*it].eType = getET_EVENTS(demoType);
+					if (*it >= getMAX_CLIENTS(demoType)) {
+						playerEntities[*it].eType = getET_EVENTS(demoType);
+					}
 					playerEntities[*it].event = 0;
 					playerEntities[*it].eventParm = 0;
 				}
@@ -562,11 +563,15 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					else if(thisPlayerEventData->events[e].isAssignedEntity) {
 						// We write the stuff to entities (if they are available)
 						if (playerEntities.find(thisPlayerEventData->events[e].assignedEntityNum) != playerEntities.end()) {
-							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eFlags |= EF_PLAYER_EVENT;
-							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].otherEntityNum = i;
-							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eType = thisPlayerEventData->events[e].eventValue + getET_EVENTS(demoType);
-							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].event = thisPlayerEventData->events[e].eventValue;
-							playerEntities[thisPlayerEventData->events[e].assignedEntityNum].eventParm = thisPlayerEventData->events[e].eventParm;
+							entityState_t* thisPlayerEntityRightHere = &playerEntities[thisPlayerEventData->events[e].assignedEntityNum];
+							if (thisPlayerEventData->events[e].assignedEntityNum >= getMAX_CLIENTS(demoType)) { // Is ET_PLAYER
+
+								thisPlayerEntityRightHere->eFlags |= EF_PLAYER_EVENT;
+								thisPlayerEntityRightHere->otherEntityNum = i;
+								thisPlayerEntityRightHere->eType = thisPlayerEventData->events[e].eventValue + getET_EVENTS(demoType);
+							}
+							thisPlayerEntityRightHere->event = thisPlayerEventData->events[e].eventValue;
+							thisPlayerEntityRightHere->eventParm = thisPlayerEventData->events[e].eventParm;
 						}
 					}
 
@@ -597,9 +602,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		for (int i = 0; i < demoReaders.size(); i++) {
 			if (demoReaders[i].currentSnapIt != demoReaders[i].nullIt) {
 
-				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetFirstSnapshotAfterSnapshotIterator(demoReaders[i].currentSnapIt);
+				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetFirstSnapshotAfterSnapshotIterator(demoReaders[i].currentSnapIt,oldTime);
 			}
-			else {
+			else if(demoReaders[i].nextSnapIt == demoReaders[i].nullIt || demoReaders[i].nextSnapIt->second.serverTime <= oldTime) {
 				int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
 				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
 			}

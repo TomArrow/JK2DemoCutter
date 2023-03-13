@@ -170,7 +170,8 @@ public:
 	qboolean SeekToTime(double time);
 	int GetFirstServerTimeAfterServerTime(int serverTime);
 	SnapshotInfoMapIterator SnapNullIt();
-	SnapshotInfoMapIterator GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator& oldSnapInfoIt);
+	SnapshotInfoMapIterator GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt);
+	SnapshotInfoMapIterator GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt, int pastServerTime);
 	int GetLastServerTimeBeforeServerTime(int serverTime);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
 	SnapshotInfoMapIterator GetSnapshotInfoAtServerTimeIterator(int serverTime);
