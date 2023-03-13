@@ -67,11 +67,16 @@ class DemoReader {
 
 	playerState_t basePlayerStates[MAX_CLIENTS_MAX]; // Contains stuff like team and max health and other stuff that otherwise messes up rendering.
 
-	std::map<int, int> playerFirstVisible;
-	std::map<int, int> playerFirstFollowed;
-	std::map<int, int> playerFirstFollowedOrVisible;
+	//std::map<int, int> playerFirstVisible;
+	//std::map<int, int> playerFirstFollowed;
+	//std::map<int, int> playerFirstFollowedOrVisible;
 	std::map<int, int> lastEventTime;
 	std::map<int, int> lastEvent;
+
+
+	int firstPacketWithPlayer[MAX_CLIENTS_MAX];
+	int firstPacketWithPlayerState[MAX_CLIENTS_MAX];
+
 
 	std::map<int, SnapshotInfo> snapshotInfos;
 	std::vector<Command> readCommands;
@@ -163,7 +168,7 @@ public:
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(double time);
-	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse);
+	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, SnapshotInfo* referenceSnap = NULL);
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);

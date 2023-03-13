@@ -204,7 +204,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 					//mainPlayerPSIsInterpolated = snapIsInterpolated;
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
-					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, NULL, NULL, qtrue);
+
+					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, NULL, NULL, qtrue,snapInfoHere);
 					/*BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;

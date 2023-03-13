@@ -4049,11 +4049,23 @@ public:
 	int snapNum;
 	std::map<int, entityState_t> entities;
 	std::map<int, int> playerCommandOrServerTimes;
+	qboolean hasPlayer[MAX_CLIENTS_MAX]{};
 	playerState_t playerState;
 	int serverTime;
 	qboolean playerStateTeleport;
 	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
 };
+
+inline bool snapshotInfosServerTimeSmallerPredicate(const std::pair<int, SnapshotInfo> &it, const int &serverTime) {
+	return it.second.serverTime < serverTime;
+};
+inline bool snapshotInfosServerTimeGreaterPredicate(const int &serverTime, const std::pair<int, SnapshotInfo>& it) {
+	return serverTime < it.second.serverTime;
+};
+inline bool snapshotInfosSnapNumPredicate(const std::pair<int, SnapshotInfo> &it, const int &snapNum) {
+	return it.second.snapNum < snapNum;
+};
+
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
