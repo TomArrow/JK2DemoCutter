@@ -8,6 +8,8 @@
 #include <jkaStuff.h>
 #include "otherGameStuff.h"
 
+#include "popl.hpp"
+
 // TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -68,7 +70,35 @@ public:
 //#pragma optimize("", off)
 #endif
 
-qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
+
+// Compare time of existing and new info to decide if the new info should override the old info
+// Generally, any time BEFORE current time is always preferred over a time AFTER current time (aka prefer old playerstate/entitystate info over future one)
+// as this is consistent with the behavior of dropped frames or similar.
+// Otherwise, the time closer to curTime is best.
+template<class T>
+inline bool IsBetterOrEqualTime(T& curTime, T& oldTime, T& newTime) {
+	return
+		oldTime == -1 || // At least equal condition.
+		newTime == curTime || // At least equal condition.
+		newTime == oldTime || // Equal condition.
+		newTime <= curTime && oldTime > curTime && newTime != -1 || // New time is before current time. Always prefer past times over future times. Better condition.
+		newTime > curTime && oldTime > curTime && newTime <= oldTime || // If BOTH times are in the future, take the closer one. At least equal condition.
+		newTime < curTime && oldTime < curTime && newTime >= oldTime; // If both in the past, newer is better. At least equal condition.
+}
+
+// Same as above but require it to be actually better, not just equal
+template<class T>
+inline bool IsBetterTime(T& curTime, T& oldTime, T& newTime) {
+	return
+		newTime != -1 && oldTime == -1 ||
+		newTime == curTime && oldTime != curTime || // Better condition.
+		newTime <= curTime && oldTime > curTime && newTime != -1 || // New time is before current time. Always prefer past times over future times. Better condition.
+		newTime > curTime && oldTime > curTime && newTime < oldTime || // If BOTH times are in the future, take the closer one. Better condition.
+		newTime < curTime && oldTime < curTime && newTime > oldTime; // If both in the past, newer is better. Better condition.
+}
+
+
+qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles, std::string* reframeSearchString) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -138,18 +168,34 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		}
 	}
 
-	std::map<int, int> lastSpectatedClientNums; // Need this for later.
+	//std::map<int, int> lastSpectatedClientNums; // Need this for later. - do we  really?
 
+
+
+	int reframeClientNum = -1; // By default there is no reframing but it can be enabled as an extra option
 	// Copy over player config strings
+	if (reframeSearchString) {
+		std::cout << "\n";
+	}
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
-			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
-			lastSpectatedClientNums[i] = spectatedClient;			
+			//int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
+			//lastSpectatedClientNums[i] = spectatedClient;			
 			//if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
 			//tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
 			//if (strlen(tmpConfigString)) {
 				//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			//}
+			if (reframeSearchString) {
+				int reframeClientNumHere = demoReaders[i].reader.getClientNumForDemo(reframeSearchString);
+				std::cout << "\n";
+				if (reframeClientNumHere != -1 && reframeClientNum != -1 && reframeClientNumHere != reframeClientNum) {
+					std::cout << "Reframe clientnum mismatch: " << reframeClientNum << " vs " << reframeClientNumHere << ". Discarding latter.\n";
+				}
+				if (reframeClientNum == -1 && reframeClientNumHere != -1) {
+					reframeClientNum = reframeClientNumHere;
+				}
+			}
 		}
 	}
 	
@@ -191,13 +237,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	std::map<int, entityState_t> playerEntitiesOld;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
-	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
-	entityState_t tmpES;
+	playerState_t tmpPS,tmpPS2, mainPlayerPS, mainPlayerPSOld;
+	entityState_t tmpES;// , mainPlayerPSSourceES;
 	int currentCommand = 1;
 	// Start writing snapshots.
 	qboolean isFirstSnapshot = qtrue;
 	std::stringstream ss;
 	int framesWritten = 0;
+	byte	areamasHere[MAX_MAP_AREA_BYTES];
 
 	while(1){
 		commandsToAdd.clear();
@@ -209,11 +256,16 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		static int entityServerTime[MAX_GENTITIES];
 		Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
 		Com_Memset(entityServerTime, 0, sizeof(entityServerTime));
+		if (reframeClientNum != -1) {
+			Com_Memset(&mainPlayerPS, 0, sizeof(mainPlayerPS));
+		}
+		Com_Memset(areamasHere, 255, sizeof(areamasHere));
 		qboolean mainPlayerPSIsInterpolated = qfalse;
-		int mainPlayerServerTime = 0;
+		//qboolean mainPlayerPSIsRealPS = qfalse;
+		int mainPlayerServerTime = -1;
+		int mainPlayerRealPSPartsServerTime = -1;
 		std::set<int> extraPlayerEventEntities[MAX_CLIENTS];
-
-
+		
 		// Clear expired player events and also clear info about extra player event entities while at it
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 
@@ -266,8 +318,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					}
 
 					
-					if (thisDemoLastSnapshotIt == demoReaders[i].nullIt || thisDemoNextSnapshotIt == demoReaders[i].nullIt)continue;
+					if (thisDemoLastSnapshotIt == demoReaders[i].nullIt || thisDemoNextSnapshotIt == demoReaders[i].nullIt) continue;
 
+					snapInfoHereIterator = thisDemoLastSnapshotIt;
 					snapInfoHere = &thisDemoLastSnapshotIt->second;
 					// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
 					snapIsInterpolated = qtrue;
@@ -280,22 +333,133 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				tmpPS = snapInfoHere->playerState;
 
-
-				// self explanatory.
-				if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime))) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
-					// For reference, here's what gets snapped (rounded) in entities:
-					// SnapVector( s->pos.trBase );
-					// SnapVector( s->apos.trBase );
-					mainPlayerPS = tmpPS;
-					mainPlayerPSIsInterpolated = snapIsInterpolated;
-					mainPlayerServerTime = snapInfoHere->serverTime;
+				// All that is visible in the current snap should be visible in final demo
+				for (int amb = 0; amb < MAX_MAP_AREA_BYTES; amb++) {
+					areamasHere[amb] = areamasHere[amb] & snapInfoHere->areamask[amb];
 				}
-				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue);
-					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || (entityIsInterpolated[tmpPS.clientNum] && (!snapIsInterpolated || entityServerTime[tmpPS.clientNum] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
-						playerEntities[tmpPS.clientNum] = tmpES;
-						entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;
-						entityServerTime[tmpPS.clientNum] = snapInfoHere->serverTime;
+
+				if (reframeClientNum != -1) {
+
+					mainPlayerPS.clientNum = reframeClientNum;
+
+					// If we are reframing, this gets its own separate handling.
+					// In reframe handling we don't have the whole "mainPlayerPSIsInterpolated" concept.
+					// We just track movement/entity data separately from playerstate data, sort of. Or rather, we remember the time of playerstate info (health,armor etc) as well as the time of the entitystate info (position etc)
+					// And based on that info we try to get the best of both worlds always.
+					if(mainPlayerRealPSPartsServerTime != time){ // Skip any further processsing if we already have a perfect real PS with the right timing.
+
+						if (tmpPS.clientNum == reframeClientNum) { // Get a true PS, nice!
+
+							bool isBetterOrEqualPlayerStateData = IsBetterOrEqualTime(time, mainPlayerRealPSPartsServerTime, snapInfoHere->serverTime);
+							bool isBetterOrEqualEntityStateData = IsBetterOrEqualTime(time, mainPlayerServerTime, snapInfoHere->serverTime);
+							if (isBetterOrEqualPlayerStateData && isBetterOrEqualEntityStateData) { // Perfect full Playerstate that is better in every way compared to what we already have. Perfection.
+								mainPlayerPS = tmpPS;
+								mainPlayerServerTime = snapInfoHere->serverTime;
+								mainPlayerRealPSPartsServerTime = snapInfoHere->serverTime;
+							}
+							else {
+								if (IsBetterTime(time, mainPlayerRealPSPartsServerTime, snapInfoHere->serverTime)) {
+									// Upgrade playerstate data only if it's actually better
+									EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS); // Just update health/armor and stuff like that. Not a godlike solution but eh.
+									mainPlayerRealPSPartsServerTime = snapInfoHere->serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
+								}
+								//if (IsBetterTime(time, mainPlayerServerTime, snapInfoHere->serverTime)) {
+									// Upgrade entitystate data only if it's actually better
+									// There is no way for this to be true without the playerstate data ALSO being better, is there?
+									// Because this is a real full playerstate. If it has more up to date info on the movement/entitystate data,
+									// it MUST also have more up to date info on the playerstate data because playerstate data includes entitystate data
+									// and there is no circumstance where we would (or should!) end up with more up to date/better playerstate data than entitystate data.
+									// Because why the heck would we update health/armor from a playerstate without updating the entitystate related data (movement etc) too?
+									// Hence, this condition doesn't have to be here. It would never trigger because the "isBetterOrEqualPlayerStateData && isBetterOrEqualEntityStateData" condition above
+									// would already catch it
+									//
+									// TODO: This explanation kinda sucks and is hard to read.
+								//}
+							}
+							
+							/*if (snapInfoHere->serverTime > mainPlayerServerTime) {
+								// We have a real PS and its newer than what we already had. Just overwrite.
+								mainPlayerPS = tmpPS;
+								mainPlayerServerTime = snapInfoHere->serverTime;
+								mainPlayerRealPSPartsServerTime = snapInfoHere->serverTime;
+							}
+							else if (snapInfoHere->serverTime < mainPlayerServerTime && snapInfoHere->serverTime > mainPlayerRealPSPartsServerTime && !mainPlayerPSIsRealPS) {
+								// We have a real PS but it's  older than the fake PS (from entities) we already have.
+								// Hence, we combine...
+								//mainPlayerPS = tmpPS;
+								//CG_EntityStateToPlayerState(&mainPlayerPSSourceES, &mainPlayerPS, demoType, qtrue, NULL, qtrue); // enhanceOnly. Aka, we only update stuff we can reasonably reliably get from entityState
+								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS); // Just update health/armor and stuff like that. Not a godlike solution but eh.
+								mainPlayerRealPSPartsServerTime = snapInfoHere->serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
+								// TODO How will this work together with the already existing PS assembly inside GetLastOrNextPlayer() ?
+							}*/
+						}
+						else {
+							// Get creative...
+							SnapshotInfoMapIterator usedSnapIt = demoReaders[i].nullIt;
+							SnapshotInfoMapIterator usedPlayerStateSnapIt = demoReaders[i].nullIt;
+							tmpPS2 = demoReaders[i].reader.GetLastOrNextPlayer(reframeClientNum, time, &usedSnapIt,&usedPlayerStateSnapIt, qtrue, &snapInfoHereIterator);
+
+							// All that is visible in the main player source snap should be visible in final demo
+							if (usedSnapIt != demoReaders[i].nullIt) {
+								for (int amb = 0; amb < MAX_MAP_AREA_BYTES; amb++) {
+									areamasHere[amb] = areamasHere[amb] & usedSnapIt->second.areamask[amb];
+								}
+							}
+
+							bool isBetterOrEqualEntityStateData = usedSnapIt != demoReaders[i].nullIt && IsBetterOrEqualTime(time, mainPlayerServerTime, usedSnapIt->second.serverTime);
+							bool isBetterOrEqualPlayerStateData = usedPlayerStateSnapIt != demoReaders[i].nullIt && IsBetterOrEqualTime(time, mainPlayerRealPSPartsServerTime, usedPlayerStateSnapIt->second.serverTime);
+
+							bool isBetterEntityStateData = usedSnapIt != demoReaders[i].nullIt && IsBetterTime(time, mainPlayerServerTime, usedSnapIt->second.serverTime);
+							bool isBetterPlayerStateData = usedPlayerStateSnapIt != demoReaders[i].nullIt && IsBetterTime(time, mainPlayerRealPSPartsServerTime, usedPlayerStateSnapIt->second.serverTime);
+
+							//mainPlayerPSSourceES;
+							if (isBetterPlayerStateData && isBetterEntityStateData) { // Uh. Can this actually happen? :thonk: Idk, let's just pretend it can for now.
+								mainPlayerPS = tmpPS2;
+								mainPlayerServerTime = usedSnapIt->second.serverTime;
+								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime;
+							}
+							else if (isBetterOrEqualEntityStateData && isBetterOrEqualPlayerStateData && usedSnapIt== usedPlayerStateSnapIt) {
+								// Equally good is only acceptable if it's a nice united playerstate and not some frankensstein monstser// Equally good is only acceptable if it's a nice united playerstate and not some frankensstein monstser
+								// TODO Tbh this condition/option might be a bit illogical/unnecessary given all the other code. Haven't thought it through fully.
+								mainPlayerPS = tmpPS2;
+								mainPlayerServerTime = usedSnapIt->second.serverTime;
+								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime;
+							}
+							else if (isBetterPlayerStateData) {
+								// Upgrade playerstate data only if it's actually better
+								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS2); // Just update health/armor and stuff like that. Not a godlike solution but eh.
+								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
+							}
+							else if (isBetterEntityStateData) {
+								// Upgrade entitystate related data if its actually better.
+								// This CAN actually happen because we might not have gotten back any playerstate related data at all so we would just end up treating this as normal entitystate data
+
+								// Sanity check.
+								assert(usedSnapIt->second.entities.find(reframeClientNum) != usedSnapIt->second.entities.end()); 
+
+								CG_EntityStateToPlayerState(&usedSnapIt->second.entities[reframeClientNum], &mainPlayerPS, demoType, qtrue, NULL, mainPlayerRealPSPartsServerTime != -1 ?  qtrue : qfalse); // Accessing the entities map like that.. not very efficient? We do the same inside GetLastOrNextPlayer, now we have done it twice. Meh.
+								mainPlayerServerTime = usedSnapIt->second.serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
+							}
+						}
+					}
+				}
+				else {
+					// self explanatory.
+					if (nonSkippedDemoIndex++ == 0 || (tmpPS.clientNum == mainPlayerPS.clientNum && mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime))) { // TODO MAke this more sophisticated. Allow moving over some non-snapped values from entitystates perhaps to smooth out mainPlayerPS
+						// For reference, here's what gets snapped (rounded) in entities:
+						// SnapVector( s->pos.trBase );
+						// SnapVector( s->apos.trBase );
+						mainPlayerPS = tmpPS;
+						mainPlayerPSIsInterpolated = snapIsInterpolated;
+						mainPlayerServerTime = snapInfoHere->serverTime;
+					}
+					else if (tmpPS.clientNum != mainPlayerPS.clientNum) {
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue);
+						if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || (entityIsInterpolated[tmpPS.clientNum] && (!snapIsInterpolated || entityServerTime[tmpPS.clientNum] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
+							playerEntities[tmpPS.clientNum] = tmpES;
+							entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;
+							entityServerTime[tmpPS.clientNum] = snapInfoHere->serverTime;
+						}
 					}
 				}
 
@@ -309,8 +473,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 						extraPlayerEventEntities[it->second.otherEntityNum].insert(it->first);
 					}
 
-					if (it->first != mainPlayerPS.clientNum) {
-						if (!(it->second.eFlags & EF_PLAYER_EVENT && it->second.otherEntityNum == mainPlayerPS.clientNum)) { // Don't copy over player event entities if we are spectating that player (all the events belong into the playerstate then)
+					int compareNum = reframeClientNum == -1 ? mainPlayerPS.clientNum : reframeClientNum;
+					if (it->first != compareNum) { // Compare against maain player ps or reframe client num. (reframing is optional for DemoMerger)
+						if (!(it->second.eFlags & EF_PLAYER_EVENT && it->second.otherEntityNum == compareNum)) { // Don't copy over player event entities if we are spectating that player (all the events belong into the playerstate then)
 							if (playerEntities.find(it->first) == playerEntities.end() || (entityIsInterpolated[it->first] && (!snapIsInterpolated || entityServerTime[it->first] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
 								playerEntities[it->first] = it->second;
 								entityIsInterpolated[it->first] = snapIsInterpolated;
@@ -318,7 +483,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 							}
 						}
 					}
-					else if(mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime)){
+					else if(reframeClientNum == -1 && // Reframe handling is completely separate already, see further above.
+						mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime)){
 						// Move some entity stuff over to playerState to improve its precision? Kind of experimental.
 						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
 						mainPlayerServerTime = snapInfoHere->serverTime;
@@ -549,7 +715,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					// Actually write the event info.
 					//
 					//
-					if (mainPlayerPS.clientNum == i) {
+					int compareNum = reframeClientNum == -1 ? mainPlayerPS.clientNum : reframeClientNum;
+					if (compareNum == i) {
 						// We write the stuff to the playerstate
 						if (thisPlayerEventData->events[e].assignedAsExternal) {
 							mainPlayerPS.externalEvent = thisPlayerEventData->events[e].eventValue;
@@ -585,7 +752,10 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
 		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
-		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
+
+		
+		Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));
+		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
 		if (isFirstSnapshot) {
 			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL,createCompressedOutput);
@@ -675,29 +845,51 @@ cuterror:
 }*/
 
 
-int main(int argc, char** argv) {
-	if (argc <3) {
+int main(int argcO, char** argvO) {
+
+	popl::OptionParser op("Allowed options");
+	auto h = op.add<popl::Switch>("h", "help", "Show help");
+	auto r = op.add<popl::Value<std::string>>("r", "reframe", "Optionally, reframe. Value same as would be with DemoReframer: Search string or clientnum");
+	op.parse(argcO, argvO);
+	auto args = op.non_option_args();
+
+
+	//if (argc <3) {
+	if (args.size() <2) {
 		std::cout << "need 2 arguments at least: outputname, demoname1, [demoname2, demoname3,...]";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
 		return 1;
+	}
+	else if (h->is_set()) {
+		std::cout << "need 2 arguments at least: demoname and buffer (before and after highlight) in milliseconds\n";
+		std::cout << "third optional argument: myctfreturns, ctfreturns, top10defrag, alldefrag, allkills or allmykills\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
+		return 0;
 	}
 	initializeGameInfos();
 	char* demoName = NULL;
-	char* outputName = NULL;
+	const char* outputName = NULL;
 
-	outputName = argv[1];
+	//outputName = argv[1];
+	outputName = args[0].c_str();
 	char* filteredOutputName = new char[strlen(outputName) + 1];
 	sanitizeFilename(outputName, filteredOutputName,qtrue);
 	//strcpy(outputName, filteredOutputName);
 	//delete[] filteredOutputName;
 
 	std::vector<std::string> inputFiles;
-	for (int i = 2; i < argc; i++) {
-		inputFiles.emplace_back(argv[i]);
+	//for (int i = 2; i < argc; i++) {
+	for (int i = 1; i < args.size(); i++) {
+		inputFiles.emplace_back(args[i]);
 	}
+
+	std::string searchString = r->is_set() ? r->value() : "";
 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 
-	if (demoCut(filteredOutputName,&inputFiles)) {
+	if (demoMerge(filteredOutputName,&inputFiles, (r->is_set() && searchString.size())? &searchString : NULL)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);

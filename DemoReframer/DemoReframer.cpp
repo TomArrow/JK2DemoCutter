@@ -210,7 +210,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
 
-					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, &sourceSnap, qtrue,&snapInfoHereIt);
+					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, &sourceSnap,NULL, qtrue,&snapInfoHereIt);
 					/*BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;

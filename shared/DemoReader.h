@@ -142,8 +142,8 @@ class DemoReader {
 	qboolean ReadMessage();
 
 	qboolean ReadMessageReal();
-	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, qboolean detailedPS = qfalse);
-	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, qboolean detailedPS = qfalse);
+	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
+	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
 
 
 
@@ -184,7 +184,7 @@ public:
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(double time);
-	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL);
+	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL);
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);

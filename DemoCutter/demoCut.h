@@ -3135,6 +3135,7 @@ extern saberMoveData_jk2_t	saberMoveData_jk2[LS_MOVE_MAX_JK2];
 
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime = qtrue, qboolean clientSideStyleEventConversion=qfalse);
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues=qtrue, playerState_t* baseState=NULL, qboolean enhanceOnly=qfalse);
+void EnhancePlayerStateWithBaseState(playerState_t* ps, playerState_t* baseState);
 
 float LerpAngle(float from, float to, float frac);
 

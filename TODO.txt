@@ -79,6 +79,7 @@ Demostats: Find demos with dismemberment.
 
 
 
+
 TODO: make saber shenanigans 2.0 work: https://github.com/Boothand/jk2mp/commit/613157c3160009482fa00c3d4f668c080423a796
 
 
@@ -129,6 +130,13 @@ detect teamkills
 - option to stop detecting dooms and or restrict them when variouus force powwers are active (aka dont detect saber doom if player was nowhere near other player as its likely a force puill or sth).
 - make killspree parameter accept number to say how many kills must be saber kills to accept it
 - bc leading to cap
+
+
+DemoMerger:
+- Show scoreboard/Intermission (when reframing?)
+- Crouch discrepancy?
+- also reframer: Show scoreboard when dead? with merger it can jump between showing and not showing actually
+- Weird ZEROEVENT aand other duplicated events still
 
 
 DONE: 
