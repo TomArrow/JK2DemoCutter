@@ -241,7 +241,7 @@ void MSG_Init( msg_t *buf, byte *data, int length ) {
 	buf->raw = qfalse;
 }
 
-void MSG_InitRaw( msg_t *buf, std::vector<byte> *dataRaw) {
+void MSG_InitRaw( msg_t *buf, std::vector<byte,mi_stl_allocator<byte>> *dataRaw) {
 	
 	Com_Memset (buf, 0, sizeof(*buf));
 	buf->dataRaw = dataRaw;

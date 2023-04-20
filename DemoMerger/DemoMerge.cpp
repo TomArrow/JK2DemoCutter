@@ -57,7 +57,7 @@ class DemoReaderTrackingWrapper {
 public:
 	DemoReader reader;
 	int packetsUsed = 0;
-	std::vector<std::string> commandDupesToFilter;
+	std::vector<std::string,mi_stl_allocator<std::string>> commandDupesToFilter;
 	SnapshotInfoMapIterator currentSnapIt, nextSnapIt, nullIt;
 };
 
@@ -98,7 +98,7 @@ inline bool IsBetterTime(T& curTime, T& oldTime, T& newTime) {
 }
 
 
-qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles, std::string* reframeSearchString) {
+qboolean demoMerge( const char* outputName, std::vector<std::string,mi_stl_allocator<std::string>>* inputFiles, std::string* reframeSearchString) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -140,7 +140,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	memset(&demo, 0, sizeof(demo));
 	memset(&playerEventData, 0, sizeof(playerEventData));
 
-	std::vector<DemoReaderTrackingWrapper> demoReaders;
+	std::vector<DemoReaderTrackingWrapper,mi_stl_allocator<DemoReaderTrackingWrapper>> demoReaders;
 	std::cout << "loading up demos...";
 	int startTime = INT_MAX;
 	demoReaders.reserve(inputFiles->size()); // This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
@@ -235,8 +235,8 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
-	std::vector<std::string> commandsToAdd;
-	std::vector<Event> eventsToAdd;
+	std::vector<std::string,mi_stl_allocator<std::string>> commandsToAdd;
+	std::vector<Event,mi_stl_allocator<Event>> eventsToAdd;
 	playerState_t tmpPS,tmpPS2, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;// , mainPlayerPSSourceES;
 	int currentCommand = 1;
@@ -494,7 +494,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommandsAtServerTime(time);
+				std::vector<std::string,mi_stl_allocator<std::string>> newCommandsHere = demoReaders[i].reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 					
 					// New handling to avoid dupes
@@ -543,7 +543,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 				// Ok now... redo all events for players do avoid inconsistencies. This is unelegant af but I see no realistic way of doing it properly without making it
 				// incredibly complicated, hard to read and possibly even more unelegant in places
-				std::vector<Event> newEvents = demoReaders[i].reader.GetNewEventsAtServerTime(time,EK_ALL);
+				std::vector<Event,mi_stl_allocator<Event>> newEvents = demoReaders[i].reader.GetNewEventsAtServerTime(time,EK_ALL);
 				for (int e = 0; e < newEvents.size(); e++) {
 					// We check whether this event is already registered.
 					// Since we are combining multiple demos, each event will (or can) come from multiple places.
@@ -879,7 +879,7 @@ int main(int argcO, char** argvO) {
 	//strcpy(outputName, filteredOutputName);
 	//delete[] filteredOutputName;
 
-	std::vector<std::string> inputFiles;
+	std::vector<std::string,mi_stl_allocator<std::string>> inputFiles;
 	//for (int i = 2; i < argc; i++) {
 	for (int i = 1; i < args.size(); i++) {
 		inputFiles.emplace_back(args[i]);

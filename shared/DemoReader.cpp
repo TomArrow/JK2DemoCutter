@@ -42,9 +42,9 @@ int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean pr
 		std::string thisPlayerLower = *thisPlayer;
 		std::transform(thisPlayerLower.begin(), thisPlayerLower.end(), thisPlayerLower.begin(), tolowerSignSafe);
 
-		std::vector<NameMatch> colorStrippedMatches;
-		std::vector<NameMatch> caseInsensitiveMatches;
-		std::vector<NameMatch> matches;
+		std::vector<NameMatch,mi_stl_allocator<NameMatch>> colorStrippedMatches;
+		std::vector<NameMatch,mi_stl_allocator<NameMatch>> caseInsensitiveMatches;
+		std::vector<NameMatch,mi_stl_allocator<NameMatch>> matches;
 
 		// Find matching player name
 		for (int c = 0; c < maxClientsThisDemo; c++) {
@@ -1260,8 +1260,8 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 	return std::map<int, entityState_t>();
 }
 
-std::vector<std::string> DemoReader::GetNewCommands(double time) {
-	std::vector<std::string> retVal;
+std::vector<std::string,mi_stl_allocator<std::string>> DemoReader::GetNewCommands(double time) {
+	std::vector<std::string,mi_stl_allocator<std::string>> retVal;
 	SeekToTime(time);
 	for (int i = 0; i < readCommands.size(); i++) {
 		if (readCommands[i].demoTime <= time && readCommands[i].demoTime > lastGottenCommandsTime) {
@@ -1272,8 +1272,8 @@ std::vector<std::string> DemoReader::GetNewCommands(double time) {
 	return retVal;
 }
 // Don't combine this with GetNewCommands, they keep track in different ways. Pick one or the other.
-std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime) {
-	std::vector<std::string> retVal;
+std::vector<std::string,mi_stl_allocator<std::string>> DemoReader::GetNewCommandsAtServerTime(int serverTime) {
+	std::vector<std::string,mi_stl_allocator<std::string>> retVal;
 	SeekToServerTime(serverTime);
 	for (int i = 0; i < readCommands.size(); i++) {
 		if (readCommands[i].serverTime <= serverTime && readCommands[i].serverTime > lastGottenCommandsServerTime) {
@@ -1288,8 +1288,8 @@ inline bool EventTimeGreaterPredicate(const double& time,const Event& it) {
 	return time < it.demoTime;
 }
 
-std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind) {
-	std::vector<Event> retVal;
+std::vector<Event,mi_stl_allocator<Event>> DemoReader::GetNewEvents(double time, eventKind_t kind) {
+	std::vector<Event,mi_stl_allocator<Event>> retVal;
 	SeekToTime(time);
 	auto startIt = readEvents.begin();
 
@@ -1312,8 +1312,8 @@ inline bool EventServerTimeGreaterPredicate(const int& serverTime, const Event& 
 	return serverTime < it.serverTime;
 }
 
-std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind) {
-	std::vector<Event> retVal;
+std::vector<Event,mi_stl_allocator<Event>> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind) {
+	std::vector<Event,mi_stl_allocator<Event>> retVal;
 	SeekToServerTime(serverTime);
 
 	auto startIt = readEvents.begin();
@@ -1406,7 +1406,7 @@ readNext:
 	int				buf;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
-	std::vector<byte>			oldDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>			oldDataRaw;
 
 	if (isCompressedFile) {
 		oldDataRaw.clear();
@@ -1945,7 +1945,7 @@ int main(int argc, char** argv) {
 }*/
 
 
-void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
+void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
 	int eventHere = generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity->event & ~EV_EVENT_BITS,demoType);
 	int maxLength = 0;
 	if (eventHere == EV_GENERAL_SOUND_GENERAL) {

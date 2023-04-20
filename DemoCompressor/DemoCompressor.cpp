@@ -39,10 +39,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
-	std::vector<byte>	oldDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>	oldDataRaw;
 	msg_t			newMsg;
 	byte			newData[MAX_MSGLEN];
-	std::vector<byte>	newDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>	newDataRaw;
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];

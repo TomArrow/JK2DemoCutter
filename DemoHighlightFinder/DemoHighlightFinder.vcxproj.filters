@@ -206,6 +206,9 @@
     <ClCompile Include="..\shared\animMappingTable.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\mimalloc\src\static.c">
+      <Filter>Common\mimalloc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -222,6 +225,9 @@
     </Filter>
     <Filter Include="Common\zlib">
       <UniqueIdentifier>{6af2f373-c149-42da-b467-9857652df5b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\mimalloc">
+      <UniqueIdentifier>{b140ab58-ba60-4fc6-b524-3186a087e50d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

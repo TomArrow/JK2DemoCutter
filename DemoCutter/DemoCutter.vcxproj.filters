@@ -19,6 +19,9 @@
     <Filter Include="Source Files\zlib">
       <UniqueIdentifier>{0521e698-11e7-4b54-866f-39256ce875d4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mimalloc">
+      <UniqueIdentifier>{713eda6d-666d-49c2-8e16-2a8ddb2ea581}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="demoCut.cpp">
@@ -224,6 +227,9 @@
     </ClCompile>
     <ClCompile Include="..\shared\animMappingTable.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\mimalloc\src\static.c">
+      <Filter>Source Files\mimalloc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

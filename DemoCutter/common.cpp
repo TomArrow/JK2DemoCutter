@@ -1783,8 +1783,8 @@ float LerpAngle(float from, float to, float frac) {
 
 
 
-std::vector<std::string> splitString(std::string input, std::string separator, bool trim, bool allowEmpty) {
-	std::vector<std::string> retVal;
+std::vector<std::string,mi_stl_allocator<std::string>> splitString(std::string input, std::string separator, bool trim, bool allowEmpty) {
+	std::vector<std::string,mi_stl_allocator<std::string>> retVal;
 	int position = 0;
 	size_t foundPos = 0;
 	size_t lastFoundPos = -1;
@@ -3586,7 +3586,7 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
 	byte			bufData[MAX_MSGLEN];
-	std::vector<byte>			bufDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>			bufDataRaw;
 	msg_t			buf;
 	int				i;
 	int				len;
@@ -3683,7 +3683,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
-	std::vector<byte>			msgDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>			msgDataRaw;
 	clSnapshot_t* frame, * oldframe;
 	int				lastframe = 0;
 	int				snapFlags;
@@ -3905,10 +3905,10 @@ qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* c
 
 //void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
 // TODO: Make this work for JKA? No idea. Whatever.
-void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw) {
+void demoCutWriteDeltaSnapshotManual(std::vector<std::string,mi_stl_allocator<std::string>>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
-	std::vector<byte>			msgDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>			msgDataRaw;
 	qboolean		doDelta = qfalse;
 	clSnapshot_t* frame;// , * oldframe;
 	int				lastframe = 0;
@@ -3986,7 +3986,7 @@ G_FindConfigstringIndex
 
 ================
 */
-int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd,demoType_t demoType) {
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd,demoType_t demoType) {
 	int		i;
 	//char	s[MAX_STRING_CHARS];
 	char* s;
@@ -4026,13 +4026,13 @@ int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, cli
 }
 
 
-int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_SOUNDS(demoType), MAX_SOUNDS, qtrue, clCut, commandsToAdd, demoType);
 }
-int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qtrue, clCut, commandsToAdd, demoType);
 }
-int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qfalse, clCut, commandsToAdd, demoType);
 }
 

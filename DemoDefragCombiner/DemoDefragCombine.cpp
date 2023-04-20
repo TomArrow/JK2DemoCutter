@@ -24,7 +24,7 @@ struct SourcePlayerInfo {
 //#pragma optimize("", off)
 #endif
 
-qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) {
+qboolean demoCut( const char* outputName, std::vector<std::string,mi_stl_allocator<std::string>>* inputFiles) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -66,7 +66,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	memset(&demo, 0, sizeof(demo));
 
-	std::vector<DemoReader> demoReaders;
+	std::vector<DemoReader,mi_stl_allocator<DemoReader>> demoReaders;
 	std::cout << "loading up demos...";
 	demoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
@@ -144,8 +144,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	float fps = 60.0f;
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
-	std::vector<std::string> commandsToAdd;
-	std::vector<Event> eventsToAdd;
+	std::vector<std::string,mi_stl_allocator<std::string>> commandsToAdd;
+	std::vector<Event,mi_stl_allocator<Event>> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;
 	int currentCommand = 1;
@@ -232,7 +232,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].GetNewCommands(sourceTime);
+				std::vector<std::string,mi_stl_allocator<std::string>> newCommandsHere = demoReaders[i].GetNewCommands(sourceTime);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
@@ -245,7 +245,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 
 				// Get new events and remember them.
-				std::vector<Event> newEventsHere = demoReaders[i].GetNewEvents(sourceTime);
+				std::vector<Event,mi_stl_allocator<Event>> newEventsHere = demoReaders[i].GetNewEvents(sourceTime);
 				for (int c = 0; c < newEventsHere.size(); c++) {
 					Event* thisEvent = &newEventsHere[c];
 					int eventNumber = thisEvent->eventNumber;
@@ -364,7 +364,7 @@ int main(int argc, char** argv) {
 	strcpy(outputName, filteredOutputName);
 	delete[] filteredOutputName;
 
-	std::vector<std::string> inputFiles;
+	std::vector<std::string,mi_stl_allocator<std::string>> inputFiles;
 	for (int i = 2; i < argc; i++) {
 		inputFiles.emplace_back(argv[i]);
 	}

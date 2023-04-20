@@ -75,7 +75,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 	memset(&demo, 0, sizeof(demo));
 
-	//std::vector<DemoReaderTrackingWrapper> demoReaders;
+	//std::vector<DemoReaderTrackingWrapper,mi_stl_allocator<DemoReaderTrackingWrapper>> demoReaders;
 	std::cout << "loading up demo...";
 	DemoReaderTrackingWrapper* demoReader = new DemoReaderTrackingWrapper();
 	int startTime = INT_MAX;
@@ -152,8 +152,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
-	std::vector<std::string> commandsToAdd;
-	std::vector<Event> eventsToAdd;
+	std::vector<std::string,mi_stl_allocator<std::string>> commandsToAdd;
+	std::vector<Event,mi_stl_allocator<Event>> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
 	mainPlayerPS.clientNum = -1;
 	entityState_t tmpES;
@@ -239,7 +239,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReader->reader.GetNewCommandsAtServerTime(time);
+				std::vector<std::string,mi_stl_allocator<std::string>> newCommandsHere = demoReader->reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					//if (i == 0) { // This is the main reference demo. Just add this stuff.

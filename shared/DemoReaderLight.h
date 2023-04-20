@@ -12,7 +12,7 @@ class DemoReaderLight {
 
 	std::map<int, int> lastEvent;
 
-	std::vector<int> pingValues[MAX_CLIENTS_MAX];
+	std::vector<int,mi_stl_allocator<int>> pingValues[MAX_CLIENTS_MAX];
 	qboolean		playerSeen[MAX_CLIENTS_MAX];
 
 	int lastKnownRedFlagCarrier = -1;

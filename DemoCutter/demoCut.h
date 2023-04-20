@@ -25,6 +25,10 @@
 #include "animsStanceMappings.h"
 
 
+#include "mimalloc.h"
+#include "mimalloc-override.h"
+
+
 
 #ifdef _WIN32
 #define WINDOWS // For popl library
@@ -44,7 +48,7 @@
 
 /*
 struct parsedArguments_t {
-	std::vector<std::string> mainArgs;
+	std::vector<std::string,mi_stl_allocator<std::string>> mainArgs;
 	std::map<std::string, std::string> extraArgs;
 };
 
@@ -1345,11 +1349,11 @@ typedef struct {
 	int		bit;				// for bitwise reads and writes
 
 	qboolean	raw;			// raw, everything saved as integers
-	std::vector<byte>*	dataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>*	dataRaw;
 } msg_t;
 
 void MSG_Init(msg_t* buf, byte* data, int length);
-void MSG_InitRaw(msg_t* buf, std::vector<byte>* dataRaw);
+void MSG_InitRaw(msg_t* buf, std::vector<byte,mi_stl_allocator<byte>>* dataRaw);
 void MSG_InitOOB(msg_t* buf, byte* data, int length);
 void MSG_Clear(msg_t* buf);
 void MSG_WriteData(msg_t* buf, const void* data, int length);
@@ -3238,7 +3242,7 @@ extern demo_t demo;
 void sanitizeFilename(const char* input, char* output, qboolean allowExtension=qfalse);
 
 
-std::vector<std::string> splitString(std::string input, std::string separator, bool trim = true, bool allowEmpty = false);
+std::vector<std::string,mi_stl_allocator<std::string>> splitString(std::string input, std::string separator, bool trim = true, bool allowEmpty = false);
 
 
 
@@ -4091,13 +4095,13 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);
 void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities);
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);
-void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
+void demoCutWriteDeltaSnapshotManual(std::vector<std::string,mi_stl_allocator<std::string>>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
 
 std::string makeConfigStringCommand(int index, std::string value);
-int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType);
+int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType);
+int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType);
+int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, demoType_t demoType);
 void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t* demoType, qboolean* isCompressed, qboolean* checkFor103 = NULL);

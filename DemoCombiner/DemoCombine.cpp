@@ -18,7 +18,7 @@ class DemoSource {
 public:
 	std::string sourceName;
 	std::string demoPath;
-	std::vector<std::string> playersToCopy;
+	std::vector<std::string,mi_stl_allocator<std::string>> playersToCopy;
 	double delay=0.0f; // Absolute delay of the demo time against the target demo time
 	double showStart = 0.0f; // In demo time
 	double showEnd = std::numeric_limits<float>::infinity(); // In demo time
@@ -40,7 +40,7 @@ struct SourcePlayerInfo {
 class DemoReaderWrapper {
 public:
 	DemoReader reader;
-	std::vector<SourcePlayerInfo> playersToCopy;
+	std::vector<SourcePlayerInfo,mi_stl_allocator<SourcePlayerInfo>> playersToCopy;
 	DemoSource* sourceInfo;
 	int targetFramesRead;
 };
@@ -141,8 +141,8 @@ public:
 		}
 		return -1;
 	}
-	std::vector<int> freeSlots(int demoIndex) { // Returns the erased slots
-		std::vector<int> erasedSlots;
+	std::vector<int,mi_stl_allocator<int>> freeSlots(int demoIndex) { // Returns the erased slots
+		std::vector<int,mi_stl_allocator<int>> erasedSlots;
 		int countErased = 0;
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
 			mappingIterator iteratorHere = it;
@@ -156,8 +156,8 @@ public:
 		}
 		return erasedSlots;
 	}
-	/*std::vector<int> getModelMappings(int demoIndex) { // Returns the erased slots
-		std::vector<int> modelSlots;
+	/*std::vector<int,mi_stl_allocator<int>> getModelMappings(int demoIndex) { // Returns the erased slots
+		std::vector<int,mi_stl_allocator<int>> modelSlots;
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++; ) {
 			
 			if (it->second.demoIndex == demoIndex && it->second.isModel) {
@@ -247,9 +247,9 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 		std::string thisPlayerLower = *thisPlayer;
 		std::transform(thisPlayerLower.begin(), thisPlayerLower.end(), thisPlayerLower.begin(), tolowerSignSafe);
 
-		std::vector<NameMatch> colorStrippedMatches;
-		std::vector<NameMatch> caseInsensitiveMatches;
-		std::vector<NameMatch> matches;
+		std::vector<NameMatch,mi_stl_allocator<NameMatch>> colorStrippedMatches;
+		std::vector<NameMatch,mi_stl_allocator<NameMatch>> caseInsensitiveMatches;
+		std::vector<NameMatch,mi_stl_allocator<NameMatch>> matches;
 
 		// Find matching player name
 		for (int c = 0; c < MAX_CLIENTS; c++) {
@@ -342,7 +342,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 }*/
 
 
-qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
+qboolean demoCut( const char* outputName, std::vector<DemoSource,mi_stl_allocator<DemoSource>>* inputFiles) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -385,8 +385,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	memset(&demo, 0, sizeof(demo));
 
-	std::vector<DemoReaderLight> pingDemoReaders;
-	std::vector<DemoReaderWrapper> demoReaders;
+	std::vector<DemoReaderLight,mi_stl_allocator<DemoReaderLight>> pingDemoReaders;
+	std::vector<DemoReaderWrapper,mi_stl_allocator<DemoReaderWrapper>> demoReaders;
 	demoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
@@ -520,8 +520,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	double fps = 60.0f;
 	std::map<int, entityState_t> targetEntities;
 	std::map<int, entityState_t> targetEntitiesOld;
-	std::vector<std::string> commandsToAdd;
-	std::vector<Event> eventsToAdd;
+	std::vector<std::string,mi_stl_allocator<std::string>> commandsToAdd;
+	std::vector<Event,mi_stl_allocator<Event>> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;
 	int currentCommand = 1;
@@ -889,7 +889,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime - demoReaders[i].sourceInfo->delay);
+				std::vector<std::string,mi_stl_allocator<std::string>> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime - demoReaders[i].sourceInfo->delay);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
@@ -917,7 +917,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay - 2.0 * 1000.0 / fps);
 					// Just ignore the return value.
 				}
-				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
+				std::vector<Event,mi_stl_allocator<Event>> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
 				std::map<int, entityState_t> entitiesHere;
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
 				for (int c = 0; c < newEventsHere.size(); c++) {
@@ -1064,7 +1064,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				if (!demoReaders[i].sourceInfo->isFinished) {
 					std::cout << "Demo " << i << " has ended at " << sourceTime << " (" << demoReaders[i].reader.getCurrentDemoTime() << "). Demo had a delay of " << demoReaders[i].sourceInfo->delay << ". endReached: " << endReached << ", showEndReached: " << showEndReached << std::endl;
 					// We reached the end of this demo.
-					std::vector<int> erasedSlots = slotManager.freeSlots(i);
+					std::vector<int,mi_stl_allocator<int>> erasedSlots = slotManager.freeSlots(i);
 					for (int sl = 0; sl < erasedSlots.size(); sl++) {
 						int erasedSlot = erasedSlots[sl];
 						if (erasedSlot >= 0 && erasedSlot < MAX_CLIENTS) {
@@ -1183,12 +1183,12 @@ int main(int argc, char** argv) {
 
 	// Read the script
 	scriptName = argv[2];
-	//std::vector<std::string> inputFiles;
+	//std::vector<std::string,mi_stl_allocator<std::string>> inputFiles;
 	mINI::INIFile file(scriptName);
 	mINI::INIStructure ini;
 	file.read(ini);
 
-	std::vector<DemoSource> demoSources;
+	std::vector<DemoSource,mi_stl_allocator<DemoSource>> demoSources;
 
 	for (auto const& it : ini)
 	{
@@ -1247,7 +1247,7 @@ int main(int argc, char** argv) {
 
 		demoSource.demoPath = collection.get("path");
 
-		std::vector<std::string> players = splitString(collection.get("players"),",");
+		std::vector<std::string,mi_stl_allocator<std::string>> players = splitString(collection.get("players"),",");
 
 		for (int i = 0; i < players.size(); i++) {
 			std::cout << "player: " << players[i] << std::endl;

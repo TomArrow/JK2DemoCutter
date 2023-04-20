@@ -236,7 +236,7 @@ void DemoReaderLight::GetMedianOfLocalAveragesPingData(float* playerPingData) { 
 	for (int i = 0; i < maxClientsThisDemo; i++) {
 
 		static float localAverageData[LOCAL_AVERAGE_SAMPLE_COUNT];
-		std::vector<float> localAverages;
+		std::vector<float,mi_stl_allocator<float>> localAverages;
 		int s = 0;
 		for (; s < pingValues[i].size(); s++) {
 			localAverageData[s % LOCAL_AVERAGE_SAMPLE_COUNT] = pingValues[i][s]; // Add sample to pool
@@ -330,7 +330,7 @@ readNext:
 	int				buf;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
-	std::vector<byte> oldDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>> oldDataRaw;
 
 	if (isCompressedFile) {
 		oldDataRaw.clear();

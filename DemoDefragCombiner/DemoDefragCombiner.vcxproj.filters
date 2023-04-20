@@ -206,6 +206,9 @@
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c">
       <Filter>Common\lzmaSDK</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\mimalloc\src\static.c">
+      <Filter>Common\mimalloc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -219,6 +222,9 @@
     </Filter>
     <Filter Include="Common\lzmaSDK">
       <UniqueIdentifier>{d8a1dd04-abbd-4483-ab2e-3f23396dac02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\mimalloc">
+      <UniqueIdentifier>{c0508c95-b4c6-4be5-90ab-98733f1dd5d0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

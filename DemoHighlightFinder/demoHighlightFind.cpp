@@ -17,8 +17,10 @@
 
 #include "popl.hpp"
 
+
 #define DEBUGSTATSDB
 
+#include "mimalloc-new-delete.h"
 
 
 
@@ -50,8 +52,8 @@ struct ioHandles_t {
 
 
 
-
-
+#define COMMA ,
+#define STD_MAP_ALLOC(key,value,alloc) std::map<key,value,std::less<key>,alloc<std::pair<const key,value>>>
 
 
 class ExtraSearchOptions {
@@ -161,7 +163,8 @@ TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 int lastEventTime[MAX_GENTITIES];
 float lastGroundHeight[MAX_CLIENTS]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
-std::map<int,std::string> lastPlayerModel;
+//std::map<int,std::string,std::less<int>,mi_stl_allocator<std::pair<int,std::string>>> lastPlayerModel;
+STD_MAP_ALLOC(int,std::string,mi_stl_allocator) lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
@@ -235,7 +238,8 @@ struct cgs{
 
 #ifdef DEBUGSTATSDB
 typedef std::tuple<int, int, int, int, int,int> animStanceKey; // demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance
-std::map< animStanceKey, int> animStanceCounts;
+//std::map< animStanceKey, int,std::less<animStanceKey>,mi_stl_allocator<int>> animStanceCounts;
+STD_MAP_ALLOC(animStanceKey,int,mi_stl_allocator) animStanceCounts;
 #endif
 
 
@@ -271,7 +275,7 @@ public:
 	std::string attackerName;
 	std::string victimName;
 	std::string modInfoString;
-	std::vector< NearbyPlayer> nearbyPlayers;
+	std::vector< NearbyPlayer, mi_stl_allocator<NearbyPlayer>> nearbyPlayers;
 };
 
 struct SpreeInfo {
@@ -287,8 +291,10 @@ struct SpreeInfo {
 
 // For detecting killstreaks
 // Killer is the key, kill info is the value
-std::map<int, std::vector<Kill>> kills;
-std::map<int, int> timeCheckedForKillStreaks;
+//std::map<int, std::vector<Kill, mi_stl_allocator<Kill>>> kills;
+STD_MAP_ALLOC(int, std::vector<Kill COMMA mi_stl_allocator<Kill>>,mi_stl_allocator) kills;
+//std::map<int, int,std::less<int>,mi_stl_allocator<int>> timeCheckedForKillStreaks;
+STD_MAP_ALLOC(int, int,mi_stl_allocator) timeCheckedForKillStreaks;
 
 #define KILLSTREAK_MIN_KILLS 3
 #define KILLSTREAK_SUPERFAST_MAX_INTERVAL 1000
@@ -487,7 +493,7 @@ public:
 	}
 };
 
-std::vector<boost_t> boosts;
+std::vector<boost_t,mi_stl_allocator<boost_t>> boosts;
 
 
 
@@ -499,7 +505,7 @@ int headJumpCount[MAX_CLIENTS_MAX]; // Jumps over player heads
 int specialJumpCount[MAX_CLIENTS_MAX]; // Jumps over items in certain situations (over top of forcefield or midair sentry for example). Not yet implemented.
 
 //int64_t walkDetectedTime[max_clients];
-std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS_MAX];
+std::vector<int64_t,mi_stl_allocator<int64_t>> walkDetectedTimes[MAX_CLIENTS_MAX];
 
 
 struct {
@@ -523,7 +529,7 @@ struct Speed {
 	float angularSnap;
 };
 
-std::vector<Speed> speeds[MAX_CLIENTS_MAX];
+std::vector<Speed,mi_stl_allocator<Speed>> speeds[MAX_CLIENTS_MAX];
 // TODO For future? Have angle saved too. See at what angle the kill comes. Big angle between capper and chaser at high speed is more impressive?
 
 
@@ -942,7 +948,7 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
 
-	static std::vector<std::string> modelsToAdd;
+	static std::vector<std::string,mi_stl_allocator<std::string>> modelsToAdd;
 	modelsToAdd.clear();
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
@@ -1009,7 +1015,7 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 }
 
 template<unsigned int max_clients>
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, ExtraSearchOptions opts,bool& wasDoingSQLiteExecution) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill,mi_stl_allocator<Kill>>* killsOfThisSpree,std::vector<int,mi_stl_allocator<int>>* victims,std::vector<std::string,mi_stl_allocator<std::string>>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, ExtraSearchOptions opts,bool& wasDoingSQLiteExecution) {
 
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
@@ -1768,7 +1774,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
-	std::vector<byte>	oldDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>	oldDataRaw;
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
 	//char			newName[MAX_OSPATH];
@@ -3936,8 +3942,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							// Find nearby players.
 							std::stringstream nearbyPlayersSS;
-							std::vector<int> nearbyPlayers;
-							std::vector<int> nearbyPlayersDistances;
+							std::vector<int,mi_stl_allocator<int>> nearbyPlayers;
+							std::vector<int,mi_stl_allocator<int>> nearbyPlayersDistances;
 							int nearbyPlayersCount = 0;
 							if (playerIsVisibleOrFollowed) {
 								if (playerEntity) {
@@ -4199,9 +4205,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 						int maxTimeLast = sp == 0 ? -1 : killStreakSpeedTypes[sp-1];
 						int countFittingInLastBracket = 0;
 
-						static std::vector<Kill> killsOfThisSpree;
-						static std::vector<int> victims;
-						static std::vector<std::string> hashes;
+						static std::vector<Kill,mi_stl_allocator<Kill>> killsOfThisSpree;
+						static std::vector<int,mi_stl_allocator<int>> victims;
+						static std::vector<std::string,mi_stl_allocator<std::string>> hashes;
 						victims.reserve(10);
 						hashes.reserve(10);
 						killsOfThisSpree.reserve(10);

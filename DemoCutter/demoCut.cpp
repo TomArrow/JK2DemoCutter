@@ -217,7 +217,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
-	std::vector<byte>	oldDataRaw;
+	std::vector<byte,mi_stl_allocator<byte>>	oldDataRaw;
 	int				oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];

@@ -84,8 +84,8 @@ class DemoReader {
 
 
 	SnapshotInfoMap snapshotInfos;
-	std::vector<Command> readCommands;
-	std::vector<Event> readEvents;
+	std::vector<Command,mi_stl_allocator<Command>> readCommands;
+	std::vector<Event,mi_stl_allocator<Event>> readEvents;
 
 	int lastKnownRedFlagCarrier = -1;
 	int lastKnownBlueFlagCarrier = -1;
@@ -189,10 +189,10 @@ public:
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
-	std::vector<std::string> DemoReader::GetNewCommands(double time);
-	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime);
-	std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind=EK_ENTITY);
-	std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind=EK_ENTITY);
+	std::vector<std::string,mi_stl_allocator<std::string>> DemoReader::GetNewCommands(double time);
+	std::vector<std::string,mi_stl_allocator<std::string>> DemoReader::GetNewCommandsAtServerTime(int serverTime);
+	std::vector<Event,mi_stl_allocator<Event>> DemoReader::GetNewEvents(double time, eventKind_t kind=EK_ENTITY);
+	std::vector<Event,mi_stl_allocator<Event>> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind=EK_ENTITY);
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum, int* maxLength);
 	const char* GetPlayerConfigString(int playerNum, int* maxLength);
@@ -210,6 +210,6 @@ public:
 
 
 
-void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType);
+void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string,mi_stl_allocator<std::string>>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType);
 
 #endif
