@@ -32,6 +32,16 @@
 
 
 
+#ifdef _MSC_VER
+#include <excpt.h>
+#define __TRY __try
+#define __EXCEPT __except(EXCEPTION_EXECUTE_HANDLER)
+#else
+#define __TRY try
+#define __EXCEPT catch(...)
+#endif
+
+
 /*
 struct parsedArguments_t {
 	std::vector<std::string> mainArgs;

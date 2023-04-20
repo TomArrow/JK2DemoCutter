@@ -139,6 +139,10 @@ DemoMerger:
 - Weird ZEROEVENT aand other duplicated events still
 
 
+
+check for @@@PLRENAME to track who is who and build a chain that allows to more easily identify players
+
+
 DONE: 
 
 - make optional ultralong (18 second) killspree detection for fetchd DONE

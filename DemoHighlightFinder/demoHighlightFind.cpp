@@ -20,6 +20,40 @@
 #define DEBUGSTATSDB
 
 
+
+
+struct ioHandles_t {
+	// Killdb
+	sqlite3* killDb;
+	sqlite3_stmt* insertLaughsStatement;
+	sqlite3_stmt* insertDefragRunStatement;
+	sqlite3_stmt* insertCaptureStatement;
+	sqlite3_stmt* insertSpreeStatement;
+	sqlite3_stmt* insertStatement;
+	sqlite3_stmt* insertAngleStatement;
+	sqlite3_stmt* insertPlayerModelStatement;
+	sqlite3_stmt* updatePlayerModelCountStatement;
+	sqlite3_stmt* selectLastInsertRowIdStatement;
+	sqlite3_stmt* insertPlayerDemoStatsStatement;
+
+	// Debugstatsdb
+	sqlite3* debugStatsDb;
+	sqlite3_stmt* insertAnimStanceStatement;
+	sqlite3_stmt* updateAnimStanceCountStatement;
+
+	std::ofstream* outputBatHandle;
+	std::ofstream* outputBatHandleKillSprees;
+	std::ofstream* outputBatHandleDefrag;
+	std::ofstream* outputBatHandleCaptures;
+	std::ofstream* outputBatHandleLaughs;
+};
+
+
+
+
+
+
+
 class ExtraSearchOptions {
 public:
 	bool quickSkipNonSaberExclusive = false; // Not implemented (yet). Skip demoss that aren't saber only
@@ -901,7 +935,7 @@ void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 }
 
 template<unsigned int max_clients>
-void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* insertPlayerModelStatement,sqlite3_stmt* updatePlayerModelCountStatement, demoType_t demoType) {
+void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t demoType,bool& wasDoingSQLiteExecution) {
 
 
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -945,35 +979,37 @@ void CheckForNameChanges(clientActive_t* clCut,sqlite3* killDb,sqlite3_stmt* ins
 				//variantCString = variant.c_str();
 			}
 		}
-		SQLBIND_TEXT(insertPlayerModelStatement, "@map", mapname.c_str());
-		SQLBIND_TEXT(updatePlayerModelCountStatement, "@map", mapname.c_str());
-		SQLBIND_TEXT(insertPlayerModelStatement, "@baseModel", baseModel.c_str());
-		SQLBIND_TEXT(updatePlayerModelCountStatement, "@baseModel", baseModel.c_str());
+		SQLBIND_TEXT(io.insertPlayerModelStatement, "@map", mapname.c_str());
+		SQLBIND_TEXT(io.updatePlayerModelCountStatement, "@map", mapname.c_str());
+		SQLBIND_TEXT(io.insertPlayerModelStatement, "@baseModel", baseModel.c_str());
+		SQLBIND_TEXT(io.updatePlayerModelCountStatement, "@baseModel", baseModel.c_str());
 		if (variantExists) {
-			SQLBIND_TEXT(insertPlayerModelStatement, "@variant", variant.c_str());
-			SQLBIND_TEXT(updatePlayerModelCountStatement, "@variant", variant.c_str());
+			SQLBIND_TEXT(io.insertPlayerModelStatement, "@variant", variant.c_str());
+			SQLBIND_TEXT(io.updatePlayerModelCountStatement, "@variant", variant.c_str());
 		}
 		else {
-			SQLBIND_NULL(insertPlayerModelStatement, "@variant");
-			SQLBIND_NULL(updatePlayerModelCountStatement, "@variant");
+			SQLBIND_NULL(io.insertPlayerModelStatement, "@variant");
+			SQLBIND_NULL(io.updatePlayerModelCountStatement, "@variant");
 		}
 
-		int queryResult = sqlite3_step(insertPlayerModelStatement);
+		wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertPlayerModelStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting player model into database: " << sqlite3_errmsg(killDb) << "\n";
+			std::cout << "Error inserting player model into database: " << sqlite3_errmsg(io.killDb) << "\n";
 		}
-		sqlite3_reset(insertPlayerModelStatement);
-		queryResult = sqlite3_step(updatePlayerModelCountStatement);
+		sqlite3_reset(io.insertPlayerModelStatement);
+		queryResult = sqlite3_step(io.updatePlayerModelCountStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating player model count in database: " << sqlite3_errmsg(killDb) << "\n";
+			std::cout << "Error updating player model count in database: " << sqlite3_errmsg(io.killDb) << "\n";
 		}
-		sqlite3_reset(updatePlayerModelCountStatement);
+		sqlite3_reset(io.updatePlayerModelCountStatement);
+		wasDoingSQLiteExecution = false;
 	}
 
 }
 
 template<unsigned int max_clients>
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, std::ofstream* outputBatHandleKillSprees, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,sqlite3_stmt* insertSpreeStatement,sqlite3* killDb,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, ExtraSearchOptions opts) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, ExtraSearchOptions opts,bool& wasDoingSQLiteExecution) {
 
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
@@ -1075,45 +1111,47 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
 
 		// Log the kill.
-		SQLBIND_TEXT(insertSpreeStatement, "@hash", hash_hex_string.c_str());
-		SQLBIND_TEXT(insertSpreeStatement, "@shorthash", shorthash.c_str());
-		SQLBIND(insertSpreeStatement, int, "@maxDelay", maxDelay);
-		SQLBIND(insertSpreeStatement, int, "@maxDelayActual", maxDelayActual);
-		SQLBIND_TEXT(insertSpreeStatement, "@map", mapname.c_str());
-		SQLBIND_TEXT(insertSpreeStatement, "@killerName", playername.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@hash", hash_hex_string.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@shorthash", shorthash.c_str());
+		SQLBIND(io.insertSpreeStatement, int, "@maxDelay", maxDelay);
+		SQLBIND(io.insertSpreeStatement, int, "@maxDelayActual", maxDelayActual);
+		SQLBIND_TEXT(io.insertSpreeStatement, "@map", mapname.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@killerName", playername.c_str());
 		std::string playernameStripped = Q_StripColorAll(playername);
-		SQLBIND_TEXT(insertSpreeStatement, "@killerNameStripped", playernameStripped.c_str());
-		SQLBIND_TEXT(insertSpreeStatement, "@victimNames", victimsString.c_str());
-		SQLBIND_TEXT(insertSpreeStatement, "@victimNamesStripped", victimsStringStripped.c_str());
-		SQLBIND_TEXT(insertSpreeStatement, "@killTypes", killTypesString.c_str());
-		SQLBIND(insertSpreeStatement, int, "@killTypesCount", killTypeCount);
-		SQLBIND_TEXT(insertSpreeStatement, "@killHashes", killHashesString.c_str());
-		SQLBIND(insertSpreeStatement, int, "@killerClientNum", clientNumAttacker);
-		SQLBIND_TEXT(insertSpreeStatement, "@victimClientNums", victimsNumsString.c_str());
-		SQLBIND(insertSpreeStatement, int, "@countKills", spreeInfo->countKills);
-		SQLBIND(insertSpreeStatement, int, "@countRets", spreeInfo->countRets);
-		SQLBIND(insertSpreeStatement, int, "@countDooms", spreeInfo->countDooms);
-		SQLBIND(insertSpreeStatement, int, "@countExplosions", spreeInfo->countExplosions);
-		SQLBIND(insertSpreeStatement, int, "@countThirdPersons", spreeInfo->countThirdPersons);
+		SQLBIND_TEXT(io.insertSpreeStatement, "@killerNameStripped", playernameStripped.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@victimNames", victimsString.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@victimNamesStripped", victimsStringStripped.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@killTypes", killTypesString.c_str());
+		SQLBIND(io.insertSpreeStatement, int, "@killTypesCount", killTypeCount);
+		SQLBIND_TEXT(io.insertSpreeStatement, "@killHashes", killHashesString.c_str());
+		SQLBIND(io.insertSpreeStatement, int, "@killerClientNum", clientNumAttacker);
+		SQLBIND_TEXT(io.insertSpreeStatement, "@victimClientNums", victimsNumsString.c_str());
+		SQLBIND(io.insertSpreeStatement, int, "@countKills", spreeInfo->countKills);
+		SQLBIND(io.insertSpreeStatement, int, "@countRets", spreeInfo->countRets);
+		SQLBIND(io.insertSpreeStatement, int, "@countDooms", spreeInfo->countDooms);
+		SQLBIND(io.insertSpreeStatement, int, "@countExplosions", spreeInfo->countExplosions);
+		SQLBIND(io.insertSpreeStatement, int, "@countThirdPersons", spreeInfo->countThirdPersons);
 
-		SQLBIND_TEXT(insertSpreeStatement, "@nearbyPlayers", nearbyPlayers.size() > 0 ? nearbyPlayersString.c_str() : NULL);
-		SQLBIND(insertSpreeStatement, int, "@nearbyPlayerCount", nearbyPlayers.size());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@nearbyPlayers", nearbyPlayers.size() > 0 ? nearbyPlayersString.c_str() : NULL);
+		SQLBIND(io.insertSpreeStatement, int, "@nearbyPlayerCount", nearbyPlayers.size());
 
-		SQLBIND(insertSpreeStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-		SQLBIND(insertSpreeStatement, int, "@maxSpeedAttacker", maxSpeedAttacker);
-		SQLBIND(insertSpreeStatement, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
-		SQLBIND_TEXT(insertSpreeStatement, "@demoName", oldBasename.c_str());
-		SQLBIND_TEXT(insertSpreeStatement, "@demoPath", oldPath.c_str());
-		SQLBIND(insertSpreeStatement, int, "@demoTime", spreeInfo->lastKillTime - spreeInfo->totalTime);
-		SQLBIND(insertSpreeStatement, int, "@duration", spreeInfo->totalTime);
-		SQLBIND(insertSpreeStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-		SQLBIND(insertSpreeStatement, int, "@demoDateTime", oldDemoDateModified);
+		SQLBIND(io.insertSpreeStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+		SQLBIND(io.insertSpreeStatement, int, "@maxSpeedAttacker", maxSpeedAttacker);
+		SQLBIND(io.insertSpreeStatement, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
+		SQLBIND_TEXT(io.insertSpreeStatement, "@demoName", oldBasename.c_str());
+		SQLBIND_TEXT(io.insertSpreeStatement, "@demoPath", oldPath.c_str());
+		SQLBIND(io.insertSpreeStatement, int, "@demoTime", spreeInfo->lastKillTime - spreeInfo->totalTime);
+		SQLBIND(io.insertSpreeStatement, int, "@duration", spreeInfo->totalTime);
+		SQLBIND(io.insertSpreeStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+		SQLBIND(io.insertSpreeStatement, int, "@demoDateTime", oldDemoDateModified);
 
-		int queryResult = sqlite3_step(insertSpreeStatement);
+		wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertSpreeStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting killing spree into database: " << sqlite3_errmsg(killDb) << "\n";
+			std::cout << "Error inserting killing spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
 		}
-		sqlite3_reset(insertSpreeStatement);
+		sqlite3_reset(io.insertSpreeStatement);
+		wasDoingSQLiteExecution = false;
 
 
 		int startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
@@ -1141,9 +1179,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
 
-		(*outputBatHandleKillSprees) << "\nrem hash: " << hash_hex_string;
-		(*outputBatHandleKillSprees) << "\nrem demoCurrentTime: " << demoCurrentTime;
-		(*outputBatHandleKillSprees) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+		(*io.outputBatHandleKillSprees) << "\nrem hash: " << hash_hex_string;
+		(*io.outputBatHandleKillSprees) << "\nrem demoCurrentTime: " << demoCurrentTime;
+		(*io.outputBatHandleKillSprees) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 		delete[] targetFilenameFiltered;
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
 		std::cout << ss.str() << "\n";
@@ -1153,7 +1191,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 }
 
-void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChangeInDemoTime, std::ofstream* outputBatHandleLaughs, sqlite3* killDb, sqlite3_stmt* insertLaughsStatement, sqlite3_stmt* selectLastInsertRowIdStatement, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force) {
+void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution) {
 	if (firstLaugh != -1  && (demoCurrentTime - firstLaugh > MAX_LAUGH_DELAY || force) && laughCount > 0) {
 		
 		if (laughCount > 1) { // Let's not bloat the database with single laughs. Could miss some stuff but oh well.
@@ -1165,41 +1203,43 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 			std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
 			std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
-			SQLBIND_TEXT(insertLaughsStatement, "@map", mapname.c_str());
-			SQLBIND_TEXT(insertLaughsStatement, "@serverName", serverName.c_str());
+			SQLBIND_TEXT(io.insertLaughsStatement, "@map", mapname.c_str());
+			SQLBIND_TEXT(io.insertLaughsStatement, "@serverName", serverName.c_str());
 			std::string serverNameStripped = Q_StripColorAll(serverName);
-			SQLBIND_TEXT(insertLaughsStatement, "@serverNameStripped", serverNameStripped.c_str());
+			SQLBIND_TEXT(io.insertLaughsStatement, "@serverNameStripped", serverNameStripped.c_str());
 			std::string laughsString = laughs.str();
 			std::string laughsChatlogString = laughsChatlog.str();
-			SQLBIND_TEXT(insertLaughsStatement, "@laughs", laughsString.c_str());
-			SQLBIND_TEXT(insertLaughsStatement, "@chatlog", laughsChatlogString.c_str());
+			SQLBIND_TEXT(io.insertLaughsStatement, "@laughs", laughsString.c_str());
+			SQLBIND_TEXT(io.insertLaughsStatement, "@chatlog", laughsChatlogString.c_str());
 			std::string laughsChatlogStringStripped = Q_StripColorAll(laughsChatlogString);
-			SQLBIND_TEXT(insertLaughsStatement, "@chatlogStripped", laughsChatlogStringStripped.c_str());
-			SQLBIND(insertLaughsStatement, int, "@laughCount", laughCount);
-			SQLBIND_TEXT(insertLaughsStatement, "@demoName", (*oldBasename).c_str());
-			SQLBIND_TEXT(insertLaughsStatement, "@demoPath", (*oldPath).c_str());
-			SQLBIND(insertLaughsStatement, int, "@duration", duration);
-			SQLBIND(insertLaughsStatement, int, "@demoTime", firstLaugh);
-			SQLBIND(insertLaughsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-			SQLBIND(insertLaughsStatement, int, "@demoDateTime", oldDemoDateModified);
-			SQLBIND(insertLaughsStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+			SQLBIND_TEXT(io.insertLaughsStatement, "@chatlogStripped", laughsChatlogStringStripped.c_str());
+			SQLBIND(io.insertLaughsStatement, int, "@laughCount", laughCount);
+			SQLBIND_TEXT(io.insertLaughsStatement, "@demoName", (*oldBasename).c_str());
+			SQLBIND_TEXT(io.insertLaughsStatement, "@demoPath", (*oldPath).c_str());
+			SQLBIND(io.insertLaughsStatement, int, "@duration", duration);
+			SQLBIND(io.insertLaughsStatement, int, "@demoTime", firstLaugh);
+			SQLBIND(io.insertLaughsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+			SQLBIND(io.insertLaughsStatement, int, "@demoDateTime", oldDemoDateModified);
+			SQLBIND(io.insertLaughsStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 
-			int queryResult = sqlite3_step(insertLaughsStatement);
+			wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertLaughsStatement);
 			uint64_t insertedId = -1;
 			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting laugh spree into database: " << sqlite3_errmsg(killDb) << "\n";
+				std::cout << "Error inserting laugh spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
 			}
 			else {
-				queryResult = sqlite3_step(selectLastInsertRowIdStatement);
+				queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
 				if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-					std::cout << "Error retrieving inserted laughs id from database: " << sqlite3_errmsg(killDb) << "\n";
+					std::cout << "Error retrieving inserted laughs id from database: " << sqlite3_errmsg(io.killDb) << "\n";
 				}
 				else {
-					insertedId = sqlite3_column_int64(selectLastInsertRowIdStatement, 0);
+					insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
 				}
-				sqlite3_reset(selectLastInsertRowIdStatement);
+				sqlite3_reset(io.selectLastInsertRowIdStatement);
 			}
-			sqlite3_reset(insertLaughsStatement);
+			sqlite3_reset(io.insertLaughsStatement);
+			wasDoingSQLiteExecution = false;
 
 			int startTime = firstLaugh - LAUGHS_CUT_PRE_TIME - bufferTime;
 			int endTime = lastLaugh + bufferTime;
@@ -1220,9 +1260,9 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 			sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-			(*outputBatHandleLaughs) << "\nrem demoCurrentTime: " << demoCurrentTime;
-			(*outputBatHandleLaughs) << "\nrem insertid" << insertedId;
-			(*outputBatHandleLaughs) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+			(*io.outputBatHandleLaughs) << "\nrem demoCurrentTime: " << demoCurrentTime;
+			(*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
+			(*io.outputBatHandleLaughs) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 			delete[] targetFilenameFiltered;
 			std::cout << targetFilename << "\n";
 		}
@@ -1233,37 +1273,11 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 
 
+
 template<unsigned int max_clients>
-qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const char* outputBatFile,const char* outputBatFileKillSprees, const char* outputBatFileDefrag,const char* outputBatFileCaptures,const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts) {
-	fileHandle_t	oldHandle = 0;
-	//fileHandle_t	newHandle = 0;
-	msg_t			oldMsg;
-	byte			oldData[MAX_MSGLEN];
-	std::vector<byte>	oldDataRaw;
-	int				oldSize;
-	char			oldName[MAX_OSPATH];
-	//char			newName[MAX_OSPATH];
-	int				buf;
-	int				readGamestate = 0;
-	//demoPlay_t* play = demo.play.handle;
-	qboolean		ret = qfalse;
-	int				framesSaved = 0;
-	char			ext[7]{};
-	//char			originalExt[7]{};
-	demoType_t		demoType;
-	int				demoStartTime = 0;
-	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int64_t			demoCurrentTime = 0;
-	int				demoOldTime = 0;
-	int				deltaTimeFromLastSnapshot = 0;
-	int				lastGameStateChange = 0;
-	int				lastGameStateChangeInDemoTime = 0;
-	int				lastKnownTime = 0;
-	qboolean		isCompressedFile = qfalse;
-	int				psGeneralSaberMove = 0;
-	int				psGeneralTorsoAnim = 0;
-	int				psGeneralLegsAnim = 0;
-	const int		speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // The different max delays between kills for killstreaks are in an array. Normally we skip the last one (veeery long 18 seconds), but some ppl might wanna activate those too.
+qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts) {
+
+	ioHandles_t io;
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -1271,50 +1285,22 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 	std::ofstream outputBatHandleCaptures;
 	std::ofstream outputBatHandleLaughs;
 
-	outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
-	outputBatHandleKillSprees.open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
-	outputBatHandleDefrag.open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
-	outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
-	outputBatHandleLaughs.open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandle = &outputBatHandle;
+	io.outputBatHandleKillSprees = &outputBatHandleKillSprees;
+	io.outputBatHandleDefrag = &outputBatHandleDefrag;
+	io.outputBatHandleCaptures = &outputBatHandleCaptures;
+	io.outputBatHandleLaughs = &outputBatHandleLaughs;
 
-	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
-	Com_Memset(playerVisibleFrames,0,sizeof(playerVisibleFrames));
-	Com_Memset(playerVisibleClientFrames,0,sizeof(playerVisibleClientFrames));
-	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
-	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
-	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
-	Com_Memset(lastEvent,0,sizeof(lastEvent));
-	Com_Memset(lastGroundHeight,0,sizeof(lastGroundHeight));
-	Com_Memset(lastEventTime,0,sizeof(lastEventTime));
-	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
-	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
-	Com_Memset(recentKillsDuringFlagHold,0,sizeof(recentKillsDuringFlagHold));
-	Com_Memset(recentFlagHoldEnemyNearbyTimes,0,sizeof(recentFlagHoldEnemyNearbyTimes));
-	Com_Memset(recentFlagHoldVariousInfo,0,sizeof(recentFlagHoldVariousInfo));
-	Com_Memset(playerTeams,0,sizeof(playerTeams));
-	Com_Memset(teamInfo,0,sizeof(teamInfo));
-	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
-	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
-	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
-	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
-	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+	
 
-	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
-	for (int i = 0; i < max_clients; i++) {
-		lastBackflip[i] = -1;
-		lastSelfSentryJump[i] = -1;
-	}
-	Com_Memset(&specialJumpCount, 0, sizeof(specialJumpCount));
-	Com_Memset(&headJumpCount, 0, sizeof(headJumpCount));
-	//for (int i = 0; i < max_clients; i++) {
-	//	walkDetectedTime[i] = -1;
-	//}
-	Com_Memset(&cgs,0,sizeof(cgs));
-	resetLaughs();
+	io.outputBatHandle->open(outputBatFile, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleKillSprees->open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleDefrag->open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleCaptures->open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleLaughs->open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
 
-	sqlite3* killDb;
-	sqlite3_open("killDatabase.db",&killDb);
-	/*sqlite3_exec(killDb, "CREATE TABLE kills ("
+	sqlite3_open("killDatabase.db", &io.killDb);
+	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
 		"map	TEXT NOT NULL,"
@@ -1345,7 +1331,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"PRIMARY KEY(hash)"
 		"); ",
 		NULL,NULL,NULL);*/
-	sqlite3_exec(killDb, "CREATE TABLE kills ("
+	sqlite3_exec(io.killDb, "CREATE TABLE kills ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
 		"map	TEXT NOT NULL,"
@@ -1377,7 +1363,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"); ",
 		NULL, NULL, NULL);
 
-	sqlite3_exec(killDb, "CREATE TABLE killAngles ("
+	sqlite3_exec(io.killDb, "CREATE TABLE killAngles ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
 		"map	TEXT NOT NULL,"
@@ -1438,7 +1424,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 		"attackerJumpHeight	REAL,"
 		"victimJumpHeight	REAL,"
-		
+
 		"directionX	REAL,"
 		"directionY	REAL,"
 		"directionZ	REAL,"
@@ -1449,7 +1435,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"demoDateTime TIMESTAMP NOT NULL"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(killDb, "CREATE TABLE captures ("
+	sqlite3_exec(io.killDb, "CREATE TABLE captures ("
 		"id	INTEGER PRIMARY KEY,"
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
@@ -1501,7 +1487,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"demoDateTime TIMESTAMP NOT NULL"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(killDb, "CREATE TABLE defragRuns ("
+	sqlite3_exec(io.killDb, "CREATE TABLE defragRuns ("
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
 		"serverNameStripped	TEXT NOT NULL,"
@@ -1525,7 +1511,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"demoDateTime TIMESTAMP NOT NULL"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(killDb, "CREATE TABLE laughs ("
+	sqlite3_exec(io.killDb, "CREATE TABLE laughs ("
 		"id	INTEGER PRIMARY KEY,"
 		"map	TEXT NOT NULL,"
 		"serverName	TEXT NOT NULL,"
@@ -1543,7 +1529,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"demoDateTime TIMESTAMP NOT NULL"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(killDb, "CREATE TABLE killSprees ("
+	sqlite3_exec(io.killDb, "CREATE TABLE killSprees ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
 		"maxDelay	INTEGER NOT NULL,"
@@ -1576,16 +1562,16 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"demoDateTime TIMESTAMP NOT NULL"//,"
 		//"PRIMARY KEY(hash)"
 		"); ",
-		NULL,NULL,NULL);
-	sqlite3_exec(killDb, "CREATE TABLE playerModels (" 
+		NULL, NULL, NULL);
+	sqlite3_exec(io.killDb, "CREATE TABLE playerModels ("
 		"map	TEXT NOT NULL,"
 		"baseModel	TEXT NOT NULL,"
 		"variant	TEXT,"
 		"countFound INTEGER NOT NULL,"
 		"PRIMARY KEY(map,baseModel,variant)"
 		"); ",
-		NULL,NULL,NULL);
-	sqlite3_exec(killDb, "CREATE TABLE playerDemoStats (" 
+		NULL, NULL, NULL);
+	sqlite3_exec(io.killDb, "CREATE TABLE playerDemoStats ("
 		"map	TEXT NOT NULL,"
 		"playerName TEXT NOT NULL,"
 		"playerNameStripped TEXT NOT NULL,"
@@ -1605,8 +1591,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"demoDateTime TIMESTAMP NOT NULL"//,"
 		//"PRIMARY KEY(playerName,clientNum,map,demoPath)"
 		"); ",
-		NULL,NULL,NULL);
-	
+		NULL, NULL, NULL);
+
 	/*char* preparedStatementText = "INSERT INTO kills"
 		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, targetIsVisible,attackerIsVisible,"
 		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
@@ -1619,66 +1605,65 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"(hash,shorthash,map,serverName,serverNameStripped,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
 		"VALUES "
 		"(@hash,@shorthash,@map,@serverName,@serverNameStripped,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
-	sqlite3_stmt* insertStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertStatement, NULL);
+;
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
 		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
 		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
-	sqlite3_stmt* insertAngleStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertAngleStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
 		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
 		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
-	sqlite3_stmt* insertCaptureStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertCaptureStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertCaptureStatement, NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
 		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
 		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
-	sqlite3_stmt* insertDefragRunStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertDefragRunStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDefragRunStatement, NULL);
 	preparedStatementText = "INSERT INTO laughs"
 		"(map,serverName,serverNameStripped,laughs,chatlog,chatlogStripped,laughCount,demoRecorderClientnum,demoName,demoPath,duration,demoTime,serverTime,demoDateTime)"
 		"VALUES "
 		"(@map,@serverName,@serverNameStripped,@laughs,@chatlog,@chatlogStripped,@laughCount,@demoRecorderClientnum,@demoName,@demoPath,@duration,@demoTime,@serverTime,@demoDateTime);";
-	sqlite3_stmt* insertLaughsStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertLaughsStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
 		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
-	sqlite3_stmt* insertSpreeStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertSpreeStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
-	sqlite3_stmt* insertPlayerModelStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&insertPlayerModelStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerModelStatement, NULL);
 	preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
-	sqlite3_stmt* updatePlayerModelCountStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&updatePlayerModelCountStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
 	preparedStatementText = "SELECT last_insert_rowid();";
-	sqlite3_stmt* selectLastInsertRowIdStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText,strlen(preparedStatementText)+1,&selectLastInsertRowIdStatement,NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectLastInsertRowIdStatement, NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
 		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
 		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
-	sqlite3_stmt* insertPlayerDemoStatsStatement;
-	sqlite3_prepare_v2(killDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertPlayerDemoStatsStatement, NULL);
+
+	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
 
 
-	sqlite3_exec(killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	sqlite3_exec(io.killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
 
 #ifdef DEBUGSTATSDB
-	sqlite3* debugStatsDb;
-	sqlite3_open("debugStatsDb.db", &debugStatsDb);
+	sqlite3_open("debugStatsDb.db", &io.debugStatsDb);
 
-	sqlite3_exec(debugStatsDb, "CREATE TABLE animStances ("
+	sqlite3_exec(io.debugStatsDb, "CREATE TABLE animStances ("
 		"demoVersion INTEGER NOT NULL,"
 		"saberHolstered BOOLEAN NOT NULL,"
 		"torsoAnim INTEGER NOT NULL,"
@@ -1690,13 +1675,162 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		"); ",
 		NULL, NULL, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO animStances (demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance,countFound) VALUES (@demoVersion,@saberHolstered,@torsoAnim,@legsAnim,@saberMove,@stance, 0);";
-	sqlite3_stmt* insertAnimStanceStatement;
-	sqlite3_prepare_v2(debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &insertAnimStanceStatement, NULL);
+
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAnimStanceStatement, NULL);
 	preparedStatementText = "UPDATE animStances SET countFound = countFound + @countFound WHERE demoVersion=@demoVersion AND saberHolstered=@saberHolstered AND torsoAnim=@torsoAnim AND @legsAnim=@legsAnim AND saberMove=@saberMove AND stance=@stance;";
-	sqlite3_stmt* updateAnimStanceCountStatement;
-	sqlite3_prepare_v2(debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &updateAnimStanceCountStatement, NULL);
-	sqlite3_exec(debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateAnimStanceCountStatement, NULL);
+	sqlite3_exec(io.debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 #endif
+
+
+	bool SEHExceptionCaught = false;
+	bool wasDoingSQLiteExecution = false;
+	bool doFinalizeSQLite = true;
+
+	// turn oldpath absolute
+	std::filesystem::path tmpFSPath = sourceDemoFile;
+	std::string oldPathFullOutside = std::filesystem::absolute(tmpFSPath).string();
+
+	int64_t			demoCurrentTime = 0;
+
+	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io);
+
+	if (SEHExceptionCaught) {
+		// This demo errored. Remember it.
+		// We are catching access violations and such.
+		//
+		SEHExceptionCaught = true; // Actually it can be normal exception too but whatever.
+		if (wasDoingSQLiteExecution) { // If there was access violation while doing sqlite writess, maybe its not safe to wanna preserve the data.  Just ditch it.
+			doFinalizeSQLite = false;
+		}
+
+		std::ofstream exceptionOutputHandle;
+
+		exceptionOutputHandle.open("highlightExtractionExceptions.log", std::ios_base::app); // append instead of overwrite
+		exceptionOutputHandle << oldPathFullOutside << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n";
+		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << oldPathFullOutside << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n\n\n\n\n";
+		exceptionOutputHandle.close();
+	}
+
+	if (doFinalizeSQLite) {
+#ifdef DEBUGSTATSDB
+		sqlite3_exec(io.debugStatsDb, "COMMIT;", NULL, NULL, NULL);
+
+		sqlite3_finalize(io.insertAnimStanceStatement);
+		sqlite3_finalize(io.updateAnimStanceCountStatement);
+		sqlite3_close(io.debugStatsDb);
+#endif
+
+
+		sqlite3_exec(io.killDb, "COMMIT;", NULL, NULL, NULL);
+		sqlite3_finalize(io.insertLaughsStatement);
+		sqlite3_finalize(io.insertDefragRunStatement);
+		sqlite3_finalize(io.insertCaptureStatement);
+		sqlite3_finalize(io.insertSpreeStatement);
+		sqlite3_finalize(io.insertStatement);
+		sqlite3_finalize(io.insertAngleStatement);
+		sqlite3_finalize(io.insertPlayerModelStatement);
+		sqlite3_finalize(io.updatePlayerModelCountStatement);
+		sqlite3_finalize(io.selectLastInsertRowIdStatement);
+		sqlite3_finalize(io.insertPlayerDemoStatsStatement);
+		sqlite3_close(io.killDb);
+	}
+
+	io.outputBatHandle->close();
+	io.outputBatHandleKillSprees->close();
+	io.outputBatHandleDefrag->close();
+	io.outputBatHandleCaptures->close();
+	io.outputBatHandleLaughs->close();
+	
+	return success;
+}
+
+
+
+
+
+template<unsigned int max_clients>
+qboolean demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int bufferTime,  const highlightSearchMode_t searchMode, const ExtraSearchOptions opts,bool& SEHExceptionCaught,int64_t& demoCurrentTime,bool& wasDoingSQLiteExecution,const ioHandles_t& io) {
+
+	__TRY{
+		return demoHighlightFindReal<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, demoCurrentTime,wasDoingSQLiteExecution,io);
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
+}
+
+template<unsigned int max_clients>
+qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io) {
+	fileHandle_t	oldHandle = 0;
+	//fileHandle_t	newHandle = 0;
+	msg_t			oldMsg;
+	byte			oldData[MAX_MSGLEN];
+	std::vector<byte>	oldDataRaw;
+	int				oldSize;
+	char			oldName[MAX_OSPATH];
+	//char			newName[MAX_OSPATH];
+	int				buf;
+	int				readGamestate = 0;
+	//demoPlay_t* play = demo.play.handle;
+	qboolean		ret = qfalse;
+	int				framesSaved = 0;
+	char			ext[7]{};
+	//char			originalExt[7]{};
+	demoType_t		demoType;
+	int				demoStartTime = 0;
+	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
+	int				demoOldTime = 0;
+	int				deltaTimeFromLastSnapshot = 0;
+	int				lastGameStateChange = 0;
+	int				lastGameStateChangeInDemoTime = 0;
+	int				lastKnownTime = 0;
+	qboolean		isCompressedFile = qfalse;
+	int				psGeneralSaberMove = 0;
+	int				psGeneralTorsoAnim = 0;
+	int				psGeneralLegsAnim = 0;
+	const int		speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // The different max delays between kills for killstreaks are in an array. Normally we skip the last one (veeery long 18 seconds), but some ppl might wanna activate those too.
+
+	
+
+	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
+	Com_Memset(playerVisibleFrames,0,sizeof(playerVisibleFrames));
+	Com_Memset(playerVisibleClientFrames,0,sizeof(playerVisibleClientFrames));
+	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
+	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
+	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
+	Com_Memset(lastEvent,0,sizeof(lastEvent));
+	Com_Memset(lastGroundHeight,0,sizeof(lastGroundHeight));
+	Com_Memset(lastEventTime,0,sizeof(lastEventTime));
+	Com_Memset(playerLastSaberMove,0,sizeof(playerLastSaberMove));
+	Com_Memset(recentFlagHoldTimes,0,sizeof(recentFlagHoldTimes));
+	Com_Memset(recentKillsDuringFlagHold,0,sizeof(recentKillsDuringFlagHold));
+	Com_Memset(recentFlagHoldEnemyNearbyTimes,0,sizeof(recentFlagHoldEnemyNearbyTimes));
+	Com_Memset(recentFlagHoldVariousInfo,0,sizeof(recentFlagHoldVariousInfo));
+	Com_Memset(playerTeams,0,sizeof(playerTeams));
+	Com_Memset(teamInfo,0,sizeof(teamInfo));
+	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
+	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
+	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
+	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
+	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+
+	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
+	for (int i = 0; i < max_clients; i++) {
+		lastBackflip[i] = -1;
+		lastSelfSentryJump[i] = -1;
+	}
+	Com_Memset(&specialJumpCount, 0, sizeof(specialJumpCount));
+	Com_Memset(&headJumpCount, 0, sizeof(headJumpCount));
+	//for (int i = 0; i < max_clients; i++) {
+	//	walkDetectedTime[i] = -1;
+	//}
+	Com_Memset(&cgs,0,sizeof(cgs));
+	resetLaughs();
+
+	
 
 
 
@@ -1761,6 +1895,10 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 	std::string oldPath = va("%s%s", oldName, ext);
 	std::string oldBasename = oldPath.substr(oldPath.find_last_of("/\\") + 1);
+
+
+
+
 
 	// turn oldpath absolute
 	std::filesystem::path tmpFSPath = oldPath;
@@ -1882,7 +2020,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
-				CheckForNameChanges<max_clients>(&demo.cut.Cl,killDb,insertPlayerModelStatement, updatePlayerModelCountStatement,demoType);
+				CheckForNameChanges<max_clients>(&demo.cut.Cl,io,demoType,wasDoingSQLiteExecution);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				updateForcePowersInfo(&demo.cut.Cl);
 				updateGameInfo(&demo.cut.Cl, demoType);
@@ -3475,200 +3613,203 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							const char* modString = logModString.c_str();
 
 							// Log the kill.
-							SQLBIND_TEXT(insertStatement, "@hash", hash_hex_string.c_str());
-							SQLBIND_TEXT(insertStatement, "@shorthash", shorthash.c_str());
-							SQLBIND_TEXT(insertStatement, "@map", mapname.c_str());
-							SQLBIND_TEXT(insertStatement, "@serverName", serverName.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@hash", hash_hex_string.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@shorthash", shorthash.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@map", mapname.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@serverName", serverName.c_str());
 							std::string serverNameStripped = Q_StripColorAll(serverName);
-							SQLBIND_TEXT(insertStatement, "@serverNameStripped", serverNameStripped.c_str());
-							SQLBIND_TEXT(insertStatement, "@killerName", playername.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@serverNameStripped", serverNameStripped.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@killerName", playername.c_str());
 							std::string playernameStripped = Q_StripColorAll(playername);
-							SQLBIND_TEXT(insertStatement, "@killerNameStripped", playernameStripped.c_str());
-							SQLBIND_TEXT(insertStatement, "@victimName", victimname.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@killerNameStripped", playernameStripped.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@victimName", victimname.c_str());
 							std::string victimnameStripped = Q_StripColorAll(victimname);
-							SQLBIND_TEXT(insertStatement, "@victimNameStripped", victimnameStripped.c_str());
+							SQLBIND_TEXT(io.insertStatement, "@victimNameStripped", victimnameStripped.c_str());
 							if (isWorldKill) {
-								SQLBIND_NULL(insertStatement, "@killerTeam");
+								SQLBIND_NULL(io.insertStatement, "@killerTeam");
 							}
 							else {
-								SQLBIND(insertStatement, int, "@killerTeam", playerTeams[attacker]);
+								SQLBIND(io.insertStatement, int, "@killerTeam", playerTeams[attacker]);
 							}
-							SQLBIND(insertStatement, int, "@victimTeam", playerTeams[target]);
-							SQLBIND(insertStatement, int, "@redScore", teamInfo[TEAM_RED].score);
-							SQLBIND(insertStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							SQLBIND(io.insertStatement, int, "@victimTeam", playerTeams[target]);
+							SQLBIND(io.insertStatement, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND(io.insertStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
 							if (victimIsFlagCarrier) {
-								SQLBIND(insertStatement, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.blueflag: cgs.redflag);
+								SQLBIND(io.insertStatement, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.blueflag: cgs.redflag);
 							}
 							else {
-								SQLBIND_NULL(insertStatement, "@otherFlagStatus");
+								SQLBIND_NULL(io.insertStatement, "@otherFlagStatus");
 							}
-							SQLBIND(insertStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
-							SQLBIND(insertStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
-							SQLBIND(insertStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount +  teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
-							SQLBIND(insertStatement, int, "@killerClientNum", attacker);
-							SQLBIND(insertStatement, int, "@victimClientNum", target);
-							SQLBIND(insertStatement, int, "@isDoomKill", isDoomKill);
-							SQLBIND(insertStatement, int, "@isExplosion", thisKill.isExplosion);
-							SQLBIND(insertStatement, int, "@isSuicide", isSuicide);
-							SQLBIND(insertStatement, int, "@isModSuicide", mod==MOD_SUICIDE_GENERAL);
-							SQLBIND(insertStatement, int, "@meansOfDeath", mod); // Original or generalized? hmm
-							SQLBIND(insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
-							SQLBIND(insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
-							SQLBIND(insertStatement, double, "@positionZ", thisEs->pos.trBase[2]);
+							SQLBIND(io.insertStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND(io.insertStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND(io.insertStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount +  teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
+							SQLBIND(io.insertStatement, int, "@killerClientNum", attacker);
+							SQLBIND(io.insertStatement, int, "@victimClientNum", target);
+							SQLBIND(io.insertStatement, int, "@isDoomKill", isDoomKill);
+							SQLBIND(io.insertStatement, int, "@isExplosion", thisKill.isExplosion);
+							SQLBIND(io.insertStatement, int, "@isSuicide", isSuicide);
+							SQLBIND(io.insertStatement, int, "@isModSuicide", mod==MOD_SUICIDE_GENERAL);
+							SQLBIND(io.insertStatement, int, "@meansOfDeath", mod); // Original or generalized? hmm
+							SQLBIND(io.insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
+							SQLBIND(io.insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
+							SQLBIND(io.insertStatement, double, "@positionZ", thisEs->pos.trBase[2]);
 
-							int queryResult = sqlite3_step(insertStatement);
+							wasDoingSQLiteExecution = true;
+							int queryResult = sqlite3_step(io.insertStatement);
 							if (queryResult != SQLITE_DONE) {
 #ifndef DEBUG
 								if (queryResult != SQLITE_CONSTRAINT)
 #endif
-									std::cout << "Error inserting kill into database: " << sqlite3_errmsg(killDb) << " (" << queryResult << ")" << "\n";
+									std::cout << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb) << " (" << queryResult << ")" << "\n";
 							}
-							sqlite3_reset(insertStatement);
+							sqlite3_reset(io.insertStatement);
+							wasDoingSQLiteExecution = false;
 
 
-							SQLBIND_TEXT(insertAngleStatement, "@hash", hash_hex_string.c_str());
-							SQLBIND_TEXT(insertAngleStatement, "@shorthash", shorthash.c_str());
-							SQLBIND_TEXT(insertAngleStatement, "@map", mapname.c_str());
-							SQLBIND(insertAngleStatement, int, "@isReturn", victimIsFlagCarrier);
-							SQLBIND(insertAngleStatement, int, "@killerIsFlagCarrier", attackerIsFlagCarrier);
+							SQLBIND_TEXT(io.insertAngleStatement, "@hash", hash_hex_string.c_str());
+							SQLBIND_TEXT(io.insertAngleStatement, "@shorthash", shorthash.c_str());
+							SQLBIND_TEXT(io.insertAngleStatement, "@map", mapname.c_str());
+							SQLBIND(io.insertAngleStatement, int, "@isReturn", victimIsFlagCarrier);
+							SQLBIND(io.insertAngleStatement, int, "@killerIsFlagCarrier", attackerIsFlagCarrier);
 							if (victimIsFlagCarrier) {
-								SQLBIND(insertAngleStatement, int, "@victimFlagHoldTime", recentFlagHoldTimes[target]);
-								//SQLBIND(insertAngleStatement, int, "@flagPickupSource", teamInfo[victimFlagTeam].flagHoldOrigin);
-								SQLBIND(insertAngleStatement, int, "@victimFlagPickupSource", victimCarrierLastPickupOrigin);
-								SQLBIND(insertAngleStatement, int, "@victimCapperKills", victimFlagCarrierKillCount);
-								SQLBIND(insertAngleStatement, int, "@victimCapperRets", victimFlagCarrierRetCount);
-								SQLBIND(insertAngleStatement, int, "@victimCapperWasFollowedOrVisible", capperWasVisibleOrFollowed);
+								SQLBIND(io.insertAngleStatement, int, "@victimFlagHoldTime", recentFlagHoldTimes[target]);
+								//SQLBIND(io.insertAngleStatement, int, "@flagPickupSource", teamInfo[victimFlagTeam].flagHoldOrigin);
+								SQLBIND(io.insertAngleStatement, int, "@victimFlagPickupSource", victimCarrierLastPickupOrigin);
+								SQLBIND(io.insertAngleStatement, int, "@victimCapperKills", victimFlagCarrierKillCount);
+								SQLBIND(io.insertAngleStatement, int, "@victimCapperRets", victimFlagCarrierRetCount);
+								SQLBIND(io.insertAngleStatement, int, "@victimCapperWasFollowedOrVisible", capperWasVisibleOrFollowed);
 
-								SQLBIND(insertAngleStatement, double, "@victimCapperMaxNearbyEnemyCount", maxNearbyEnemyCount);
-								SQLBIND(insertAngleStatement, double, "@victimCapperMoreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
-								SQLBIND(insertAngleStatement, double, "@victimCapperAverageNearbyEnemyCount", averageNearbyEnemyCount);
-								SQLBIND(insertAngleStatement, double, "@victimCapperMaxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
-								SQLBIND(insertAngleStatement, double, "@victimCapperAnyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
-								SQLBIND(insertAngleStatement, double, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
-								SQLBIND(insertAngleStatement, double, "@victimCapperAverageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperMaxNearbyEnemyCount", maxNearbyEnemyCount);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperMoreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperAverageNearbyEnemyCount", averageNearbyEnemyCount);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperMaxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperAnyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
+								SQLBIND(io.insertAngleStatement, double, "@victimCapperAverageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@victimFlagHoldTime");
-								SQLBIND_NULL(insertAngleStatement, "@victimFlagPickupSource");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperKills");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperRets");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperWasFollowedOrVisible");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimFlagHoldTime");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimFlagPickupSource");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperKills");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperRets");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperWasFollowedOrVisible");
 
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperMaxNearbyEnemyCount");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperMoreThanOneNearbyEnemyTimePercent");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperAverageNearbyEnemyCount");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperMaxVeryCloseEnemyCount");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperAnyVeryCloseEnemyTimePercent");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent");
-								SQLBIND_NULL(insertAngleStatement, "@victimCapperAverageVeryCloseEnemyCount");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMaxNearbyEnemyCount");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMoreThanOneNearbyEnemyTimePercent");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperAverageNearbyEnemyCount");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMaxVeryCloseEnemyCount");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperAnyVeryCloseEnemyTimePercent");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent");
+								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperAverageVeryCloseEnemyCount");
 							}
-							SQLBIND(insertAngleStatement, int, "@targetIsVisible", targetIsVisible);
-							SQLBIND(insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
-							SQLBIND(insertAngleStatement, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
-							SQLBIND(insertAngleStatement, int, "@isSuicide", isSuicide);
-							SQLBIND(insertAngleStatement, int, "@isModSuicide", mod == MOD_SUICIDE_GENERAL);
-							SQLBIND(insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
-							SQLBIND(insertAngleStatement, int, "@attackerIsFollowed", attackerIsFollowed);
-							SQLBIND(insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
-							SQLBIND(insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND(io.insertAngleStatement, int, "@targetIsVisible", targetIsVisible);
+							SQLBIND(io.insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
+							SQLBIND(io.insertAngleStatement, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
+							SQLBIND(io.insertAngleStatement, int, "@isSuicide", isSuicide);
+							SQLBIND(io.insertAngleStatement, int, "@isModSuicide", mod == MOD_SUICIDE_GENERAL);
+							SQLBIND(io.insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
+							SQLBIND(io.insertAngleStatement, int, "@attackerIsFollowed", attackerIsFollowed);
+							SQLBIND(io.insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
+							SQLBIND(io.insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 
-							SQLBIND_TEXT(insertAngleStatement, "@boosts", (boostCountAttacker + boostCountVictim) > 0 ? boostsString.c_str() : NULL);
-							SQLBIND(insertAngleStatement, int, "@boostCountTotal", boostCountAttacker + boostCountVictim);
-							SQLBIND(insertAngleStatement, int, "@boostCountAttacker", boostCountAttacker);
-							SQLBIND(insertAngleStatement, int, "@boostCountVictim", boostCountVictim);
+							SQLBIND_TEXT(io.insertAngleStatement, "@boosts", (boostCountAttacker + boostCountVictim) > 0 ? boostsString.c_str() : NULL);
+							SQLBIND(io.insertAngleStatement, int, "@boostCountTotal", boostCountAttacker + boostCountVictim);
+							SQLBIND(io.insertAngleStatement, int, "@boostCountAttacker", boostCountAttacker);
+							SQLBIND(io.insertAngleStatement, int, "@boostCountVictim", boostCountVictim);
 
 							if (canBeAirborne) {
 								if (killerProjectile == -1) {
-									SQLBIND_NULL(insertAngleStatement, "@projectileWasAirborne");
+									SQLBIND_NULL(io.insertAngleStatement, "@projectileWasAirborne");
 								}
 								else {
-									SQLBIND(insertAngleStatement, int, "@projectileWasAirborne", projectileWasAirborne);
+									SQLBIND(io.insertAngleStatement, int, "@projectileWasAirborne", projectileWasAirborne);
 								}
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@projectileWasAirborne");
+								SQLBIND_NULL(io.insertAngleStatement, "@projectileWasAirborne");
 							}
 
 							if (attacker >= 0 && attacker < max_clients) {
-								SQLBIND(insertAngleStatement, int, "@headJumps", headJumpCountAttacker);
-								SQLBIND(insertAngleStatement, int, "@specialJumps", specialJumpCountAttacker);
-								SQLBIND(insertAngleStatement, int, "@timeSinceLastSelfSentryJump", timeSinceLastSelfSentryJump);
+								SQLBIND(io.insertAngleStatement, int, "@headJumps", headJumpCountAttacker);
+								SQLBIND(io.insertAngleStatement, int, "@specialJumps", specialJumpCountAttacker);
+								SQLBIND(io.insertAngleStatement, int, "@timeSinceLastSelfSentryJump", timeSinceLastSelfSentryJump);
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@headJumps");
-								SQLBIND_NULL(insertAngleStatement, "@specialJumps");
-								SQLBIND_NULL(insertAngleStatement, "@timeSinceLastSelfSentryJump");
+								SQLBIND_NULL(io.insertAngleStatement, "@headJumps");
+								SQLBIND_NULL(io.insertAngleStatement, "@specialJumps");
+								SQLBIND_NULL(io.insertAngleStatement, "@timeSinceLastSelfSentryJump");
 							}
 
 							if (baseFlagDistanceKnownAndApplicable) {
-								SQLBIND(insertAngleStatement, double, "@baseFlagDistance", baseFlagDistance);
+								SQLBIND(io.insertAngleStatement, double, "@baseFlagDistance", baseFlagDistance);
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@baseFlagDistance");
+								SQLBIND_NULL(io.insertAngleStatement, "@baseFlagDistance");
 							}
 
 
-							SQLBIND(insertAngleStatement, double, "@maxAngularSpeedAttacker", maxAngularSpeedAttackerFloat >= 0 ? maxAngularSpeedAttackerFloat : NULL);
-							SQLBIND(insertAngleStatement, double, "@maxAngularAccelerationAttacker", maxAngularAccelerationAttackerFloat >= 0 ? maxAngularAccelerationAttackerFloat * accelerationMultiplier : NULL);
-							SQLBIND(insertAngleStatement, double, "@maxAngularJerkAttacker", maxAngularJerkAttackerFloat >= 0 ? maxAngularJerkAttackerFloat * jerkMultiplier : NULL);
-							SQLBIND(insertAngleStatement, double, "@maxAngularSnapAttacker", maxAngularSnapAttackerFloat >= 0 ? maxAngularSnapAttackerFloat *snapMultiplier : NULL); 
+							SQLBIND(io.insertAngleStatement, double, "@maxAngularSpeedAttacker", maxAngularSpeedAttackerFloat >= 0 ? maxAngularSpeedAttackerFloat : NULL);
+							SQLBIND(io.insertAngleStatement, double, "@maxAngularAccelerationAttacker", maxAngularAccelerationAttackerFloat >= 0 ? maxAngularAccelerationAttackerFloat * accelerationMultiplier : NULL);
+							SQLBIND(io.insertAngleStatement, double, "@maxAngularJerkAttacker", maxAngularJerkAttackerFloat >= 0 ? maxAngularJerkAttackerFloat * jerkMultiplier : NULL);
+							SQLBIND(io.insertAngleStatement, double, "@maxAngularSnapAttacker", maxAngularSnapAttackerFloat >= 0 ? maxAngularSnapAttackerFloat *snapMultiplier : NULL); 
 
 
-							SQLBIND(insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
-							SQLBIND(insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
-							SQLBIND(insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
-							SQLBIND(insertAngleStatement, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
+							SQLBIND(io.insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
+							SQLBIND(io.insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
+							SQLBIND(io.insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
+							SQLBIND(io.insertAngleStatement, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
 							if (thisKill.timeSinceBackflip >= 0) {
-								SQLBIND(insertAngleStatement, int, "@timeSinceLastBackflip",thisKill.timeSinceBackflip);
+								SQLBIND(io.insertAngleStatement, int, "@timeSinceLastBackflip",thisKill.timeSinceBackflip);
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@timeSinceLastBackflip");
+								SQLBIND_NULL(io.insertAngleStatement, "@timeSinceLastBackflip");
 							}
-							SQLBIND_TEXT(insertAngleStatement, "@meansOfDeathString", modString);
-							SQLBIND_TEXT(insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
-							SQLBIND(insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
-							SQLBIND(insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
+							SQLBIND_TEXT(io.insertAngleStatement, "@meansOfDeathString", modString);
+							SQLBIND_TEXT(io.insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
+							SQLBIND(io.insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
+							SQLBIND(io.insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
 
-							SQLBIND(insertAngleStatement, double, "@attackerJumpHeight", attackerJumpHeight);
-							SQLBIND(insertAngleStatement, double, "@victimJumpHeight", victimJumpHeight);
+							SQLBIND(io.insertAngleStatement, double, "@attackerJumpHeight", attackerJumpHeight);
+							SQLBIND(io.insertAngleStatement, double, "@victimJumpHeight", victimJumpHeight);
 
 							if (attackerIsFollowed) {
-								SQLBIND(insertAngleStatement, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
-								SQLBIND(insertAngleStatement, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);
-								SQLBIND(insertAngleStatement, double, "@directionZ", demo.cut.Cl.snap.ps.velocity[2]);
-								SQLBIND(insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(demo.cut.Cl.snap.ps.velocity));
+								SQLBIND(io.insertAngleStatement, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
+								SQLBIND(io.insertAngleStatement, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);
+								SQLBIND(io.insertAngleStatement, double, "@directionZ", demo.cut.Cl.snap.ps.velocity[2]);
+								SQLBIND(io.insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(demo.cut.Cl.snap.ps.velocity));
 							} else if(attackerEntity){
-								SQLBIND(insertAngleStatement, double, "@directionX", attackerEntity->pos.trDelta[0]);
-								SQLBIND(insertAngleStatement, double, "@directionY", attackerEntity->pos.trDelta[1]);
-								SQLBIND(insertAngleStatement, double, "@directionZ", attackerEntity->pos.trDelta[2]);
-								SQLBIND(insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(attackerEntity->pos.trDelta));
+								SQLBIND(io.insertAngleStatement, double, "@directionX", attackerEntity->pos.trDelta[0]);
+								SQLBIND(io.insertAngleStatement, double, "@directionY", attackerEntity->pos.trDelta[1]);
+								SQLBIND(io.insertAngleStatement, double, "@directionZ", attackerEntity->pos.trDelta[2]);
+								SQLBIND(io.insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(attackerEntity->pos.trDelta));
 							} else {
-								SQLBIND_NULL(insertAngleStatement,  "@directionX");
-								SQLBIND_NULL(insertAngleStatement,  "@directionY");
-								SQLBIND_NULL(insertAngleStatement,  "@directionZ");
-								SQLBIND_NULL(insertAngleStatement,  "@currentSpeedAttacker");
+								SQLBIND_NULL(io.insertAngleStatement,  "@directionX");
+								SQLBIND_NULL(io.insertAngleStatement,  "@directionY");
+								SQLBIND_NULL(io.insertAngleStatement,  "@directionZ");
+								SQLBIND_NULL(io.insertAngleStatement,  "@currentSpeedAttacker");
 							}
 							if (targetIsFollowed) {
-								SQLBIND(insertAngleStatement, double, "@currentSpeedTarget", VectorLength(demo.cut.Cl.snap.ps.velocity));
+								SQLBIND(io.insertAngleStatement, double, "@currentSpeedTarget", VectorLength(demo.cut.Cl.snap.ps.velocity));
 							}
 							else if (targetEntity) {
-								SQLBIND(insertAngleStatement, double, "@currentSpeedTarget", VectorLength(targetEntity->pos.trDelta));
+								SQLBIND(io.insertAngleStatement, double, "@currentSpeedTarget", VectorLength(targetEntity->pos.trDelta));
 							}
 							else {
-								SQLBIND_NULL(insertAngleStatement, "@currentSpeedTarget");
+								SQLBIND_NULL(io.insertAngleStatement, "@currentSpeedTarget");
 							}
-							SQLBIND_TEXT(insertAngleStatement, "@demoName", oldBasename.c_str());
-							SQLBIND_TEXT(insertAngleStatement, "@demoPath", oldPath.c_str());
-							SQLBIND(insertAngleStatement, int, "@demoTime", demoCurrentTime);
-							SQLBIND(insertAngleStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-							SQLBIND(insertAngleStatement, int, "@demoDateTime", oldDemoDateModified);
+							SQLBIND_TEXT(io.insertAngleStatement, "@demoName", oldBasename.c_str());
+							SQLBIND_TEXT(io.insertAngleStatement, "@demoPath", oldPath.c_str());
+							SQLBIND(io.insertAngleStatement, int, "@demoTime", demoCurrentTime);
+							SQLBIND(io.insertAngleStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND(io.insertAngleStatement, int, "@demoDateTime", oldDemoDateModified);
 
-							queryResult = sqlite3_step(insertAngleStatement);
+							wasDoingSQLiteExecution = true;
+							queryResult = sqlite3_step(io.insertAngleStatement);
 							if (queryResult != SQLITE_DONE) {
-								std::cout<< "Error inserting kill angle into database: " << sqlite3_errmsg(killDb) <<"\n";
+								std::cout<< "Error inserting kill angle into database: " << sqlite3_errmsg(io.killDb) <<"\n";
 							}
-							sqlite3_reset(insertAngleStatement);
-
+							sqlite3_reset(io.insertAngleStatement);
+							wasDoingSQLiteExecution = false;
 
 
 							//if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisible) continue; // Not that interesting.
@@ -3688,9 +3829,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
 
-							outputBatHandle << "\nrem demoCurrentTime: " << demoCurrentTime;
-							outputBatHandle << "\nrem hash: " << hash_hex_string;
-							outputBatHandle << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							(*io.outputBatHandle) << "\nrem demoCurrentTime: " << demoCurrentTime;
+							(*io.outputBatHandle) << "\nrem hash: " << hash_hex_string;
+							(*io.outputBatHandle) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
 							std::cout << mapname << " " << logModString << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
@@ -3907,86 +4048,88 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
 
-							SQLBIND_TEXT(insertCaptureStatement, "@map", mapname.c_str());
-							SQLBIND_TEXT(insertCaptureStatement, "@serverName", serverName.c_str());
+							SQLBIND_TEXT(io.insertCaptureStatement, "@map", mapname.c_str());
+							SQLBIND_TEXT(io.insertCaptureStatement, "@serverName", serverName.c_str());
 							std::string serverNameStripped = Q_StripColorAll(serverName);
-							SQLBIND_TEXT(insertCaptureStatement, "@serverNameStripped", serverNameStripped.c_str());
-							SQLBIND(insertCaptureStatement, int, "@flagHoldTime", flagHoldTime);
-							//SQLBIND(insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
-							SQLBIND(insertCaptureStatement, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
-							SQLBIND_TEXT(insertCaptureStatement, "@capperName", playername.c_str());
+							SQLBIND_TEXT(io.insertCaptureStatement, "@serverNameStripped", serverNameStripped.c_str());
+							SQLBIND(io.insertCaptureStatement, int, "@flagHoldTime", flagHoldTime);
+							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
+							SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
+							SQLBIND_TEXT(io.insertCaptureStatement, "@capperName", playername.c_str());
 							std::string playernameStripped = Q_StripColorAll(playername);
-							SQLBIND_TEXT(insertCaptureStatement, "@capperNameStripped", playernameStripped.c_str());
-							SQLBIND(insertCaptureStatement, int, "@capperClientNum", playerNum);
-							SQLBIND(insertCaptureStatement, int, "@capperIsVisible", playerIsVisible);
-							SQLBIND(insertCaptureStatement, int, "@capperIsFollowed", playerIsFollowed);
-							SQLBIND(insertCaptureStatement, int, "@capperIsFollowedOrVisible", playerIsVisibleOrFollowed);
-							SQLBIND(insertCaptureStatement, int, "@capperWasVisible", wasVisible);
-							SQLBIND(insertCaptureStatement, int, "@capperWasFollowed", wasFollowed);
-							SQLBIND(insertCaptureStatement, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
-							SQLBIND(insertCaptureStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-							SQLBIND(insertCaptureStatement, int, "@flagTeam", flagTeam);
-							SQLBIND(insertCaptureStatement, int, "@capperKills", flagCarrierKillCount);
-							SQLBIND(insertCaptureStatement, int, "@capperRets", flagCarrierRetCount);
-							SQLBIND(insertCaptureStatement, int, "@redScore", teamInfo[TEAM_RED].score);
-							SQLBIND(insertCaptureStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
-							SQLBIND(insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
-							SQLBIND(insertCaptureStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
-							SQLBIND(insertCaptureStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
-							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
-							SQLBIND(insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapper);
-							SQLBIND(insertCaptureStatement, double, "@averageSpeedCapper", averageSpeedCapper);
-							SQLBIND_TEXT(insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
-							SQLBIND(insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
-							SQLBIND_TEXT(insertCaptureStatement, "@nearbyEnemies", nearbyEnemiesString.c_str());
-							SQLBIND(insertCaptureStatement, int, "@nearbyEnemyCount", nearbyEnemiescount);
+							SQLBIND_TEXT(io.insertCaptureStatement, "@capperNameStripped", playernameStripped.c_str());
+							SQLBIND(io.insertCaptureStatement, int, "@capperClientNum", playerNum);
+							SQLBIND(io.insertCaptureStatement, int, "@capperIsVisible", playerIsVisible);
+							SQLBIND(io.insertCaptureStatement, int, "@capperIsFollowed", playerIsFollowed);
+							SQLBIND(io.insertCaptureStatement, int, "@capperIsFollowedOrVisible", playerIsVisibleOrFollowed);
+							SQLBIND(io.insertCaptureStatement, int, "@capperWasVisible", wasVisible);
+							SQLBIND(io.insertCaptureStatement, int, "@capperWasFollowed", wasFollowed);
+							SQLBIND(io.insertCaptureStatement, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
+							SQLBIND(io.insertCaptureStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND(io.insertCaptureStatement, int, "@flagTeam", flagTeam);
+							SQLBIND(io.insertCaptureStatement, int, "@capperKills", flagCarrierKillCount);
+							SQLBIND(io.insertCaptureStatement, int, "@capperRets", flagCarrierRetCount);
+							SQLBIND(io.insertCaptureStatement, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND(io.insertCaptureStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							SQLBIND(io.insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND(io.insertCaptureStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND(io.insertCaptureStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
+							SQLBIND(io.insertCaptureStatement, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
+							SQLBIND(io.insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapper);
+							SQLBIND(io.insertCaptureStatement, double, "@averageSpeedCapper", averageSpeedCapper);
+							SQLBIND_TEXT(io.insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
+							SQLBIND(io.insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
+							SQLBIND_TEXT(io.insertCaptureStatement, "@nearbyEnemies", nearbyEnemiesString.c_str());
+							SQLBIND(io.insertCaptureStatement, int, "@nearbyEnemyCount", nearbyEnemiescount);
 
-							SQLBIND(insertCaptureStatement, double, "@maxNearbyEnemyCount", maxNearbyEnemyCount);
-							SQLBIND(insertCaptureStatement, double, "@moreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
-							SQLBIND(insertCaptureStatement, double, "@averageNearbyEnemyCount", averageNearbyEnemyCount);
-							SQLBIND(insertCaptureStatement, double, "@maxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
-							SQLBIND(insertCaptureStatement, double, "@anyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
-							SQLBIND(insertCaptureStatement, double, "@moreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
-							SQLBIND(insertCaptureStatement, double, "@averageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
+							SQLBIND(io.insertCaptureStatement, double, "@maxNearbyEnemyCount", maxNearbyEnemyCount);
+							SQLBIND(io.insertCaptureStatement, double, "@moreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
+							SQLBIND(io.insertCaptureStatement, double, "@averageNearbyEnemyCount", averageNearbyEnemyCount);
+							SQLBIND(io.insertCaptureStatement, double, "@maxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
+							SQLBIND(io.insertCaptureStatement, double, "@anyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
+							SQLBIND(io.insertCaptureStatement, double, "@moreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
+							SQLBIND(io.insertCaptureStatement, double, "@averageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
 
 							if (playerIsVisibleOrFollowed) {
-								SQLBIND(insertCaptureStatement, double, "@positionX", currentPos[0]);
-								SQLBIND(insertCaptureStatement, double, "@positionY", currentPos[1]);
-								SQLBIND(insertCaptureStatement, double, "@positionZ", currentPos[2]);
-								SQLBIND(insertCaptureStatement, double, "@directionX", currentDir[0]);
-								SQLBIND(insertCaptureStatement, double, "@directionY", currentDir[1]);
-								SQLBIND(insertCaptureStatement, double, "@directionZ", currentDir[2]);
+								SQLBIND(io.insertCaptureStatement, double, "@positionX", currentPos[0]);
+								SQLBIND(io.insertCaptureStatement, double, "@positionY", currentPos[1]);
+								SQLBIND(io.insertCaptureStatement, double, "@positionZ", currentPos[2]);
+								SQLBIND(io.insertCaptureStatement, double, "@directionX", currentDir[0]);
+								SQLBIND(io.insertCaptureStatement, double, "@directionY", currentDir[1]);
+								SQLBIND(io.insertCaptureStatement, double, "@directionZ", currentDir[2]);
 							}
 							else {
-								SQLBIND_NULL(insertCaptureStatement,  "@positionX");
-								SQLBIND_NULL(insertCaptureStatement,  "@positionY");
-								SQLBIND_NULL(insertCaptureStatement,  "@positionZ");
-								SQLBIND_NULL(insertCaptureStatement,  "@directionX");
-								SQLBIND_NULL(insertCaptureStatement,  "@directionY");
-								SQLBIND_NULL(insertCaptureStatement,  "@directionZ");
+								SQLBIND_NULL(io.insertCaptureStatement,  "@positionX");
+								SQLBIND_NULL(io.insertCaptureStatement,  "@positionY");
+								SQLBIND_NULL(io.insertCaptureStatement,  "@positionZ");
+								SQLBIND_NULL(io.insertCaptureStatement,  "@directionX");
+								SQLBIND_NULL(io.insertCaptureStatement,  "@directionY");
+								SQLBIND_NULL(io.insertCaptureStatement,  "@directionZ");
 							}
-							SQLBIND_TEXT(insertCaptureStatement, "@demoName", oldBasename.c_str());
-							SQLBIND_TEXT(insertCaptureStatement, "@demoPath", oldPath.c_str());
-							SQLBIND(insertCaptureStatement, int, "@demoTime", demoCurrentTime);
-							SQLBIND(insertCaptureStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-							SQLBIND(insertCaptureStatement, int, "@demoDateTime", oldDemoDateModified);
+							SQLBIND_TEXT(io.insertCaptureStatement, "@demoName", oldBasename.c_str());
+							SQLBIND_TEXT(io.insertCaptureStatement, "@demoPath", oldPath.c_str());
+							SQLBIND(io.insertCaptureStatement, int, "@demoTime", demoCurrentTime);
+							SQLBIND(io.insertCaptureStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND(io.insertCaptureStatement, int, "@demoDateTime", oldDemoDateModified);
 
-							int queryResult = sqlite3_step(insertCaptureStatement);
+							wasDoingSQLiteExecution = true;
+							int queryResult = sqlite3_step(io.insertCaptureStatement);
 							uint64_t insertedId = -1;
 							if (queryResult != SQLITE_DONE) {
-								std::cout << "Error inserting capture into database: " << sqlite3_errmsg(killDb) << "\n";
+								std::cout << "Error inserting capture into database: " << sqlite3_errmsg(io.killDb) << "\n";
 							}
 							else {
-								queryResult = sqlite3_step(selectLastInsertRowIdStatement);
+								queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
 								if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-									std::cout << "Error retrieving inserted capture id from database: " << sqlite3_errmsg(killDb) << "\n";
+									std::cout << "Error retrieving inserted capture id from database: " << sqlite3_errmsg(io.killDb) << "\n";
 								}
 								else {
-									insertedId = sqlite3_column_int64(selectLastInsertRowIdStatement,0);
+									insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement,0);
 								}
-								sqlite3_reset(selectLastInsertRowIdStatement);
+								sqlite3_reset(io.selectLastInsertRowIdStatement);
 							}
-							sqlite3_reset(insertCaptureStatement);
+							sqlite3_reset(io.insertCaptureStatement);
+							wasDoingSQLiteExecution = false;
 
 							if (!playerIsVisibleOrFollowed && !wasVisibleOrFollowed) continue; // No need to cut out those who were not visible at all in any way.
 							if (searchMode == SEARCH_MY_CTF_RETURNS && playerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
@@ -4017,9 +4160,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-							outputBatHandleCaptures << "\nrem demoCurrentTime: " << demoCurrentTime;
-							outputBatHandleCaptures << "\nrem insertid" << insertedId;
-							outputBatHandleCaptures << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							(*io.outputBatHandleCaptures) << "\nrem demoCurrentTime: " << demoCurrentTime;
+							(*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
+							(*io.outputBatHandleCaptures) << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							delete[] targetFilenameFiltered;
 							std::cout << targetFilename << "\n";
 
@@ -4107,7 +4250,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								// This kill is not part of a killspree. Reset.
 								// But first, check if this concludes an existing killspree that we can now save.
 								if (countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType,opts);
+									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, oldBasename, oldPath, oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
 								}
 
 								// Reset.
@@ -4120,7 +4263,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 						}
 						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, &outputBatHandleKillSprees, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, insertSpreeStatement, killDb, oldBasename, oldPath, oldDemoDateModified, demoType,opts);
+							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, oldBasename, oldPath, oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
 						}
 
 					}
@@ -4375,7 +4518,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		}
 
 		// Check for finished laugh sequences
-		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,&outputBatHandleLaughs,killDb,insertLaughsStatement,selectLastInsertRowIdStatement,&oldBasename,&oldPath,oldDemoDateModified,sourceDemoFile,qfalse);
+		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,io,&oldBasename,&oldPath,oldDemoDateModified,sourceDemoFile,qfalse,wasDoingSQLiteExecution);
 
 
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
@@ -4591,44 +4734,46 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
 					std::string formattedTimeString = formattedTime.str();
 
-					SQLBIND_TEXT(insertDefragRunStatement, "@map", mapname.c_str());
-					SQLBIND_TEXT(insertDefragRunStatement, "@serverName", serverName.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@map", mapname.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@serverName", serverName.c_str());
 					std::string serverNameStripped = Q_StripColorAll(serverName);
-					SQLBIND_TEXT(insertDefragRunStatement, "@serverNameStripped", serverNameStripped.c_str());
-					SQLBIND_TEXT(insertDefragRunStatement, "@readableTime", formattedTimeString.c_str());
-					SQLBIND(insertDefragRunStatement, int, "@totalMilliseconds", totalMilliSeconds);
-					SQLBIND_TEXT(insertDefragRunStatement, "@playerName", playername.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@serverNameStripped", serverNameStripped.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@readableTime", formattedTimeString.c_str());
+					SQLBIND(io.insertDefragRunStatement, int, "@totalMilliseconds", totalMilliSeconds);
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@playerName", playername.c_str());
 					std::string playernameStripped = Q_StripColorAll(playername);
-					SQLBIND_TEXT(insertDefragRunStatement, "@playerNameStripped", playernameStripped.c_str());
-					SQLBIND(insertDefragRunStatement, int, "@isTop10", isLogged);
-					SQLBIND(insertDefragRunStatement, int, "@isNumber1", isNumberOne);
-					SQLBIND(insertDefragRunStatement, int, "@isPersonalBest", isPersonalBest);
-					SQLBIND_TEXT(insertDefragRunStatement, "@demoName", oldBasename.c_str());
-					SQLBIND_TEXT(insertDefragRunStatement, "@demoPath", oldPath.c_str());
-					SQLBIND(insertDefragRunStatement, int, "@demoTime", demoCurrentTime);
-					SQLBIND(insertDefragRunStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-					SQLBIND(insertDefragRunStatement, int, "@demoDateTime", oldDemoDateModified);
-					SQLBIND(insertDefragRunStatement, int, "@wasVisible", wasVisible);
-					SQLBIND(insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
-					SQLBIND(insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@playerNameStripped", playernameStripped.c_str());
+					SQLBIND(io.insertDefragRunStatement, int, "@isTop10", isLogged);
+					SQLBIND(io.insertDefragRunStatement, int, "@isNumber1", isNumberOne);
+					SQLBIND(io.insertDefragRunStatement, int, "@isPersonalBest", isPersonalBest);
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoName", oldBasename.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoPath", oldPath.c_str());
+					SQLBIND(io.insertDefragRunStatement, int, "@demoTime", demoCurrentTime);
+					SQLBIND(io.insertDefragRunStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+					SQLBIND(io.insertDefragRunStatement, int, "@demoDateTime", oldDemoDateModified);
+					SQLBIND(io.insertDefragRunStatement, int, "@wasVisible", wasVisible);
+					SQLBIND(io.insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
+					SQLBIND(io.insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
 
 					// Do we have strafe deviation info?
 					int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
 					if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
-						SQLBIND(insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum/strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
+						SQLBIND(io.insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum/strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
 					}
 					else {
-						SQLBIND_NULL(insertDefragRunStatement, "@averageStrafeDeviation");
+						SQLBIND_NULL(io.insertDefragRunStatement, "@averageStrafeDeviation");
 					}
 
-					SQLBIND(insertDefragRunStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-					SQLBIND(insertDefragRunStatement, int, "@runnerClientNum", playerNumber);
+					SQLBIND(io.insertDefragRunStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+					SQLBIND(io.insertDefragRunStatement, int, "@runnerClientNum", playerNumber);
 
-					int queryResult = sqlite3_step(insertDefragRunStatement);
+					wasDoingSQLiteExecution = true;
+					int queryResult = sqlite3_step(io.insertDefragRunStatement);
 					if (queryResult != SQLITE_DONE) {
-						std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(killDb) << "\n";
+						std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(io.killDb) << "\n";
 					}
-					sqlite3_reset(insertDefragRunStatement);
+					sqlite3_reset(io.insertDefragRunStatement);
+					wasDoingSQLiteExecution = false;
 
 					//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 					//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
@@ -4655,8 +4800,8 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
 					sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-					outputBatHandleDefrag << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					outputBatHandleDefrag << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+					(*io.outputBatHandleDefrag) << "\nrem demoCurrentTime: "<< demoCurrentTime;
+					(*io.outputBatHandleDefrag) << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
@@ -4668,7 +4813,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		}
 
 		if (hadConfigStringCommands) {
-			CheckForNameChanges<max_clients>(&demo.cut.Cl, killDb, insertPlayerModelStatement, updatePlayerModelCountStatement, demoType);
+			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			updateForcePowersInfo(&demo.cut.Cl);
 			updateGameInfo(&demo.cut.Cl,demoType);
@@ -4732,7 +4877,7 @@ cuterror:
 	}*/
 
 	// One last check for unsaved laughs near end of demo. TODO Do we have to do this with some other stuff too? Not sure.
-	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, &outputBatHandleLaughs, killDb, insertLaughsStatement, selectLastInsertRowIdStatement, &oldBasename, &oldPath, oldDemoDateModified, sourceDemoFile, qtrue);
+	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &oldBasename, &oldPath, oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution);
 
 
 
@@ -4748,13 +4893,13 @@ cuterror:
 			double strafeDeviationNoSaberMove = it->second.strafeDeviationNoSaberMove.sum / it->second.strafeDeviationNoSaberMove.divisor;
 			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5;
 			int64_t strafeNoSaberMoveSampleCount = it->second.strafeDeviationNoSaberMove.divisor+0.5;
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@map", mapname.c_str());
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@map", mapname.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
 			std::string playernameStripped = Q_StripColorAll(playerName);
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
-			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
-			SQLBIND(insertPlayerDemoStatsStatement, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
+			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
+			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
 
 			std::stringstream ssStrafeJson;
 			std::stringstream ssStrafeNoSaberMoveJson;
@@ -4804,103 +4949,81 @@ cuterror:
 			ssStrafeNoSaberMoveJson << "]\n";
 			std::string ssStrafeJsonString = ssStrafeJson.str();
 			std::string ssStrafeNoSaberMoveJsonString = ssStrafeNoSaberMoveJson.str();
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
 
 
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
 
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
 
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
-			SQLBIND_TEXT(insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
-			SQLBIND(insertPlayerDemoStatsStatement, int, "@demoDateTime", oldDemoDateModified);
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@demoDateTime", oldDemoDateModified);
 
-			int queryResult = sqlite3_step(insertPlayerDemoStatsStatement);
+			wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
 			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(debugStatsDb) << "\n";
+				std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
 			}
-			sqlite3_reset(insertPlayerDemoStatsStatement);
+			sqlite3_reset(io.insertPlayerDemoStatsStatement);
+			wasDoingSQLiteExecution = false;
 		}
 
 	}
+
 
 #ifdef DEBUGSTATSDB
 	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
 
-		/*SQLBIND(insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
-		SQLBIND(insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(insertAnimStanceStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(insertAnimStanceStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
-		SQLBIND(insertAnimStanceStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);
-		SQLBIND(updateAnimStanceCountStatement, int, "@countFound", );
-		SQLBIND(updateAnimStanceCountStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
-		SQLBIND(updateAnimStanceCountStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(updateAnimStanceCountStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(updateAnimStanceCountStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
-		SQLBIND(updateAnimStanceCountStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);*/
-		SQLBIND(insertAnimStanceStatement, int, "@demoVersion", std::get<0>(it->first));
-		SQLBIND(insertAnimStanceStatement, int, "@saberHolstered", std::get<1>(it->first));
-		SQLBIND(insertAnimStanceStatement, int, "@torsoAnim", std::get<2>(it->first));
-		SQLBIND(insertAnimStanceStatement, int, "@legsAnim", std::get<3>(it->first));
-		SQLBIND(insertAnimStanceStatement, int, "@saberMove", std::get<4>(it->first));
-		SQLBIND(insertAnimStanceStatement, int, "@stance", std::get<5>(it->first));
-		SQLBIND(updateAnimStanceCountStatement, int, "@countFound", it->second);
-		SQLBIND(updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
-		SQLBIND(updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
-		SQLBIND(updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
-		SQLBIND(updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
-		SQLBIND(updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
-		SQLBIND(updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
+		/*SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
+		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
+		SQLBIND(io.insertAnimStanceStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", );
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);*/
+		SQLBIND(io.insertAnimStanceStatement, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@stance", std::get<5>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", it->second);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
 
-		int queryResult = sqlite3_step(insertAnimStanceStatement);
+		wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(debugStatsDb) << "\n";
+			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
 		}
-		sqlite3_reset(insertAnimStanceStatement);
+		sqlite3_reset(io.insertAnimStanceStatement);
 
-		queryResult = sqlite3_step(updateAnimStanceCountStatement);
+		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(debugStatsDb) << "\n";
+			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
 		}
-		sqlite3_reset(updateAnimStanceCountStatement);
+		sqlite3_reset(io.updateAnimStanceCountStatement);
+		wasDoingSQLiteExecution = false;
 	}
-
-
-
-	sqlite3_exec(debugStatsDb, "COMMIT;", NULL, NULL, NULL);
-
-	sqlite3_finalize(insertAnimStanceStatement);
-	sqlite3_finalize(updateAnimStanceCountStatement);
-	sqlite3_close(debugStatsDb);
 #endif
 
 
-	sqlite3_exec(killDb, "COMMIT;", NULL, NULL, NULL);
-	sqlite3_finalize(insertLaughsStatement);
-	sqlite3_finalize(insertDefragRunStatement);
-	sqlite3_finalize(insertCaptureStatement);
-	sqlite3_finalize(insertSpreeStatement);
-	sqlite3_finalize(insertStatement);
-	sqlite3_finalize(insertAngleStatement);
-	sqlite3_finalize(insertPlayerModelStatement);
-	sqlite3_finalize(updatePlayerModelCountStatement);
-	sqlite3_finalize(selectLastInsertRowIdStatement);
-	sqlite3_finalize(insertPlayerDemoStatsStatement);
-	sqlite3_close(killDb);
-
 	FS_FCloseFile(oldHandle);
 	//FS_FCloseFile(newHandle);
-
-	outputBatHandle.close();
-	outputBatHandleKillSprees.close();
-	outputBatHandleDefrag.close();
-	outputBatHandleCaptures.close();
-	outputBatHandleLaughs.close();
 
 
 	std::cout << "\ndone." << "\n\n";
@@ -4919,13 +5042,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int maxClientsHere = getMAX_CLIENTS(demoType);
 	switch (maxClientsHere) {
 	case 1: // JK 2 SP
-		return demoHighlightFindReal<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
+		return demoHighlightFindExceptWrapper<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
 		break;
 	case 32:
-		return demoHighlightFindReal<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
+		return demoHighlightFindExceptWrapper<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
 		break;
 	case 64:
-		return demoHighlightFindReal<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
+		return demoHighlightFindExceptWrapper<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, searchMode, opts);
 		break;
 	default:
 		throw std::exception("unsupported MAX_CLIENTS count.");
