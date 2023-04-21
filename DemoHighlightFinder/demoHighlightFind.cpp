@@ -1721,8 +1721,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		std::ofstream exceptionOutputHandle;
 
 		exceptionOutputHandle.open("highlightExtractionExceptions.log", std::ios_base::app); // append instead of overwrite
-		exceptionOutputHandle << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n";
-		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n\n\n\n\n";
+		exceptionOutputHandle << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << ";" << errorInfo << "\n";
+		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution<< "\n\n"<< errorInfo << "\n\n\n\n\n";
 		exceptionOutputHandle.close();
 	}
 

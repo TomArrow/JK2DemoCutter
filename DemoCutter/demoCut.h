@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <sstream>
 
 
 #include "anims.h"
@@ -30,12 +31,111 @@
 #define WINDOWS // For popl library
 #endif
 
+extern std::string errorInfo;
 
+#define NOMINMAX
 
 #ifdef _MSC_VER
+#include <windows.h>
+#undef SEARCH_ALL
+#undef near
 #include <excpt.h>
+#include <dbghelp.h>
+
+typedef struct exceptionCodeName_t {
+	DWORD64 code;
+	char* name;
+};
+#define EXCEPTNAME(name) {name,#name}
+static const exceptionCodeName_t codeNames[] = {
+	EXCEPTNAME(STILL_ACTIVE), EXCEPTNAME(EXCEPTION_ACCESS_VIOLATION), EXCEPTNAME(EXCEPTION_DATATYPE_MISALIGNMENT), EXCEPTNAME(EXCEPTION_BREAKPOINT), EXCEPTNAME(EXCEPTION_SINGLE_STEP), EXCEPTNAME(EXCEPTION_ARRAY_BOUNDS_EXCEEDED), EXCEPTNAME(EXCEPTION_FLT_DENORMAL_OPERAND), EXCEPTNAME(EXCEPTION_FLT_DIVIDE_BY_ZERO), EXCEPTNAME(EXCEPTION_FLT_INEXACT_RESULT), EXCEPTNAME(EXCEPTION_FLT_INVALID_OPERATION), EXCEPTNAME(EXCEPTION_FLT_OVERFLOW), EXCEPTNAME(EXCEPTION_FLT_STACK_CHECK), EXCEPTNAME(EXCEPTION_FLT_UNDERFLOW), EXCEPTNAME(EXCEPTION_INT_DIVIDE_BY_ZERO), EXCEPTNAME(EXCEPTION_INT_OVERFLOW), EXCEPTNAME(EXCEPTION_PRIV_INSTRUCTION), EXCEPTNAME(EXCEPTION_IN_PAGE_ERROR), EXCEPTNAME(EXCEPTION_ILLEGAL_INSTRUCTION), EXCEPTNAME(EXCEPTION_NONCONTINUABLE_EXCEPTION), EXCEPTNAME(EXCEPTION_STACK_OVERFLOW), EXCEPTNAME(EXCEPTION_INVALID_DISPOSITION), EXCEPTNAME(EXCEPTION_GUARD_PAGE), EXCEPTNAME(EXCEPTION_INVALID_HANDLE),
+#ifdef STATUS_POSSIBLE_DEADLOCK
+	EXCEPTNAME(EXCEPTION_POSSIBLE_DEADLOCK), 
+#endif	
+	EXCEPTNAME(CONTROL_C_EXIT)
+};
+
+inline  std::string getFunctionName(void* addr)
+{
+	std::stringstream ss;
+	HANDLE hProcess = GetCurrentProcess();
+
+	char searchPath[MAX_PATH+3];
+	searchPath[0] ='.';
+	searchPath[1] =';';
+	searchPath[2] = 0;
+	if (GetModuleFileNameA(NULL, searchPath + 2, MAX_PATH)) {
+		// Remove filename itself
+		int index = 2;
+		int lastSlashPos = 1;
+		while (searchPath[index] != 0) {
+			if (searchPath[index] == '\\' || searchPath[index] == '/') {
+				lastSlashPos = index;
+			} 
+			index++;
+		}
+		searchPath[lastSlashPos + 1] = 0; // Cut it off here.
+	}
+	else {
+
+		searchPath[2] = 0;
+	}
+
+	
+
+	SymInitialize(hProcess, searchPath, TRUE);
+
+	IMAGEHLP_LINE line;
+	line.SizeOfStruct = sizeof(IMAGEHLP_LINE);
+
+	char buf[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+	SYMBOL_INFO* symbol = (SYMBOL_INFO*)buf;
+	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+	symbol->MaxNameLen = MAX_SYM_NAME;
+
+	DWORD64 displacement = 0;
+	if (SymFromAddr(hProcess, (DWORD64)addr, &displacement, symbol))
+	{
+		ss << symbol->Name;
+		char functionName[MAX_SYM_NAME];
+		if (UnDecorateSymbolName(symbol->Name, functionName, MAX_SYM_NAME, UNDNAME_COMPLETE))
+		{
+			ss << "," << functionName;
+		}
+	}
+
+	DWORD displacementLine = 0;
+	if (SymGetLineFromAddr(hProcess, (DWORD64)addr, &displacementLine, &line))
+	{
+		ss << ",file:" << line.FileName << "," << "line:" << line.LineNumber;
+	}
+
+
+	SymCleanup(hProcess);
+	return ss.str();
+}
+
+int inline seh_filter_func(_EXCEPTION_POINTERS* exceptInfo) {
+	std::stringstream ss;
+	ss << errorInfo << std::hex << "addr:" << exceptInfo->ExceptionRecord->ExceptionAddress << ",code:" << exceptInfo->ExceptionRecord->ExceptionCode;
+	for (int i = 0; i < sizeof(codeNames) / sizeof(codeNames[0]); i++) {
+		if (codeNames[i].code == exceptInfo->ExceptionRecord->ExceptionCode) {
+			ss << " (" << codeNames[i].name << ")";
+			break;
+		}
+	}
+	ss << std::hex << ",flags:" << exceptInfo->ExceptionRecord->ExceptionFlags << ",info:" << exceptInfo->ExceptionRecord->ExceptionInformation << ",record:" << exceptInfo->ExceptionRecord->ExceptionRecord << ",params:" << exceptInfo->ExceptionRecord->NumberParameters;
+#ifdef _AMD64_
+	ss << std::hex << ",rip:" << exceptInfo->ContextRecord->Rip << ",name:" << getFunctionName((void*)exceptInfo->ContextRecord->Rip);
+#else
+	ss << std::hex << ",eip:" << exceptInfo->ContextRecord->Eip << ",name:" << getFunctionName((void*)exceptInfo->ContextRecord->Eip);
+#endif    
+	ss << ",INFOEND";
+	errorInfo = ss.str();
+	return EXCEPTION_EXECUTE_HANDLER;
+}
 #define __TRY __try
-#define __EXCEPT __except(EXCEPTION_EXECUTE_HANDLER)
+#define __EXCEPT __except(seh_filter_func(GetExceptionInformation()))
 #else
 #define __TRY try
 #define __EXCEPT catch(...)

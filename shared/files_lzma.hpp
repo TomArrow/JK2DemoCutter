@@ -102,7 +102,7 @@ class LZMAIncrementalCompressor {
 		while (*size < requestedSize) {
 
 			if (currentVectorData && currentVectorDataLeft > 0) {
-				size_t diff = min(currentVectorDataLeft, (requestedSize - *size));
+				size_t diff = std::min(currentVectorDataLeft, (requestedSize - *size));
 				memcpy(byteBuffer, currentVectorData, diff);
 				currentVectorData += diff;
 				currentVectorDataLeft -= diff;

@@ -12,6 +12,9 @@
 //
 
 
+
+std::string errorInfo = "";
+
 static	int			cmd_argc;
 static	char* cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
 static	char		cmd_tokenized[BIG_INFO_STRING + MAX_STRING_TOKENS];	// will have 0 bytes inserted
@@ -1796,7 +1799,7 @@ std::vector<std::string> splitString(std::string input, std::string separator, b
 			if (tmpLocation != std::string::npos && tmpLocation < (newString.size() - 1)) {
 				newString.erase(tmpLocation + 1);
 			}
-			newString.erase(0, std::max((int)newString.find_first_not_of(" "), 0));
+			newString.erase(0, (std::max)((int)newString.find_first_not_of(" "), 0));
 		}
 		if (allowEmpty || newString.size() > 0)
 			retVal.push_back(newString);
@@ -1809,7 +1812,7 @@ std::vector<std::string> splitString(std::string input, std::string separator, b
 			if (tmpLocation != std::string::npos && tmpLocation < (newString.size() - 1)) {
 				newString.erase(tmpLocation + 1);
 			}
-			newString.erase(0, std::max((int)newString.find_first_not_of(" "), 0));
+			newString.erase(0, (std::max)((int)newString.find_first_not_of(" "), 0));
 		}
 		if (allowEmpty || newString.size() > 0)
 			retVal.push_back(newString);
@@ -1969,7 +1972,7 @@ int getLikelyStanceFromTorsoAnim(int torsoAnim,demoType_t demoType, byte* probab
 		// But under that, it declines. Then we use whichever probability value ends up smaller.
 		// For sample sizes over 100, effectively the actual probability is used.
 
-		byte actualProbability = (byte)std::min((int)highestProbability,(int)(10.0*sqrt(mappingHere->totalCount)));
+		byte actualProbability = (byte)(std::min)((int)highestProbability,(int)(10.0*sqrt(mappingHere->totalCount)));
 		*probability = actualProbability;
 	}
 	return highestProbabilityStance;
