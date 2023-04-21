@@ -47,6 +47,11 @@ struct ioHandles_t {
 	std::ofstream* outputBatHandleCaptures;
 	std::ofstream* outputBatHandleLaughs;
 };
+struct sharedVariables_t {
+	std::string oldPath;
+	std::string oldBasename;
+	time_t oldDemoDateModified;
+};
 
 
 
@@ -1689,14 +1694,22 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	bool doFinalizeSQLite = true;
 
 	// turn oldpath absolute
-	std::filesystem::path tmpFSPath = sourceDemoFile;
-	std::string oldPathFullOutside = std::filesystem::absolute(tmpFSPath).string();
+	//std::filesystem::path tmpFSPath = sourceDemoFile;
+	//std::string oldPathFullOutside = std::filesystem::absolute(tmpFSPath).string();
+
+	sharedVariables_t sharedVars;
 
 	int64_t			demoCurrentTime = 0;
 
-	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io);
+	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io, sharedVars);
 
-	if (SEHExceptionCaught) {
+	qboolean successStatisticsSave = qfalse;
+	if (!SEHExceptionCaught || !wasDoingSQLiteExecution) {
+		successStatisticsSave = saveStatisticsToDb(io, wasDoingSQLiteExecution, sharedVars,SEHExceptionCaught); // This will only return false if there's an exception.
+	}
+
+
+	if (SEHExceptionCaught || !successStatisticsSave) {
 		// This demo errored. Remember it.
 		// We are catching access violations and such.
 		//
@@ -1708,8 +1721,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		std::ofstream exceptionOutputHandle;
 
 		exceptionOutputHandle.open("highlightExtractionExceptions.log", std::ios_base::app); // append instead of overwrite
-		exceptionOutputHandle << oldPathFullOutside << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n";
-		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << oldPathFullOutside << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n\n\n\n\n";
+		exceptionOutputHandle << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n";
+		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n\n\n\n\n";
 		exceptionOutputHandle.close();
 	}
 
@@ -1747,14 +1760,152 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 }
 
 
+static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQLiteExecution, const sharedVariables_t& sharedVars) {
+	// Save player stats
+	for (auto it = playerDemoStatsMap.begin(); it != playerDemoStatsMap.end(); it++) {
+
+		if (it->second.everUsed) { // Some clients may have never been visible or not even existed at all (we have entries for all client nums by default but they're only set to "everUsed" if they were actually seen)
+
+			std::string mapname = std::get<0>(it->first);
+			std::string playerName = std::get<1>(it->first);
+			int clientNum = std::get<2>(it->first);
+			double strafeDeviation = it->second.strafeDeviation.sum / it->second.strafeDeviation.divisor;
+			double strafeDeviationNoSaberMove = it->second.strafeDeviationNoSaberMove.sum / it->second.strafeDeviationNoSaberMove.divisor;
+			int64_t strafeSampleCount = it->second.strafeDeviation.divisor + 0.5;
+			int64_t strafeNoSaberMoveSampleCount = it->second.strafeDeviationNoSaberMove.divisor + 0.5;
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@map", mapname.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
+			std::string playernameStripped = Q_StripColorAll(playerName);
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
+			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
+			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
+
+			std::stringstream ssStrafeJson;
+			std::stringstream ssStrafeNoSaberMoveJson;
+			ssStrafeJson << "[\n";
+			ssStrafeNoSaberMoveJson << "[\n";
+			for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
+				double valueHere = it->second.strafeDeviationBuckets[b].sum / it->second.strafeDeviationBuckets[b].divisor;
+				int64_t sampleCount = it->second.strafeDeviationBuckets[b].divisor + 0.5;
+				if (b != 0) {
+					ssStrafeJson << ",\n";
+				}
+				ssStrafeJson << "{\n";
+				ssStrafeJson << "\"average\":";
+				if (sampleCount) {
+					ssStrafeJson << valueHere;
+				}
+				else {
+					ssStrafeJson << "null";
+				}
+				ssStrafeJson << ",\n";
+				ssStrafeJson << "\"sampleCount\":" << sampleCount << ",\n";
+				ssStrafeJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
+				ssStrafeJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
+				ssStrafeJson << "}\n";
+
+				// No saber move data
+				valueHere = it->second.strafeDeviationNoSaberMoveBuckets[b].sum / it->second.strafeDeviationNoSaberMoveBuckets[b].divisor;
+				sampleCount = it->second.strafeDeviationNoSaberMoveBuckets[b].divisor + 0.5;
+				if (b != 0) {
+					ssStrafeNoSaberMoveJson << ",\n";
+				}
+				ssStrafeNoSaberMoveJson << "{\n";
+				ssStrafeNoSaberMoveJson << "\"average\":";
+				if (sampleCount) {
+					ssStrafeNoSaberMoveJson << valueHere;
+				}
+				else {
+					ssStrafeNoSaberMoveJson << "null";
+				}
+				ssStrafeNoSaberMoveJson << ",\n";
+				ssStrafeNoSaberMoveJson << "\"sampleCount\":" << sampleCount << ",\n";
+				ssStrafeNoSaberMoveJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
+				ssStrafeNoSaberMoveJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
+				ssStrafeNoSaberMoveJson << "}\n";
+			}
+			ssStrafeJson << "]\n";
+			ssStrafeNoSaberMoveJson << "]\n";
+			std::string ssStrafeJsonString = ssStrafeJson.str();
+			std::string ssStrafeNoSaberMoveJsonString = ssStrafeNoSaberMoveJson.str();
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
 
 
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
 
-template<unsigned int max_clients>
-qboolean demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int bufferTime,  const highlightSearchMode_t searchMode, const ExtraSearchOptions opts,bool& SEHExceptionCaught,int64_t& demoCurrentTime,bool& wasDoingSQLiteExecution,const ioHandles_t& io) {
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
 
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoName", sharedVars.oldBasename.c_str());
+			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoPath", sharedVars.oldPath.c_str());
+			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+
+			wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+			}
+			sqlite3_reset(io.insertPlayerDemoStatsStatement);
+			wasDoingSQLiteExecution = false;
+		}
+
+	}
+
+#ifdef DEBUGSTATSDB
+	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
+
+		/*SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
+		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
+		SQLBIND(io.insertAnimStanceStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", );
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);*/
+		SQLBIND(io.insertAnimStanceStatement, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND(io.insertAnimStanceStatement, int, "@stance", std::get<5>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", it->second);
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
+
+		wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+		}
+		sqlite3_reset(io.insertAnimStanceStatement);
+
+		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+		}
+		sqlite3_reset(io.updateAnimStanceCountStatement);
+		wasDoingSQLiteExecution = false;
+	}
+#endif
+}
+
+
+qboolean inline saveStatisticsToDb(ioHandles_t& io, bool& wasDoingSQLiteExecution, const sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
 	__TRY{
-		return demoHighlightFindReal<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, demoCurrentTime,wasDoingSQLiteExecution,io);
+		saveStatisticsToDbReal(io, wasDoingSQLiteExecution, sharedVars);
+		return qtrue;
 	}
 	__EXCEPT{
 		SEHExceptionCaught = true;
@@ -1763,7 +1914,19 @@ qboolean demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int bufferT
 }
 
 template<unsigned int max_clients>
-qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io) {
+qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int bufferTime,  const highlightSearchMode_t searchMode, const ExtraSearchOptions opts,bool& SEHExceptionCaught,int64_t& demoCurrentTime,bool& wasDoingSQLiteExecution,const ioHandles_t& io,sharedVariables_t& sharedVars) {
+
+	__TRY{
+		return demoHighlightFindReal<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, demoCurrentTime,wasDoingSQLiteExecution,io,sharedVars,SEHExceptionCaught);
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
+}
+
+template<unsigned int max_clients>
+qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io, sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -1893,19 +2056,20 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 
 
 
-	std::string oldPath = va("%s%s", oldName, ext);
-	std::string oldBasename = oldPath.substr(oldPath.find_last_of("/\\") + 1);
+	sharedVars.oldPath = va("%s%s", oldName, ext);
+	sharedVars.oldBasename = sharedVars.oldPath.substr(sharedVars.oldPath.find_last_of("/\\") + 1);
 
 
 
 
 
 	// turn oldpath absolute
-	std::filesystem::path tmpFSPath = oldPath;
-	oldPath = std::filesystem::absolute(tmpFSPath).string();
+	std::filesystem::path tmpFSPath = sharedVars.oldPath;
+	sharedVars.oldPath = std::filesystem::absolute(tmpFSPath).string();
 
 	std::filesystem::file_time_type filetime = std::filesystem::last_write_time(va("%s%s", oldName, ext));
-	time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
+	//time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
+	sharedVars.oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
@@ -2005,7 +2169,9 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 			case svc_nop_general:
 				break;
 			case svc_serverCommand_general:
-				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
+				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc,SEHExceptionCaught)) {
+					goto cuterror;
+				}
 				break;
 			case svc_gamestate_general:
 				lastGameStateChange = demo.cut.Cl.snap.serverTime;
@@ -2014,7 +2180,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 				//	goto cutcomplete;
 				//}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType)) { // Pass demoType by reference in case we need 1.03 detection
+				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType,SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
 					goto cuterror;
 				}
 
@@ -2038,7 +2204,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 				readGamestate++;
 				break;
 			case svc_snapshot_general:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,qtrue)) {
+				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught,qtrue)) {
 					goto cuterror;
 				}
 
@@ -3797,11 +3963,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							else {
 								SQLBIND_NULL(io.insertAngleStatement, "@currentSpeedTarget");
 							}
-							SQLBIND_TEXT(io.insertAngleStatement, "@demoName", oldBasename.c_str());
-							SQLBIND_TEXT(io.insertAngleStatement, "@demoPath", oldPath.c_str());
+							SQLBIND_TEXT(io.insertAngleStatement, "@demoName", sharedVars.oldBasename.c_str());
+							SQLBIND_TEXT(io.insertAngleStatement, "@demoPath", sharedVars.oldPath.c_str());
 							SQLBIND(io.insertAngleStatement, int, "@demoTime", demoCurrentTime);
 							SQLBIND(io.insertAngleStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-							SQLBIND(io.insertAngleStatement, int, "@demoDateTime", oldDemoDateModified);
+							SQLBIND(io.insertAngleStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
 							wasDoingSQLiteExecution = true;
 							queryResult = sqlite3_step(io.insertAngleStatement);
@@ -4106,11 +4272,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								SQLBIND_NULL(io.insertCaptureStatement,  "@directionY");
 								SQLBIND_NULL(io.insertCaptureStatement,  "@directionZ");
 							}
-							SQLBIND_TEXT(io.insertCaptureStatement, "@demoName", oldBasename.c_str());
-							SQLBIND_TEXT(io.insertCaptureStatement, "@demoPath", oldPath.c_str());
+							SQLBIND_TEXT(io.insertCaptureStatement, "@demoName", sharedVars.oldBasename.c_str());
+							SQLBIND_TEXT(io.insertCaptureStatement, "@demoPath", sharedVars.oldPath.c_str());
 							SQLBIND(io.insertCaptureStatement, int, "@demoTime", demoCurrentTime);
 							SQLBIND(io.insertCaptureStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-							SQLBIND(io.insertCaptureStatement, int, "@demoDateTime", oldDemoDateModified);
+							SQLBIND(io.insertCaptureStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
 							wasDoingSQLiteExecution = true;
 							int queryResult = sqlite3_step(io.insertCaptureStatement);
@@ -4250,7 +4416,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 								// This kill is not part of a killspree. Reset.
 								// But first, check if this concludes an existing killspree that we can now save.
 								if (countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, oldBasename, oldPath, oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
+									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, sharedVars.oldBasename, sharedVars.oldPath, sharedVars.oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
 								}
 
 								// Reset.
@@ -4263,7 +4429,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 							}
 						}
 						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, oldBasename, oldPath, oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
+							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, sharedVars.oldBasename, sharedVars.oldPath, sharedVars.oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
 						}
 
 					}
@@ -4518,7 +4684,7 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 		}
 
 		// Check for finished laugh sequences
-		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,io,&oldBasename,&oldPath,oldDemoDateModified,sourceDemoFile,qfalse,wasDoingSQLiteExecution);
+		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,io,&sharedVars.oldBasename,&sharedVars.oldPath, sharedVars.oldDemoDateModified,sourceDemoFile,qfalse,wasDoingSQLiteExecution);
 
 
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
@@ -4746,11 +4912,11 @@ qboolean demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const
 					SQLBIND(io.insertDefragRunStatement, int, "@isTop10", isLogged);
 					SQLBIND(io.insertDefragRunStatement, int, "@isNumber1", isNumberOne);
 					SQLBIND(io.insertDefragRunStatement, int, "@isPersonalBest", isPersonalBest);
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoName", oldBasename.c_str());
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoPath", oldPath.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoName", sharedVars.oldBasename.c_str());
+					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoPath", sharedVars.oldPath.c_str());
 					SQLBIND(io.insertDefragRunStatement, int, "@demoTime", demoCurrentTime);
 					SQLBIND(io.insertDefragRunStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-					SQLBIND(io.insertDefragRunStatement, int, "@demoDateTime", oldDemoDateModified);
+					SQLBIND(io.insertDefragRunStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 					SQLBIND(io.insertDefragRunStatement, int, "@wasVisible", wasVisible);
 					SQLBIND(io.insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
 					SQLBIND(io.insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
@@ -4877,149 +5043,14 @@ cuterror:
 	}*/
 
 	// One last check for unsaved laughs near end of demo. TODO Do we have to do this with some other stuff too? Not sure.
-	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &oldBasename, &oldPath, oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution);
+	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution);
 
 
 
-	// Save player stats
-	for (auto it = playerDemoStatsMap.begin(); it != playerDemoStatsMap.end(); it++) {
-
-		if (it->second.everUsed) { // Some clients may have never been visible or not even existed at all (we have entries for all client nums by default but they're only set to "everUsed" if they were actually seen)
-
-			std::string mapname = std::get<0>(it->first);
-			std::string playerName = std::get<1>(it->first);
-			int clientNum = std::get<2>(it->first);
-			double strafeDeviation = it->second.strafeDeviation.sum / it->second.strafeDeviation.divisor;
-			double strafeDeviationNoSaberMove = it->second.strafeDeviationNoSaberMove.sum / it->second.strafeDeviationNoSaberMove.divisor;
-			int64_t strafeSampleCount = it->second.strafeDeviation.divisor+0.5;
-			int64_t strafeNoSaberMoveSampleCount = it->second.strafeDeviationNoSaberMove.divisor+0.5;
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@map", mapname.c_str());
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
-			std::string playernameStripped = Q_StripColorAll(playerName);
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
-			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
-			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
-
-			std::stringstream ssStrafeJson;
-			std::stringstream ssStrafeNoSaberMoveJson;
-			ssStrafeJson << "[\n";
-			ssStrafeNoSaberMoveJson << "[\n";
-			for (int b = 0; b < STRAFE_ANALYSIS_BUCKET_COUNT; b++) {
-				double valueHere = it->second.strafeDeviationBuckets[b].sum / it->second.strafeDeviationBuckets[b].divisor;
-				int64_t sampleCount = it->second.strafeDeviationBuckets[b].divisor+0.5;
-				if (b != 0) {
-					ssStrafeJson << ",\n";
-				}
-				ssStrafeJson << "{\n";
-				ssStrafeJson << "\"average\":";
-				if (sampleCount) {
-					ssStrafeJson << valueHere;
-				}
-				else {
-					ssStrafeJson << "null";
-				}
-				ssStrafeJson << ",\n";
-				ssStrafeJson << "\"sampleCount\":" << sampleCount << ",\n";
-				ssStrafeJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
-				ssStrafeJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
-				ssStrafeJson << "}\n";
-
-				// No saber move data
-				valueHere = it->second.strafeDeviationNoSaberMoveBuckets[b].sum / it->second.strafeDeviationNoSaberMoveBuckets[b].divisor;
-				sampleCount = it->second.strafeDeviationNoSaberMoveBuckets[b].divisor+0.5;
-				if (b != 0) {
-					ssStrafeNoSaberMoveJson << ",\n";
-				}
-				ssStrafeNoSaberMoveJson << "{\n";
-				ssStrafeNoSaberMoveJson << "\"average\":";
-				if (sampleCount) {
-					ssStrafeNoSaberMoveJson << valueHere;
-				}
-				else {
-					ssStrafeNoSaberMoveJson << "null";
-				}
-				ssStrafeNoSaberMoveJson << ",\n";
-				ssStrafeNoSaberMoveJson << "\"sampleCount\":" << sampleCount << ",\n";
-				ssStrafeNoSaberMoveJson << "\"bucketFromIncluding\":" << strafeAnalysisBuckets[b].fromIncluding << ",\n";
-				ssStrafeNoSaberMoveJson << "\"bucketToExcluding\":" << strafeAnalysisBuckets[b].toExcluding << "\n";
-				ssStrafeNoSaberMoveJson << "}\n";
-			}
-			ssStrafeJson << "]\n";
-			ssStrafeNoSaberMoveJson << "]\n";
-			std::string ssStrafeJsonString = ssStrafeJson.str();
-			std::string ssStrafeNoSaberMoveJsonString = ssStrafeNoSaberMoveJson.str();
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
+	
 
 
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
 
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
-
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoName", oldBasename.c_str());
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoPath", oldPath.c_str());
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@demoDateTime", oldDemoDateModified);
-
-			wasDoingSQLiteExecution = true;
-			int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
-			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
-			}
-			sqlite3_reset(io.insertPlayerDemoStatsStatement);
-			wasDoingSQLiteExecution = false;
-		}
-
-	}
-
-
-#ifdef DEBUGSTATSDB
-	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
-
-		/*SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
-		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
-		SQLBIND(io.insertAnimStanceStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", );
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);*/
-		SQLBIND(io.insertAnimStanceStatement, int, "@demoVersion", std::get<0>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", std::get<1>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", std::get<2>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", std::get<3>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", std::get<4>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@stance", std::get<5>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", it->second);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
-
-		wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
-		}
-		sqlite3_reset(io.insertAnimStanceStatement);
-
-		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
-		}
-		sqlite3_reset(io.updateAnimStanceCountStatement);
-		wasDoingSQLiteExecution = false;
-	}
-#endif
 
 
 	FS_FCloseFile(oldHandle);

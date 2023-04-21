@@ -3213,7 +3213,7 @@ void demoCutParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clC
 //
 // Shared demo parsing functions
 //
-qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType) {
+static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType) {
 	int				i;
 	entityState_t* es;
 	int				newnum;
@@ -3292,6 +3292,15 @@ qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientAct
 
 	return qtrue;
 }
+qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, bool& SEHExceptionCaught) {
+	__TRY{
+		return demoCutParseGamestateReal(msg,clcCut,clCut,demoType);
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
+}
 
 
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType) {
@@ -3338,7 +3347,7 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	}
 }
 
-void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
+static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t* clcCut) {
 	int index;
 	int seq = MSG_ReadLong(msg);
 	char* s = MSG_ReadString(msg);
@@ -3348,6 +3357,16 @@ void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut) {
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
 	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
+}
+qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, bool& SEHExceptionCaught) {
+	__TRY{
+		demoCutParseCommandStringReal(msg,clcCut);
+		return qtrue;
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
 }
 
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType) {
@@ -3397,7 +3416,7 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 	return qtrue;
 }
 
-qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap) {
+static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap) {
 	int len;
 	clSnapshot_t* oldSnap;
 	clSnapshot_t newSnap;
@@ -3510,6 +3529,15 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 
 
 	return qtrue;
+}
+qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, qboolean writeOldSnap) {
+	__TRY{
+		return demoCutParseSnapshotReal(msg,clcCut,clCut,demoType,writeOldSnap);
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
 }
 
 void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType) {

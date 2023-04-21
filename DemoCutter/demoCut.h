@@ -4078,11 +4078,14 @@ inline bool snapshotInfosSnapNumPredicate(const std::pair<int, SnapshotInfo> &it
 	return it.second.snapNum < snapNum;
 };
 
-qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
+//qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
+qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, bool& SEHExceptionCaught);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
-void demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
+//qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
+qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, bool& SEHExceptionCaught);
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
-qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
+//qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
+qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, qboolean writeOldSnap = qfalse);
 
 void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType);
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);

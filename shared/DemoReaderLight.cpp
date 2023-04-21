@@ -331,6 +331,7 @@ readNext:
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
 	std::vector<byte> oldDataRaw;
+	bool			SEHExceptionCaught = false;
 
 	if (isCompressedFile) {
 		oldDataRaw.clear();
@@ -394,7 +395,9 @@ readNext:
 		case svc_nop_general:
 			break;
 		case svc_serverCommand_general:
-			demoCutParseCommandString(&oldMsg, &thisDemo.cut.Clc);
+			if (!demoCutParseCommandString(&oldMsg, &thisDemo.cut.Clc, SEHExceptionCaught)) {
+				return qfalse;
+			}
 			break;
 		case svc_gamestate_general:
 			lastGameStateChange = thisDemo.cut.Cl.snap.serverTime;
@@ -403,7 +406,7 @@ readNext:
 			//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 			//	goto cutcomplete;
 			//}
-			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType)) {
+			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType, SEHExceptionCaught)) {
 				return qfalse;
 			}
 			//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
@@ -415,7 +418,7 @@ readNext:
 			readGamestate++;
 			break;
 		case svc_snapshot_general:
-			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType)) {
+			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType, SEHExceptionCaught)) {
 				return qfalse;
 			}
 

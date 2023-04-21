@@ -77,7 +77,7 @@ TODO: use EV_PAIN to get health for entitystate->playerstate.
 
 Demostats: Find demos with dismemberment.
 
-
+Maybe get a stacktrace for SEH exceptions. But don't wanna include 20000000 GB of Boost code just to get the stacktrace. 
 
 
 TODO: make saber shenanigans 2.0 work: https://github.com/Boothand/jk2mp/commit/613157c3160009482fa00c3d4f668c080423a796

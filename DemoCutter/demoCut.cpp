@@ -237,7 +237,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	int				lastValidSnap = -1;
 
 	int				mapRestartCounter = 0;
-
+	bool			SEHExceptionCaught = false;
 	//mvprotocol_t	protocol;
 
 	// Since not in MME:
@@ -381,7 +381,9 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			case svc_nop_general:
 				break;
 			case svc_serverCommand_general:
-				demoCutParseCommandString(&oldMsg, &demo.cut.Clc);
+				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, SEHExceptionCaught)) {
+					goto cuterror;
+				}
 				break;
 			case svc_gamestate_general:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
@@ -389,7 +391,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					goto cutcomplete;
 				}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType)) {
+				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, SEHExceptionCaught)) {
 					goto cuterror;
 				}
 				// Only open if none opened yet.
@@ -423,7 +425,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				readGamestate++;
 				break;
 			case svc_snapshot_general:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType)) {
+				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught)) {
 					goto cuterror;
 				}
 				if (messageOffset++ == 0) {
