@@ -41,6 +41,10 @@ struct ioHandles_t {
 	sqlite3_stmt* insertAnimStanceStatement;
 	sqlite3_stmt* updateAnimStanceCountStatement;
 
+	// Demostats (optionaal)
+	sqlite3* demoStatsDb;
+	sqlite3_stmt* insertPacketStatsStatement;
+
 	std::ofstream* outputBatHandle;
 	std::ofstream* outputBatHandleKillSprees;
 	std::ofstream* outputBatHandleDefrag;
@@ -64,6 +68,7 @@ public:
 	bool quickSkipNonSaberExclusive = false; // Not implemented (yet). Skip demoss that aren't saber only
 	bool onlyLogSaberKills = false;
 	int onlyLogKillSpreesWithSaberKills = 0;
+	int writeDemoPacketStats = 0; // 0 = don't write stats. -1  = write immediately on every packet. other number = write  as soon as time interval in demotime has passed
 	bool onlyLogCapturesWithSaberKills = false;
 	bool findSuperSlowKillStreaks = false;
 };
@@ -375,6 +380,29 @@ inline void TET_LastSeenUpdate(int entityNum, int demoCurrentTime) {
 	}
 }
 
+
+
+// Demo stats
+typedef struct demoPeriodPacketStats_t {
+	int totalPacketsSize;
+	int totalSnapshotSize;
+	int totalServerCommandSize;
+	int droppedPackets;
+	int totalPacketCount;
+	int periodTotalTime;
+	int maxPacketSize;
+	int minPacketSize;
+};
+demoPeriodPacketStats_t currentPacketPeriodStats;
+int64_t lastPacketStatsWritten = 0;
+
+
+
+
+static inline void resetCurrentPacketPeriodStats() {
+	Com_Memset(&currentPacketPeriodStats, 0, sizeof(currentPacketPeriodStats));
+	currentPacketPeriodStats.minPacketSize = INT_MAX;
+}
 
 enum BoostDetectionType {
 	BOOST_NONE,
@@ -1665,6 +1693,44 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	sqlite3_exec(io.killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
 
+
+	if (opts.writeDemoPacketStats) {
+		sqlite3_open("demoStats.db", &io.demoStatsDb);
+		sqlite3_exec(io.demoStatsDb, "CREATE TABLE demoPacketStats ("
+			"demoTime INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"timeSinceLast INTEGER NOT NULL," // demotime since last point
+			"skippedPacketsSinceLast INTEGER NOT NULL,"
+			"bytesSinceLast INTEGER NOT NULL,"
+			"bytesPerSecond INTEGER NOT NULL,"
+			"snapshotBytesSinceLast INTEGER NOT NULL,"
+			"snapshotBytesPerSecond INTEGER NOT NULL,"
+			"serverCommandBytesSinceLast INTEGER NOT NULL,"
+			"serverCommandBytesPerSecond INTEGER NOT NULL,"
+			"packetsSinceLast INTEGER NOT NULL,"
+			"packetsPerSecond REAL NOT NULL,"
+			"bytesPerPacket INTEGER NOT NULL,"
+			"periodMaxPacketSize INTEGER NOT NULL,"
+			"periodMinPacketSize INTEGER NOT NULL,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"
+			"); ",
+			NULL, NULL, NULL);
+		preparedStatementText = "INSERT INTO demoPacketStats "
+			"(demoTime,serverTime,timeSinceLast,skippedPacketsSinceLast,bytesSinceLast,bytesPerSecond,snapshotBytesSinceLast,snapshotBytesPerSecond,serverCommandBytesSinceLast,serverCommandBytesPerSecond,packetsSinceLast,packetsPerSecond,bytesPerPacket,periodMaxPacketSize,periodMinPacketSize,demoName,demoPath,demoDateTime)"
+			" VALUES "
+			"(@demoTime,@serverTime,@timeSinceLast,@skippedPacketsSinceLast,@bytesSinceLast,@bytesPerSecond,@snapshotBytesSinceLast,@snapshotBytesPerSecond,@serverCommandBytesSinceLast,@serverCommandBytesPerSecond,@packetsSinceLast,@packetsPerSecond,@bytesPerPacket,@periodMaxPacketSize,@periodMinPacketSize,@demoName,@demoPath,@demoDateTime)";
+
+		sqlite3_prepare_v2(io.demoStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPacketStatsStatement, NULL);
+		sqlite3_exec(io.demoStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	}
+	else {
+		io.demoStatsDb = NULL;
+		io.insertPacketStatsStatement = NULL;
+	}
+
+
 #ifdef DEBUGSTATSDB
 	sqlite3_open("debugStatsDb.db", &io.debugStatsDb);
 
@@ -1748,6 +1814,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		sqlite3_finalize(io.selectLastInsertRowIdStatement);
 		sqlite3_finalize(io.insertPlayerDemoStatsStatement);
 		sqlite3_close(io.killDb);
+
+		if (opts.writeDemoPacketStats) {
+			sqlite3_exec(io.demoStatsDb, "COMMIT;", NULL, NULL, NULL);
+			sqlite3_finalize(io.insertPacketStatsStatement);
+			sqlite3_close(io.demoStatsDb);
+		}
 	}
 
 	io.outputBatHandle->close();
@@ -1979,6 +2051,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
 	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
 	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+	resetCurrentPacketPeriodStats();
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < max_clients; i++) {
@@ -2101,6 +2174,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		float playerStateStrafeDeviationThisFrame = 0;
 
 	cutcontinue:
+
+		int oldOldSize = oldSize;
+
 		if (isCompressedFile) {
 			oldDataRaw.clear();
 			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
@@ -2108,10 +2184,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		else {
 			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
 		}
+		int oldSequenceNum = demo.cut.Clc.serverMessageSequence;
+
 		/* Read the sequence number */
 		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 			goto cuterror;
+
 		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
+		currentPacketPeriodStats.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
 		oldSize -= 4;
 		/* Read the message size */
 		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
@@ -2135,6 +2215,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				goto cuterror;
 		}
 		oldSize -= oldMsg.cursize;
+
+		//Stats
+		int thisMessageTotalSize = oldOldSize - oldSize;
+		currentPacketPeriodStats.totalPacketCount++;
+		currentPacketPeriodStats.totalPacketsSize += thisMessageTotalSize;
+		currentPacketPeriodStats.maxPacketSize = std::max(currentPacketPeriodStats.maxPacketSize, oldSize);
+		currentPacketPeriodStats.minPacketSize = std::min(currentPacketPeriodStats.minPacketSize, oldSize);
+
+
 		// init the bitstream
 		MSG_BeginReading(&oldMsg);
 		// Skip the reliable sequence acknowledge number
@@ -2143,6 +2232,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		// parse the message
 		//
 		while (1) {
+
+			int oldMsgOffset = oldMsg.readcount;
+
 			byte cmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
 				Com_Printf("Demo cutter, read past end of server message.\n");
@@ -2161,6 +2253,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 				goto cutcontinue;
 			}
+
+
 			// other commands
 			switch (cmd) {
 			default:
@@ -2172,6 +2266,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc,SEHExceptionCaught)) {
 					goto cuterror;
 				}
+				currentPacketPeriodStats.totalServerCommandSize += oldMsg.readcount - oldMsgOffset;
 				break;
 			case svc_gamestate_general:
 				lastGameStateChange = demo.cut.Cl.snap.serverTime;
@@ -2207,6 +2302,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught,qtrue)) {
 					goto cuterror;
 				}
+				currentPacketPeriodStats.totalSnapshotSize += oldMsg.readcount - oldMsgOffset;
 
 				// Time related stuff
 				if (messageOffset++ == 0) {
@@ -2220,6 +2316,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				deltaTimeFromLastSnapshot = demoCurrentTime - demoOldTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
+				currentPacketPeriodStats.periodTotalTime += demoCurrentTime - demoOldTime;
 				demoOldTime = demoCurrentTime;
 
 				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(demo.cut.Cl.snap.ps.saberMove,demoType);
@@ -4990,6 +5087,42 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
 		}
 
+
+
+		if (oldSize == 0 || (opts.writeDemoPacketStats && currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) > opts.writeDemoPacketStats))) {
+
+			SQLBIND(io.insertPacketStatsStatement, int, "@timeSinceLast", currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@skippedPacketsSinceLast", currentPacketPeriodStats.droppedPackets);
+			SQLBIND(io.insertPacketStatsStatement, int, "@bytesSinceLast", currentPacketPeriodStats.totalPacketsSize);
+			SQLBIND(io.insertPacketStatsStatement, int, "@bytesPerSecond", 1000*currentPacketPeriodStats.totalPacketsSize/ currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@snapshotBytesSinceLast", currentPacketPeriodStats.totalSnapshotSize);
+			SQLBIND(io.insertPacketStatsStatement, int, "@snapshotBytesPerSecond", 1000 * currentPacketPeriodStats.totalSnapshotSize / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@serverCommandBytesSinceLast", currentPacketPeriodStats.totalServerCommandSize);
+			SQLBIND(io.insertPacketStatsStatement, int, "@serverCommandBytesPerSecond", 1000 * currentPacketPeriodStats.totalServerCommandSize / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@packetsSinceLast", currentPacketPeriodStats.totalPacketCount);
+			SQLBIND(io.insertPacketStatsStatement, double, "@packetsPerSecond", 1000.0* (double)currentPacketPeriodStats.totalPacketCount/ (double)currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@bytesPerPacket", currentPacketPeriodStats.totalPacketsSize /currentPacketPeriodStats.totalPacketCount);
+			SQLBIND(io.insertPacketStatsStatement, int, "@periodMaxPacketSize", currentPacketPeriodStats.maxPacketSize);
+			SQLBIND(io.insertPacketStatsStatement, int, "@periodMinPacketSize", currentPacketPeriodStats.minPacketSize);
+			SQLBIND(io.insertPacketStatsStatement, int, "@demoTime", demoCurrentTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+
+			SQLBIND_TEXT(io.insertPacketStatsStatement, "@demoName", sharedVars.oldBasename.c_str());
+			SQLBIND_TEXT(io.insertPacketStatsStatement, "@demoPath", sharedVars.oldPath.c_str());
+			SQLBIND(io.insertPacketStatsStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+
+			wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertPacketStatsStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cout << "Error inserting packet stats into database: " << sqlite3_errmsg(io.demoStatsDb) << "\n";
+			}
+			sqlite3_reset(io.insertPacketStatsStatement);
+			wasDoingSQLiteExecution = false;
+
+			lastPacketStatsWritten = demoCurrentTime;
+			resetCurrentPacketPeriodStats();
+		}
+
 #if DEBUG
 		if (oldSize == 0) {
 			goto cutcomplete;
@@ -5016,6 +5149,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}*/
 
 		Com_Memcpy(&lastFrameInfo, &thisFrameInfo, sizeof(lastFrameInfo));
+
 
 
 
@@ -5126,6 +5260,7 @@ int main(int argcO, char** argvO) {
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");
 	auto S = op.add<popl::Implicit<int>>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat). Optional: Provide number of needed saber kills in killspree.",1);
+	auto d = op.add<popl::Implicit<int>>("d", "write-demo-packet-stats", "Write stats about packet size and rate over time. If specified without a value, each packet gets an entry. Otherwise, a number can be provided as the interval in milliseconds to write stats.",0);
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
@@ -5155,6 +5290,7 @@ int main(int argcO, char** argvO) {
 	ExtraSearchOptions opts;
 	opts.onlyLogSaberKills = s->is_set();
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set() ? S->value() : 0;
+	opts.writeDemoPacketStats = d->is_set() ? (d->value() <= 0 ? -1 : d->value()) : 0;
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
 	opts.quickSkipNonSaberExclusive =  q->value();
 	opts.findSuperSlowKillStreaks = l->value();
