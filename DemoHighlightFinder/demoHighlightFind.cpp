@@ -5102,7 +5102,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 
-		if (oldSize == 0 || (opts.writeDemoPacketStats && currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) > opts.writeDemoPacketStats))) {
+		if (oldSize == 0 || (opts.writeDemoPacketStats && currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) >= opts.writeDemoPacketStats))) {
 
 			SQLBIND(io.insertPacketStatsStatement, int, "@timeSinceLast", currentPacketPeriodStats.periodTotalTime);
 			SQLBIND(io.insertPacketStatsStatement, int, "@skippedPacketsSinceLast", currentPacketPeriodStats.droppedPackets);
