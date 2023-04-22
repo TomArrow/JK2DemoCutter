@@ -392,6 +392,9 @@ typedef struct demoPeriodPacketStats_t {
 	int periodTotalTime;
 	int maxPacketSize;
 	int minPacketSize;
+	int nonDeltaSnapshotCount;
+	int angleChanges;
+	int entitiesReceivedTotal;
 };
 demoPeriodPacketStats_t currentPacketPeriodStats;
 int64_t lastPacketStatsWritten = 0;
@@ -1712,15 +1715,22 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			"bytesPerPacket INTEGER NOT NULL,"
 			"periodMaxPacketSize INTEGER NOT NULL,"
 			"periodMinPacketSize INTEGER NOT NULL,"
+			"nonDeltaSnapsSinceLast INTEGER NOT NULL,"
+			"nonDeltaSnapsPerSecond INTEGER NOT NULL,"
+			"angleChangesSinceLast INTEGER NOT NULL,"
+			"angleChangesPerSecond INTEGER NOT NULL,"
+			"entitiesSinceLast INTEGER NOT NULL,"
+			"entitiesPerSecond INTEGER NOT NULL,"
+			"entitiesPerPacket INTEGER NOT NULL,"
 			"demoName TEXT NOT NULL,"
 			"demoPath TEXT NOT NULL,"
 			"demoDateTime TIMESTAMP NOT NULL"
 			"); ",
 			NULL, NULL, NULL);
 		preparedStatementText = "INSERT INTO demoPacketStats "
-			"(demoTime,serverTime,timeSinceLast,skippedPacketsSinceLast,bytesSinceLast,bytesPerSecond,snapshotBytesSinceLast,snapshotBytesPerSecond,serverCommandBytesSinceLast,serverCommandBytesPerSecond,packetsSinceLast,packetsPerSecond,bytesPerPacket,periodMaxPacketSize,periodMinPacketSize,demoName,demoPath,demoDateTime)"
+			"(demoTime,serverTime,timeSinceLast,skippedPacketsSinceLast,bytesSinceLast,bytesPerSecond,snapshotBytesSinceLast,snapshotBytesPerSecond,serverCommandBytesSinceLast,serverCommandBytesPerSecond,packetsSinceLast,packetsPerSecond,bytesPerPacket,periodMaxPacketSize,periodMinPacketSize,nonDeltaSnapsSinceLast,nonDeltaSnapsPerSecond,angleChangesSinceLast,angleChangesPerSecond,entitiesSinceLast,entitiesPerSecond,entitiesPerPacket,demoName,demoPath,demoDateTime)"
 			" VALUES "
-			"(@demoTime,@serverTime,@timeSinceLast,@skippedPacketsSinceLast,@bytesSinceLast,@bytesPerSecond,@snapshotBytesSinceLast,@snapshotBytesPerSecond,@serverCommandBytesSinceLast,@serverCommandBytesPerSecond,@packetsSinceLast,@packetsPerSecond,@bytesPerPacket,@periodMaxPacketSize,@periodMinPacketSize,@demoName,@demoPath,@demoDateTime)";
+			"(@demoTime,@serverTime,@timeSinceLast,@skippedPacketsSinceLast,@bytesSinceLast,@bytesPerSecond,@snapshotBytesSinceLast,@snapshotBytesPerSecond,@serverCommandBytesSinceLast,@serverCommandBytesPerSecond,@packetsSinceLast,@packetsPerSecond,@bytesPerPacket,@periodMaxPacketSize,@periodMinPacketSize,@nonDeltaSnapsSinceLast,@nonDeltaSnapsPerSecond,@angleChangesSinceLast,@angleChangesPerSecond,@entitiesSinceLast,@entitiesPerSecond,@entitiesPerPacket,@demoName,@demoPath,@demoDateTime)";
 
 		sqlite3_prepare_v2(io.demoStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPacketStatsStatement, NULL);
 		sqlite3_exec(io.demoStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
@@ -2302,6 +2312,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught,qtrue)) {
 					goto cuterror;
 				}
+				currentPacketPeriodStats.angleChanges += (int)(demo.cut.Cl.oldSnap.ps.clientNum != demo.cut.Cl.snap.ps.clientNum); // I'm 14 and this is optimized.
+				currentPacketPeriodStats.nonDeltaSnapshotCount += (int)(demo.cut.Cl.snap.deltaNum == -1); // I'm 14 and this is optimized.
+				currentPacketPeriodStats.entitiesReceivedTotal += demo.cut.Cl.snap.parseEntitiesNum;
 				currentPacketPeriodStats.totalSnapshotSize += oldMsg.readcount - oldMsgOffset;
 
 				// Time related stuff
@@ -5104,6 +5117,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			SQLBIND(io.insertPacketStatsStatement, int, "@bytesPerPacket", currentPacketPeriodStats.totalPacketsSize /currentPacketPeriodStats.totalPacketCount);
 			SQLBIND(io.insertPacketStatsStatement, int, "@periodMaxPacketSize", currentPacketPeriodStats.maxPacketSize);
 			SQLBIND(io.insertPacketStatsStatement, int, "@periodMinPacketSize", currentPacketPeriodStats.minPacketSize);
+
+			SQLBIND(io.insertPacketStatsStatement, int, "@nonDeltaSnapsSinceLast", currentPacketPeriodStats.nonDeltaSnapshotCount);
+			SQLBIND(io.insertPacketStatsStatement, int, "@nonDeltaSnapsPerSecond", 1000  * currentPacketPeriodStats.nonDeltaSnapshotCount / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@angleChangesSinceLast", currentPacketPeriodStats.angleChanges);
+			SQLBIND(io.insertPacketStatsStatement, int, "@angleChangesPerSecond", 1000 * currentPacketPeriodStats.angleChanges / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@entitiesSinceLast", currentPacketPeriodStats.entitiesReceivedTotal);
+			SQLBIND(io.insertPacketStatsStatement, int, "@entitiesPerSecond", 1000 * currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND(io.insertPacketStatsStatement, int, "@entitiesPerPacket", currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.totalPacketCount);
+
 			SQLBIND(io.insertPacketStatsStatement, int, "@demoTime", demoCurrentTime);
 			SQLBIND(io.insertPacketStatsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 
