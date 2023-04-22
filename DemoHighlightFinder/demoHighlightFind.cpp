@@ -2230,8 +2230,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		int thisMessageTotalSize = oldOldSize - oldSize;
 		currentPacketPeriodStats.totalPacketCount++;
 		currentPacketPeriodStats.totalPacketsSize += thisMessageTotalSize;
-		currentPacketPeriodStats.maxPacketSize = std::max(currentPacketPeriodStats.maxPacketSize, oldSize);
-		currentPacketPeriodStats.minPacketSize = std::min(currentPacketPeriodStats.minPacketSize, oldSize);
+		currentPacketPeriodStats.maxPacketSize = std::max(currentPacketPeriodStats.maxPacketSize, thisMessageTotalSize);
+		currentPacketPeriodStats.minPacketSize = std::min(currentPacketPeriodStats.minPacketSize, thisMessageTotalSize);
 
 
 		// init the bitstream
