@@ -2314,7 +2314,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 				currentPacketPeriodStats.angleChanges += (int)(demo.cut.Cl.oldSnap.ps.clientNum != demo.cut.Cl.snap.ps.clientNum); // I'm 14 and this is optimized.
 				currentPacketPeriodStats.nonDeltaSnapshotCount += (int)(demo.cut.Cl.snap.deltaNum == -1); // I'm 14 and this is optimized.
-				currentPacketPeriodStats.entitiesReceivedTotal += demo.cut.Cl.snap.parseEntitiesNum;
+				currentPacketPeriodStats.entitiesReceivedTotal += demo.cut.Cl.snap.numEntities;
 				currentPacketPeriodStats.totalSnapshotSize += oldMsg.readcount - oldMsgOffset;
 
 				// Time related stuff
