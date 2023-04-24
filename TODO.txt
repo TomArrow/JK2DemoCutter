@@ -77,6 +77,10 @@ TODO: use EV_PAIN to get health for entitystate->playerstate.
 
 Demostats: Find demos with dismemberment.
 
+merger: fix events. add persistance to all objects (for strobe demos mostly). add optional smoothing/interpolation with 3 modes: serverTime, commandTime hybrid, commandTime absolute.
+
+fix wrong A2A detections. example: my dbs on andon
+
 Maybe get a stacktrace for SEH exceptions. But don't wanna include 20000000 GB of Boost code just to get the stacktrace. 
 
 

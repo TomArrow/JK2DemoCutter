@@ -1598,7 +1598,7 @@ qboolean FS_FileExists(const char* file);
 qboolean FS_FileErase(const char* file);
 void	FS_FCloseFile(fileHandle_t f);
 //int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType = qfalse, fileCompressionScheme_t* compressionUsed=NULL);
-int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed=NULL);
+int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed=NULL, qboolean nonExclusiveRead=qfalse);
 
 void	QDECL Com_sprintf(char* dest,int size, const char* fmt, ...);
 

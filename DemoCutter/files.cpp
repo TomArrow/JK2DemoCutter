@@ -382,7 +382,7 @@ int FS_filelength(fileHandle_t f) {
 }
 
 
-int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed) {
+int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed, qboolean nonExclusiveRead) {
 	std::string		netpath;
 	long			hash;
 	int				l;
@@ -428,7 +428,15 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 
 	netpath = FS_BuildOSPath("", "", filename);
 	//fsh[*file].handleFiles.file.o = fopen(netpath.c_str(), "rb");
-	fopen_s(&fsh[*file].handleFiles.file.o,netpath.c_str(), "rb");
+#ifdef _WIN32
+	if (nonExclusiveRead) {
+		fsh[*file].handleFiles.file.o = _fsopen(netpath.c_str(), "rb", _SH_DENYNO);
+	}
+#endif
+	else 
+	{
+		fopen_s(&fsh[*file].handleFiles.file.o, netpath.c_str(), "rb");
+	}
 
 	fsh[*file].compressedFileInfo.readMode = qtrue;
 

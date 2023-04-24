@@ -295,7 +295,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	fileCompressionScheme_t compressionSchemeUsed = FILECOMPRESSION_NONE;
 
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed);
+	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed,qtrue);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for cutting.\n", oldName);
 		return qfalse;
