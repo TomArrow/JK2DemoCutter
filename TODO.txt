@@ -75,13 +75,23 @@ log pauses, their times and durations and total pause duration
 log a number of total player changes during a game.
 TODO: use EV_PAIN to get health for entitystate->playerstate.
 
+detect: dbs against ssomeone who's crouching or in roll
+
+todo: add conversion to/from MBII so ppl can do campathss in jamme. Then make a "campath baker"  tool that can bake a jamme path into a demo.
+
 Demostats: Find demos with dismemberment.
+
+TODO: Use saberattackchaincount for something? What about saberBlocked? FallingToDeath?
 
 merger: fix events. add persistance to all objects (for strobe demos mostly). add optional smoothing/interpolation with 3 modes: serverTime, commandTime hybrid, commandTime absolute.
 
 fix wrong A2A detections. example: my dbs on andon
 
-Maybe get a stacktrace for SEH exceptions. But don't wanna include 20000000 GB of Boost code just to get the stacktrace. 
+Maybe get a stacktrace for SEH exceptions. But don't wanna include 20000000 GB of Boost code just to get the stacktrace.
+
+detect: keypress burst speeds.
+detect: comebacks.
+detect: games.
 
 
 TODO: make saber shenanigans 2.0 work: https://github.com/Boothand/jk2mp/commit/613157c3160009482fa00c3d4f668c080423a796

@@ -3749,16 +3749,24 @@ qboolean inline BG_SaberInSpecialAttack(int anim, demoType_t demoType)
 
 
 typedef struct {
-	char* name;
+	const char* name;
 	size_t		offset;
 	int		bits;		// 0 = float
 } netField_t;
 
 // using the stringizing operator to save typing...
+#ifdef _MSC_VER 
+#define	NETF(x) #x,offsetof(entityState_t,x) // Ok you'll think this is completely braindead, but hear me out... MSVC will not allow the offsetof magic in constexpr unless you use THEIR macro. DONT ASK ME WHY
+#else
 #define	NETF(x) #x,(size_t)&((entityState_t*)0)->x
+#endif 
 
 // using the stringizing operator to save typing...
+#ifdef _MSC_VER 
+#define	PSF(x) #x,offsetof(playerState_t,x) // Ok you'll think this is completely braindead, but hear me out... MSVC will not allow the offsetof magic in constexpr unless you use THEIR macro. DONT ASK ME WHY
+#else
 #define	PSF(x) #x,(size_t)&((playerState_t*)0)->x
+#endif 
 
 
 void vectoangles(const vec3_t value1, vec3_t angles);

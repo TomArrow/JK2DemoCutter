@@ -7,7 +7,7 @@
 
 #include "anims.h"
 #include "demoCut.h"
-
+#include <array>
 
 
 // entityState_t->eFlags
@@ -5536,7 +5536,7 @@ static  netField_t	playerStateFieldsJKA[] =
 
 
 
-static  netField_t	entityStateFieldsJKA[] = // Apply to both DM_25 and DM_26 from what I can tell
+static constexpr netField_t	entityStateFieldsJKA[132] = // Apply to both DM_25 and DM_26 from what I can tell
 {
 { NETF(pos.trTime), 32 },
 { NETF(pos.trBase[1]), 0 },
@@ -5729,6 +5729,144 @@ static  netField_t	entityStateFieldsJKA[] = // Apply to both DM_25 and DM_26 fro
 { NETF(userVec2[2]), 1 }
 };
 
+
+
+
+// MBII netfields
+constexpr inline bool strcmp_const(const char* a, const char* b) {
+	bool equal = true;
+	while (equal) {
+		equal = equal && *a == *b;
+		if (*a == 0 || *b == 0) break;
+		a++;
+		b++;
+	}
+	return !equal;
+}
+
+
+// Not as nice as real atoi but will do for the net overrides. Just can't use the hex notation and stuff.
+static inline constexpr int simpleatoi_const(const char* text, int oldVal=0) {
+	return (*text >= '0' && *text <= '9') ? simpleatoi_const(text + 1, (*text - '0') + oldVal * 10) : (*text == 0 ? oldVal : throw std::logic_error("Not a number"));
+}
+
+// 
+static inline constexpr void MSG_CheckNETFPSFOverridesConstExpr(const char* overrideFile, int len, netField_t* netFields, int numFields)
+{
+	//char overrideFile[4096]{ };
+	char entryName[4096]{ };
+	char bits[4096]{ };
+	int ibits=0;
+	int i = 0;
+	int j=0;
+
+	//Now parse through. Lines beginning with ; are disabled.
+	while (overrideFile[i])
+	{
+		if (overrideFile[i] == ';')
+		{ //parse to end of the line
+			while (overrideFile[i] != '\n')
+			{
+				i++;
+			}
+		}
+
+		if (overrideFile[i] != ';' &&
+			overrideFile[i] != '\n' &&
+			overrideFile[i] != '\r')
+		{ //on a valid char I guess, parse it
+			j = 0;
+
+			while (overrideFile[i] && overrideFile[i] != ',')
+			{
+				entryName[j] = overrideFile[i];
+				j++;
+				i++;
+			}
+			entryName[j] = 0;
+
+			if (!overrideFile[i])
+			{ //just give up, this shouldn't happen
+				throw std::logic_error("ERROR: Parsing error for overrides");
+				return;
+			}
+
+			while (overrideFile[i] == ',' || overrideFile[i] == ' ')
+			{ //parse to the start of the value
+				i++;
+			}
+
+			j = 0;
+			while (overrideFile[i] != '\n' && overrideFile[i] != '\r')
+			{ //now read the value in
+				bits[j] = overrideFile[i];
+				j++;
+				i++;
+			}
+			bits[j] = 0;
+
+			if (bits[0])
+			{
+				if (!strcmp_const(bits, "GENTITYNUM_BITS"))
+				{ //special case
+					ibits = GENTITYNUM_BITS;
+				}
+				else
+				{
+					ibits = simpleatoi_const(bits);
+				}
+
+				j = 0;
+
+				//Now go through all the fields and see if we can find a match
+				while (j < numFields)
+				{
+
+					if (!strcmp_const(netFields[j].name, entryName))
+					{ //found it, set the bits
+						netFields[j].bits = ibits;
+						break;
+					}
+					j++;
+				}
+
+				if (j == numFields)
+				{ //failed to find the value
+					throw std::logic_error("ERROR: Override parsing: Value is not valid.");
+					//Com_Printf("WARNING: Value '%s' from %s is not valid\n", entryName, fileName);
+				}
+			}
+			else
+			{ //also should not happen
+				throw std::logic_error("ERROR: Override parsing: Parsing error.");
+				return;
+			}
+		}
+
+		i++;
+	}
+}
+
+template<int size>
+static inline constexpr std::array<netField_t, size> netfieldOverride(const char* overrideText,int overrideTextLength,const netField_t* oldFields) {
+	std::array<netField_t, size> newNetFields{};
+	for (int i = 0; i < size; i++) {
+		newNetFields[i] = entityStateFieldsJKA[i];
+	}
+	MSG_CheckNETFPSFOverridesConstExpr(overrideText, overrideTextLength, newNetFields.data(), size);
+	return newNetFields;
+}
+
+static constexpr auto entityFieldsJKAMBIIV1 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
 
 
 
