@@ -4958,7 +4958,7 @@ Ghoul2 Insert End
 //fields from the normal playerState -mcg
 //=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
 
-static netField_t	playerStateFieldsJKA[] =
+static constexpr netField_t	playerStateFieldsJKA[] =
 {
 { PSF(commandTime), 32 },
 { PSF(origin[1]), 0 },
@@ -5536,7 +5536,7 @@ static  netField_t	playerStateFieldsJKA[] =
 
 
 
-static constexpr netField_t	entityStateFieldsJKA[132] = // Apply to both DM_25 and DM_26 from what I can tell
+static constexpr netField_t	entityStateFieldsJKA[] = // Apply to both DM_25 and DM_26 from what I can tell
 {
 { NETF(pos.trTime), 32 },
 { NETF(pos.trBase[1]), 0 },
@@ -5851,13 +5851,34 @@ template<int size>
 static inline constexpr std::array<netField_t, size> netfieldOverride(const char* overrideText,int overrideTextLength,const netField_t* oldFields) {
 	std::array<netField_t, size> newNetFields{};
 	for (int i = 0; i < size; i++) {
-		newNetFields[i] = entityStateFieldsJKA[i];
+		newNetFields[i] = oldFields[i];
 	}
 	MSG_CheckNETFPSFOverridesConstExpr(overrideText, overrideTextLength, newNetFields.data(), size);
 	return newNetFields;
 }
 
+
+// MB II Netfields: 
+
+// B16
+static constexpr auto entityFieldsJKAMBIIV0 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"userInt3, 32\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// B17
 static constexpr auto entityFieldsJKAMBIIV1 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// B18-B19.1
+static constexpr auto entityFieldsJKAMBIIV2 { []() constexpr {
 	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
 	constexpr const char* overrides = 
 		"userInt1, 32\n"
@@ -5867,7 +5888,299 @@ static constexpr auto entityFieldsJKAMBIIV1 { []() constexpr {
 		"userFloat2, 0\n";
 	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
 }() };
+// RC1
+static constexpr auto entityFieldsJKAMBIIV3 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// RC2-RC3P3
+static constexpr auto entityFieldsJKAMBIIV4 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"eFlags2, 12\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// 0.0.2 - 0.1.8
+static constexpr auto entityFieldsJKAMBIIV5 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"eFlags2, 14\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// 1.0 - 1.6.2.2
+static constexpr auto entityFieldsJKAMBIIV6 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"eFlags2, 28\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// 1.7.0.2-1.7.1.1
+static constexpr auto entityFieldsJKAMBIIV7 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"csSounds_Std, 32\n"
+		"csSounds_Combat, 32\n"
+		"eFlags2, 28\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// 1.7.2.1
+static constexpr auto entityFieldsJKAMBIIV8 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"customRGBA[0], 32\n"
+		"customRGBA[1], 32\n"
+		"customRGBA[2], 32\n"
+		"customRGBA[3], 32\n"
+		"csSounds_Std, 32\n"
+		"csSounds_Combat, 32\n"
+		"eFlags2, 28\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// 1.8 - 1.9.3.1
+static constexpr auto entityFieldsJKAMBIIV9 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"eventParm, GENTITYNUM_BITS\n"
+		"customRGBA[0], 32\n"
+		"customRGBA[1], 32\n"
+		"customRGBA[2], 32\n"
+		"customRGBA[3], 32\n"
+		"csSounds_Std, 32\n"
+		"csSounds_Combat, 32\n"
+		"eFlags2, 28\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
 
+
+
+
+// B16
+static constexpr auto playerStateFieldsJKAMBIIV0 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"userInt1, 10\n"
+		"userInt3, 32\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// B17
+static constexpr auto playerStateFieldsJKAMBIIV1 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// B18
+static constexpr auto playerStateFieldsJKAMBIIV2 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// B19.1 to RC1
+static constexpr auto playerStateFieldsJKAMBIIV3 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// RC2 to RC3P3
+static constexpr auto playerStateFieldsJKAMBIIV4 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"fd.forcePower, 9\n"
+		"eFlags2, 12\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// 0.0.2 to 0.1.8
+static constexpr auto playerStateFieldsJKAMBIIV5 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"fd.forcePower, 9\n"
+		"eFlags2, 14\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// 1.0 to 1.7.1.1
+static constexpr auto playerStateFieldsJKAMBIIV6 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"fd.forcePower, 9\n"
+		"eFlags2, 28\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// 1.7.2.1
+static constexpr auto playerStateFieldsJKAMBIIV7 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"zoomMode, 3\n"
+		"fd.forcePower, 9\n"
+		"customRGBA[0], 32\n"
+		"customRGBA[1], 32\n"
+		"customRGBA[2], 32\n"
+		"customRGBA[3], 32\n"
+		"eFlags2, 28\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// 1.8 to 1.9.3.1
+static constexpr auto playerStateFieldsJKAMBIIV8 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"externalEventParm, GENTITYNUM_BITS\n"
+		"eventParms[0], GENTITYNUM_BITS\n"
+		"eventParms[1], GENTITYNUM_BITS\n"
+		"zoomMode, 3\n"
+		"fd.forcePower, 9\n"
+		"customRGBA[0], 32\n"
+		"customRGBA[1], 32\n"
+		"customRGBA[2], 32\n"
+		"customRGBA[3], 32\n"
+		"eFlags2, 28\n"
+		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
 
 
 
