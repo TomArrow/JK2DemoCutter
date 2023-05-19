@@ -206,6 +206,9 @@
     <ClCompile Include="..\shared\animMappingTable.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\SQLDelayer.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -281,6 +284,9 @@
     </ClInclude>
     <ClInclude Include="..\shared\zlib\zutil.h">
       <Filter>Common\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\SQLDelayer.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

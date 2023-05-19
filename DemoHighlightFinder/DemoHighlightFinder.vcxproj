@@ -70,6 +70,7 @@
     <ClCompile Include="..\shared\lzmaSDK\XzDec.c" />
     <ClCompile Include="..\shared\lzmaSDK\XzEnc.c" />
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c" />
+    <ClCompile Include="..\shared\SQLDelayer.cpp" />
     <ClCompile Include="..\shared\sqlite\sqlite3.c" />
     <ClCompile Include="..\shared\zlib\adler32.c" />
     <ClCompile Include="..\shared\zlib\compress.c" />
@@ -94,6 +95,7 @@
     <ClInclude Include="..\shared\boostTupleHash.hpp" />
     <ClInclude Include="..\shared\include\picosha3.h" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />
+    <ClInclude Include="..\shared\SQLDelayer.h" />
     <ClInclude Include="..\shared\sqlite\sqlite3.h" />
     <ClInclude Include="..\shared\zlib\crc32.h" />
     <ClInclude Include="..\shared\zlib\deflate.h" />
@@ -233,7 +235,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;DEBUG;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_NOTRYCATCH;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;DEBUG;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ExceptionHandling>Async</ExceptionHandling>

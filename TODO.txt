@@ -89,6 +89,8 @@ fix wrong A2A detections. example: my dbs on andon
 
 Maybe get a stacktrace for SEH exceptions. But don't wanna include 20000000 GB of Boost code just to get the stacktrace.
 
+idea: better interpolation using gravity and velocity. maybe even with jump in between? hmm. but 2 jumps would be 2 much. Or even use AI to do interpolation?
+
 detect: keypress burst speeds.
 detect: comebacks.
 detect: games.

@@ -35,7 +35,10 @@ extern std::string errorInfo;
 
 #define NOMINMAX
 
-#ifdef _MSC_VER
+#ifdef _NOTRYCATCH
+#define __TRY if(1)
+#define __EXCEPT if(0)
+#elif defined(_MSC_VER)
 #include <windows.h>
 #undef SEARCH_ALL
 #undef near

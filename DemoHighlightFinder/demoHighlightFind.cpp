@@ -16,12 +16,13 @@
 #include "picosha3.h"
 
 #include "popl.hpp"
+#include "SQLDelayer.h"
 
 #define DEBUGSTATSDB
 
 
 
-
+typedef std::vector<SQLDelayedQuery*> queryCollection;
 struct ioHandles_t {
 	// Killdb
 	sqlite3* killDb;
@@ -45,6 +46,24 @@ struct ioHandles_t {
 	sqlite3* demoStatsDb;
 	sqlite3_stmt* insertPacketStatsStatement;
 
+	// Entity to DB (optional)
+	sqlite3* entityDataDb;
+	sqlite3_stmt* insertEntityDataStatement;
+	sqlite3_stmt* insertPlayerStateDataStatement;
+	sqlite3_stmt* insertGameStateDataStatement;
+	sqlite3_stmt* insertConfigStringDataStatement;
+
+	// Delayer query stuff
+	queryCollection* laughQueries;
+	queryCollection* defragQueries;
+	queryCollection* captureQueries;
+	queryCollection* spreeQueries;
+	queryCollection* killQueries;
+	queryCollection* killAngleQueries;
+	queryCollection* playerModelQueries;
+	queryCollection* playerDemoStatsQueries;
+
+	// Output bat files
 	std::ofstream* outputBatHandle;
 	std::ofstream* outputBatHandleKillSprees;
 	std::ofstream* outputBatHandleDefrag;
@@ -67,6 +86,7 @@ class ExtraSearchOptions {
 public:
 	bool quickSkipNonSaberExclusive = false; // Not implemented (yet). Skip demoss that aren't saber only
 	bool onlyLogSaberKills = false;
+	bool entityDataToDb = false;
 	int onlyLogKillSpreesWithSaberKills = 0;
 	int writeDemoPacketStats = 0; // 0 = don't write stats. -1  = write immediately on every packet. other number = write  as soon as time interval in demotime has passed
 	bool onlyLogCapturesWithSaberKills = false;
@@ -249,9 +269,13 @@ std::map< animStanceKey, int> animStanceCounts;
 #endif
 
 
-#define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
-#define SQLBIND_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
-#define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
+//#define SQLBIND_DELAYED(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
+//#define SQLBIND_DELAYED_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
+//#define SQLBIND_DELAYED_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
+
+#define SQLBIND_DELAYED(delayedQuery,type,name,value) delayedQuery->add(name,value)
+#define SQLBIND_DELAYED_NULL(delayedQuery,name) delayedQuery->add(name,SQLDelayedValue_NULL)
+#define SQLBIND_DELAYED_TEXT(delayedQuery,name,value) delayedQuery->add(name,value)
 
 #define NEARBY_PLAYER_MAX_DISTANCE 1000.0f
 #define VERYCLOSE_PLAYER_MAX_DISTANCE 300.0f
@@ -1015,19 +1039,24 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 				//variantCString = variant.c_str();
 			}
 		}
-		SQLBIND_TEXT(io.insertPlayerModelStatement, "@map", mapname.c_str());
-		SQLBIND_TEXT(io.updatePlayerModelCountStatement, "@map", mapname.c_str());
-		SQLBIND_TEXT(io.insertPlayerModelStatement, "@baseModel", baseModel.c_str());
-		SQLBIND_TEXT(io.updatePlayerModelCountStatement, "@baseModel", baseModel.c_str());
+
+		SQLDelayedQuery* query = new SQLDelayedQuery();
+
+		SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+		//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@map", mapname.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@baseModel", baseModel.c_str());
+		//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@baseModel", baseModel.c_str());
 		if (variantExists) {
-			SQLBIND_TEXT(io.insertPlayerModelStatement, "@variant", variant.c_str());
-			SQLBIND_TEXT(io.updatePlayerModelCountStatement, "@variant", variant.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@variant", variant.c_str());
+			//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@variant", variant.c_str());
 		}
 		else {
-			SQLBIND_NULL(io.insertPlayerModelStatement, "@variant");
-			SQLBIND_NULL(io.updatePlayerModelCountStatement, "@variant");
+			SQLBIND_DELAYED_NULL(query, "@variant");
+			//SQLBIND_DELAYED_NULL(io.updatePlayerModelCountStatement, "@variant");
 		}
 
+		query->bind(io.insertPlayerModelStatement);
+		query->bind(io.updatePlayerModelCountStatement);
 		wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertPlayerModelStatement);
 		if (queryResult != SQLITE_DONE) {
@@ -1147,39 +1176,43 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
 
 		// Log the kill.
-		SQLBIND_TEXT(io.insertSpreeStatement, "@hash", hash_hex_string.c_str());
-		SQLBIND_TEXT(io.insertSpreeStatement, "@shorthash", shorthash.c_str());
-		SQLBIND(io.insertSpreeStatement, int, "@maxDelay", maxDelay);
-		SQLBIND(io.insertSpreeStatement, int, "@maxDelayActual", maxDelayActual);
-		SQLBIND_TEXT(io.insertSpreeStatement, "@map", mapname.c_str());
-		SQLBIND_TEXT(io.insertSpreeStatement, "@killerName", playername.c_str());
+		SQLDelayedQuery* query = new SQLDelayedQuery();
+
+		SQLBIND_DELAYED_TEXT(query, "@hash", hash_hex_string.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@shorthash", shorthash.c_str());
+		SQLBIND_DELAYED(query, int, "@maxDelay", maxDelay);
+		SQLBIND_DELAYED(query, int, "@maxDelayActual", maxDelayActual);
+		SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@killerName", playername.c_str());
 		std::string playernameStripped = Q_StripColorAll(playername);
-		SQLBIND_TEXT(io.insertSpreeStatement, "@killerNameStripped", playernameStripped.c_str());
-		SQLBIND_TEXT(io.insertSpreeStatement, "@victimNames", victimsString.c_str());
-		SQLBIND_TEXT(io.insertSpreeStatement, "@victimNamesStripped", victimsStringStripped.c_str());
-		SQLBIND_TEXT(io.insertSpreeStatement, "@killTypes", killTypesString.c_str());
-		SQLBIND(io.insertSpreeStatement, int, "@killTypesCount", killTypeCount);
-		SQLBIND_TEXT(io.insertSpreeStatement, "@killHashes", killHashesString.c_str());
-		SQLBIND(io.insertSpreeStatement, int, "@killerClientNum", clientNumAttacker);
-		SQLBIND_TEXT(io.insertSpreeStatement, "@victimClientNums", victimsNumsString.c_str());
-		SQLBIND(io.insertSpreeStatement, int, "@countKills", spreeInfo->countKills);
-		SQLBIND(io.insertSpreeStatement, int, "@countRets", spreeInfo->countRets);
-		SQLBIND(io.insertSpreeStatement, int, "@countDooms", spreeInfo->countDooms);
-		SQLBIND(io.insertSpreeStatement, int, "@countExplosions", spreeInfo->countExplosions);
-		SQLBIND(io.insertSpreeStatement, int, "@countThirdPersons", spreeInfo->countThirdPersons);
+		SQLBIND_DELAYED_TEXT(query, "@killerNameStripped", playernameStripped.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@victimNames", victimsString.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@victimNamesStripped", victimsStringStripped.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@killTypes", killTypesString.c_str());
+		SQLBIND_DELAYED(query, int, "@killTypesCount", killTypeCount);
+		SQLBIND_DELAYED_TEXT(query, "@killHashes", killHashesString.c_str());
+		SQLBIND_DELAYED(query, int, "@killerClientNum", clientNumAttacker);
+		SQLBIND_DELAYED_TEXT(query, "@victimClientNums", victimsNumsString.c_str());
+		SQLBIND_DELAYED(query, int, "@countKills", spreeInfo->countKills);
+		SQLBIND_DELAYED(query, int, "@countRets", spreeInfo->countRets);
+		SQLBIND_DELAYED(query, int, "@countDooms", spreeInfo->countDooms);
+		SQLBIND_DELAYED(query, int, "@countExplosions", spreeInfo->countExplosions);
+		SQLBIND_DELAYED(query, int, "@countThirdPersons", spreeInfo->countThirdPersons);
 
-		SQLBIND_TEXT(io.insertSpreeStatement, "@nearbyPlayers", nearbyPlayers.size() > 0 ? nearbyPlayersString.c_str() : NULL);
-		SQLBIND(io.insertSpreeStatement, int, "@nearbyPlayerCount", nearbyPlayers.size());
+		SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyPlayers.size() > 0 ? nearbyPlayersString.c_str() : NULL);
+		SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyPlayers.size());
 
-		SQLBIND(io.insertSpreeStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-		SQLBIND(io.insertSpreeStatement, int, "@maxSpeedAttacker", maxSpeedAttacker);
-		SQLBIND(io.insertSpreeStatement, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
-		SQLBIND_TEXT(io.insertSpreeStatement, "@demoName", oldBasename.c_str());
-		SQLBIND_TEXT(io.insertSpreeStatement, "@demoPath", oldPath.c_str());
-		SQLBIND(io.insertSpreeStatement, int, "@demoTime", spreeInfo->lastKillTime - spreeInfo->totalTime);
-		SQLBIND(io.insertSpreeStatement, int, "@duration", spreeInfo->totalTime);
-		SQLBIND(io.insertSpreeStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-		SQLBIND(io.insertSpreeStatement, int, "@demoDateTime", oldDemoDateModified);
+		SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+		SQLBIND_DELAYED(query, int, "@maxSpeedAttacker", maxSpeedAttacker);
+		SQLBIND_DELAYED(query, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
+		SQLBIND_DELAYED_TEXT(query, "@demoName", oldBasename.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@demoPath", oldPath.c_str());
+		SQLBIND_DELAYED(query, int, "@demoTime", spreeInfo->lastKillTime - spreeInfo->totalTime);
+		SQLBIND_DELAYED(query, int, "@duration", spreeInfo->totalTime);
+		SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+		SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
+
+		query->bind(io.insertSpreeStatement);
 
 		wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertSpreeStatement);
@@ -1234,29 +1267,33 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 			int duration = lastLaugh - firstLaugh;
 
+			SQLDelayedQuery* query = new SQLDelayedQuery();
+
 			// Aye, let's log it.
 			int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 			const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 			std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
 			std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
-			SQLBIND_TEXT(io.insertLaughsStatement, "@map", mapname.c_str());
-			SQLBIND_TEXT(io.insertLaughsStatement, "@serverName", serverName.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
 			std::string serverNameStripped = Q_StripColorAll(serverName);
-			SQLBIND_TEXT(io.insertLaughsStatement, "@serverNameStripped", serverNameStripped.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 			std::string laughsString = laughs.str();
 			std::string laughsChatlogString = laughsChatlog.str();
-			SQLBIND_TEXT(io.insertLaughsStatement, "@laughs", laughsString.c_str());
-			SQLBIND_TEXT(io.insertLaughsStatement, "@chatlog", laughsChatlogString.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@laughs", laughsString.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@chatlog", laughsChatlogString.c_str());
 			std::string laughsChatlogStringStripped = Q_StripColorAll(laughsChatlogString);
-			SQLBIND_TEXT(io.insertLaughsStatement, "@chatlogStripped", laughsChatlogStringStripped.c_str());
-			SQLBIND(io.insertLaughsStatement, int, "@laughCount", laughCount);
-			SQLBIND_TEXT(io.insertLaughsStatement, "@demoName", (*oldBasename).c_str());
-			SQLBIND_TEXT(io.insertLaughsStatement, "@demoPath", (*oldPath).c_str());
-			SQLBIND(io.insertLaughsStatement, int, "@duration", duration);
-			SQLBIND(io.insertLaughsStatement, int, "@demoTime", firstLaugh);
-			SQLBIND(io.insertLaughsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-			SQLBIND(io.insertLaughsStatement, int, "@demoDateTime", oldDemoDateModified);
-			SQLBIND(io.insertLaughsStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+			SQLBIND_DELAYED_TEXT(query, "@chatlogStripped", laughsChatlogStringStripped.c_str());
+			SQLBIND_DELAYED(query, int, "@laughCount", laughCount);
+			SQLBIND_DELAYED_TEXT(query, "@demoName", (*oldBasename).c_str());
+			SQLBIND_DELAYED_TEXT(query, "@demoPath", (*oldPath).c_str());
+			SQLBIND_DELAYED(query, int, "@duration", duration);
+			SQLBIND_DELAYED(query, int, "@demoTime", firstLaugh);
+			SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+			SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
+			SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+
+			query->bind(io.insertLaughsStatement);
 
 			wasDoingSQLiteExecution = true;
 			int queryResult = sqlite3_step(io.insertLaughsStatement);
@@ -1334,6 +1371,17 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleDefrag->open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleCaptures->open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleLaughs->open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
+
+
+
+	io.laughQueries = new queryCollection();
+	io.defragQueries = new queryCollection();
+	io.captureQueries = new queryCollection();
+	io.spreeQueries = new queryCollection();
+	io.killQueries = new queryCollection();
+	io.killAngleQueries = new queryCollection();
+	io.playerModelQueries = new queryCollection();
+	io.playerDemoStatsQueries = new queryCollection();
 
 	sqlite3_open("killDatabase.db", &io.killDb);
 	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
@@ -1741,6 +1789,11 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	}
 
 
+	if (opts.entityDataToDb) {
+		sqlite3_open("entityDataDb.db", &io.entityDataDb);
+	}
+
+
 #ifdef DEBUGSTATSDB
 	sqlite3_open("debugStatsDb.db", &io.debugStatsDb);
 
@@ -1830,6 +1883,15 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			sqlite3_finalize(io.insertPacketStatsStatement);
 			sqlite3_close(io.demoStatsDb);
 		}
+		if (opts.entityDataToDb) {
+			sqlite3_exec(io.entityDataDb, "COMMIT;", NULL, NULL, NULL);
+
+			if(io.insertEntityDataStatement) sqlite3_finalize(io.insertEntityDataStatement); // TODO Remove the ifs here once all is implemented
+			if(io.insertPlayerStateDataStatement) sqlite3_finalize(io.insertPlayerStateDataStatement);
+			if(io.insertGameStateDataStatement) sqlite3_finalize(io.insertGameStateDataStatement);
+			if(io.insertConfigStringDataStatement) sqlite3_finalize(io.insertConfigStringDataStatement);
+			sqlite3_close(io.entityDataDb);
+		}
 	}
 
 	io.outputBatHandle->close();
@@ -1848,6 +1910,8 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 
 		if (it->second.everUsed) { // Some clients may have never been visible or not even existed at all (we have entries for all client nums by default but they're only set to "everUsed" if they were actually seen)
 
+			SQLDelayedQuery* query = new SQLDelayedQuery();
+
 			std::string mapname = std::get<0>(it->first);
 			std::string playerName = std::get<1>(it->first);
 			int clientNum = std::get<2>(it->first);
@@ -1855,13 +1919,13 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 			double strafeDeviationNoSaberMove = it->second.strafeDeviationNoSaberMove.sum / it->second.strafeDeviationNoSaberMove.divisor;
 			int64_t strafeSampleCount = it->second.strafeDeviation.divisor + 0.5;
 			int64_t strafeNoSaberMoveSampleCount = it->second.strafeDeviationNoSaberMove.divisor + 0.5;
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@map", mapname.c_str());
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerName", playerName.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@playerName", playerName.c_str());
 			std::string playernameStripped = Q_StripColorAll(playerName);
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@playerNameStripped", playernameStripped.c_str());
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@clientNum", clientNum);
-			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviation", strafeDeviation);
-			SQLBIND(io.insertPlayerDemoStatsStatement, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
+			SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
+			SQLBIND_DELAYED(query, int, "@clientNum", clientNum);
+			SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", strafeDeviation);
+			SQLBIND_DELAYED(query, double, "@averageStrafeDeviationNoSaberMove", strafeDeviationNoSaberMove);
 
 			std::stringstream ssStrafeJson;
 			std::stringstream ssStrafeNoSaberMoveJson;
@@ -1911,21 +1975,23 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 			ssStrafeNoSaberMoveJson << "]\n";
 			std::string ssStrafeJsonString = ssStrafeJson.str();
 			std::string ssStrafeNoSaberMoveJsonString = ssStrafeNoSaberMoveJson.str();
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@averageStrafeDeviationBucketsJSON", ssStrafeJsonString.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@averageStrafeDeviationNoSaberMoveBucketsJSON", ssStrafeNoSaberMoveJsonString.c_str());
 
 
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeSampleCount", strafeSampleCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
+			SQLBIND_DELAYED(query, int, "@strafeSampleCount", strafeSampleCount);
+			SQLBIND_DELAYED(query, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
 
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberCount", it->second.hitBySaberCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@parryCount", it->second.parryCount);
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@attackFromParryCount", it->second.attackFromParryCount);
+			SQLBIND_DELAYED(query, int, "@hitBySaberCount", it->second.hitBySaberCount);
+			SQLBIND_DELAYED(query, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
+			SQLBIND_DELAYED(query, int, "@parryCount", it->second.parryCount);
+			SQLBIND_DELAYED(query, int, "@attackFromParryCount", it->second.attackFromParryCount);
 
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoName", sharedVars.oldBasename.c_str());
-			SQLBIND_TEXT(io.insertPlayerDemoStatsStatement, "@demoPath", sharedVars.oldPath.c_str());
-			SQLBIND(io.insertPlayerDemoStatsStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+			SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
+			SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+
+			query->bind(io.insertPlayerDemoStatsStatement);
 
 			wasDoingSQLiteExecution = true;
 			int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
@@ -1941,6 +2007,8 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 #ifdef DEBUGSTATSDB
 	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
 
+		SQLDelayedQuery* query = new SQLDelayedQuery();
+
 		/*SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
 		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
 		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
@@ -1952,27 +2020,29 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", demo.cut.Cl.snap.ps.legsAnim & ~ANIM_TOGGLEBIT);
 		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", demo.cut.Cl.snap.ps.saberMove);
 		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", demo.cut.Cl.snap.ps.fd.saberAnimLevel);*/
-		SQLBIND(io.insertAnimStanceStatement, int, "@demoVersion", std::get<0>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", std::get<1>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", std::get<2>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@legsAnim", std::get<3>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@saberMove", std::get<4>(it->first));
-		SQLBIND(io.insertAnimStanceStatement, int, "@stance", std::get<5>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@countFound", it->second);
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
-		SQLBIND(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
+		SQLBIND_DELAYED(query, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND_DELAYED(query, int, "@saberHolstered", std::get<1>(it->first));
+		SQLBIND_DELAYED(query, int, "@torsoAnim", std::get<2>(it->first));
+		SQLBIND_DELAYED(query, int, "@legsAnim", std::get<3>(it->first));
+		SQLBIND_DELAYED(query, int, "@saberMove", std::get<4>(it->first));
+		SQLBIND_DELAYED(query, int, "@stance", std::get<5>(it->first));
+		SQLBIND_DELAYED(query, int, "@countFound", it->second);
+		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@demoVersion", std::get<0>(it->first));
+		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@saberHolstered", std::get<1>(it->first));
+		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@torsoAnim", std::get<2>(it->first));
+		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@legsAnim", std::get<3>(it->first));
+		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
+		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
 
 		wasDoingSQLiteExecution = true;
+		query->bind(io.insertAnimStanceStatement);
 		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
 		if (queryResult != SQLITE_DONE) {
 			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
 		}
 		sqlite3_reset(io.insertAnimStanceStatement);
 
+		query->bind(io.updateAnimStanceCountStatement);
 		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
 		if (queryResult != SQLITE_DONE) {
 			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
@@ -3888,48 +3958,51 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::string logModString = logModStringSS.str();
 							const char* modString = logModString.c_str();
 
-							// Log the kill.
-							SQLBIND_TEXT(io.insertStatement, "@hash", hash_hex_string.c_str());
-							SQLBIND_TEXT(io.insertStatement, "@shorthash", shorthash.c_str());
-							SQLBIND_TEXT(io.insertStatement, "@map", mapname.c_str());
-							SQLBIND_TEXT(io.insertStatement, "@serverName", serverName.c_str());
-							std::string serverNameStripped = Q_StripColorAll(serverName);
-							SQLBIND_TEXT(io.insertStatement, "@serverNameStripped", serverNameStripped.c_str());
-							SQLBIND_TEXT(io.insertStatement, "@killerName", playername.c_str());
-							std::string playernameStripped = Q_StripColorAll(playername);
-							SQLBIND_TEXT(io.insertStatement, "@killerNameStripped", playernameStripped.c_str());
-							SQLBIND_TEXT(io.insertStatement, "@victimName", victimname.c_str());
-							std::string victimnameStripped = Q_StripColorAll(victimname);
-							SQLBIND_TEXT(io.insertStatement, "@victimNameStripped", victimnameStripped.c_str());
-							if (isWorldKill) {
-								SQLBIND_NULL(io.insertStatement, "@killerTeam");
-							}
-							else {
-								SQLBIND(io.insertStatement, int, "@killerTeam", playerTeams[attacker]);
-							}
-							SQLBIND(io.insertStatement, int, "@victimTeam", playerTeams[target]);
-							SQLBIND(io.insertStatement, int, "@redScore", teamInfo[TEAM_RED].score);
-							SQLBIND(io.insertStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
-							if (victimIsFlagCarrier) {
-								SQLBIND(io.insertStatement, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.blueflag: cgs.redflag);
-							}
-							else {
-								SQLBIND_NULL(io.insertStatement, "@otherFlagStatus");
-							}
-							SQLBIND(io.insertStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
-							SQLBIND(io.insertStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
-							SQLBIND(io.insertStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount +  teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
-							SQLBIND(io.insertStatement, int, "@killerClientNum", attacker);
-							SQLBIND(io.insertStatement, int, "@victimClientNum", target);
-							SQLBIND(io.insertStatement, int, "@isDoomKill", isDoomKill);
-							SQLBIND(io.insertStatement, int, "@isExplosion", thisKill.isExplosion);
-							SQLBIND(io.insertStatement, int, "@isSuicide", isSuicide);
-							SQLBIND(io.insertStatement, int, "@isModSuicide", mod==MOD_SUICIDE_GENERAL);
-							SQLBIND(io.insertStatement, int, "@meansOfDeath", mod); // Original or generalized? hmm
-							SQLBIND(io.insertStatement, double, "@positionX", thisEs->pos.trBase[0]);
-							SQLBIND(io.insertStatement, double, "@positionY", thisEs->pos.trBase[1]);
-							SQLBIND(io.insertStatement, double, "@positionZ", thisEs->pos.trBase[2]);
+							SQLDelayedQuery* query = new SQLDelayedQuery();
 
+							// Log the kill.
+							SQLBIND_DELAYED_TEXT(query, "@hash", hash_hex_string.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@shorthash", shorthash.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
+							std::string serverNameStripped = Q_StripColorAll(serverName);
+							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@killerName", playername.c_str());
+							std::string playernameStripped = Q_StripColorAll(playername);
+							SQLBIND_DELAYED_TEXT(query, "@killerNameStripped", playernameStripped.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@victimName", victimname.c_str());
+							std::string victimnameStripped = Q_StripColorAll(victimname);
+							SQLBIND_DELAYED_TEXT(query, "@victimNameStripped", victimnameStripped.c_str());
+							if (isWorldKill) {
+								SQLBIND_DELAYED_NULL(query, "@killerTeam");
+							}
+							else {
+								SQLBIND_DELAYED(query, int, "@killerTeam", playerTeams[attacker]);
+							}
+							SQLBIND_DELAYED(query, int, "@victimTeam", playerTeams[target]);
+							SQLBIND_DELAYED(query, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND_DELAYED(query, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							if (victimIsFlagCarrier) {
+								SQLBIND_DELAYED(query, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.blueflag: cgs.redflag);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@otherFlagStatus");
+							}
+							SQLBIND_DELAYED(query, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND_DELAYED(query, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND_DELAYED(query, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount +  teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
+							SQLBIND_DELAYED(query, int, "@killerClientNum", attacker);
+							SQLBIND_DELAYED(query, int, "@victimClientNum", target);
+							SQLBIND_DELAYED(query, int, "@isDoomKill", isDoomKill);
+							SQLBIND_DELAYED(query, int, "@isExplosion", thisKill.isExplosion);
+							SQLBIND_DELAYED(query, int, "@isSuicide", isSuicide);
+							SQLBIND_DELAYED(query, int, "@isModSuicide", mod==MOD_SUICIDE_GENERAL);
+							SQLBIND_DELAYED(query, int, "@meansOfDeath", mod); // Original or generalized? hmm
+							SQLBIND_DELAYED(query, double, "@positionX", thisEs->pos.trBase[0]);
+							SQLBIND_DELAYED(query, double, "@positionY", thisEs->pos.trBase[1]);
+							SQLBIND_DELAYED(query, double, "@positionZ", thisEs->pos.trBase[2]);
+
+							query->bind(io.insertStatement);
 							wasDoingSQLiteExecution = true;
 							int queryResult = sqlite3_step(io.insertStatement);
 							if (queryResult != SQLITE_DONE) {
@@ -3941,144 +4014,146 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							sqlite3_reset(io.insertStatement);
 							wasDoingSQLiteExecution = false;
 
+							SQLDelayedQuery* angleQuery = new SQLDelayedQuery();
 
-							SQLBIND_TEXT(io.insertAngleStatement, "@hash", hash_hex_string.c_str());
-							SQLBIND_TEXT(io.insertAngleStatement, "@shorthash", shorthash.c_str());
-							SQLBIND_TEXT(io.insertAngleStatement, "@map", mapname.c_str());
-							SQLBIND(io.insertAngleStatement, int, "@isReturn", victimIsFlagCarrier);
-							SQLBIND(io.insertAngleStatement, int, "@killerIsFlagCarrier", attackerIsFlagCarrier);
+							SQLBIND_DELAYED_TEXT(angleQuery, "@hash", hash_hex_string.c_str());
+							SQLBIND_DELAYED_TEXT(angleQuery, "@shorthash", shorthash.c_str());
+							SQLBIND_DELAYED_TEXT(angleQuery, "@map", mapname.c_str());
+							SQLBIND_DELAYED(angleQuery, int, "@isReturn", victimIsFlagCarrier);
+							SQLBIND_DELAYED(angleQuery, int, "@killerIsFlagCarrier", attackerIsFlagCarrier);
 							if (victimIsFlagCarrier) {
-								SQLBIND(io.insertAngleStatement, int, "@victimFlagHoldTime", recentFlagHoldTimes[target]);
+								SQLBIND_DELAYED(angleQuery, int, "@victimFlagHoldTime", recentFlagHoldTimes[target]);
 								//SQLBIND(io.insertAngleStatement, int, "@flagPickupSource", teamInfo[victimFlagTeam].flagHoldOrigin);
-								SQLBIND(io.insertAngleStatement, int, "@victimFlagPickupSource", victimCarrierLastPickupOrigin);
-								SQLBIND(io.insertAngleStatement, int, "@victimCapperKills", victimFlagCarrierKillCount);
-								SQLBIND(io.insertAngleStatement, int, "@victimCapperRets", victimFlagCarrierRetCount);
-								SQLBIND(io.insertAngleStatement, int, "@victimCapperWasFollowedOrVisible", capperWasVisibleOrFollowed);
+								SQLBIND_DELAYED(angleQuery, int, "@victimFlagPickupSource", victimCarrierLastPickupOrigin);
+								SQLBIND_DELAYED(angleQuery, int, "@victimCapperKills", victimFlagCarrierKillCount);
+								SQLBIND_DELAYED(angleQuery, int, "@victimCapperRets", victimFlagCarrierRetCount);
+								SQLBIND_DELAYED(angleQuery, int, "@victimCapperWasFollowedOrVisible", capperWasVisibleOrFollowed);
 
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperMaxNearbyEnemyCount", maxNearbyEnemyCount);
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperMoreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperAverageNearbyEnemyCount", averageNearbyEnemyCount);
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperMaxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperAnyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
-								SQLBIND(io.insertAngleStatement, double, "@victimCapperAverageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperMaxNearbyEnemyCount", maxNearbyEnemyCount);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperMoreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperAverageNearbyEnemyCount", averageNearbyEnemyCount);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperMaxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperAnyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
+								SQLBIND_DELAYED(angleQuery, double, "@victimCapperAverageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
 							}
 							else {
-								SQLBIND_NULL(io.insertAngleStatement, "@victimFlagHoldTime");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimFlagPickupSource");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperKills");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperRets");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperWasFollowedOrVisible");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimFlagHoldTime");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimFlagPickupSource");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperKills");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperRets");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperWasFollowedOrVisible");
 
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMaxNearbyEnemyCount");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMoreThanOneNearbyEnemyTimePercent");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperAverageNearbyEnemyCount");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMaxVeryCloseEnemyCount");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperAnyVeryCloseEnemyTimePercent");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent");
-								SQLBIND_NULL(io.insertAngleStatement, "@victimCapperAverageVeryCloseEnemyCount");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperMaxNearbyEnemyCount");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperMoreThanOneNearbyEnemyTimePercent");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperAverageNearbyEnemyCount");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperMaxVeryCloseEnemyCount");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperAnyVeryCloseEnemyTimePercent");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperAverageVeryCloseEnemyCount");
 							}
-							SQLBIND(io.insertAngleStatement, int, "@targetIsVisible", targetIsVisible);
-							SQLBIND(io.insertAngleStatement, int, "@targetIsFollowed", targetIsFollowed);
-							SQLBIND(io.insertAngleStatement, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
-							SQLBIND(io.insertAngleStatement, int, "@isSuicide", isSuicide);
-							SQLBIND(io.insertAngleStatement, int, "@isModSuicide", mod == MOD_SUICIDE_GENERAL);
-							SQLBIND(io.insertAngleStatement, int, "@attackerIsVisible", attackerIsVisible);
-							SQLBIND(io.insertAngleStatement, int, "@attackerIsFollowed", attackerIsFollowed);
-							SQLBIND(io.insertAngleStatement, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
-							SQLBIND(io.insertAngleStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND_DELAYED(angleQuery, int, "@targetIsVisible", targetIsVisible);
+							SQLBIND_DELAYED(angleQuery, int, "@targetIsFollowed", targetIsFollowed);
+							SQLBIND_DELAYED(angleQuery, int, "@targetIsFollowedOrVisible", targetIsVisibleOrFollowed);
+							SQLBIND_DELAYED(angleQuery, int, "@isSuicide", isSuicide);
+							SQLBIND_DELAYED(angleQuery, int, "@isModSuicide", mod == MOD_SUICIDE_GENERAL);
+							SQLBIND_DELAYED(angleQuery, int, "@attackerIsVisible", attackerIsVisible);
+							SQLBIND_DELAYED(angleQuery, int, "@attackerIsFollowed", attackerIsFollowed);
+							SQLBIND_DELAYED(angleQuery, int, "@attackerIsFollowedOrVisible", attackerIsVisibleOrFollowed);
+							SQLBIND_DELAYED(angleQuery, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 
-							SQLBIND_TEXT(io.insertAngleStatement, "@boosts", (boostCountAttacker + boostCountVictim) > 0 ? boostsString.c_str() : NULL);
-							SQLBIND(io.insertAngleStatement, int, "@boostCountTotal", boostCountAttacker + boostCountVictim);
-							SQLBIND(io.insertAngleStatement, int, "@boostCountAttacker", boostCountAttacker);
-							SQLBIND(io.insertAngleStatement, int, "@boostCountVictim", boostCountVictim);
+							SQLBIND_DELAYED_TEXT(angleQuery, "@boosts", (boostCountAttacker + boostCountVictim) > 0 ? boostsString.c_str() : NULL);
+							SQLBIND_DELAYED(angleQuery, int, "@boostCountTotal", boostCountAttacker + boostCountVictim);
+							SQLBIND_DELAYED(angleQuery, int, "@boostCountAttacker", boostCountAttacker);
+							SQLBIND_DELAYED(angleQuery, int, "@boostCountVictim", boostCountVictim);
 
 							if (canBeAirborne) {
 								if (killerProjectile == -1) {
-									SQLBIND_NULL(io.insertAngleStatement, "@projectileWasAirborne");
+									SQLBIND_DELAYED_NULL(angleQuery, "@projectileWasAirborne");
 								}
 								else {
-									SQLBIND(io.insertAngleStatement, int, "@projectileWasAirborne", projectileWasAirborne);
+									SQLBIND_DELAYED(angleQuery, int, "@projectileWasAirborne", projectileWasAirborne);
 								}
 							}
 							else {
-								SQLBIND_NULL(io.insertAngleStatement, "@projectileWasAirborne");
+								SQLBIND_DELAYED_NULL(angleQuery, "@projectileWasAirborne");
 							}
 
 							if (attacker >= 0 && attacker < max_clients) {
-								SQLBIND(io.insertAngleStatement, int, "@headJumps", headJumpCountAttacker);
-								SQLBIND(io.insertAngleStatement, int, "@specialJumps", specialJumpCountAttacker);
-								SQLBIND(io.insertAngleStatement, int, "@timeSinceLastSelfSentryJump", timeSinceLastSelfSentryJump);
+								SQLBIND_DELAYED(angleQuery, int, "@headJumps", headJumpCountAttacker);
+								SQLBIND_DELAYED(angleQuery, int, "@specialJumps", specialJumpCountAttacker);
+								SQLBIND_DELAYED(angleQuery, int, "@timeSinceLastSelfSentryJump", timeSinceLastSelfSentryJump);
 							}
 							else {
-								SQLBIND_NULL(io.insertAngleStatement, "@headJumps");
-								SQLBIND_NULL(io.insertAngleStatement, "@specialJumps");
-								SQLBIND_NULL(io.insertAngleStatement, "@timeSinceLastSelfSentryJump");
+								SQLBIND_DELAYED_NULL(angleQuery, "@headJumps");
+								SQLBIND_DELAYED_NULL(angleQuery, "@specialJumps");
+								SQLBIND_DELAYED_NULL(angleQuery, "@timeSinceLastSelfSentryJump");
 							}
 
 							if (baseFlagDistanceKnownAndApplicable) {
-								SQLBIND(io.insertAngleStatement, double, "@baseFlagDistance", baseFlagDistance);
+								SQLBIND_DELAYED(angleQuery, double, "@baseFlagDistance", baseFlagDistance);
 							}
 							else {
-								SQLBIND_NULL(io.insertAngleStatement, "@baseFlagDistance");
+								SQLBIND_DELAYED_NULL(angleQuery, "@baseFlagDistance");
 							}
 
 
-							SQLBIND(io.insertAngleStatement, double, "@maxAngularSpeedAttacker", maxAngularSpeedAttackerFloat >= 0 ? maxAngularSpeedAttackerFloat : NULL);
-							SQLBIND(io.insertAngleStatement, double, "@maxAngularAccelerationAttacker", maxAngularAccelerationAttackerFloat >= 0 ? maxAngularAccelerationAttackerFloat * accelerationMultiplier : NULL);
-							SQLBIND(io.insertAngleStatement, double, "@maxAngularJerkAttacker", maxAngularJerkAttackerFloat >= 0 ? maxAngularJerkAttackerFloat * jerkMultiplier : NULL);
-							SQLBIND(io.insertAngleStatement, double, "@maxAngularSnapAttacker", maxAngularSnapAttackerFloat >= 0 ? maxAngularSnapAttackerFloat *snapMultiplier : NULL); 
+							SQLBIND_DELAYED(angleQuery, double, "@maxAngularSpeedAttacker", maxAngularSpeedAttackerFloat >= 0 ? maxAngularSpeedAttackerFloat : NULL);
+							SQLBIND_DELAYED(angleQuery, double, "@maxAngularAccelerationAttacker", maxAngularAccelerationAttackerFloat >= 0 ? maxAngularAccelerationAttackerFloat * accelerationMultiplier : NULL);
+							SQLBIND_DELAYED(angleQuery, double, "@maxAngularJerkAttacker", maxAngularJerkAttackerFloat >= 0 ? maxAngularJerkAttackerFloat * jerkMultiplier : NULL);
+							SQLBIND_DELAYED(angleQuery, double, "@maxAngularSnapAttacker", maxAngularSnapAttackerFloat >= 0 ? maxAngularSnapAttackerFloat *snapMultiplier : NULL);
 
 
-							SQLBIND(io.insertAngleStatement, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
-							SQLBIND(io.insertAngleStatement, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
-							SQLBIND(io.insertAngleStatement, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
-							SQLBIND(io.insertAngleStatement, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
+							SQLBIND_DELAYED(angleQuery, double, "@maxSpeedAttacker", maxSpeedAttackerFloat >= 0 ? maxSpeedAttackerFloat : NULL);
+							SQLBIND_DELAYED(angleQuery, double, "@maxSpeedTarget", maxSpeedTargetFloat >= 0 ? maxSpeedTargetFloat : NULL);
+							SQLBIND_DELAYED(angleQuery, double, "@lastSaberMoveChangeSpeed", thisKill.speedatSaberMoveChange >= 0 ? thisKill.speedatSaberMoveChange : NULL);
+							SQLBIND_DELAYED(angleQuery, int, "@timeSinceLastSaberMoveChange", thisKill.timeSinceSaberMoveChange >= 0 ? thisKill.timeSinceSaberMoveChange : NULL);
 							if (thisKill.timeSinceBackflip >= 0) {
-								SQLBIND(io.insertAngleStatement, int, "@timeSinceLastBackflip",thisKill.timeSinceBackflip);
+								SQLBIND_DELAYED(angleQuery, int, "@timeSinceLastBackflip",thisKill.timeSinceBackflip);
 							}
 							else {
-								SQLBIND_NULL(io.insertAngleStatement, "@timeSinceLastBackflip");
+								SQLBIND_DELAYED_NULL(angleQuery, "@timeSinceLastBackflip");
 							}
-							SQLBIND_TEXT(io.insertAngleStatement, "@meansOfDeathString", modString);
-							SQLBIND_TEXT(io.insertAngleStatement, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
-							SQLBIND(io.insertAngleStatement, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
-							SQLBIND(io.insertAngleStatement, int, "@probableKillingWeapon", probableKillingWeapon);
+							SQLBIND_DELAYED_TEXT(angleQuery, "@meansOfDeathString", modString);
+							SQLBIND_DELAYED_TEXT(angleQuery, "@nearbyPlayers", thisKill.nearbyPlayers.size() > 0? nearbyPlayersString.c_str():NULL);
+							SQLBIND_DELAYED(angleQuery, int, "@nearbyPlayerCount", thisKill.nearbyPlayers.size());
+							SQLBIND_DELAYED(angleQuery, int, "@probableKillingWeapon", probableKillingWeapon);
 
-							SQLBIND(io.insertAngleStatement, double, "@attackerJumpHeight", attackerJumpHeight);
-							SQLBIND(io.insertAngleStatement, double, "@victimJumpHeight", victimJumpHeight);
+							SQLBIND_DELAYED(angleQuery, double, "@attackerJumpHeight", attackerJumpHeight);
+							SQLBIND_DELAYED(angleQuery, double, "@victimJumpHeight", victimJumpHeight);
 
 							if (attackerIsFollowed) {
-								SQLBIND(io.insertAngleStatement, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
-								SQLBIND(io.insertAngleStatement, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);
-								SQLBIND(io.insertAngleStatement, double, "@directionZ", demo.cut.Cl.snap.ps.velocity[2]);
-								SQLBIND(io.insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(demo.cut.Cl.snap.ps.velocity));
+								SQLBIND_DELAYED(angleQuery, double, "@directionX", demo.cut.Cl.snap.ps.velocity[0]);
+								SQLBIND_DELAYED(angleQuery, double, "@directionY", demo.cut.Cl.snap.ps.velocity[1]);
+								SQLBIND_DELAYED(angleQuery, double, "@directionZ", demo.cut.Cl.snap.ps.velocity[2]);
+								SQLBIND_DELAYED(angleQuery, double, "@currentSpeedAttacker", VectorLength(demo.cut.Cl.snap.ps.velocity));
 							} else if(attackerEntity){
-								SQLBIND(io.insertAngleStatement, double, "@directionX", attackerEntity->pos.trDelta[0]);
-								SQLBIND(io.insertAngleStatement, double, "@directionY", attackerEntity->pos.trDelta[1]);
-								SQLBIND(io.insertAngleStatement, double, "@directionZ", attackerEntity->pos.trDelta[2]);
-								SQLBIND(io.insertAngleStatement, double, "@currentSpeedAttacker", VectorLength(attackerEntity->pos.trDelta));
+								SQLBIND_DELAYED(angleQuery, double, "@directionX", attackerEntity->pos.trDelta[0]);
+								SQLBIND_DELAYED(angleQuery, double, "@directionY", attackerEntity->pos.trDelta[1]);
+								SQLBIND_DELAYED(angleQuery, double, "@directionZ", attackerEntity->pos.trDelta[2]);
+								SQLBIND_DELAYED(angleQuery, double, "@currentSpeedAttacker", VectorLength(attackerEntity->pos.trDelta));
 							} else {
-								SQLBIND_NULL(io.insertAngleStatement,  "@directionX");
-								SQLBIND_NULL(io.insertAngleStatement,  "@directionY");
-								SQLBIND_NULL(io.insertAngleStatement,  "@directionZ");
-								SQLBIND_NULL(io.insertAngleStatement,  "@currentSpeedAttacker");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@directionX");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@directionY");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@directionZ");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@currentSpeedAttacker");
 							}
 							if (targetIsFollowed) {
-								SQLBIND(io.insertAngleStatement, double, "@currentSpeedTarget", VectorLength(demo.cut.Cl.snap.ps.velocity));
+								SQLBIND_DELAYED(angleQuery, double, "@currentSpeedTarget", VectorLength(demo.cut.Cl.snap.ps.velocity));
 							}
 							else if (targetEntity) {
-								SQLBIND(io.insertAngleStatement, double, "@currentSpeedTarget", VectorLength(targetEntity->pos.trDelta));
+								SQLBIND_DELAYED(angleQuery, double, "@currentSpeedTarget", VectorLength(targetEntity->pos.trDelta));
 							}
 							else {
-								SQLBIND_NULL(io.insertAngleStatement, "@currentSpeedTarget");
+								SQLBIND_DELAYED_NULL(angleQuery, "@currentSpeedTarget");
 							}
-							SQLBIND_TEXT(io.insertAngleStatement, "@demoName", sharedVars.oldBasename.c_str());
-							SQLBIND_TEXT(io.insertAngleStatement, "@demoPath", sharedVars.oldPath.c_str());
-							SQLBIND(io.insertAngleStatement, int, "@demoTime", demoCurrentTime);
-							SQLBIND(io.insertAngleStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-							SQLBIND(io.insertAngleStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+							SQLBIND_DELAYED_TEXT(angleQuery, "@demoName", sharedVars.oldBasename.c_str());
+							SQLBIND_DELAYED_TEXT(angleQuery, "@demoPath", sharedVars.oldPath.c_str());
+							SQLBIND_DELAYED(angleQuery, int, "@demoTime", demoCurrentTime);
+							SQLBIND_DELAYED(angleQuery, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
+							angleQuery->bind(io.insertAngleStatement);
 							wasDoingSQLiteExecution = true;
 							queryResult = sqlite3_step(io.insertAngleStatement);
 							if (queryResult != SQLITE_DONE) {
@@ -4324,70 +4399,73 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
 
-							SQLBIND_TEXT(io.insertCaptureStatement, "@map", mapname.c_str());
-							SQLBIND_TEXT(io.insertCaptureStatement, "@serverName", serverName.c_str());
-							std::string serverNameStripped = Q_StripColorAll(serverName);
-							SQLBIND_TEXT(io.insertCaptureStatement, "@serverNameStripped", serverNameStripped.c_str());
-							SQLBIND(io.insertCaptureStatement, int, "@flagHoldTime", flagHoldTime);
-							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
-							SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
-							SQLBIND_TEXT(io.insertCaptureStatement, "@capperName", playername.c_str());
-							std::string playernameStripped = Q_StripColorAll(playername);
-							SQLBIND_TEXT(io.insertCaptureStatement, "@capperNameStripped", playernameStripped.c_str());
-							SQLBIND(io.insertCaptureStatement, int, "@capperClientNum", playerNum);
-							SQLBIND(io.insertCaptureStatement, int, "@capperIsVisible", playerIsVisible);
-							SQLBIND(io.insertCaptureStatement, int, "@capperIsFollowed", playerIsFollowed);
-							SQLBIND(io.insertCaptureStatement, int, "@capperIsFollowedOrVisible", playerIsVisibleOrFollowed);
-							SQLBIND(io.insertCaptureStatement, int, "@capperWasVisible", wasVisible);
-							SQLBIND(io.insertCaptureStatement, int, "@capperWasFollowed", wasFollowed);
-							SQLBIND(io.insertCaptureStatement, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
-							SQLBIND(io.insertCaptureStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-							SQLBIND(io.insertCaptureStatement, int, "@flagTeam", flagTeam);
-							SQLBIND(io.insertCaptureStatement, int, "@capperKills", flagCarrierKillCount);
-							SQLBIND(io.insertCaptureStatement, int, "@capperRets", flagCarrierRetCount);
-							SQLBIND(io.insertCaptureStatement, int, "@redScore", teamInfo[TEAM_RED].score);
-							SQLBIND(io.insertCaptureStatement, int, "@blueScore", teamInfo[TEAM_BLUE].score);
-							SQLBIND(io.insertCaptureStatement, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
-							SQLBIND(io.insertCaptureStatement, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
-							SQLBIND(io.insertCaptureStatement, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
-							SQLBIND(io.insertCaptureStatement, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
-							SQLBIND(io.insertCaptureStatement, double, "@maxSpeedCapper", maxSpeedCapper);
-							SQLBIND(io.insertCaptureStatement, double, "@averageSpeedCapper", averageSpeedCapper);
-							SQLBIND_TEXT(io.insertCaptureStatement, "@nearbyPlayers", nearbyPlayersString.c_str());
-							SQLBIND(io.insertCaptureStatement, int, "@nearbyPlayerCount", nearbyPlayersCount);
-							SQLBIND_TEXT(io.insertCaptureStatement, "@nearbyEnemies", nearbyEnemiesString.c_str());
-							SQLBIND(io.insertCaptureStatement, int, "@nearbyEnemyCount", nearbyEnemiescount);
+							SQLDelayedQuery* query = new SQLDelayedQuery();
 
-							SQLBIND(io.insertCaptureStatement, double, "@maxNearbyEnemyCount", maxNearbyEnemyCount);
-							SQLBIND(io.insertCaptureStatement, double, "@moreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
-							SQLBIND(io.insertCaptureStatement, double, "@averageNearbyEnemyCount", averageNearbyEnemyCount);
-							SQLBIND(io.insertCaptureStatement, double, "@maxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
-							SQLBIND(io.insertCaptureStatement, double, "@anyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
-							SQLBIND(io.insertCaptureStatement, double, "@moreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
-							SQLBIND(io.insertCaptureStatement, double, "@averageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
+							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
+							std::string serverNameStripped = Q_StripColorAll(serverName);
+							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
+							SQLBIND_DELAYED(query, int, "@flagHoldTime", flagHoldTime);
+							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
+							SQLBIND_DELAYED(query, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
+							SQLBIND_DELAYED_TEXT(query, "@capperName", playername.c_str());
+							std::string playernameStripped = Q_StripColorAll(playername);
+							SQLBIND_DELAYED_TEXT(query, "@capperNameStripped", playernameStripped.c_str());
+							SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
+							SQLBIND_DELAYED(query, int, "@capperIsVisible", playerIsVisible);
+							SQLBIND_DELAYED(query, int, "@capperIsFollowed", playerIsFollowed);
+							SQLBIND_DELAYED(query, int, "@capperIsFollowedOrVisible", playerIsVisibleOrFollowed);
+							SQLBIND_DELAYED(query, int, "@capperWasVisible", wasVisible);
+							SQLBIND_DELAYED(query, int, "@capperWasFollowed", wasFollowed);
+							SQLBIND_DELAYED(query, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
+							SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND_DELAYED(query, int, "@flagTeam", flagTeam);
+							SQLBIND_DELAYED(query, int, "@capperKills", flagCarrierKillCount);
+							SQLBIND_DELAYED(query, int, "@capperRets", flagCarrierRetCount);
+							SQLBIND_DELAYED(query, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND_DELAYED(query, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							SQLBIND_DELAYED(query, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND_DELAYED(query, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND_DELAYED(query, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
+							SQLBIND_DELAYED(query, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
+							SQLBIND_DELAYED(query, double, "@maxSpeedCapper", maxSpeedCapper);
+							SQLBIND_DELAYED(query, double, "@averageSpeedCapper", averageSpeedCapper);
+							SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyPlayersString.c_str());
+							SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyPlayersCount);
+							SQLBIND_DELAYED_TEXT(query, "@nearbyEnemies", nearbyEnemiesString.c_str());
+							SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", nearbyEnemiescount);
+
+							SQLBIND_DELAYED(query, double, "@maxNearbyEnemyCount", maxNearbyEnemyCount);
+							SQLBIND_DELAYED(query, double, "@moreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
+							SQLBIND_DELAYED(query, double, "@averageNearbyEnemyCount", averageNearbyEnemyCount);
+							SQLBIND_DELAYED(query, double, "@maxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
+							SQLBIND_DELAYED(query, double, "@anyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
+							SQLBIND_DELAYED(query, double, "@moreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
+							SQLBIND_DELAYED(query, double, "@averageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
 
 							if (playerIsVisibleOrFollowed) {
-								SQLBIND(io.insertCaptureStatement, double, "@positionX", currentPos[0]);
-								SQLBIND(io.insertCaptureStatement, double, "@positionY", currentPos[1]);
-								SQLBIND(io.insertCaptureStatement, double, "@positionZ", currentPos[2]);
-								SQLBIND(io.insertCaptureStatement, double, "@directionX", currentDir[0]);
-								SQLBIND(io.insertCaptureStatement, double, "@directionY", currentDir[1]);
-								SQLBIND(io.insertCaptureStatement, double, "@directionZ", currentDir[2]);
+								SQLBIND_DELAYED(query, double, "@positionX", currentPos[0]);
+								SQLBIND_DELAYED(query, double, "@positionY", currentPos[1]);
+								SQLBIND_DELAYED(query, double, "@positionZ", currentPos[2]);
+								SQLBIND_DELAYED(query, double, "@directionX", currentDir[0]);
+								SQLBIND_DELAYED(query, double, "@directionY", currentDir[1]);
+								SQLBIND_DELAYED(query, double, "@directionZ", currentDir[2]);
 							}
 							else {
-								SQLBIND_NULL(io.insertCaptureStatement,  "@positionX");
-								SQLBIND_NULL(io.insertCaptureStatement,  "@positionY");
-								SQLBIND_NULL(io.insertCaptureStatement,  "@positionZ");
-								SQLBIND_NULL(io.insertCaptureStatement,  "@directionX");
-								SQLBIND_NULL(io.insertCaptureStatement,  "@directionY");
-								SQLBIND_NULL(io.insertCaptureStatement,  "@directionZ");
+								SQLBIND_DELAYED_NULL(query,  "@positionX");
+								SQLBIND_DELAYED_NULL(query,  "@positionY");
+								SQLBIND_DELAYED_NULL(query,  "@positionZ");
+								SQLBIND_DELAYED_NULL(query,  "@directionX");
+								SQLBIND_DELAYED_NULL(query,  "@directionY");
+								SQLBIND_DELAYED_NULL(query,  "@directionZ");
 							}
-							SQLBIND_TEXT(io.insertCaptureStatement, "@demoName", sharedVars.oldBasename.c_str());
-							SQLBIND_TEXT(io.insertCaptureStatement, "@demoPath", sharedVars.oldPath.c_str());
-							SQLBIND(io.insertCaptureStatement, int, "@demoTime", demoCurrentTime);
-							SQLBIND(io.insertCaptureStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-							SQLBIND(io.insertCaptureStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+							SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
+							SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
+							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
+							query->bind(io.insertCaptureStatement);
 							wasDoingSQLiteExecution = true;
 							int queryResult = sqlite3_step(io.insertCaptureStatement);
 							uint64_t insertedId = -1;
@@ -5010,39 +5088,42 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
 					std::string formattedTimeString = formattedTime.str();
 
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@map", mapname.c_str());
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@serverName", serverName.c_str());
+					SQLDelayedQuery* query = new SQLDelayedQuery();
+
+					SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+					SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
 					std::string serverNameStripped = Q_StripColorAll(serverName);
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@serverNameStripped", serverNameStripped.c_str());
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@readableTime", formattedTimeString.c_str());
-					SQLBIND(io.insertDefragRunStatement, int, "@totalMilliseconds", totalMilliSeconds);
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@playerName", playername.c_str());
+					SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
+					SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
+					SQLBIND_DELAYED(query, int, "@totalMilliseconds", totalMilliSeconds);
+					SQLBIND_DELAYED_TEXT(query, "@playerName", playername.c_str());
 					std::string playernameStripped = Q_StripColorAll(playername);
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@playerNameStripped", playernameStripped.c_str());
-					SQLBIND(io.insertDefragRunStatement, int, "@isTop10", isLogged);
-					SQLBIND(io.insertDefragRunStatement, int, "@isNumber1", isNumberOne);
-					SQLBIND(io.insertDefragRunStatement, int, "@isPersonalBest", isPersonalBest);
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoName", sharedVars.oldBasename.c_str());
-					SQLBIND_TEXT(io.insertDefragRunStatement, "@demoPath", sharedVars.oldPath.c_str());
-					SQLBIND(io.insertDefragRunStatement, int, "@demoTime", demoCurrentTime);
-					SQLBIND(io.insertDefragRunStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-					SQLBIND(io.insertDefragRunStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
-					SQLBIND(io.insertDefragRunStatement, int, "@wasVisible", wasVisible);
-					SQLBIND(io.insertDefragRunStatement, int, "@wasFollowed", wasFollowed);
-					SQLBIND(io.insertDefragRunStatement, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
+					SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
+					SQLBIND_DELAYED(query, int, "@isTop10", isLogged);
+					SQLBIND_DELAYED(query, int, "@isNumber1", isNumberOne);
+					SQLBIND_DELAYED(query, int, "@isPersonalBest", isPersonalBest);
+					SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
+					SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
+					SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
+					SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+					SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+					SQLBIND_DELAYED(query, int, "@wasVisible", wasVisible);
+					SQLBIND_DELAYED(query, int, "@wasFollowed", wasFollowed);
+					SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
 
 					// Do we have strafe deviation info?
 					int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
 					if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
-						SQLBIND(io.insertDefragRunStatement, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum/strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
+						SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum/strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
 					}
 					else {
-						SQLBIND_NULL(io.insertDefragRunStatement, "@averageStrafeDeviation");
+						SQLBIND_DELAYED_NULL(query, "@averageStrafeDeviation");
 					}
 
-					SQLBIND(io.insertDefragRunStatement, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-					SQLBIND(io.insertDefragRunStatement, int, "@runnerClientNum", playerNumber);
+					SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+					SQLBIND_DELAYED(query, int, "@runnerClientNum", playerNumber);
 
+					query->bind(io.insertDefragRunStatement);
 					wasDoingSQLiteExecution = true;
 					int queryResult = sqlite3_step(io.insertDefragRunStatement);
 					if (queryResult != SQLITE_DONE) {
@@ -5104,35 +5185,38 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		if (oldSize == 0 || (opts.writeDemoPacketStats && currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) >= opts.writeDemoPacketStats))) {
 
-			SQLBIND(io.insertPacketStatsStatement, int, "@timeSinceLast", currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@skippedPacketsSinceLast", currentPacketPeriodStats.droppedPackets);
-			SQLBIND(io.insertPacketStatsStatement, int, "@bytesSinceLast", currentPacketPeriodStats.totalPacketsSize);
-			SQLBIND(io.insertPacketStatsStatement, int, "@bytesPerSecond", 1000*currentPacketPeriodStats.totalPacketsSize/ currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@snapshotBytesSinceLast", currentPacketPeriodStats.totalSnapshotSize);
-			SQLBIND(io.insertPacketStatsStatement, int, "@snapshotBytesPerSecond", 1000 * currentPacketPeriodStats.totalSnapshotSize / currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@serverCommandBytesSinceLast", currentPacketPeriodStats.totalServerCommandSize);
-			SQLBIND(io.insertPacketStatsStatement, int, "@serverCommandBytesPerSecond", 1000 * currentPacketPeriodStats.totalServerCommandSize / currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@packetsSinceLast", currentPacketPeriodStats.totalPacketCount);
-			SQLBIND(io.insertPacketStatsStatement, double, "@packetsPerSecond", 1000.0* (double)currentPacketPeriodStats.totalPacketCount/ (double)currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@bytesPerPacket", currentPacketPeriodStats.totalPacketsSize /currentPacketPeriodStats.totalPacketCount);
-			SQLBIND(io.insertPacketStatsStatement, int, "@periodMaxPacketSize", currentPacketPeriodStats.maxPacketSize);
-			SQLBIND(io.insertPacketStatsStatement, int, "@periodMinPacketSize", currentPacketPeriodStats.minPacketSize);
+			SQLDelayedQuery* query = new SQLDelayedQuery();
 
-			SQLBIND(io.insertPacketStatsStatement, int, "@nonDeltaSnapsSinceLast", currentPacketPeriodStats.nonDeltaSnapshotCount);
-			SQLBIND(io.insertPacketStatsStatement, int, "@nonDeltaSnapsPerSecond", 1000  * currentPacketPeriodStats.nonDeltaSnapshotCount / currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@angleChangesSinceLast", currentPacketPeriodStats.angleChanges);
-			SQLBIND(io.insertPacketStatsStatement, int, "@angleChangesPerSecond", 1000 * currentPacketPeriodStats.angleChanges / currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@entitiesSinceLast", currentPacketPeriodStats.entitiesReceivedTotal);
-			SQLBIND(io.insertPacketStatsStatement, int, "@entitiesPerSecond", 1000 * currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.periodTotalTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@entitiesPerPacket", currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.totalPacketCount);
+			SQLBIND_DELAYED(query, int, "@timeSinceLast", currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@skippedPacketsSinceLast", currentPacketPeriodStats.droppedPackets);
+			SQLBIND_DELAYED(query, int, "@bytesSinceLast", currentPacketPeriodStats.totalPacketsSize);
+			SQLBIND_DELAYED(query, int, "@bytesPerSecond", 1000*currentPacketPeriodStats.totalPacketsSize/ currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@snapshotBytesSinceLast", currentPacketPeriodStats.totalSnapshotSize);
+			SQLBIND_DELAYED(query, int, "@snapshotBytesPerSecond", 1000 * currentPacketPeriodStats.totalSnapshotSize / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@serverCommandBytesSinceLast", currentPacketPeriodStats.totalServerCommandSize);
+			SQLBIND_DELAYED(query, int, "@serverCommandBytesPerSecond", 1000 * currentPacketPeriodStats.totalServerCommandSize / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@packetsSinceLast", currentPacketPeriodStats.totalPacketCount);
+			SQLBIND_DELAYED(query, double, "@packetsPerSecond", 1000.0* (double)currentPacketPeriodStats.totalPacketCount/ (double)currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@bytesPerPacket", currentPacketPeriodStats.totalPacketsSize /currentPacketPeriodStats.totalPacketCount);
+			SQLBIND_DELAYED(query, int, "@periodMaxPacketSize", currentPacketPeriodStats.maxPacketSize);
+			SQLBIND_DELAYED(query, int, "@periodMinPacketSize", currentPacketPeriodStats.minPacketSize);
 
-			SQLBIND(io.insertPacketStatsStatement, int, "@demoTime", demoCurrentTime);
-			SQLBIND(io.insertPacketStatsStatement, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+			SQLBIND_DELAYED(query, int, "@nonDeltaSnapsSinceLast", currentPacketPeriodStats.nonDeltaSnapshotCount);
+			SQLBIND_DELAYED(query, int, "@nonDeltaSnapsPerSecond", 1000  * currentPacketPeriodStats.nonDeltaSnapshotCount / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@angleChangesSinceLast", currentPacketPeriodStats.angleChanges);
+			SQLBIND_DELAYED(query, int, "@angleChangesPerSecond", 1000 * currentPacketPeriodStats.angleChanges / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@entitiesSinceLast", currentPacketPeriodStats.entitiesReceivedTotal);
+			SQLBIND_DELAYED(query, int, "@entitiesPerSecond", 1000 * currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@entitiesPerPacket", currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.totalPacketCount);
 
-			SQLBIND_TEXT(io.insertPacketStatsStatement, "@demoName", sharedVars.oldBasename.c_str());
-			SQLBIND_TEXT(io.insertPacketStatsStatement, "@demoPath", sharedVars.oldPath.c_str());
-			SQLBIND(io.insertPacketStatsStatement, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+			SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
+			SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 
+			SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
+			SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
+			SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+
+			query->bind(io.insertPacketStatsStatement);
 			wasDoingSQLiteExecution = true;
 			int queryResult = sqlite3_step(io.insertPacketStatsStatement);
 			if (queryResult != SQLITE_DONE) {
@@ -5286,6 +5370,7 @@ int main(int argcO, char** argvO) {
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
+	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -5310,6 +5395,7 @@ int main(int argcO, char** argvO) {
 
 
 	ExtraSearchOptions opts;
+	opts.entityDataToDb = e->is_set();
 	opts.onlyLogSaberKills = s->is_set();
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set() ? S->value() : 0;
 	opts.writeDemoPacketStats = d->is_set() ? (d->value() <= 0 ? -1 : d->value()) : 0;
