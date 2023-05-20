@@ -18,11 +18,20 @@
 #include "popl.hpp"
 #include "SQLDelayer.h"
 
+#include <mutex>
+#include "named_mutex.hpp"
+
 #define DEBUGSTATSDB
 
+typedef class SQLDelayedQueryWrapper_t {
+public:
+	SQLDelayedQuery query;
+	std::string batchSuffix = ""; // Text that should appear after the cutting command (like metadata that finishes collecting after a kill)
+	std::string batchPrefix = ""; // Text that should appear before the cutting command (like insert Id)
+	std::string batchString = ""; // Main text to appear in batch
+};
 
-
-typedef std::vector<SQLDelayedQuery*> queryCollection;
+typedef std::vector<SQLDelayedQueryWrapper_t*> queryCollection;
 struct ioHandles_t {
 	// Killdb
 	sqlite3* killDb;
@@ -62,6 +71,8 @@ struct ioHandles_t {
 	queryCollection* killAngleQueries;
 	queryCollection* playerModelQueries;
 	queryCollection* playerDemoStatsQueries;
+	queryCollection* animStanceQueries;
+	queryCollection* packetStatsQueries;
 
 	// Output bat files
 	std::ofstream* outputBatHandle;
@@ -1040,7 +1051,8 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 			}
 		}
 
-		SQLDelayedQuery* query = new SQLDelayedQuery();
+		SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+		SQLDelayedQuery* query = &queryWrapper->query;
 
 		SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 		//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@map", mapname.c_str());
@@ -1055,20 +1067,8 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 			//SQLBIND_DELAYED_NULL(io.updatePlayerModelCountStatement, "@variant");
 		}
 
-		query->bind(io.insertPlayerModelStatement);
-		query->bind(io.updatePlayerModelCountStatement);
-		wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertPlayerModelStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting player model into database: " << sqlite3_errmsg(io.killDb) << "\n";
-		}
-		sqlite3_reset(io.insertPlayerModelStatement);
-		queryResult = sqlite3_step(io.updatePlayerModelCountStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating player model count in database: " << sqlite3_errmsg(io.killDb) << "\n";
-		}
-		sqlite3_reset(io.updatePlayerModelCountStatement);
-		wasDoingSQLiteExecution = false;
+		io.playerModelQueries->push_back(queryWrapper);
+
 	}
 
 }
@@ -1175,8 +1175,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(clientNumAttacker, spreeInfo->lastKillTime - spreeInfo->totalTime - 1000, spreeInfo->lastKillTime);
 		int maxSpeedVictims = spreeInfo->maxVictimSpeed;
 
-		// Log the kill.
-		SQLDelayedQuery* query = new SQLDelayedQuery();
+		// Log the killspree.
+		SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+		SQLDelayedQuery* query = &queryWrapper->query;
 
 		SQLBIND_DELAYED_TEXT(query, "@hash", hash_hex_string.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@shorthash", shorthash.c_str());
@@ -1212,16 +1213,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 		SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
 
-		query->bind(io.insertSpreeStatement);
-
-		wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertSpreeStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting killing spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
-		}
-		sqlite3_reset(io.insertSpreeStatement);
-		wasDoingSQLiteExecution = false;
-
+		io.spreeQueries->push_back(queryWrapper);
 
 		int startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
 		int endTime = spreeInfo->lastKillTime + bufferTime;
@@ -1247,10 +1239,12 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 		sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
+		std::stringstream batSS;
+		batSS << "\nrem hash: " << hash_hex_string;
+		batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+		batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+		queryWrapper->batchString = batSS.str();
 
-		(*io.outputBatHandleKillSprees) << "\nrem hash: " << hash_hex_string;
-		(*io.outputBatHandleKillSprees) << "\nrem demoCurrentTime: " << demoCurrentTime;
-		(*io.outputBatHandleKillSprees) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 		delete[] targetFilenameFiltered;
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
 		std::cout << ss.str() << "\n";
@@ -1267,7 +1261,8 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 			int duration = lastLaugh - firstLaugh;
 
-			SQLDelayedQuery* query = new SQLDelayedQuery();
+			SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+			SQLDelayedQuery* query = &queryWrapper->query;
 
 			// Aye, let's log it.
 			int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -1293,26 +1288,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
 			SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 
-			query->bind(io.insertLaughsStatement);
-
-			wasDoingSQLiteExecution = true;
-			int queryResult = sqlite3_step(io.insertLaughsStatement);
-			uint64_t insertedId = -1;
-			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting laugh spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
-			}
-			else {
-				queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
-				if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-					std::cout << "Error retrieving inserted laughs id from database: " << sqlite3_errmsg(io.killDb) << "\n";
-				}
-				else {
-					insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
-				}
-				sqlite3_reset(io.selectLastInsertRowIdStatement);
-			}
-			sqlite3_reset(io.insertLaughsStatement);
-			wasDoingSQLiteExecution = false;
+			io.laughQueries->push_back(queryWrapper);
 
 			int startTime = firstLaugh - LAUGHS_CUT_PRE_TIME - bufferTime;
 			int endTime = lastLaugh + bufferTime;
@@ -1333,9 +1309,11 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 			sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-			(*io.outputBatHandleLaughs) << "\nrem demoCurrentTime: " << demoCurrentTime;
-			(*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
-			(*io.outputBatHandleLaughs) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+			std::stringstream batSS;
+			batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+			batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+			queryWrapper->batchString = batSS.str();
+
 			delete[] targetFilenameFiltered;
 			std::cout << targetFilename << "\n";
 		}
@@ -1345,43 +1323,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 }
 
 
-
-
-template<unsigned int max_clients>
-qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts) {
-
-	ioHandles_t io;
-
-	std::ofstream outputBatHandle;
-	std::ofstream outputBatHandleKillSprees;
-	std::ofstream outputBatHandleDefrag;
-	std::ofstream outputBatHandleCaptures;
-	std::ofstream outputBatHandleLaughs;
-
-	io.outputBatHandle = &outputBatHandle;
-	io.outputBatHandleKillSprees = &outputBatHandleKillSprees;
-	io.outputBatHandleDefrag = &outputBatHandleDefrag;
-	io.outputBatHandleCaptures = &outputBatHandleCaptures;
-	io.outputBatHandleLaughs = &outputBatHandleLaughs;
-
-	
-
-	io.outputBatHandle->open(outputBatFile, std::ios_base::app); // append instead of overwrite
-	io.outputBatHandleKillSprees->open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
-	io.outputBatHandleDefrag->open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
-	io.outputBatHandleCaptures->open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
-	io.outputBatHandleLaughs->open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
-
-
-
-	io.laughQueries = new queryCollection();
-	io.defragQueries = new queryCollection();
-	io.captureQueries = new queryCollection();
-	io.spreeQueries = new queryCollection();
-	io.killQueries = new queryCollection();
-	io.killAngleQueries = new queryCollection();
-	io.playerModelQueries = new queryCollection();
-	io.playerDemoStatsQueries = new queryCollection();
+void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions opts) {
 
 	sqlite3_open("killDatabase.db", &io.killDb);
 	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
@@ -1689,7 +1631,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		"(hash,shorthash,map,serverName,serverNameStripped,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
 		"VALUES "
 		"(@hash,@shorthash,@map,@serverName,@serverNameStripped,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
-;
+	;
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
 		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
@@ -1816,6 +1758,211 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateAnimStanceCountStatement, NULL);
 	sqlite3_exec(io.debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 #endif
+}
+
+void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions opts) {
+
+	// Animstances
+#ifdef DEBUGSTATSDB
+	// anim stance stuff
+	for (auto it = io.animStanceQueries->begin(); it != io.animStanceQueries->end(); it++) {
+		//wasDoingSQLiteExecution = true;
+		(*it)->query.bind(io.insertAnimStanceStatement);
+		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+		}
+		sqlite3_reset(io.insertAnimStanceStatement);
+
+		(*it)->query.bind(io.updateAnimStanceCountStatement);
+		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+		}
+		sqlite3_reset(io.updateAnimStanceCountStatement);
+		//wasDoingSQLiteExecution = false;
+	}
+#endif
+
+	// Kills
+	for (auto it = io.killQueries->begin(); it != io.killQueries->end(); it++) {
+		(*it)->query.bind(io.insertStatement);
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertStatement);
+		if (queryResult != SQLITE_DONE) {
+#ifndef DEBUG
+			if (queryResult != SQLITE_CONSTRAINT)
+#endif
+				std::cout << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb) << " (" << queryResult << ")" << "\n";
+		}
+		sqlite3_reset(io.insertStatement);
+		//wasDoingSQLiteExecution = false;
+	}
+
+	// Kill angles
+	for (auto it = io.killAngleQueries->begin(); it != io.killAngleQueries->end(); it++) {
+		(*it)->query.bind(io.insertAngleStatement);
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertAngleStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting kill angle into database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		sqlite3_reset(io.insertAngleStatement);
+		//wasDoingSQLiteExecution = false;
+		(*io.outputBatHandle) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+	}
+
+	// Sprees
+	for (auto it = io.spreeQueries->begin(); it != io.spreeQueries->end(); it++) {
+		(*it)->query.bind(io.insertSpreeStatement);
+
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertSpreeStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting killing spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		sqlite3_reset(io.insertSpreeStatement);
+		//wasDoingSQLiteExecution = false;
+		(*io.outputBatHandleKillSprees) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+	}
+
+	// Captures
+	for (auto it = io.captureQueries->begin(); it != io.captureQueries->end(); it++) {
+		(*it)->query.bind(io.insertCaptureStatement);
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertCaptureStatement);
+		uint64_t insertedId = -1;
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting capture into database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		else {
+			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
+			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
+				std::cout << "Error retrieving inserted capture id from database: " << sqlite3_errmsg(io.killDb) << "\n";
+			}
+			else {
+				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
+			}
+			sqlite3_reset(io.selectLastInsertRowIdStatement);
+		}
+		sqlite3_reset(io.insertCaptureStatement);
+		//wasDoingSQLiteExecution = false;
+
+		if((*it)->batchString.size()) (*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
+		(*io.outputBatHandleCaptures) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+	}
+
+	// Defrag
+	for (auto it = io.defragQueries->begin(); it != io.defragQueries->end(); it++) {
+		(*it)->query.bind(io.insertDefragRunStatement);
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertDefragRunStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		sqlite3_reset(io.insertDefragRunStatement);
+		//wasDoingSQLiteExecution = false;
+		(*io.outputBatHandleDefrag) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+	}
+
+	// Laughs
+	for (auto it = io.laughQueries->begin(); it != io.laughQueries->end(); it++) {
+		(*it)->query.bind(io.insertLaughsStatement);
+
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertLaughsStatement);
+		uint64_t insertedId = -1;
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting laugh spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		else {
+			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
+			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
+				std::cout << "Error retrieving inserted laughs id from database: " << sqlite3_errmsg(io.killDb) << "\n";
+			}
+			else {
+				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
+			}
+			sqlite3_reset(io.selectLastInsertRowIdStatement);
+		}
+		sqlite3_reset(io.insertLaughsStatement);
+		//wasDoingSQLiteExecution = false;
+				
+		if ((*it)->batchString.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
+		(*io.outputBatHandleLaughs) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+	}
+
+	// Player demo stats
+	for (auto it = io.playerDemoStatsQueries->begin(); it != io.playerDemoStatsQueries->end(); it++) {
+		(*it)->query.bind(io.insertPlayerDemoStatsStatement);
+
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+		}
+		sqlite3_reset(io.insertPlayerDemoStatsStatement);
+		//wasDoingSQLiteExecution = false;
+	}
+
+	// Packet stats
+	if (opts.writeDemoPacketStats) {
+		for (auto it = io.packetStatsQueries->begin(); it != io.packetStatsQueries->end(); it++) {
+			(*it)->query.bind(io.insertPacketStatsStatement);
+			//wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertPacketStatsStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cout << "Error inserting packet stats into database: " << sqlite3_errmsg(io.demoStatsDb) << "\n";
+			}
+			sqlite3_reset(io.insertPacketStatsStatement);
+			//wasDoingSQLiteExecution = false;
+		}
+	}
+
+	// Player model
+	for (auto it = io.playerModelQueries->begin(); it != io.playerModelQueries->end(); it++) {
+		(*it)->query.bind(io.insertPlayerModelStatement);
+		(*it)->query.bind(io.updatePlayerModelCountStatement);
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertPlayerModelStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error inserting player model into database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		sqlite3_reset(io.insertPlayerModelStatement);
+		queryResult = sqlite3_step(io.updatePlayerModelCountStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cout << "Error updating player model count in database: " << sqlite3_errmsg(io.killDb) << "\n";
+		}
+		sqlite3_reset(io.updatePlayerModelCountStatement);
+		//wasDoingSQLiteExecution = false;
+	}
+
+
+
+	if (opts.entityDataToDb) {
+		// ? Not yet implemented anyway.
+	}
+}
+
+template<unsigned int max_clients>
+qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts) {
+
+	ioHandles_t io;
+
+	
+
+
+
+	io.laughQueries = new queryCollection();
+	io.defragQueries = new queryCollection();
+	io.captureQueries = new queryCollection();
+	io.spreeQueries = new queryCollection();
+	io.killQueries = new queryCollection();
+	io.killAngleQueries = new queryCollection();
+	io.playerModelQueries = new queryCollection();
+	io.playerDemoStatsQueries = new queryCollection();
+	io.animStanceQueries = new queryCollection();
+
 
 
 	bool SEHExceptionCaught = false;
@@ -1832,11 +1979,36 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io, sharedVars);
 
+	openAndSetupDb(io,opts);
+
 	qboolean successStatisticsSave = qfalse;
 	if (!SEHExceptionCaught || !wasDoingSQLiteExecution) {
 		successStatisticsSave = saveStatisticsToDb(io, wasDoingSQLiteExecution, sharedVars,SEHExceptionCaught); // This will only return false if there's an exception.
 	}
 
+	// Acquire the mutex for saving stuff here
+	nes::named_mutex mutex{ "DemoHighlightFinder_postAnalysis_dataSaving" };
+	std::unique_lock lock{ mutex };
+
+	std::ofstream outputBatHandle;
+	std::ofstream outputBatHandleKillSprees;
+	std::ofstream outputBatHandleDefrag;
+	std::ofstream outputBatHandleCaptures;
+	std::ofstream outputBatHandleLaughs;
+
+	io.outputBatHandle = &outputBatHandle;
+	io.outputBatHandleKillSprees = &outputBatHandleKillSprees;
+	io.outputBatHandleDefrag = &outputBatHandleDefrag;
+	io.outputBatHandleCaptures = &outputBatHandleCaptures;
+	io.outputBatHandleLaughs = &outputBatHandleLaughs;
+
+	io.outputBatHandle->open(outputBatFile, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleKillSprees->open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleDefrag->open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleCaptures->open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleLaughs->open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
+
+	executeAllQueries(io, opts);
 
 	if (SEHExceptionCaught || !successStatisticsSave) {
 		// This demo errored. Remember it.
@@ -1899,6 +2071,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleDefrag->close();
 	io.outputBatHandleCaptures->close();
 	io.outputBatHandleLaughs->close();
+
+	lock.unlock();
 	
 	return success;
 }
@@ -1910,7 +2084,8 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 
 		if (it->second.everUsed) { // Some clients may have never been visible or not even existed at all (we have entries for all client nums by default but they're only set to "everUsed" if they were actually seen)
 
-			SQLDelayedQuery* query = new SQLDelayedQuery();
+			SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+			SQLDelayedQuery* query = &queryWrapper->query;
 
 			std::string mapname = std::get<0>(it->first);
 			std::string playerName = std::get<1>(it->first);
@@ -1991,15 +2166,7 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 			SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
 			SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
-			query->bind(io.insertPlayerDemoStatsStatement);
-
-			wasDoingSQLiteExecution = true;
-			int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
-			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
-			}
-			sqlite3_reset(io.insertPlayerDemoStatsStatement);
-			wasDoingSQLiteExecution = false;
+			io.playerDemoStatsQueries->push_back(queryWrapper);
 		}
 
 	}
@@ -2007,7 +2174,8 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 #ifdef DEBUGSTATSDB
 	for (auto it = animStanceCounts.begin(); it != animStanceCounts.end(); it++) {
 
-		SQLDelayedQuery* query = new SQLDelayedQuery();
+		SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+		SQLDelayedQuery* query = &queryWrapper->query;
 
 		/*SQLBIND(io.insertAnimStanceStatement, int, "@saberHolstered", demo.cut.Cl.snap.ps.saberHolstered);
 		SQLBIND(io.insertAnimStanceStatement, int, "@torsoAnim", demo.cut.Cl.snap.ps.torsoAnim & ~ANIM_TOGGLEBIT);
@@ -2034,21 +2202,7 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@saberMove", std::get<4>(it->first));
 		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
 
-		wasDoingSQLiteExecution = true;
-		query->bind(io.insertAnimStanceStatement);
-		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
-		}
-		sqlite3_reset(io.insertAnimStanceStatement);
-
-		query->bind(io.updateAnimStanceCountStatement);
-		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
-		}
-		sqlite3_reset(io.updateAnimStanceCountStatement);
-		wasDoingSQLiteExecution = false;
+		io.animStanceQueries->push_back(queryWrapper);
 	}
 #endif
 }
@@ -3958,7 +4112,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::string logModString = logModStringSS.str();
 							const char* modString = logModString.c_str();
 
-							SQLDelayedQuery* query = new SQLDelayedQuery();
+							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+							SQLDelayedQuery* query = &queryWrapper->query;
 
 							// Log the kill.
 							SQLBIND_DELAYED_TEXT(query, "@hash", hash_hex_string.c_str());
@@ -4002,19 +4157,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, double, "@positionY", thisEs->pos.trBase[1]);
 							SQLBIND_DELAYED(query, double, "@positionZ", thisEs->pos.trBase[2]);
 
-							query->bind(io.insertStatement);
-							wasDoingSQLiteExecution = true;
-							int queryResult = sqlite3_step(io.insertStatement);
-							if (queryResult != SQLITE_DONE) {
-#ifndef DEBUG
-								if (queryResult != SQLITE_CONSTRAINT)
-#endif
-									std::cout << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb) << " (" << queryResult << ")" << "\n";
-							}
-							sqlite3_reset(io.insertStatement);
-							wasDoingSQLiteExecution = false;
+							io.killQueries->push_back(queryWrapper);
 
-							SQLDelayedQuery* angleQuery = new SQLDelayedQuery();
+							SQLDelayedQueryWrapper_t* angleQueryWrapper = new SQLDelayedQueryWrapper_t();
+							SQLDelayedQuery* angleQuery = &angleQueryWrapper->query;
 
 							SQLBIND_DELAYED_TEXT(angleQuery, "@hash", hash_hex_string.c_str());
 							SQLBIND_DELAYED_TEXT(angleQuery, "@shorthash", shorthash.c_str());
@@ -4153,14 +4299,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
-							angleQuery->bind(io.insertAngleStatement);
-							wasDoingSQLiteExecution = true;
-							queryResult = sqlite3_step(io.insertAngleStatement);
-							if (queryResult != SQLITE_DONE) {
-								std::cout<< "Error inserting kill angle into database: " << sqlite3_errmsg(io.killDb) <<"\n";
-							}
-							sqlite3_reset(io.insertAngleStatement);
-							wasDoingSQLiteExecution = false;
+							io.killAngleQueries->push_back(angleQueryWrapper);
 
 
 							//if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisible) continue; // Not that interesting.
@@ -4179,10 +4318,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-
-							(*io.outputBatHandle) << "\nrem demoCurrentTime: " << demoCurrentTime;
-							(*io.outputBatHandle) << "\nrem hash: " << hash_hex_string;
-							(*io.outputBatHandle) << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							std::stringstream batSS;
+							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+							batSS << "\nrem hash: " << hash_hex_string;
+							batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							angleQueryWrapper->batchString = batSS.str();
+							
 							delete[] targetFilenameFiltered;
 							std::cout << mapname << " " << logModString << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
@@ -4334,10 +4475,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// Find nearby enemies
 							std::stringstream nearbyEnemiesSS;
 							int nearbyEnemiescount = 0;
-							for (int near = 0; near < nearbyPlayers.size(); near++) {
-								int nearbyPlayerHere = nearbyPlayers[near];
+							for (int nearV = 0; nearV < nearbyPlayers.size(); nearV++) {
+								int nearbyPlayerHere = nearbyPlayers[nearV];
 								if (playerTeams[nearbyPlayerHere] != playerTeams[playerNum]) {
-									nearbyEnemiesSS << (nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[near] << ")";
+									nearbyEnemiesSS << (nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[nearV] << ")";
 								}
 							}
 							std::string nearbyEnemiesString = nearbyEnemiesSS.str();
@@ -4399,7 +4540,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
 
-							SQLDelayedQuery* query = new SQLDelayedQuery();
+							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+							SQLDelayedQuery* query = &queryWrapper->query;
 
 							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 							SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
@@ -4465,25 +4607,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
-							query->bind(io.insertCaptureStatement);
-							wasDoingSQLiteExecution = true;
-							int queryResult = sqlite3_step(io.insertCaptureStatement);
-							uint64_t insertedId = -1;
-							if (queryResult != SQLITE_DONE) {
-								std::cout << "Error inserting capture into database: " << sqlite3_errmsg(io.killDb) << "\n";
-							}
-							else {
-								queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
-								if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-									std::cout << "Error retrieving inserted capture id from database: " << sqlite3_errmsg(io.killDb) << "\n";
-								}
-								else {
-									insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement,0);
-								}
-								sqlite3_reset(io.selectLastInsertRowIdStatement);
-							}
-							sqlite3_reset(io.insertCaptureStatement);
-							wasDoingSQLiteExecution = false;
+							io.captureQueries->push_back(queryWrapper);
 
 							if (!playerIsVisibleOrFollowed && !wasVisibleOrFollowed) continue; // No need to cut out those who were not visible at all in any way.
 							if (searchMode == SEARCH_MY_CTF_RETURNS && playerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
@@ -4514,9 +4638,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-							(*io.outputBatHandleCaptures) << "\nrem demoCurrentTime: " << demoCurrentTime;
-							(*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
-							(*io.outputBatHandleCaptures) << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							std::stringstream batSS;
+							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+							batSS << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							queryWrapper->batchString = batSS.str();
+							
 							delete[] targetFilenameFiltered;
 							std::cout << targetFilename << "\n";
 
@@ -5088,7 +5214,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
 					std::string formattedTimeString = formattedTime.str();
 
-					SQLDelayedQuery* query = new SQLDelayedQuery();
+					SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+					SQLDelayedQuery* query = &queryWrapper->query;
 
 					SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 					SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
@@ -5123,14 +5250,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 					SQLBIND_DELAYED(query, int, "@runnerClientNum", playerNumber);
 
-					query->bind(io.insertDefragRunStatement);
-					wasDoingSQLiteExecution = true;
-					int queryResult = sqlite3_step(io.insertDefragRunStatement);
-					if (queryResult != SQLITE_DONE) {
-						std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(io.killDb) << "\n";
-					}
-					sqlite3_reset(io.insertDefragRunStatement);
-					wasDoingSQLiteExecution = false;
+					io.defragQueries->push_back(queryWrapper);
 
 					//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 					//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
@@ -5157,8 +5277,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
 					sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
-					(*io.outputBatHandleDefrag) << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					(*io.outputBatHandleDefrag) << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+					std::stringstream batSS;
+					batSS << "\nrem demoCurrentTime: "<< demoCurrentTime;
+					batSS << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+					queryWrapper->batchString = batSS.str();
+
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
@@ -5185,7 +5308,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		if (oldSize == 0 || (opts.writeDemoPacketStats && currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) >= opts.writeDemoPacketStats))) {
 
-			SQLDelayedQuery* query = new SQLDelayedQuery();
+			SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+			SQLDelayedQuery* query = &queryWrapper->query;
 
 			SQLBIND_DELAYED(query, int, "@timeSinceLast", currentPacketPeriodStats.periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@skippedPacketsSinceLast", currentPacketPeriodStats.droppedPackets);
@@ -5216,14 +5340,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
 			SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
-			query->bind(io.insertPacketStatsStatement);
-			wasDoingSQLiteExecution = true;
-			int queryResult = sqlite3_step(io.insertPacketStatsStatement);
-			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting packet stats into database: " << sqlite3_errmsg(io.demoStatsDb) << "\n";
-			}
-			sqlite3_reset(io.insertPacketStatsStatement);
-			wasDoingSQLiteExecution = false;
+			io.packetStatsQueries->push_back(queryWrapper);
 
 			lastPacketStatsWritten = demoCurrentTime;
 			resetCurrentPacketPeriodStats();

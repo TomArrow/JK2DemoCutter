@@ -6,9 +6,12 @@
 
 
 
-#define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
-#define SQLBIND_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
-#define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
+//#define SQLBIND(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
+//#define SQLBIND_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
+//#define SQLBIND_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
+#define SQLBIND_INDEX(statement,type,index,value) sqlite3_bind_##type##(statement,index,value)
+#define SQLBIND_INDEX_NULL(statement,index) sqlite3_bind_null(statement,index)
+#define SQLBIND_INDEX_TEXT(statement,index,value) sqlite3_bind_text(statement,index,value,-1,NULL)
 
 enum SQLDelayedValueType {
 	SQLVALUE_TYPE_NULL,
@@ -66,18 +69,22 @@ public:
 
 
 	inline int bind(sqlite3_stmt* statement) {
+		int index = sqlite3_bind_parameter_index(statement, columnNameValue->c_str());
+		if (index == 0) {
+			return 0; // Sometimes we have same set of binds for multiple statements but with different values being used or not being used. So if index not found, just discard. It doesn't seem like sqlite throws an error even if we use 0 as an index but whatever, safe is safe.
+		}
 		switch (type) {
 		case SQLVALUE_TYPE_NULL:
-			return SQLBIND_NULL(statement, columnNameValue->c_str());
+			return SQLBIND_INDEX_NULL(statement, index);
 			break;
 		case SQLVALUE_TYPE_INTEGER:
-			return SQLBIND(statement, int, columnNameValue->c_str(), intValue);
+			return SQLBIND_INDEX(statement, int, index, intValue);
 			break;
 		case SQLVALUE_TYPE_REAL:
-			return SQLBIND(statement, double, columnNameValue->c_str(), doubleValue);
+			return SQLBIND_INDEX(statement, double, index, doubleValue);
 			break;
 		case SQLVALUE_TYPE_TEXT:
-			return SQLBIND_TEXT(statement, columnNameValue->c_str(), stringValue ? stringValue->c_str() : NULL);
+			return SQLBIND_INDEX_TEXT(statement, index, stringValue ? stringValue->c_str() : NULL);
 			break;
 		default:
 			throw std::invalid_argument("tried to bind SQLDelayedValue with invalid type");

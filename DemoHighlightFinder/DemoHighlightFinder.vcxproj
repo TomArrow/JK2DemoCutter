@@ -93,6 +93,7 @@
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h" />
     <ClInclude Include="..\shared\boostTupleHash.hpp" />
+    <ClInclude Include="..\shared\include\named_mutex.hpp" />
     <ClInclude Include="..\shared\include\picosha3.h" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />
     <ClInclude Include="..\shared\SQLDelayer.h" />
