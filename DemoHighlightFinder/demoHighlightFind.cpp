@@ -1942,6 +1942,23 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions opts) {
 	if (opts.entityDataToDb) {
 		// ? Not yet implemented anyway.
 	}
+
+
+
+
+	// IMPORTANT NOTE:
+	// I work a lot with pointers here.
+	// It would be appropriate to clean them up again under normal circumstances.
+	// However, this is pretty much the end of the program already.
+	// Once the program exits, all allocated memory will be automatically freed anyway.
+	// Why waste cycles cleaning up "leaked" memory when it will be cleaned by the operating system in a few moments anyway?
+	// However if this were ever "library-ized" to make it possible to run repeatedly from the same executable,
+	// all this delayed query stuff needs to be cleaned up.
+	// Concretely, the vectors holding the SQLDelayedQueryWrapper_t items (aka queryCollection) need to have delete called on them.
+	// This will call the destructor of the vectors which will also call the destructor of the SQLDelayedQuery items which in turn calls the destructors
+	// of the SQLDelayedValue items in it, and so on. That much is already prepared.
+	// But like said above, why waste cycles calling destructors etc. All is going to be cleared up after program exit anyway. This tool should be FAST!
+	// (yeah I realize it's probably not a huge performance impact but there is literally zero benefit outside of elegance/cleanliness)
 }
 
 template<unsigned int max_clients>
