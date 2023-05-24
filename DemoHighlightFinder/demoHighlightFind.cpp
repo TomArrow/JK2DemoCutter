@@ -102,6 +102,7 @@ public:
 	int writeDemoPacketStats = 0; // 0 = don't write stats. -1  = write immediately on every packet. other number = write  as soon as time interval in demotime has passed
 	bool onlyLogCapturesWithSaberKills = false;
 	bool findSuperSlowKillStreaks = false;
+	int jumpMetaEventsLimit = 0;
 };
 
 
@@ -345,6 +346,194 @@ std::map<int, int> timeCheckedForKillStreaks;
 #define OLDER_SPEEDS_STORE_LIMIT 2000 // Any speeds older than 2000ms are removed.
 #define MAX_ASSUMED_SERVER_FPS 200
 #define MAX_NEEDED_PAST_SPEED_SAMPLES (OLDER_SPEEDS_STORE_LIMIT*MAX_ASSUMED_SERVER_FPS/1000)
+
+
+
+// Meta events (for logging surrounding jumps, kills etc for each kill for music sync)
+
+typedef enum metaEventType_t {
+	METAEVENT_TEAMCAPTURE,
+	METAEVENT_ENEMYTEAMCAPTURE,
+	METAEVENT_CAPTURE,
+	METAEVENT_RETURN,
+	METAEVENT_KILL,
+	METAEVENT_DEATH,
+	METAEVENT_JUMP,
+	METAEVENT_SABERHIT, // any kind of saber hit, regardless of who is hit or who is ttacking
+	METAEVENT_SABERBLOCK, // any saber block, no matter by who or to who
+	METAEVENT_EFFECT, // effect event of any sort
+	METAEVENT_COUNT
+};
+
+const char* metaEventKeyNames[METAEVENT_COUNT] = {
+	"tc",
+	"ec",
+	"c",
+	"r",
+	"k",
+	"d",
+	"j",
+	"sh",
+	"sb",
+	"ef",
+};
+
+class MetaEvent {
+
+	MetaEvent* previous = NULL;
+	bool destroyPrevious = true;
+	int timeDelta = 0;
+
+	int64_t demoTime; // Relative to the kill
+	metaEventType_t type;
+	friend class Kill_ME;
+public:
+	~MetaEvent() {
+		if (destroyPrevious) { // Avoid recursion. This loop is only called on the latest kill that's being deleted.
+
+			MetaEvent* previous = this->previous;
+			MetaEvent* prevTmp;
+			while (previous) {
+				prevTmp = previous->previous;
+				previous->destroyPrevious = false; // Avoid recursion.
+				delete previous;
+				previous = prevTmp;
+			}
+		}
+	}
+	MetaEvent(int64_t demoTimeA, metaEventType_t typeA, MetaEvent* previousA, int timeDeltaA) {
+		demoTime = demoTimeA;
+		type = typeA;
+		previous = previousA;
+		timeDelta = timeDeltaA;
+	}
+};
+struct MetaEvent_Kill {
+	int relativeTime; // Relative to the kill
+	metaEventType_t type;
+};
+
+// Kill object for metaevent tracking
+// These are chained together in a slightly nonintuitive way.
+// For each player there is a pointer saying NULL. 
+// If a kill is "logged" this way, a new Kill_ME is created, the old pointer is saved in "previous"
+// and the new kill becomes the pointer.
+// That way we can always go back in time to an appropriate amount of time to find past kills.
+// Once a kill is detected as past a certain age, we delete it
+// It then goes back through the chain of "previous" and deletess them all.
+// The destructor also dumps all the meta info into the actual query.
+// This means we HAVE to destroy all the kills eventually for it to even work.
+// Idk how efficient this really is but seems like a fun thing to try.
+class Kill_ME { // kill for meta events
+	Kill_ME* previous = NULL;
+	SQLDelayedQueryWrapper_t* killQueryWrapper = NULL;
+	bool destroyPrevious = true;
+	std::vector<MetaEvent_Kill> metaEvents;
+	int64_t demoTime;
+
+	
+	inline void addEvent(MetaEvent* metaEventAbs) {
+		int delta = (int)(metaEventAbs->demoTime - demoTime);
+		MetaEvent_Kill metaEvent{ delta ,metaEventAbs->type };
+		metaEvents.push_back(metaEvent);
+	}
+public:
+	Kill_ME(int64_t demoTimeA,SQLDelayedQueryWrapper_t* killQueryWrapperA,Kill_ME* previousA) {
+		demoTime = demoTimeA;
+		killQueryWrapper = killQueryWrapperA;
+		previous = previousA;
+	}
+	~Kill_ME() {
+		// Dump metaEvents into query
+		if (killQueryWrapper && metaEvents.size()) { // Let's be sure
+
+			// string for SQL
+			std::stringstream ss;
+			ss << "{\"metaEvents\":[";
+			for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
+				ss << (it == metaEvents.begin() ? "" : ",") << "{\"k\":\"" << metaEventKeyNames[it->type]<< "\",\"t\":" << it->relativeTime << "}";
+			}
+			ss << "]}";
+			killQueryWrapper->query.add("@metaEvents", ss.str());
+
+			// String for .bat
+			if (killQueryWrapper->batchString.size()) {
+
+				ss.str("");
+				ss << " --meta \"{\\\"metaEvents\\\":[";
+				for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
+					ss << (it == metaEvents.begin() ? "" : ",") << "{\\\"k\\\":\\\"" << metaEventKeyNames[it->type] << "\\\",\\\"t\\\":" << it->relativeTime << "}";
+				}
+				ss << "]}\"";
+				killQueryWrapper->batchSuffix = ss.str();
+			}
+		}
+
+		if (destroyPrevious) { // Avoid recursion. This loop is only called on the latest kill that's being deleted.
+
+			Kill_ME* previous = this->previous;
+			Kill_ME* prevTmp;
+			while (previous) {
+				prevTmp = previous->previous;
+				previous->destroyPrevious = false; // Avoid recursion.
+				delete previous;
+				previous = prevTmp;
+			}
+		}
+	}
+	inline void addPastEvents(MetaEvent* lastMetaEvent, int maxTimeDelta, bool purgeOlderEvents = true) {
+		MetaEvent* current = lastMetaEvent;
+		MetaEvent* old = NULL;
+		while (current && current->demoTime >= this->demoTime - maxTimeDelta) {
+			if (current->demoTime >= this->demoTime - current->timeDelta) {
+				this->addEvent(current);
+			}
+			old = current;
+			current = current->previous;
+		}
+		if (purgeOlderEvents && old && current) { // this is only true if we arrive at one that's too old. Otherwise current will be NULL. It will also never be true if current is the original because then old would be NULL.
+			delete current; // No need to delete the ones before it as the destructor handles that automatically
+			old->previous = NULL;
+		}
+	}
+	inline void addEventRecursive(MetaEvent* metaEventAbs, int maxTimeDelta, bool purgeOlder = true) {
+		Kill_ME* current = this;
+		Kill_ME* old = NULL;
+		while (current && current->demoTime >= metaEventAbs->demoTime - maxTimeDelta) {
+			if (current->demoTime >= metaEventAbs->demoTime - metaEventAbs->timeDelta) {
+				current->addEvent(metaEventAbs);
+			}
+			old = current;
+			current = current->previous;
+		}
+		if (purgeOlder && old && current) { // this is only true if we arrive at one that's too old. Otherwise current will be NULL. It will also never be true if current == this (don't want to delete ourselves) because then old would be NULL.
+			delete current; // No need to delete the ones before it as the destructor handles that automatically
+			old->previous = NULL;
+		}
+	}
+};
+
+Kill_ME* playerPastKills[MAX_CLIENTS_MAX];
+MetaEvent* playerPastMetaEvents[MAX_CLIENTS_MAX];
+
+
+inline void addMetaEvent(metaEventType_t type, int64_t demoTime, int clientNum, int timeDelta, const ExtraSearchOptions& opts, int bufferTime) {
+	MetaEvent* theEvent = new MetaEvent(demoTime, type, playerPastMetaEvents[clientNum],timeDelta);
+	playerPastMetaEvents[clientNum] = theEvent;
+	if (playerPastKills[clientNum]) {
+		playerPastKills[clientNum]->addEventRecursive(theEvent, timeDelta,true);
+	}
+}
+
+template <int max_clients>
+inline void addMetaEventNearby(vec3_t origin, float maxDistance, metaEventType_t type, int64_t demoTime, int timeDelta, const ExtraSearchOptions& opts, int bufferTime) {
+	for (int playerNum = 0; playerNum < max_clients; playerNum++) {
+		if (thisFrameInfo.entityExists[playerNum] && VectorDistance(thisFrameInfo.playerPositions[playerNum], origin) <= maxDistance) {
+			addMetaEvent(type, demoTime, playerNum, timeDelta, opts, bufferTime);
+		}
+	}
+}
+
 
 
 enum trackedEntityType_t {
@@ -1074,7 +1263,7 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 }
 
 template<unsigned int max_clients>
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, ExtraSearchOptions opts,bool& wasDoingSQLiteExecution) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts,bool& wasDoingSQLiteExecution) {
 
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
@@ -1323,7 +1512,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 }
 
 
-void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions opts) {
+void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	sqlite3_open("killDatabase.db", &io.killDb);
 	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
@@ -1760,7 +1949,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions opts) {
 #endif
 }
 
-void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions opts) {
+void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	// Animstances
 #ifdef DEBUGSTATSDB
@@ -1962,7 +2151,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions opts) {
 }
 
 template<unsigned int max_clients>
-qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts) {
+qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 
 	ioHandles_t io;
 
@@ -1995,6 +2184,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	int64_t			demoCurrentTime = 0;
 
 	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io, sharedVars);
+
+	for (int i = 0; i < max_clients; i++) {
+		if (playerPastKills[i]) {
+			delete playerPastKills[i]; // This flushes meta info to database query and .bat
+		}
+	}
 
 	openAndSetupDb(io,opts);
 
@@ -2237,7 +2432,7 @@ qboolean inline saveStatisticsToDb(ioHandles_t& io, bool& wasDoingSQLiteExecutio
 }
 
 template<unsigned int max_clients>
-qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int bufferTime,  const highlightSearchMode_t searchMode, const ExtraSearchOptions opts,bool& SEHExceptionCaught,int64_t& demoCurrentTime,bool& wasDoingSQLiteExecution,const ioHandles_t& io,sharedVariables_t& sharedVars) {
+qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int bufferTime,  const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts,bool& SEHExceptionCaught,int64_t& demoCurrentTime,bool& wasDoingSQLiteExecution,const ioHandles_t& io,sharedVariables_t& sharedVars) {
 
 	__TRY{
 		return demoHighlightFindReal<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, demoCurrentTime,wasDoingSQLiteExecution,io,sharedVars,SEHExceptionCaught);
@@ -2249,7 +2444,7 @@ qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int 
 }
 
 template<unsigned int max_clients>
-qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io, sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
+qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io, sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -2302,6 +2497,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
 	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
 	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+	Com_Memset(&playerPastKills, 0, sizeof(playerPastKills));
+	Com_Memset(&playerPastMetaEvents, 0, sizeof(playerPastMetaEvents));
 	resetCurrentPacketPeriodStats();
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
@@ -3343,6 +3540,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 						}
+						if (opts.jumpMetaEventsLimit > 0 &&  lastFrameInfo.entityExists[i] && thisFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
+							addMetaEvent(METAEVENT_JUMP, demoCurrentTime, i, opts.jumpMetaEventsLimit, opts,bufferTime);
+						}
 					}
 					else {
 						playerVisibleFrames[i] = 0;
@@ -3996,6 +4196,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							kills[attacker].push_back(thisKill);
 
+
+
 							if (opts.onlyLogSaberKills && !isSaberKill) {
 								continue;
 							}
@@ -4319,6 +4521,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							io.killAngleQueries->push_back(angleQueryWrapper);
 
 
+							addMetaEvent(METAEVENT_DEATH, demoCurrentTime, target, bufferTime, opts,bufferTime);
+							if(attacker >= 0 && attacker < max_clients && target != attacker){
+								Kill_ME* killME = new Kill_ME(demoCurrentTime, angleQueryWrapper, playerPastKills[attacker]);
+								killME->addPastEvents(playerPastMetaEvents[attacker], bufferTime);
+								addMetaEvent(victimIsFlagCarrier ? METAEVENT_RETURN : METAEVENT_KILL, demoCurrentTime, attacker, bufferTime, opts, bufferTime);
+								playerPastKills[attacker] = killME;
+							}
+
+
 							//if (isSuicide || !victimIsFlagCarrier || isWorldKill || !targetIsVisible) continue; // Not that interesting.
 							if (isSuicide || (!victimIsFlagCarrier && searchMode != SEARCH_ALL_KILLS && searchMode != SEARCH_ALL_MY_KILLS) || isWorldKill || (!targetIsVisibleOrFollowed && !attackerIsVisibleOrFollowed)) continue; // Not that interesting.
 							// If it's not a doom kill, it's not that interesting unless we specifically are searching for our own returns or searching for everything
@@ -4365,14 +4576,23 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								constexpr float maxDistance = 100.0f + 2.0f * (float)SABER_LENGTH_MAX;
 								if (thisFrameInfo.entityExists[playerNum] && VectorDistance(thisFrameInfo.playerPositions[playerNum], thisEs->pos.trBase) <= maxDistance) {
 									hitDetectionData[playerNum].nearbySaberHitDetected = qtrue;
+									addMetaEvent(METAEVENT_SABERHIT, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
 								}
 							}
 						}
-						else if (eventNumber == EV_SHIELD_HIT_GENERAL) {
+						else if (eventNumber == EV_SHIELD_HIT_GENERAL) { // How to do this as meta event? idk. should I?
 							int playerNum = thisEs->otherEntityNum;
 							if (playerNum >= 0 && playerNum < max_clients) {
 								hitDetectionData[playerNum].confirmedHit = qtrue;
 							}
+						}
+						else if (eventNumber == EV_SABER_BLOCK_GENERAL || eventNumber == EV_SABER_CLASHFLARE_GENERAL) {
+							// We don't get anything useful out of this per se, but we can use it to sync with music for example for effect and cool.
+							addMetaEventNearby<max_clients>(thisEs->pos.trBase,200, METAEVENT_SABERBLOCK, demoCurrentTime, bufferTime, opts, bufferTime);
+						}
+						else if (eventNumber == EV_PLAY_EFFECT_GENERAL || eventNumber == EV_PLAY_EFFECT_ID_GENERAL) {
+							// We don't get anything useful out of this per se, but we can use it to sync with music for example for effect and cool.
+							addMetaEventNearby<max_clients>(thisEs->pos.trBase,200, METAEVENT_EFFECT, demoCurrentTime, bufferTime, opts, bufferTime);
 						}
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
 							int playerNum = thisEs->trickedentindex;
@@ -4625,6 +4845,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
 							io.captureQueries->push_back(queryWrapper);
+
+							addMetaEvent(METAEVENT_CAPTURE, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
+							int enemyTeam = flagTeam;
+							int playerTeam = flagTeam == TEAM_RED ? TEAM_BLUE : TEAM_RED;
+							for (int client = 0; client < max_clients; client++) {
+								if (playerTeams[client] == playerTeam && client != playerNum) {
+									addMetaEvent(METAEVENT_TEAMCAPTURE, demoCurrentTime, client, bufferTime, opts, bufferTime);
+								}
+								else if (playerTeams[client] == enemyTeam) {
+									addMetaEvent(METAEVENT_ENEMYTEAMCAPTURE, demoCurrentTime, client, bufferTime, opts, bufferTime);
+								}
+							}
 
 							if (!playerIsVisibleOrFollowed && !wasVisibleOrFollowed) continue; // No need to cut out those who were not visible at all in any way.
 							if (searchMode == SEARCH_MY_CTF_RETURNS && playerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
@@ -5439,7 +5671,7 @@ cuterror:
 
 
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, highlightSearchMode_t searchMode, ExtraSearchOptions opts) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 	char			ext[7]{};
 	demoType_t		demoType;
 	qboolean		isCompressedFile = qfalse;
@@ -5501,6 +5733,7 @@ int main(int argcO, char** argvO) {
 	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");
 	auto S = op.add<popl::Implicit<int>>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat). Optional: Provide number of needed saber kills in killspree.",1);
 	auto d = op.add<popl::Implicit<int>>("d", "write-demo-packet-stats", "Write stats about packet size and rate over time. If specified without a value, each packet gets an entry. Otherwise, a number can be provided as the interval in milliseconds to write stats.",0);
+	auto j = op.add<popl::Implicit<int>>("j", "jump-meta-events", "Track jumps as meta events. Optionally, number to limit time around kill that they are tracked in milliseconds.",0);
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
@@ -5527,21 +5760,22 @@ int main(int argcO, char** argvO) {
 	}
 	initializeGameInfos();
 
+	//char* demoName = argv[1];
+	const char* demoName = args[0].c_str();
+	//float bufferTime = atof(argv[2]);
+	float bufferTime = atof(args[1].c_str());
 
 	ExtraSearchOptions opts;
 	opts.entityDataToDb = e->is_set();
 	opts.onlyLogSaberKills = s->is_set();
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set() ? S->value() : 0;
+	opts.jumpMetaEventsLimit = j->is_set() ? (j->value() == 0 ? bufferTime : j->value()) : 0;
 	opts.writeDemoPacketStats = d->is_set() ? (d->value() <= 0 ? -1 : d->value()) : 0;
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
 	opts.quickSkipNonSaberExclusive =  q->value();
 	opts.findSuperSlowKillStreaks = l->value();
 
 
-	//char* demoName = argv[1];
-	const char* demoName = args[0].c_str();
-	//float bufferTime = atof(argv[2]);
-	float bufferTime = atof(args[1].c_str());
 
 	highlightSearchMode_t searchMode = SEARCH_INTERESTING;
 	//if (argc > 3) {
