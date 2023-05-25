@@ -386,7 +386,7 @@ class MetaEvent {
 
 	int64_t demoTime; // Relative to the kill
 	metaEventType_t type;
-	friend class Kill_ME;
+	friend class MetaEventTracker;
 public:
 	~MetaEvent() {
 		if (destroyPrevious) { // Avoid recursion. This loop is only called on the latest kill that's being deleted.
@@ -425,12 +425,13 @@ struct MetaEvent_Kill {
 // The destructor also dumps all the meta info into the actual query.
 // This means we HAVE to destroy all the kills eventually for it to even work.
 // Idk how efficient this really is but seems like a fun thing to try.
-class Kill_ME { // kill for meta events
-	Kill_ME* previous = NULL;
-	SQLDelayedQueryWrapper_t* killQueryWrapper = NULL;
+class MetaEventTracker { // kill for meta events
+	MetaEventTracker* previous = NULL;
+	SQLDelayedQueryWrapper_t* queryWrapper = NULL;
 	bool destroyPrevious = true;
 	std::vector<MetaEvent_Kill> metaEvents;
 	int64_t demoTime;
+	int64_t demoTimeStart;
 	int bufferTimeReal;
 
 	
@@ -440,15 +441,16 @@ class Kill_ME { // kill for meta events
 		metaEvents.push_back(metaEvent);
 	}
 public:
-	Kill_ME(int64_t demoTimeA,SQLDelayedQueryWrapper_t* killQueryWrapperA,Kill_ME* previousA, int bufferTime) {
+	MetaEventTracker(int64_t demoTimeA,SQLDelayedQueryWrapper_t* queryWrapperA,MetaEventTracker* previousA, int bufferTime, int duration) {
 		demoTime = demoTimeA;
-		killQueryWrapper = killQueryWrapperA;
+		queryWrapper = queryWrapperA;
 		previous = previousA;
-		bufferTimeReal = demoTime - std::max((int64_t)0, demoTime - (int64_t)bufferTime);
+		demoTimeStart = demoTime - (int64_t)duration;
+		bufferTimeReal = demoTime - std::max((int64_t)0, demoTime - (int64_t)bufferTime - (int64_t)duration);
 	}
-	~Kill_ME() {
+	~MetaEventTracker() {
 		// Dump metaEvents into query
-		if (killQueryWrapper && metaEvents.size()) { // Let's be sure
+		if (queryWrapper && metaEvents.size()) { // Let's be sure
 
 			std::sort(metaEvents.begin(),metaEvents.end(), [](MetaEvent_Kill a, MetaEvent_Kill b)
 				{
@@ -463,10 +465,10 @@ public:
 				ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type]<< it->relativeTime;
 			}
 			ss << "\"}";
-			killQueryWrapper->query.add("@metaEvents", ss.str());
+			queryWrapper->query.add("@metaEvents", ss.str());
 
 			// String for .bat
-			if (killQueryWrapper->batchString.size()) {
+			if (queryWrapper->batchString.size()) {
 
 				ss.str("");
 				ss << " --meta \"{\\\"hl\\\":"<< bufferTimeReal <<",\\\"me\\\":\\\"";
@@ -474,14 +476,17 @@ public:
 					ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type] << (bufferTimeReal+it->relativeTime); // TODO Compensate for demo not starting at exact correct millisecond.
 				}
 				ss << "\\\"}\"";
-				killQueryWrapper->batchSuffix = ss.str();
+				queryWrapper->batchSuffix = ss.str();
 			}
+		}
+		else {
+			queryWrapper->query.add("@metaEvents", SQLDelayedValue_NULL);
 		}
 
 		if (destroyPrevious) { // Avoid recursion. This loop is only called on the latest kill that's being deleted.
 
-			Kill_ME* previous = this->previous;
-			Kill_ME* prevTmp;
+			MetaEventTracker* previous = this->previous;
+			MetaEventTracker* prevTmp;
 			while (previous) {
 				prevTmp = previous->previous;
 				previous->destroyPrevious = false; // Avoid recursion.
@@ -494,7 +499,7 @@ public:
 		MetaEvent* current = lastMetaEvent;
 		MetaEvent* old = NULL;
 		while (current && current->demoTime >= this->demoTime - maxTimeDelta) {
-			if (current->demoTime >= this->demoTime - current->timeDelta) {
+			if (current->demoTime >= this->demoTimeStart - current->timeDelta) {
 				this->addEvent(current);
 			}
 			old = current;
@@ -506,10 +511,10 @@ public:
 		}
 	}
 	inline void addEventRecursive(MetaEvent* metaEventAbs, int maxTimeDelta, bool purgeOlder = true) {
-		Kill_ME* current = this;
-		Kill_ME* old = NULL;
+		MetaEventTracker* current = this;
+		MetaEventTracker* old = NULL;
 		while (current && current->demoTime >= metaEventAbs->demoTime - maxTimeDelta) {
-			if (current->demoTime >= metaEventAbs->demoTime - metaEventAbs->timeDelta) {
+			if (current->demoTimeStart >= metaEventAbs->demoTime - metaEventAbs->timeDelta) {
 				current->addEvent(metaEventAbs);
 			}
 			old = current;
@@ -522,15 +527,35 @@ public:
 	}
 };
 
-Kill_ME* playerPastKills[MAX_CLIENTS_MAX];
+typedef enum MetaEventTrackerType { // We're not gonna do it for defrag becaue we can't tell when a defrag run is starting in all cases.
+	METRACKER_KILLS,
+	METRACKER_KILLSPREES,
+	METRACKER_CAPTURES,
+	//METRACKER_LAUGHS, // No laugh cuts with metaevents for now as they're a bit different. They aren't specific to individual players. Might wanna include at least kills at some point but we won't for now as it would complicate stuff.
+	METRACKER_TOTAL_COUNT
+};
+
+int64_t requiredMetaEventAges[METRACKER_TOTAL_COUNT][MAX_CLIENTS_MAX]; // demotimes of how far back we need to keep metaevents (to have enough info for full demos) for each type of metaevent tracker. the oldest is always the one that is applied so make sure to keep this up to date.
+MetaEventTracker* metaEventTrackers[METRACKER_TOTAL_COUNT][MAX_CLIENTS_MAX];
 MetaEvent* playerPastMetaEvents[MAX_CLIENTS_MAX];
 
+inline int getMinimumMetaEventBufferTime(int clientNum, int bufferTime, int demoCurrentTime) {
+	int64_t oldestTimeRequired = demoCurrentTime-bufferTime;
+	for (int i = 0; i < METRACKER_TOTAL_COUNT; i++) {
+		if (requiredMetaEventAges[i][clientNum] < oldestTimeRequired) {
+			oldestTimeRequired = requiredMetaEventAges[i][clientNum];
+		}
+	}
+	return demoCurrentTime-oldestTimeRequired;
+}
 
 inline void addMetaEvent(metaEventType_t type, int64_t demoTime, int clientNum, int timeDelta, const ExtraSearchOptions& opts, int bufferTime) {
 	MetaEvent* theEvent = new MetaEvent(demoTime, type, playerPastMetaEvents[clientNum],timeDelta);
 	playerPastMetaEvents[clientNum] = theEvent;
-	if (playerPastKills[clientNum]) {
-		playerPastKills[clientNum]->addEventRecursive(theEvent, timeDelta,true);
+	for (int i = 0; i < METRACKER_TOTAL_COUNT; i++) {
+		if (metaEventTrackers[i][clientNum]) {
+			metaEventTrackers[i][clientNum]->addEventRecursive(theEvent, timeDelta, true);
+		}
 	}
 }
 
@@ -1406,12 +1431,19 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@maxSpeedTargets", spreeInfo->maxVictimSpeed);
 		SQLBIND_DELAYED_TEXT(query, "@demoName", oldBasename.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@demoPath", oldPath.c_str());
-		SQLBIND_DELAYED(query, int, "@demoTime", spreeInfo->lastKillTime - spreeInfo->totalTime);
+		SQLBIND_DELAYED(query, int, "@demoTime", spreeInfo->lastKillTime/* - spreeInfo->totalTime*/); // Keep this consistent with the metaevents which are always in relation to the end
 		SQLBIND_DELAYED(query, int, "@duration", spreeInfo->totalTime);
 		SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 		SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
 
 		io.spreeQueries->push_back(queryWrapper);
+
+		if (clientNumAttacker >= 0 && clientNumAttacker < max_clients) {
+			MetaEventTracker* killSpreeME = new MetaEventTracker(spreeInfo->lastKillTime, queryWrapper, metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker], bufferTime, spreeInfo->totalTime);
+			killSpreeME->addPastEvents(playerPastMetaEvents[clientNumAttacker], getMinimumMetaEventBufferTime(clientNumAttacker, bufferTime, demoCurrentTime));
+			metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker] = killSpreeME;
+		}
+
 
 		int startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
 		int endTime = spreeInfo->lastKillTime + bufferTime;
@@ -1453,6 +1485,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 }
 
 void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution) {
+	
 	if (firstLaugh != -1  && (demoCurrentTime - firstLaugh > MAX_LAUGH_DELAY || force) && laughCount > 0) {
 		
 		if (laughCount > 1) { // Let's not bloat the database with single laughs. Could miss some stuff but oh well.
@@ -1689,6 +1722,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"maxSpeedCapperLastSecond	REAL,"
 		"maxSpeedCapper	REAL,"
 		"averageSpeedCapper	REAL,"
+		"metaEvents	TEXT,"
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"nearbyEnemies	TEXT,"
@@ -1780,6 +1814,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTargets	REAL,"
+		"metaEvents	TEXT,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
 		"demoTime INTEGER NOT NULL,"
@@ -1840,9 +1875,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertCaptureStatement, NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
@@ -1859,10 +1894,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
-		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
+		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,metaEvents,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
 		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
-		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
+		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@metaEvents,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
@@ -2197,8 +2232,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io, sharedVars);
 
 	for (int i = 0; i < max_clients; i++) {
-		if (playerPastKills[i]) {
-			delete playerPastKills[i]; // This flushes meta info to database query and .bat
+		for (int t = 0; t < METRACKER_TOTAL_COUNT; t++) {
+			if (metaEventTrackers[t][i]) {
+				delete metaEventTrackers[t][i]; // This flushes meta info to database query and .bat
+			}
 		}
 	}
 
@@ -2508,7 +2545,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
 	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
 	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
-	Com_Memset(&playerPastKills, 0, sizeof(playerPastKills));
+	Com_Memset(&requiredMetaEventAges, 0, sizeof(requiredMetaEventAges));
+	Com_Memset(&metaEventTrackers, 0, sizeof(metaEventTrackers));
 	Com_Memset(&playerPastMetaEvents, 0, sizeof(playerPastMetaEvents));
 	resetCurrentPacketPeriodStats();
 
@@ -2780,6 +2818,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				currentPacketPeriodStats.periodTotalTime += demoCurrentTime - demoOldTime;
 				demoOldTime = demoCurrentTime;
+
+				for (int cl = 0; cl < max_clients; cl++) {
+					requiredMetaEventAges[METRACKER_KILLS][cl] = demoCurrentTime - bufferTime; // Kills are a point in time. Whenever a kill happens, we need to have the past [bufferTime] milliseconds available. So just always require the last [bufferTime] milliseconds minimum for kills.
+				}
+
 
 				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(demo.cut.Cl.snap.ps.saberMove,demoType);
 				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.legsAnim,demoType);
@@ -4534,10 +4577,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							addMetaEvent(METAEVENT_DEATH, demoCurrentTime, target, bufferTime, opts,bufferTime);
 							if(attacker >= 0 && attacker < max_clients && target != attacker){
-								Kill_ME* killME = new Kill_ME(demoCurrentTime, angleQueryWrapper, playerPastKills[attacker],bufferTime);
-								killME->addPastEvents(playerPastMetaEvents[attacker], bufferTime);
+								MetaEventTracker* killME = new MetaEventTracker(demoCurrentTime, angleQueryWrapper, metaEventTrackers[METRACKER_KILLS][attacker],bufferTime,0);
+								killME->addPastEvents(playerPastMetaEvents[attacker], getMinimumMetaEventBufferTime(attacker,bufferTime,demoCurrentTime));
 								addMetaEvent(victimIsFlagCarrier ? METAEVENT_RETURN : METAEVENT_KILL, demoCurrentTime, attacker, bufferTime, opts, bufferTime);
-								playerPastKills[attacker] = killME;
+								metaEventTrackers[METRACKER_KILLS][attacker] = killME;
 							}
 
 
@@ -4857,7 +4900,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							io.captureQueries->push_back(queryWrapper);
 
-							addMetaEvent(METAEVENT_CAPTURE, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
 							int enemyTeam = flagTeam;
 							int playerTeam = flagTeam == TEAM_RED ? TEAM_BLUE : TEAM_RED;
 							for (int client = 0; client < max_clients; client++) {
@@ -4868,6 +4910,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									addMetaEvent(METAEVENT_ENEMYTEAMCAPTURE, demoCurrentTime, client, bufferTime, opts, bufferTime);
 								}
 							}
+							// Meta event tracker for capture
+							MetaEventTracker* capME = new MetaEventTracker(demoCurrentTime, queryWrapper, metaEventTrackers[METRACKER_CAPTURES][playerNum], bufferTime, flagHoldTime);
+							capME->addPastEvents(playerPastMetaEvents[playerNum], getMinimumMetaEventBufferTime(playerNum, bufferTime, demoCurrentTime));
+							addMetaEvent(METAEVENT_CAPTURE, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
+							metaEventTrackers[METRACKER_CAPTURES][playerNum] = capME;
+
 
 							if (!playerIsVisibleOrFollowed && !wasVisibleOrFollowed) continue; // No need to cut out those who were not visible at all in any way.
 							if (searchMode == SEARCH_MY_CTF_RETURNS && playerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
@@ -4920,7 +4968,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// KILLSTREAK_MAX_INTERVAL 3000
 				// TODO Let it count chains of killstreaks. If there's already a valid killstreak, let there be a single longer gap there.
 
-
+				for (int cln = 0; cln < max_clients; cln++) {
+					requiredMetaEventAges[METRACKER_KILLSPREES][cln] = demoCurrentTime - bufferTime; // We will set the proper value below but kills is a map that might not contain a key for some players so we just go safe here and set the appropriate value below.
+				}
 				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
 
 					static const int killStreakSpeedTypes[] = { KILLSTREAK_SUPERFAST_MAX_INTERVAL,KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL,GIGASUPERVERYVERYSLOW_OPTIONAL_KILLSTREAK_MAX_INTERVAL };
@@ -4930,9 +4980,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					int clientNumAttacker = clientIt->first;
 
+					// Update required meta event tracking times
+					if (clientIt->second.size() == 0) {
+						requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; // No kills in backlog. We only have to keep [bufferTime] milliseconds into past.
+					}
+					else {
+						requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = clientIt->second[0].time - bufferTime; // Kills in backlog that might become part of killsprees. Take oldest one and go [bufferTime] milliseconds back in time and there's our answer.
+					}
+
 					if (clientIt->second.size() == 0 || (clientIt->second.back().time + killStreakSpeedTypes[spCount-1-speedTypesSkip]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
 
-
+					// TODO ... Wait... what happens if there's two shorter duration killsprees behind each other here? Will that get caught? Oh yeah it might.
 					for (int sp = 0; sp < (spCount- speedTypesSkip); sp++) { // We do this twice, for every killstreak duration type.
 
 						int maxTimeHere = killStreakSpeedTypes[sp];
@@ -5012,6 +5070,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					// So anything that's in there now was already checked for being part of a killstreak.
 					// So we can get rid of it all.
 					clientIt->second.clear();
+
+					// Can reset this now as no pending killsprees are here anymore.
+					requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; 
 				
 					// Clean up old speeds
 					// We do need to keep speeds of at least OLDER_SPEEDS_STORE_LIMIT because we might have to check past speeds for future kills that aren't logged yet.
@@ -5067,6 +5128,20 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								VectorCopy(thisEntity->pos.trDelta, lastKnownBlueFlagCarrierVelocity);
 								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 							}
+							else { 
+								// Reset the required meta event age for capture cuts if the player is seen without a flag.
+								// This means the player is not currently holding a flag, therefore he can't be in the process of capturing a flag,
+								// hence we can stop tracking meta events for him into the past in case we want to do a cut of him with meta events.
+								
+								// Doing this purely based on player entities visible without flag could lead to the value not being updated for some time when a player wasn't visible,
+								// theoretically leading to accumulated amounts of meta events.
+								// However ... if a player isn't visible, the most cluttery meta events won't even come into existence (jumps, saberhits etc) because that player 
+								// has to be visible for those events to be tracked. So it's ok I think.
+
+								// On the flipside... if the player is seen WITH the flag, we don't update this time, therefore we have the nice value going *at least* far enough into the past 
+								// to the point where he didn't have the flag.
+								requiredMetaEventAges[METRACKER_CAPTURES][p] = demoCurrentTime - bufferTime;
+							}
 						}
 					}
 					if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG]) {
@@ -5081,6 +5156,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownBlueFlagCarrierPosition);
 						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownBlueFlagCarrierVelocity);
 						recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
+					}
+					else {
+						// Same logic as with entities above, see comment above. But ofc playerstate is always visible but view angle can change
+						// So I think overall similar logic applies here too and besides, let's keep it consistent.
+						requiredMetaEventAges[METRACKER_CAPTURES][demo.cut.Cl.snap.ps.clientNum] = demoCurrentTime - bufferTime;
 					}
 					if (clientIsInSnapshot) {
 						clientVisibleOrFollowed = true;
