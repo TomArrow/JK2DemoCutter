@@ -1514,7 +1514,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			SQLBIND_DELAYED_TEXT(query, "@demoName", (*oldBasename).c_str());
 			SQLBIND_DELAYED_TEXT(query, "@demoPath", (*oldPath).c_str());
 			SQLBIND_DELAYED(query, int, "@duration", duration);
-			SQLBIND_DELAYED(query, int, "@demoTime", firstLaugh);
+			SQLBIND_DELAYED(query, int, "@demoTime", lastLaugh /*firstLaugh*/); // Make this consistent with the rest. Always log the end time here.
 			SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 			SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
 			SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
