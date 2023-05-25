@@ -413,6 +413,7 @@ struct MetaEvent_Kill {
 	metaEventType_t type;
 };
 
+
 // Kill object for metaevent tracking
 // These are chained together in a slightly nonintuitive way.
 // For each player there is a pointer saying NULL. 
@@ -430,6 +431,7 @@ class Kill_ME { // kill for meta events
 	bool destroyPrevious = true;
 	std::vector<MetaEvent_Kill> metaEvents;
 	int64_t demoTime;
+	int bufferTimeReal;
 
 	
 	inline void addEvent(MetaEvent* metaEventAbs) {
@@ -438,33 +440,40 @@ class Kill_ME { // kill for meta events
 		metaEvents.push_back(metaEvent);
 	}
 public:
-	Kill_ME(int64_t demoTimeA,SQLDelayedQueryWrapper_t* killQueryWrapperA,Kill_ME* previousA) {
+	Kill_ME(int64_t demoTimeA,SQLDelayedQueryWrapper_t* killQueryWrapperA,Kill_ME* previousA, int bufferTime) {
 		demoTime = demoTimeA;
 		killQueryWrapper = killQueryWrapperA;
 		previous = previousA;
+		bufferTimeReal = demoTime - std::max((int64_t)0, demoTime - (int64_t)bufferTime);
 	}
 	~Kill_ME() {
 		// Dump metaEvents into query
 		if (killQueryWrapper && metaEvents.size()) { // Let's be sure
 
+			std::sort(metaEvents.begin(),metaEvents.end(), [](MetaEvent_Kill a, MetaEvent_Kill b)
+				{
+					return a.relativeTime < b.relativeTime;
+				}
+			);
+
 			// string for SQL
 			std::stringstream ss;
-			ss << "{\"metaEvents\":[";
+			ss << "{\"me\":\"";
 			for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
-				ss << (it == metaEvents.begin() ? "" : ",") << "{\"k\":\"" << metaEventKeyNames[it->type]<< "\",\"t\":" << it->relativeTime << "}";
+				ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type]<< it->relativeTime;
 			}
-			ss << "]}";
+			ss << "\"}";
 			killQueryWrapper->query.add("@metaEvents", ss.str());
 
 			// String for .bat
 			if (killQueryWrapper->batchString.size()) {
 
 				ss.str("");
-				ss << " --meta \"{\\\"metaEvents\\\":[";
+				ss << " --meta \"{\\\"hl\\\":"<< bufferTimeReal <<",\\\"me\\\":\\\"";
 				for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
-					ss << (it == metaEvents.begin() ? "" : ",") << "{\\\"k\\\":\\\"" << metaEventKeyNames[it->type] << "\\\",\\\"t\\\":" << it->relativeTime << "}";
+					ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type] << (bufferTimeReal+it->relativeTime); // TODO Compensate for demo not starting at exact correct millisecond.
 				}
-				ss << "]}\"";
+				ss << "\\\"}\"";
 				killQueryWrapper->batchSuffix = ss.str();
 			}
 		}
@@ -1620,6 +1629,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"specialJumps	INTEGER,"
 		"timeSinceLastSelfSentryJump	INTEGER,"
 
+		"metaEvents	TEXT,"
+
 		"maxAngularSpeedAttacker	REAL,"
 		"maxAngularAccelerationAttacker	REAL,"
 		"maxAngularJerkAttacker	REAL,"
@@ -1823,9 +1834,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	;
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -4523,7 +4534,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							addMetaEvent(METAEVENT_DEATH, demoCurrentTime, target, bufferTime, opts,bufferTime);
 							if(attacker >= 0 && attacker < max_clients && target != attacker){
-								Kill_ME* killME = new Kill_ME(demoCurrentTime, angleQueryWrapper, playerPastKills[attacker]);
+								Kill_ME* killME = new Kill_ME(demoCurrentTime, angleQueryWrapper, playerPastKills[attacker],bufferTime);
 								killME->addPastEvents(playerPastMetaEvents[attacker], bufferTime);
 								addMetaEvent(victimIsFlagCarrier ? METAEVENT_RETURN : METAEVENT_KILL, demoCurrentTime, attacker, bufferTime, opts, bufferTime);
 								playerPastKills[attacker] = killME;
@@ -5733,7 +5744,7 @@ int main(int argcO, char** argvO) {
 	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");
 	auto S = op.add<popl::Implicit<int>>("S", "only-log-killsprees-with-saberkills", "Only log killsprees that contain at least one saber kill (.db as well as .bat). Optional: Provide number of needed saber kills in killspree.",1);
 	auto d = op.add<popl::Implicit<int>>("d", "write-demo-packet-stats", "Write stats about packet size and rate over time. If specified without a value, each packet gets an entry. Otherwise, a number can be provided as the interval in milliseconds to write stats.",0);
-	auto j = op.add<popl::Implicit<int>>("j", "jump-meta-events", "Track jumps as meta events. Optionally, number to limit time around kill that they are tracked in milliseconds.",0);
+	//auto j = op.add<popl::Implicit<int>>("j", "jump-meta-events", "Track jumps as meta events. Optionally, number to limit time around kill that they are tracked in milliseconds.",0);
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
@@ -5769,7 +5780,7 @@ int main(int argcO, char** argvO) {
 	opts.entityDataToDb = e->is_set();
 	opts.onlyLogSaberKills = s->is_set();
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set() ? S->value() : 0;
-	opts.jumpMetaEventsLimit = j->is_set() ? (j->value() == 0 ? bufferTime : j->value()) : 0;
+	opts.jumpMetaEventsLimit = bufferTime;//j->is_set() ? (j->value() == 0 ? bufferTime : j->value()) : 0;
 	opts.writeDemoPacketStats = d->is_set() ? (d->value() <= 0 ? -1 : d->value()) : 0;
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
 	opts.quickSkipNonSaberExclusive =  q->value();
