@@ -7,6 +7,11 @@
 #include <stateFields.h>
 #include <sstream>
 
+
+
+
+constexpr char* postEOFMetadataMarker = "HIDDENMETA";
+
 // Code is 99%-100% from jomme, from various files.
 // Most of it is likely still the same as in the original Jedi Knight source code releases
 //
@@ -3612,6 +3617,80 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 	}
 	else {
 		FS_Write(msg->data, msg->cursize, f);
+	}
+}
+
+constexpr int strlenConstExpr(const char* txt) {
+	int count = 0;
+	while (*txt != 0) {
+		count++;
+		txt++;
+	}
+	return count;
+}
+
+void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData) {
+	byte			bufData[MAX_MSGLEN];
+	std::vector<byte>			bufDataRaw;
+	msg_t			buf;
+	int				i;
+	int				len;
+	entityState_t* ent;
+	entityState_t	nullstate;
+	char* s;
+
+	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
+	int maxAllowedConfigString = getMaxConfigStrings(demoType);
+
+	// write out the gamestate message
+	if (raw) {
+		bufDataRaw.clear();
+		MSG_InitRaw(&buf, &bufDataRaw);
+	}
+	else {
+		MSG_Init(&buf, bufData, sizeof(bufData));
+	}
+	MSG_Bitstream(&buf);
+	// NOTE, MRE: all server->client messages now acknowledge
+	MSG_WriteLong(&buf, clcCut->reliableSequence);
+	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general,demoType));
+
+	// Normal demo readers will quit here. For all intents and purposes this demo message is over. But we're gonna put the metadata here now. Since it comes after svc_EOF, nobody will ever be bothered by it 
+	// but we can read it if we want to.
+	constexpr int metaMarkerLength = strlenConstExpr(postEOFMetadataMarker);
+	// This is how the demo huffman operates. Worst case a byte can take almost 2 bytes to save, from what I understand. When reading past the end, we need to detect if we SHOULD read past the end.
+	// For each byte we need to read, thus, the message length must be at least 2 bytes longer still. Hence at the end we will artificially set the message length to be minimum that long.
+	// We will only read x amount of bytes (where x is the length of the meta marker) and see if the meta marker is present. If it is, we then proceeed to read a bigstring.
+	// This same thing is technically not true for the custom compressed types (as their size is always the real size of the data) but we'll just leave it like this to be universal and simple.
+	constexpr int maxBytePerByteSaved = 2; 
+	constexpr int metaMarkerPresenceMinimumByteLengthExtra = metaMarkerLength * maxBytePerByteSaved;
+
+	const int requiredCursize = buf.cursize + metaMarkerPresenceMinimumByteLengthExtra; // We'll just set it to this value at the end if it ends up smaller.
+
+	for (int i = 0; i < metaMarkerLength; i++) {
+		MSG_WriteByte(&buf,postEOFMetadataMarker[i]);
+	}
+	MSG_WriteBigString(&buf, metaData);
+
+
+	// finished writing the client packet
+	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general, demoType)); // Done. Not really needed but whatever.
+
+	if (buf.cursize < requiredCursize) {
+		buf.cursize = requiredCursize;
+	}
+
+	// write it to the demo file
+	len = LittleLong(clcCut->serverMessageSequence - 2);
+	FS_Write(&len, 4, f);
+	len = LittleLong(buf.cursize);
+	FS_Write(&len, 4, f);
+
+	if (buf.raw) {
+		FS_Write(buf.dataRaw->data(), buf.dataRaw->size(), f);
+	}
+	else {
+		FS_Write(buf.data, buf.cursize, f);
 	}
 }
 

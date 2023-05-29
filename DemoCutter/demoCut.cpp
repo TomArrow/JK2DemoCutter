@@ -10,6 +10,7 @@
 #endif
 
 #include <chrono>
+#include <include/popl.hpp>
 
 
 
@@ -212,7 +213,7 @@ demoTime_t timeParse(std::string timeText) {
 
 
 
-qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName) {
+qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -514,6 +515,9 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (demoCurrentTime >= startTime) {
 		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
+			if (jsonMetaData) {
+				demoCutWriteEmptyMessageWithMetadata(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType, createCompressedOutput,jsonMetaData);
+			}
 			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
 			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
 			// copy rest
@@ -598,45 +602,77 @@ cuterror:
 }*/
 
 
-int main(int argc, char** argv) {
-	if (argc < 4) {
+int main(int argcO, char** argvO) {
+
+	popl::OptionParser op("Allowed options");
+	auto h = op.add<popl::Switch>("h", "help", "Show help");
+	auto m = op.add<popl::Value<std::string>>("m", "meta", "Optionally, add {}-enclosed JSON data that will be attached past the end of an empty first message in the demo.");
+	op.parse(argcO, argvO);
+	auto args = op.non_option_args();
+
+
+	//if (argc < 4) {
+	if (args.size() < 3) {
 		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime";
 		return 1;
 	}
+	else if (h->is_set()) {
+		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
+		return 0;
+	}
 	initializeGameInfos();
-	char* demoName = NULL;
-	char* outputName = NULL;
+	const char* demoName = NULL;
+	const char* outputName = NULL;
 	//float startTime = 0;
 	//float endTime = 0;
 	demoTime_t startTime;
 	demoTime_t endTime;
-	if (argc == 4) {
-		demoName = argv[1];
+	bool mustDeleteOutputName = false;
+	//if (argc == 4) {
+	if (args.size() == 3) {
+		//demoName = argv[1];
+		demoName = args[0].c_str();
 		//startTime = atof(argv[2]);
-		startTime = timeParse(argv[2]);
+		//startTime = timeParse(argv[2]);
+		startTime = timeParse(args[1].c_str());
 		//endTime = atof(argv[3]);
-		endTime = timeParse(argv[3]);
+		//endTime = timeParse(argv[3]);
+		endTime = timeParse(args[2].c_str());
 	}
-	else if(argc == 5) {
-		demoName = argv[1];
-		outputName = argv[2];
+	//else if(argc == 5) {
+	else if(args.size() == 4) {
+		//demoName = argv[1];
+		demoName = args[0].c_str();
+		//outputName = argv[2];
+		outputName = args[1].c_str();
 		char* filteredOutputName = new char[strlen(outputName)+1];
 		sanitizeFilename(outputName, filteredOutputName);
-		strcpy(outputName, filteredOutputName);
-		delete[] filteredOutputName;
+		outputName = filteredOutputName;
+		mustDeleteOutputName = true;
+		//strcpy(outputName, filteredOutputName);
 		//startTime = atof(argv[3]);
-		startTime = timeParse(argv[3]);
+		//startTime = timeParse(argv[3]);
+		startTime = timeParse(args[2].c_str());
 		//endTime = atof(argv[4]);
-		endTime = timeParse(argv[4]);
+		//endTime = timeParse(argv[4]);
+		endTime = timeParse(args[3].c_str());
 	}
+
+	std::string metaData = m->is_set() ? m->value() : "";
+
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
-	if (demoCut(demoName, startTime, endTime, outputName)) {
+	if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
 	}
 	else {
 		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
+	}
+	if (mustDeleteOutputName) {
+		delete[] outputName;
 	}
 #ifdef DEBUG
 	std::cin.get();
