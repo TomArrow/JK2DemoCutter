@@ -3713,6 +3713,10 @@ const char* demoCutReadPossibleMetadata(msg_t* msg) {
 	}
 
 	for (int i = 0; i < metaMarkerLength; i++) {
+		if (msg->cursize < msg->readcount + maxBytePerByteSaved)
+		{
+			return NULL;
+		}
 		if (MSG_ReadByte(msg) != postEOFMetadataMarker[i]) {
 			return NULL;
 		}
