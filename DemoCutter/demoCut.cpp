@@ -585,6 +585,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime - std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 					jsonMetaDocument->AddMember("odm", oldDemoDateModified, jsonMetaDocument->GetAllocator());
 				}
+				// TODO maybe save the cut offset? Meh.
 				if (!jsonMetaDocument->HasMember("wr")) {
 					jsonMetaDocument->AddMember("of", "DemoCutter", jsonMetaDocument->GetAllocator());
 				}
