@@ -73,30 +73,36 @@ public:
 		}
 		return NULL;
 	}*/
-	bool isReached(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration, int mapRestartCounter) {
+	bool isReached(int64_t demoTime, int64_t serverTime, int64_t levelStartTime, qboolean isPause, int64_t pauseDuration, int mapRestartCounter, int64_t* offset) {
 		int64_t referenceTime = 0;
 		switch (type) {
 			case DEMOTIME:
+				if (offset) *offset = demoTime - time;
 				return time <= demoTime;
 			case GAMETIME:
 				if(!isPause){
+					if (offset) *offset = (serverTime - levelStartTime) - time;
 					return mapRestartCounter >= skips && time <= (serverTime - levelStartTime);
 				}
 				else {
 					// We can't really know
+					if (offset) *offset = (serverTime - levelStartTime - pauseDuration) - time;
 					return mapRestartCounter >= skips && time <= (serverTime - levelStartTime - pauseDuration);
 				}
 			case GAMETIME_PAUSE: 
 				// This is a bit fucky and logically very bad tbh. But we know the cases in which it's gonna be used so we can try and make it work in that way. Ideally just don't use this, ever.
 				// Two pauses right after each other could have identical times in them. We have to kinda just ignore that here because what else can we really do?
 				if (isPause) {
+					if (offset) *offset = (serverTime - levelStartTime) - time;
 					return time <= (serverTime - levelStartTime);
 				}
 				else {
 					// We can't really tell...
+					if (offset) *offset = 0;
 					return qfalse;
 				}
 			case SERVERTIME:
+				if (offset) *offset = serverTime - time;
 				return time <= serverTime;
 		}
 		return NULL;
@@ -442,7 +448,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				break;
 			case svc_gamestate_general:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
-				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange,mapRestartCounter)) {
+				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange,mapRestartCounter,NULL)) {
 					Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					goto cutcomplete;
 				}
@@ -552,6 +558,9 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				mapRestartCounter++;
 			}
 		}
+
+		int64_t cutStartOffset = 0;
+
 		//if (demoCurrentTime > endTime) {
 		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
 			goto cutcomplete;
@@ -568,7 +577,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		}
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (demoCurrentTime >= startTime) {
-		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
+		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter,&cutStartOffset)) {
 			if (!jsonMetaDocument && !noForcedMeta) {
 				jsonMetaDocument = new rapidjson::Document();
 				jsonMetaDocument->SetObject();
@@ -585,7 +594,13 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime - std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 					jsonMetaDocument->AddMember("odm", oldDemoDateModified, jsonMetaDocument->GetAllocator());
 				}
-				// TODO maybe save the cut offset? Meh.
+				if (!jsonMetaDocument->HasMember("cso")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+					jsonMetaDocument->AddMember("cso", cutStartOffset, jsonMetaDocument->GetAllocator());
+				}
+				else {
+					(*jsonMetaDocument)["cso"] = cutStartOffset;
+					std::cout << "Overriding old 'cso' (cut start offset) metadata value with '"<<cutStartOffset << "'\n";
+				}
 				if (!jsonMetaDocument->HasMember("wr")) {
 					jsonMetaDocument->AddMember("of", "DemoCutter", jsonMetaDocument->GetAllocator());
 				}
