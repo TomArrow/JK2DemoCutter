@@ -14,6 +14,7 @@
 
 #include "include/rapidjson/document.h"
 #include "include/rapidjson/writer.h"
+#include <filesystem>
 
 
 // TODO attach amount of dropped frames in filename.
@@ -577,6 +578,12 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					std::string oldPathStr(oldPath);
 					std::string oldBasename = oldPathStr.substr(oldPathStr.find_last_of("/\\") + 1);
 					jsonMetaDocument->AddMember("of", rapidjson::Value(oldBasename.c_str(), jsonMetaDocument->GetAllocator()).Move(),jsonMetaDocument->GetAllocator());
+				}
+				if (!jsonMetaDocument->HasMember("odm")) { // original date modified (unix)
+					std::filesystem::file_time_type filetime = std::filesystem::last_write_time(oldPath);
+					//time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
+					time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime - std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
+					jsonMetaDocument->AddMember("odm", oldDemoDateModified, jsonMetaDocument->GetAllocator());
 				}
 				if (!jsonMetaDocument->HasMember("wr")) {
 					jsonMetaDocument->AddMember("of", "DemoCutter", jsonMetaDocument->GetAllocator());
