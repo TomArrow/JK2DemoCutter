@@ -578,6 +578,13 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					std::string oldBasename = oldPathStr.substr(oldPathStr.find_last_of("/\\") + 1);
 					jsonMetaDocument->AddMember("of", rapidjson::Value(oldBasename.c_str(), jsonMetaDocument->GetAllocator()).Move(),jsonMetaDocument->GetAllocator());
 				}
+				if (!jsonMetaDocument->HasMember("wr")) {
+					jsonMetaDocument->AddMember("of", "DemoCutter", jsonMetaDocument->GetAllocator());
+				}
+				else {
+					(*jsonMetaDocument)["wr"] = "DemoCutter";
+					std::cout << "Overriding old 'wr' (writer) metadata value with 'DemoCutter'\n";
+				}
 				rapidjson::StringBuffer sb;
 				rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
 				jsonMetaDocument->Accept(writer);
