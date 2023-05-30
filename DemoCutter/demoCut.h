@@ -4200,6 +4200,7 @@ qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActi
 void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType);
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
+const char* demoCutReadPossibleMetadata(msg_t* msg);
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);

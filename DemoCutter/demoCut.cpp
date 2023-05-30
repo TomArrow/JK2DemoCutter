@@ -12,13 +12,18 @@
 #include <chrono>
 #include <include/popl.hpp>
 
-
+#include "include/rapidjson/document.h"
+#include "include/rapidjson/writer.h"
 
 
 // TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
+
+#ifdef GetObject
+#undef GetObject // Messes with rapidjson
+#endif
 
 demo_t			demo;
 
@@ -213,7 +218,7 @@ demoTime_t timeParse(std::string timeText) {
 
 
 
-qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData) {
+qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -240,6 +245,17 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	int				mapRestartCounter = 0;
 	bool			SEHExceptionCaught = false;
 	//mvprotocol_t	protocol;
+
+	rapidjson::Document* jsonMetaDocument = NULL;
+	rapidjson::Document* jsonPreviousMetaDocument = NULL;
+
+	if (jsonMetaData) {
+		jsonMetaDocument = new rapidjson::Document();
+		if (jsonMetaDocument->Parse(jsonMetaData).HasParseError() || !jsonMetaDocument->IsObject()) {
+			std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
+			return qfalse;
+		}
+	}
 
 	// Since not in MME:
 	/*if (!play) {
@@ -296,7 +312,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	fileCompressionScheme_t compressionSchemeUsed = FILECOMPRESSION_NONE;
 
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed,qtrue);
+	const char* oldPath = va("%s%s", oldName, ext);
+	oldSize = FS_FOpenFileRead(oldPath, &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed,qtrue);
 	if (!oldHandle) {
 		Com_Printf("Failed to open %s for cutting.\n", oldName);
 		return qfalse;
@@ -310,6 +327,9 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	if (createCompressedOutput) {
 		ext[3] = 'c';
 	}
+
+	qboolean wasFirstCommandByte = qfalse;
+	qboolean firstCommandByteRead = qfalse;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
@@ -362,8 +382,41 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				goto cuterror;
 			}
 			cmd = MSG_ReadByte(&oldMsg);
+			wasFirstCommandByte = (qboolean)!firstCommandByteRead;
+			firstCommandByteRead = qtrue;
 			cmd = generalizeGameSVCOp(cmd,demoType);
 			if (cmd == svc_EOF_general) {
+				if (wasFirstCommandByte) {
+					// check for hidden meta content
+					const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg);
+					if (maybeMeta) {
+
+						jsonPreviousMetaDocument = new rapidjson::Document();
+						if (jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !jsonPreviousMetaDocument->IsObject()) {
+							// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
+							// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
+							// will quit the process. Because the user can after all just adjust and fix the commandline.
+							std::cout << "Old demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+							break;
+						}
+
+						// Copy any old values to the new meta unless they already exist.
+						if (!jsonMetaDocument) {
+							jsonMetaDocument = new rapidjson::Document();
+							jsonMetaDocument->SetObject();
+						}
+
+						for (rapidjson::Value::MemberIterator it = jsonPreviousMetaDocument->MemberBegin(); it != jsonPreviousMetaDocument->MemberEnd(); it++) {
+							if (!jsonMetaDocument->HasMember(it->name)) {
+								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo copied to new demo.\n";
+								jsonMetaDocument->AddMember(it->name, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+							}
+							else {
+								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo overridden by new metadata. Discarding.\n";
+							}
+						}
+					}
+				}
 				break;
 			}
 			// skip all the gamestates until we reach needed
@@ -515,8 +568,25 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (demoCurrentTime >= startTime) {
 		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
-			if (jsonMetaData) {
-				demoCutWriteEmptyMessageWithMetadata(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType, createCompressedOutput,jsonMetaData);
+			if (!jsonMetaDocument && !noForcedMeta) {
+				jsonMetaDocument = new rapidjson::Document();
+				jsonMetaDocument->SetObject();
+			}
+			if (jsonMetaDocument) {
+				if (!jsonMetaDocument->HasMember("of")) { // original filename
+					std::string oldPathStr(oldPath);
+					std::string oldBasename = oldPathStr.substr(oldPathStr.find_last_of("/\\") + 1);
+					jsonMetaDocument->AddMember("of", rapidjson::Value(oldBasename.c_str(), jsonMetaDocument->GetAllocator()).Move(),jsonMetaDocument->GetAllocator());
+				}
+				rapidjson::StringBuffer sb;
+				rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+				jsonMetaDocument->Accept(writer);
+				const char* finalJsonMetaString = sb.GetString();
+				demoCutWriteEmptyMessageWithMetadata(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType, createCompressedOutput,finalJsonMetaString);
+				delete jsonMetaDocument;
+				if (jsonPreviousMetaDocument) {
+					delete jsonPreviousMetaDocument;
+				}
 			}
 			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
 			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
@@ -607,6 +677,7 @@ int main(int argcO, char** argvO) {
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto m = op.add<popl::Value<std::string>>("m", "meta", "Optionally, add {}-enclosed JSON data that will be attached past the end of an empty first message in the demo.");
+	auto n = op.add<popl::Switch>("n", "no-forced-meta", "Don't write any metadata at all if neither --meta is supplied nor metadata found in original demofile. By default a 'of' key is added containing the original demo filename. This is overridden by an 'of' value existing already in the demo to be cut.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -663,7 +734,7 @@ int main(int argcO, char** argvO) {
 	std::string metaData = m->is_set() ? m->value() : "";
 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
-	if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL)) {
+	if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL, n->is_set())) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);

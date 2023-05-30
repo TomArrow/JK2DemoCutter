@@ -7,7 +7,7 @@
 #include <stateFields.h>
 #include <sstream>
 
-
+#include "include/rapidjson/document.h"
 
 
 constexpr char* postEOFMetadataMarker = "HIDDENMETA";
@@ -3692,6 +3692,32 @@ void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* cl
 	else {
 		FS_Write(buf.data, buf.cursize, f);
 	}
+}
+
+const char* demoCutReadPossibleMetadata(msg_t* msg) {
+
+	// Normal demo readers will quit here. For all intents and purposes this demo message is over. But we're gonna put the metadata here now. Since it comes after svc_EOF, nobody will ever be bothered by it 
+	// but we can read it if we want to.
+	constexpr int metaMarkerLength = strlenConstExpr(postEOFMetadataMarker);
+	// This is how the demo huffman operates. Worst case a byte can take almost 2 bytes to save, from what I understand. When reading past the end, we need to detect if we SHOULD read past the end.
+	// For each byte we need to read, thus, the message length must be at least 2 bytes longer still. Hence at the end we will artificially set the message length to be minimum that long.
+	// We will only read x amount of bytes (where x is the length of the meta marker) and see if the meta marker is present. If it is, we then proceeed to read a bigstring.
+	// This same thing is technically not true for the custom compressed types (as their size is always the real size of the data) but we'll just leave it like this to be universal and simple.
+	constexpr int maxBytePerByteSaved = 2; 
+	constexpr int metaMarkerPresenceMinimumByteLengthExtra = metaMarkerLength * maxBytePerByteSaved;
+
+	const int requiredCursize = msg->readcount + metaMarkerPresenceMinimumByteLengthExtra; // We'll just set it to this value at the end if it ends up smaller.
+
+	if (msg->cursize < requiredCursize) {
+		return NULL;
+	}
+
+	for (int i = 0; i < metaMarkerLength; i++) {
+		if (MSG_ReadByte(msg) != postEOFMetadataMarker[i]) {
+			return NULL;
+		}
+	}
+	return MSG_ReadBigString(msg);
 }
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
