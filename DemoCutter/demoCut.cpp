@@ -602,7 +602,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					std::cout << "Overriding old 'cso' (cut start offset) metadata value with '"<<cutStartOffset << "'\n";
 				}
 				if (!jsonMetaDocument->HasMember("wr")) {
-					jsonMetaDocument->AddMember("of", "DemoCutter", jsonMetaDocument->GetAllocator());
+					jsonMetaDocument->AddMember("wr", "DemoCutter", jsonMetaDocument->GetAllocator());
 				}
 				else {
 					(*jsonMetaDocument)["wr"] = "DemoCutter";
