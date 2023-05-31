@@ -28,7 +28,9 @@ public:
 	SQLDelayedQuery query;
 	std::string batchSuffix = ""; // Text that should appear after the cutting command (like metadata that finishes collecting after a kill)
 	std::string batchPrefix = ""; // Text that should appear before the cutting command (like insert Id)
-	std::string batchString = ""; // Main text to appear in batch
+	std::string batchString1 = ""; // Main text to appear in batch (part1) In parts so we can add something to the target filename.
+	std::string batchString2 = ""; // Main text to appear in batch (part2)
+	std::stringstream batchMiddlePart;
 };
 
 typedef std::vector<SQLDelayedQueryWrapper_t*> queryCollection;
@@ -468,7 +470,7 @@ public:
 			queryWrapper->query.add("@metaEvents", ss.str());
 
 			// String for .bat
-			if (queryWrapper->batchString.size()) {
+			if (queryWrapper->batchString1.size() || queryWrapper->batchString2.size()) {
 
 				ss.str("");
 				ss << " --meta \"{\\\"hl\\\":"<< bufferTimeReal <<",\\\"me\\\":\\\"";
@@ -498,7 +500,7 @@ public:
 	inline void addPastEvents(MetaEvent* lastMetaEvent, int maxTimeDelta, bool purgeOlderEvents = true) {
 		MetaEvent* current = lastMetaEvent;
 		MetaEvent* old = NULL;
-		while (current && current->demoTime >= this->demoTime - maxTimeDelta) {
+		while (current && current->demoTime >= this->demoTimeStart - maxTimeDelta) { // Using demoTimeStart here because we're adding past events to a newer tracker. They can be up to "timeDelta" before the start of this tracker timespan.
 			if (current->demoTime >= this->demoTimeStart - current->timeDelta) {
 				this->addEvent(current);
 			}
@@ -513,8 +515,8 @@ public:
 	inline void addEventRecursive(MetaEvent* metaEventAbs, int maxTimeDelta, bool purgeOlder = true) {
 		MetaEventTracker* current = this;
 		MetaEventTracker* old = NULL;
-		while (current && current->demoTime >= metaEventAbs->demoTime - maxTimeDelta) {
-			if (current->demoTimeStart >= metaEventAbs->demoTime - metaEventAbs->timeDelta) {
+		while (current && current->demoTime >= metaEventAbs->demoTime - maxTimeDelta) { // Using demoTime here because we're adding new events to a past tracker. They can be up to "timeDelta" after the end of a tracker timespan.
+			if (current->demoTime >= metaEventAbs->demoTime - metaEventAbs->timeDelta) {
 				current->addEvent(metaEventAbs);
 			}
 			old = current;
@@ -554,7 +556,7 @@ inline void addMetaEvent(metaEventType_t type, int64_t demoTime, int clientNum, 
 	playerPastMetaEvents[clientNum] = theEvent;
 	for (int i = 0; i < METRACKER_TOTAL_COUNT; i++) {
 		if (metaEventTrackers[i][clientNum]) {
-			metaEventTrackers[i][clientNum]->addEventRecursive(theEvent, timeDelta, true);
+			metaEventTrackers[i][clientNum]->addEventRecursive(theEvent, bufferTime, true);
 		}
 	}
 }
@@ -1473,7 +1475,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		batSS << "\nrem hash: " << hash_hex_string;
 		batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 		batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-		queryWrapper->batchString = batSS.str();
+		queryWrapper->batchString1 = batSS.str();
 
 		delete[] targetFilenameFiltered;
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
@@ -1543,7 +1545,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			std::stringstream batSS;
 			batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 			batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-			queryWrapper->batchString = batSS.str();
+			queryWrapper->batchString1 = batSS.str();
 
 			delete[] targetFilenameFiltered;
 			std::cout << targetFilename << "\n";
@@ -2044,7 +2046,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		sqlite3_reset(io.insertAngleStatement);
 		//wasDoingSQLiteExecution = false;
-		(*io.outputBatHandle) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+		(*io.outputBatHandle) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
 	}
 
 	// Sprees
@@ -2058,7 +2060,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		sqlite3_reset(io.insertSpreeStatement);
 		//wasDoingSQLiteExecution = false;
-		(*io.outputBatHandleKillSprees) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+		(*io.outputBatHandleKillSprees) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
 	}
 
 	// Captures
@@ -2083,8 +2085,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_reset(io.insertCaptureStatement);
 		//wasDoingSQLiteExecution = false;
 
-		if((*it)->batchString.size()) (*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
-		(*io.outputBatHandleCaptures) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+		if((*it)->batchString1.size() || (*it)->batchString1.size()) (*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
+		(*io.outputBatHandleCaptures) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
 	}
 
 	// Defrag
@@ -2097,7 +2099,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		sqlite3_reset(io.insertDefragRunStatement);
 		//wasDoingSQLiteExecution = false;
-		(*io.outputBatHandleDefrag) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+		(*io.outputBatHandleDefrag) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
 	}
 
 	// Laughs
@@ -2123,8 +2125,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_reset(io.insertLaughsStatement);
 		//wasDoingSQLiteExecution = false;
 				
-		if ((*it)->batchString.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
-		(*io.outputBatHandleLaughs) << (*it)->batchPrefix << (*it)->batchString << (*it)->batchSuffix;
+		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
+		(*io.outputBatHandleLaughs) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
 	}
 
 	// Player demo stats
@@ -4604,7 +4606,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 							batSS << "\nrem hash: " << hash_hex_string;
 							batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-							angleQueryWrapper->batchString = batSS.str();
+							angleQueryWrapper->batchString1 = batSS.str();
 							
 							delete[] targetFilenameFiltered;
 							std::cout << mapname << " " << logModString << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
@@ -4949,7 +4951,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::stringstream batSS;
 							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 							batSS << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-							queryWrapper->batchString = batSS.str();
+							queryWrapper->batchString1 = batSS.str();
 							
 							delete[] targetFilenameFiltered;
 							std::cout << targetFilename << "\n";
@@ -5620,7 +5622,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					std::stringstream batSS;
 					batSS << "\nrem demoCurrentTime: "<< demoCurrentTime;
 					batSS << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-					queryWrapper->batchString = batSS.str();
+					queryWrapper->batchString1 = batSS.str();
 
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
