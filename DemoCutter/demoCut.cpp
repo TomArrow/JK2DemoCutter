@@ -253,6 +253,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	bool			SEHExceptionCaught = false;
 	//mvprotocol_t	protocol;
 
+	int64_t originalFileAbsoluteCutOffset = 0;
+
 	rapidjson::Document* jsonMetaDocument = NULL;
 	rapidjson::Document* jsonPreviousMetaDocument = NULL;
 
@@ -261,6 +263,9 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		if (jsonMetaDocument->Parse(jsonMetaData).HasParseError() || !jsonMetaDocument->IsObject()) {
 			std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
 			return qfalse;
+		}
+		if (jsonMetaDocument->HasMember("oco")) {
+			originalFileAbsoluteCutOffset = (*jsonMetaDocument)["oco"].GetInt64();
 		}
 	}
 
@@ -583,6 +588,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				jsonMetaDocument->SetObject();
 			}
 			if (jsonMetaDocument) {
+				// TODO: Save "oto": Original total offset. Throughout all cuts, what's the offset from the original file now?
+
 				if (!jsonMetaDocument->HasMember("of")) { // original filename
 					std::string oldPathStr(oldPath);
 					std::string oldBasename = oldPathStr.substr(oldPathStr.find_last_of("/\\") + 1);
@@ -601,6 +608,17 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					(*jsonMetaDocument)["cso"] = cutStartOffset;
 					std::cout << "Overriding old 'cso' (cut start offset) metadata value with '"<<cutStartOffset << "'\n";
 				}
+
+				originalFileAbsoluteCutOffset += demoCurrentTime;
+				if (!jsonMetaDocument->HasMember("oco")) { // original cut offset. aka absolute offset from start of the once ancestral original demo before any cutting was done. this value is read back by subsequent cutting into originalFileAbsoluteCutOffset and then added to the new offset.
+					jsonMetaDocument->AddMember("oco", originalFileAbsoluteCutOffset, jsonMetaDocument->GetAllocator());
+				}
+				else {
+					(*jsonMetaDocument)["oco"] = originalFileAbsoluteCutOffset;
+					std::cout << "Overriding old 'oco' (original cut offset) metadata value with '"<< originalFileAbsoluteCutOffset << "'\n";
+				}
+
+
 				if (!jsonMetaDocument->HasMember("wr")) {
 					jsonMetaDocument->AddMember("wr", "DemoCutter", jsonMetaDocument->GetAllocator());
 				}

@@ -42,6 +42,11 @@ MAYBE current stance of victim? not important tho.
 captureS: save kills/rets during run. overall fastest speed during run. kills in last 5 seconds. PARTIALLY DONE
 also: get longer-span killstreaks with spans longer than 3s, but mark them as such. or rather: maybe make separate detections or sth? 3,5,7,9 seconds span. hmm. or: 3 second main but allow a bit in between?
 
+
+
+BC/Ret that leads to captures...
+
+
 check: leads to capture? can do that now
 
 for everything: save highest amount of consecutive lost packets?
