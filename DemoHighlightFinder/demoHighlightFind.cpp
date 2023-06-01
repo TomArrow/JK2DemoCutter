@@ -30,7 +30,7 @@ public:
 	std::string batchPrefix = ""; // Text that should appear before the cutting command (like insert Id)
 	std::string batchString1 = ""; // Main text to appear in batch (part1) In parts so we can add something to the target filename.
 	std::string batchString2 = ""; // Main text to appear in batch (part2)
-	std::stringstream batchMiddlePart;
+	std::stringstream batchMiddlePart; // Something to insert into the middle of the target cut filename. Not the most intuitive variable name but that's what this comment is for
 };
 
 typedef std::vector<SQLDelayedQueryWrapper_t*> queryCollection;
@@ -249,6 +249,7 @@ struct hitDetectionData_t {
 };
 
 hitDetectionData_t hitDetectionData[MAX_CLIENTS_MAX];
+qboolean jumpDetected[MAX_CLIENTS_MAX];
 
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
 jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
@@ -500,8 +501,8 @@ public:
 	inline void addPastEvents(MetaEvent* lastMetaEvent, int maxTimeDelta, bool purgeOlderEvents = true) {
 		MetaEvent* current = lastMetaEvent;
 		MetaEvent* old = NULL;
-		while (current && current->demoTime >= this->demoTimeStart - maxTimeDelta) { // Using demoTimeStart here because we're adding past events to a newer tracker. They can be up to "timeDelta" before the start of this tracker timespan.
-			if (current->demoTime >= this->demoTimeStart - current->timeDelta) {
+		while (current && current->demoTime >= this->demoTime - maxTimeDelta) { // Not using demotimeStart here because maxTimeDelta already takes into account how far into the past we must save
+			if (current->demoTime >= this->demoTimeStart - current->timeDelta) {// Using demoTimeStart here because we're adding past events to a newer tracker. They can be up to "timeDelta" before the start of this tracker timespan.
 				this->addEvent(current);
 			}
 			old = current;
@@ -2547,6 +2548,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
 	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
 	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+	Com_Memset(&jumpDetected, 0, sizeof(jumpDetected));
 	Com_Memset(&requiredMetaEventAges, 0, sizeof(requiredMetaEventAges));
 	Com_Memset(&metaEventTrackers, 0, sizeof(metaEventTrackers));
 	Com_Memset(&playerPastMetaEvents, 0, sizeof(playerPastMetaEvents));
@@ -2668,6 +2670,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 		Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+		Com_Memset(&jumpDetected, 0, sizeof(jumpDetected));
 
 		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
 		float playerStateStrafeDeviationThisFrame = 0;
@@ -3596,8 +3599,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 						}
-						if (opts.jumpMetaEventsLimit > 0 &&  lastFrameInfo.entityExists[i] && thisFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
-							addMetaEvent(METAEVENT_JUMP, demoCurrentTime, i, opts.jumpMetaEventsLimit, opts,bufferTime);
+						if (lastFrameInfo.entityExists[i] && thisFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
+							// Sadly this doesn't always work. It often does, but also often doesn't.
+							// My guess: It's only 1 frame with quick jumps and the server didn't send that particular frame due to snap limit.
+							// Or: It's not even a single frame? idk.
+							jumpDetected[i] = qtrue;
 						}
 					}
 					else {
@@ -3621,6 +3627,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						|| generalEventPred1 >= EV_PAIN_GENERAL && generalEventPred1 <= EV_DEATH3_GENERAL
 						) {
 						hitDetectionData[demo.cut.Cl.snap.ps.clientNum].painDetected = qtrue;
+					}
+					if (generalEvent == EV_JUMP_GENERAL
+						|| generalEventPred0 == EV_JUMP_GENERAL
+						|| generalEventPred1 == EV_JUMP_GENERAL
+						) {
+						jumpDetected[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 					}
 				}
 
@@ -4624,6 +4636,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								hitDetectionData[playerNum].painDetected = qtrue;
 							}
 						}
+
+						else if (eventNumber == EV_JUMP_GENERAL) {
+
+							int clientNumJump = thisEs->number < max_clients ? thisEs->number : thisEs->otherEntityNum;
+							if(clientNumJump >=0 && clientNumJump < max_clients){ // idk why it wouldnt but be safe. someone could alwayss mess with a demo or make weird mods.
+								jumpDetected[clientNumJump] = qtrue;
+							}
+						}
 					
 						else if (eventNumber == EV_SABER_HIT_GENERAL && thisEs->eventParm == 1) { // Saber hit against client
 							
@@ -4648,7 +4668,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 						else if (eventNumber == EV_PLAY_EFFECT_GENERAL || eventNumber == EV_PLAY_EFFECT_ID_GENERAL) {
 							// We don't get anything useful out of this per se, but we can use it to sync with music for example for effect and cool.
-							addMetaEventNearby<max_clients>(thisEs->pos.trBase,200, METAEVENT_EFFECT, demoCurrentTime, bufferTime, opts, bufferTime);
+							// tripmine has splash radius 256.0f. lets add 50 to make it safe (since stuff can move).
+							// There is no weapon (at least in JK2) with higher splash radius I believe.
+							addMetaEventNearby<max_clients>(thisEs->pos.trBase, 256.0f + 50.0f, METAEVENT_EFFECT, demoCurrentTime, bufferTime, opts, bufferTime); 
 						}
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
 							int playerNum = thisEs->trickedentindex;
@@ -4958,6 +4980,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 						}
+					}
+				}
+
+
+				// Check jumps (because it relies on events too... otherwise I'd do it up there.
+				for (int i = 0; i < max_clients; i++) {
+					if (opts.jumpMetaEventsLimit > 0 && jumpDetected[i]) {
+						addMetaEvent(METAEVENT_JUMP, demoCurrentTime, i, opts.jumpMetaEventsLimit, opts,bufferTime);
 					}
 				}
 
