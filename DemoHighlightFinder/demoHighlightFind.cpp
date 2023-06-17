@@ -104,6 +104,7 @@ public:
 	int writeDemoPacketStats = 0; // 0 = don't write stats. -1  = write immediately on every packet. other number = write  as soon as time interval in demotime has passed
 	bool onlyLogCapturesWithSaberKills = false;
 	bool findSuperSlowKillStreaks = false;
+	bool noFindOutput = false;
 	int jumpMetaEventsLimit = 0;
 };
 
@@ -1480,14 +1481,14 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 		delete[] targetFilenameFiltered;
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
-		std::cout << ss.str() << "\n";
+		if(!opts.noFindOutput) std::cout << ss.str() << "\n";
 
 		//timeCheckedForKillStreaks[clientNumAttacker] = spreeInfo->lastKillTime;
 	}
 
 }
 
-void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution) {
+void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
 	
 	if (firstLaugh != -1  && (demoCurrentTime - firstLaugh > MAX_LAUGH_DELAY || force) && laughCount > 0) {
 		
@@ -1549,7 +1550,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			queryWrapper->batchString1 = batSS.str();
 
 			delete[] targetFilenameFiltered;
-			std::cout << targetFilename << "\n";
+			if (!opts.noFindOutput)  std::cout << targetFilename << "\n";
 		}
 
 		resetLaughs(); // Reset again so we can track future laugh sequences.
@@ -2665,6 +2666,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	entityState_t* droppedFlagEntities[MAX_TEAMS]{};
 	entityState_t* baseFlagEntities[MAX_TEAMS]{};
 
+	int oldSequenceNum=0;
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
 
@@ -2686,14 +2688,31 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		else {
 			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
 		}
-		int oldSequenceNum = demo.cut.Clc.serverMessageSequence;
+		oldSequenceNum = demo.cut.Clc.serverMessageSequence;
 
 		/* Read the sequence number */
 		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 			goto cuterror;
 
 		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
-		currentPacketPeriodStats.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
+
+		if (demo.cut.Clc.serverMessageSequence == oldSequenceNum) {
+			std::cout << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << "\n";
+		}
+		else if (demo.cut.Clc.serverMessageSequence < oldSequenceNum) {
+			if (demo.cut.Clc.serverMessageSequence == -1) {
+#ifdef DEBUG
+				std::cout << "Message number changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with "<< oldSize << " bytes left." << "\n";
+#endif
+			}
+			else {
+				std::cout << "WARNING: Message number order changed: " << oldSequenceNum << "->" << demo.cut.Clc.serverMessageSequence << " at demotime " << demoCurrentTime << "\n";
+			}
+		}
+		else {
+			currentPacketPeriodStats.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
+		}
+
 		oldSize -= 4;
 		/* Read the message size */
 		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
@@ -2701,8 +2720,21 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		oldMsg.cursize = LittleLong(oldMsg.cursize);
 		oldSize -= 4;
 		/* Negative size signals end of demo */
-		if (oldMsg.cursize < 0)
+		if (oldMsg.cursize < 0) {
+			if (oldMsg.cursize == -1) {
+				if (oldSize > 0
+#ifdef DEBUG
+	|| true
+#endif
+					) {
+					std::cout << "Message size changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
+				}
+			}
+			else {
+				std::cout << "Message size changed to weird value: "<< oldMsg.cursize << ". Treating as end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
+			}
 			break;
+		}
 		if (oldMsg.cursize > oldMsg.maxsize)
 			goto cuterror;
 		/* Read the actual message */
@@ -4621,7 +4653,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							angleQueryWrapper->batchString1 = batSS.str();
 							
 							delete[] targetFilenameFiltered;
-							std::cout << mapname << " " << logModString << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
+							if (!opts.noFindOutput)  std::cout << mapname << " " << logModString << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
 						}
 
@@ -4976,7 +5008,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							queryWrapper->batchString1 = batSS.str();
 							
 							delete[] targetFilenameFiltered;
-							std::cout << targetFilename << "\n";
+							if (!opts.noFindOutput)  std::cout << targetFilename << "\n";
 
 
 						}
@@ -5370,7 +5402,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 
 		// Check for finished laugh sequences
-		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,io,&sharedVars.oldBasename,&sharedVars.oldPath, sharedVars.oldDemoDateModified,sourceDemoFile,qfalse,wasDoingSQLiteExecution);
+		checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime,io,&sharedVars.oldBasename,&sharedVars.oldPath, sharedVars.oldDemoDateModified,sourceDemoFile,qfalse,wasDoingSQLiteExecution,opts);
 
 
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
@@ -5656,7 +5688,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
-					std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+					if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 				}
 
 				
@@ -5772,7 +5804,7 @@ cuterror:
 	}*/
 
 	// One last check for unsaved laughs near end of demo. TODO Do we have to do this with some other stuff too? Not sure.
-	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution);
+	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution,opts);
 
 
 
@@ -5786,7 +5818,7 @@ cuterror:
 	//FS_FCloseFile(newHandle);
 
 
-	std::cout << "\ndone." << "\n\n";
+	std::cout << "\ndone at demotime "<< demoCurrentTime << " and messsage number "<<demo.cut.Clc.serverMessageSequence << " (old: " << oldSequenceNum << ")." << "\n\n";
 
 
  	return ret;
@@ -5861,6 +5893,7 @@ int main(int argcO, char** argvO) {
 	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
+	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -5897,6 +5930,7 @@ int main(int argcO, char** argvO) {
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
 	opts.quickSkipNonSaberExclusive =  q->value();
 	opts.findSuperSlowKillStreaks = l->value();
+	opts.noFindOutput = n->value();
 
 
 
