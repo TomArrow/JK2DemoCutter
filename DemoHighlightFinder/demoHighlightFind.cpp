@@ -1304,7 +1304,7 @@ template<unsigned int max_clients>
 void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts,bool& wasDoingSQLiteExecution) {
 
 
-	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS) {
+	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS || spreeInfo->countRets >= 2) { // gotta be at least 3 kills or 2 rets to count as killstreak
 		int countSaberKills = 0;
 		int maxDelayActual = 0;
 		int CS_PLAYERS_here = getCS_PLAYERS(demoType);
