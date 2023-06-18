@@ -429,6 +429,7 @@ struct MetaEvent_Kill {
 // The destructor also dumps all the meta info into the actual query.
 // This means we HAVE to destroy all the kills eventually for it to even work.
 // Idk how efficient this really is but seems like a fun thing to try.
+#define METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY 5000
 class MetaEventTracker { // kill for meta events
 	MetaEventTracker* previous = NULL;
 	SQLDelayedQueryWrapper_t* queryWrapper = NULL;
@@ -437,7 +438,7 @@ class MetaEventTracker { // kill for meta events
 	int64_t demoTime;
 	int64_t demoTimeStart;
 	int bufferTimeReal;
-
+	bool trackResultingCaptures = false;
 	
 	inline void addEvent(MetaEvent* metaEventAbs) {
 		int delta = (int)(metaEventAbs->demoTime - demoTime);
@@ -445,12 +446,13 @@ class MetaEventTracker { // kill for meta events
 		metaEvents.push_back(metaEvent);
 	}
 public:
-	MetaEventTracker(int64_t demoTimeA,SQLDelayedQueryWrapper_t* queryWrapperA,MetaEventTracker* previousA, int bufferTime, int duration) {
+	MetaEventTracker(int64_t demoTimeA,SQLDelayedQueryWrapper_t* queryWrapperA,MetaEventTracker* previousA, int bufferTime, int duration,bool trackResultingCapturesA) {
 		demoTime = demoTimeA;
 		queryWrapper = queryWrapperA;
 		previous = previousA;
 		demoTimeStart = demoTime - (int64_t)duration;
 		bufferTimeReal = demoTime - std::max((int64_t)0, demoTime - (int64_t)bufferTime - (int64_t)duration);
+		trackResultingCaptures = trackResultingCapturesA;
 	}
 	~MetaEventTracker() {
 		// Dump metaEvents into query
@@ -462,11 +464,16 @@ public:
 				}
 			);
 
+			int ledToCaptures = 0;
+
 			// string for SQL
 			std::stringstream ss;
 			ss << "{\"me\":\"";
 			for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
 				ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type]<< it->relativeTime;
+				if (trackResultingCaptures && it->type == METAEVENT_CAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track captures resulting from thing.
+					ledToCaptures++;
+				}
 			}
 			ss << "\"}";
 			queryWrapper->query.add("@metaEvents", ss.str());
@@ -481,6 +488,17 @@ public:
 				}
 				ss << "\\\"}\"";
 				queryWrapper->batchSuffix = ss.str();
+			}
+
+			if (ledToCaptures >= 1) {
+				queryWrapper->batchMiddlePart << "_LTC";
+				if (ledToCaptures > 1) {
+					queryWrapper->batchMiddlePart << ledToCaptures;
+				}
+				queryWrapper->query.add("@resultingCaptures", ledToCaptures);
+			}
+			else {
+				queryWrapper->query.add("@resultingCaptures", SQLDelayedValue_NULL);
 			}
 		}
 		else {
@@ -1443,7 +1461,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		io.spreeQueries->push_back(queryWrapper);
 
 		if (clientNumAttacker >= 0 && clientNumAttacker < max_clients) {
-			MetaEventTracker* killSpreeME = new MetaEventTracker(spreeInfo->lastKillTime, queryWrapper, metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker], bufferTime, spreeInfo->totalTime);
+			MetaEventTracker* killSpreeME = new MetaEventTracker(spreeInfo->lastKillTime, queryWrapper, metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker], bufferTime, spreeInfo->totalTime,true);
 			killSpreeME->addPastEvents(playerPastMetaEvents[clientNumAttacker], getMinimumMetaEventBufferTime(clientNumAttacker, bufferTime, demoCurrentTime));
 			metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker] = killSpreeME;
 		}
@@ -1462,26 +1480,35 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 
 
-		std::stringstream ss;
-		ss << mapname << std::setfill('0') << "___KILLSPREE" <<maxDelay<<"_"<< spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << "___" << playername << "__";
+		std::stringstream ss; // First half of target filename
+		std::stringstream ss2; // Second half of target filename (so we can insert more modifiers that we don't know about yet)
+		ss << mapname << std::setfill('0') << "___KILLSPREE" << maxDelay << "_" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "");
+		ss2 << "___" << playername << "__";
 		for (int i = 0; i < victims->size(); i++) {
-			ss << "_" << (*victims)[i];
+			ss2 << "_" << (*victims)[i];
 		}
-		ss << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
+		ss2 << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 		std::string targetFilename = ss.str();
+		std::string targetFilename2 = ss2.str();
 		char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+		char* targetFilename2Filtered = new char[targetFilename2.length() + 1];
 		sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+		sanitizeFilename(targetFilename2.c_str(), targetFilename2Filtered);
 
 		std::stringstream batSS;
+		std::stringstream batSS2;
 		batSS << "\nrem hash: " << hash_hex_string;
 		batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
-		batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+		batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
+		batSS2 << targetFilename2Filtered << "\" " << startTime << " " << endTime;
 		queryWrapper->batchString1 = batSS.str();
+		queryWrapper->batchString2 = batSS2.str();
 
 		delete[] targetFilenameFiltered;
+		delete[] targetFilename2Filtered;
 		//std::cout << mapname << " " << modInfo.str() << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "\n";
-		if(!opts.noFindOutput) std::cout << ss.str() << "\n";
+		if(!opts.noFindOutput) std::cout << ss.str() << ss2.str() << "\n";
 
 		//timeCheckedForKillStreaks[clientNumAttacker] = spreeInfo->lastKillTime;
 	}
@@ -1666,6 +1693,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"specialJumps	INTEGER,"
 		"timeSinceLastSelfSentryJump	INTEGER,"
 
+		"resultingCaptures INTEGER,"
 		"metaEvents	TEXT,"
 
 		"maxAngularSpeedAttacker	REAL,"
@@ -1818,6 +1846,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"demoRecorderClientnum	INTEGER NOT NULL,"
 		"maxSpeedAttacker	REAL,"
 		"maxSpeedTargets	REAL,"
+		"resultingCaptures INTEGER,"
 		"metaEvents	TEXT,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
@@ -1873,9 +1902,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	;
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,resultingCaptures,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@resultingCaptures,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -1898,10 +1927,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
-		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,metaEvents,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
+		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,metaEvents,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
 		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
-		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@metaEvents,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
+		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@metaEvents,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
@@ -2048,7 +2077,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		sqlite3_reset(io.insertAngleStatement);
 		//wasDoingSQLiteExecution = false;
-		(*io.outputBatHandle) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
+		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandle) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Sprees
@@ -2062,7 +2091,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		sqlite3_reset(io.insertSpreeStatement);
 		//wasDoingSQLiteExecution = false;
-		(*io.outputBatHandleKillSprees) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
+		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandleKillSprees) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Captures
@@ -2088,7 +2117,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = false;
 
 		if((*it)->batchString1.size() || (*it)->batchString1.size()) (*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
-		(*io.outputBatHandleCaptures) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
+		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandleCaptures) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Defrag
@@ -2101,7 +2130,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		sqlite3_reset(io.insertDefragRunStatement);
 		//wasDoingSQLiteExecution = false;
-		(*io.outputBatHandleDefrag) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
+		if((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleDefrag) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Laughs
@@ -2128,7 +2157,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = false;
 				
 		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
-		(*io.outputBatHandleLaughs) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix;
+		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleLaughs) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Player demo stats
@@ -4623,7 +4652,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							addMetaEvent(METAEVENT_DEATH, demoCurrentTime, target, bufferTime, opts,bufferTime);
 							if(attacker >= 0 && attacker < max_clients && target != attacker){
-								MetaEventTracker* killME = new MetaEventTracker(demoCurrentTime, angleQueryWrapper, metaEventTrackers[METRACKER_KILLS][attacker],bufferTime,0);
+								MetaEventTracker* killME = new MetaEventTracker(demoCurrentTime, angleQueryWrapper, metaEventTrackers[METRACKER_KILLS][attacker],bufferTime,0,true);
 								killME->addPastEvents(playerPastMetaEvents[attacker], getMinimumMetaEventBufferTime(attacker,bufferTime,demoCurrentTime));
 								addMetaEvent(victimIsFlagCarrier ? METAEVENT_RETURN : METAEVENT_KILL, demoCurrentTime, attacker, bufferTime, opts, bufferTime);
 								metaEventTrackers[METRACKER_KILLS][attacker] = killME;
@@ -4639,20 +4668,29 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 							std::stringstream ss;
+							std::stringstream ss2;
 							std::string boostString = ((boostCountAttacker + boostCountVictim) > 0 ?( va("_BST%s%s", boostCountAttacker > 0 ? va("%dA", boostCountAttacker) : "", boostCountVictim > 0 ? va("%dV", boostCountVictim) : "")) : "");
-							ss << mapname << std::setfill('0') << "___"<< logModString << boostString << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << (attackerIsVisibleOrFollowed ? "" : "_attackerInvis")<< (targetIsVisibleOrFollowed ? "" : "_targetInvis") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
+							ss << mapname << std::setfill('0') << "___" << logModString << boostString;
+							ss2 << "___" << playername << "___" << victimname << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << (attackerIsFollowed ? "" : "___thirdperson") << (attackerIsVisibleOrFollowed ? "" : "_attackerInvis") << (targetIsVisibleOrFollowed ? "" : "_targetInvis") << "_" << attacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 							std::string targetFilename = ss.str();
+							std::string targetFilename2 = ss2.str();
 							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+							char* targetFilename2Filtered = new char[targetFilename2.length() + 1];
 							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+							sanitizeFilename(targetFilename2.c_str(), targetFilename2Filtered);
 
 							std::stringstream batSS;
+							std::stringstream batSS2;
 							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 							batSS << "\nrem hash: " << hash_hex_string;
-							batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+							batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered; 
+							batSS2 << targetFilename2Filtered << "\" " << startTime << " " << endTime;
 							angleQueryWrapper->batchString1 = batSS.str();
+							angleQueryWrapper->batchString2 = batSS2.str();
 							
 							delete[] targetFilenameFiltered;
+							delete[] targetFilename2Filtered;
 							if (!opts.noFindOutput)  std::cout << mapname << " " << logModString << boostString << " " << attacker << " " << target << " " << playername << " " << victimname << (isDoomKill ? " DOOM" : "") << " followed:" << attackerIsFollowed << "___" << maxSpeedAttacker << "_" << maxSpeedTarget << "ups" << "\n";
 
 						}
@@ -4967,7 +5005,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 							// Meta event tracker for capture
-							MetaEventTracker* capME = new MetaEventTracker(demoCurrentTime, queryWrapper, metaEventTrackers[METRACKER_CAPTURES][playerNum], bufferTime, flagHoldTime);
+							MetaEventTracker* capME = new MetaEventTracker(demoCurrentTime, queryWrapper, metaEventTrackers[METRACKER_CAPTURES][playerNum], bufferTime, flagHoldTime, false);
 							capME->addPastEvents(playerPastMetaEvents[playerNum], getMinimumMetaEventBufferTime(playerNum, bufferTime, demoCurrentTime));
 							addMetaEvent(METAEVENT_CAPTURE, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
 							metaEventTrackers[METRACKER_CAPTURES][playerNum] = capME;
