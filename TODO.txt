@@ -1,18 +1,13 @@
-lost packet count
-keep date modified
-dbs speed
+make laughs a meta event?
+
+lost packet count (global count for demo?)
 top10 inferred (top10i)
 automatically save invalid delta frame thingie
 better prediction for laggy demos with gravity?
 detect changes of who is spectated! (and if so add teleport flag) EF_TELEPORT_BIT
-What about player state / player entity events? How to handle those? 
-Obituary event makes zero sense atm... lol. Just using original clientnums that make no sense in the new demo
-look at BG_EvaluateTrajectory for non player entity trajectories
-and BG_PlayerStateToEntityStateExtraPolate and CG_AddToHistory for player entity trajectories
 Clean up older SnapshotInfos (that are just too old to be useful, like 30+ sec?) to save RAM on long demos.
 Make demos identifiable so I can avoid re-cutting them
 should we properly map event entities too?
-solve CROUCH when info comes from entities.
 Remember or even interpolate Health/Armor when getting info from entity state? Maybe even ... infer health and such from hit info?
 
 weapon select wheel when switching between entity and playerstate
@@ -20,16 +15,12 @@ I think this is reason for weapon select issue maybe:
 if ( ps->persistant[PERS_SPAWN_COUNT] != ops->persistant[PERS_SPAWN_COUNT] ) {
 		CG_Respawn();
 	}
-Maybe always remember last known full playerstate and copy some stuff from it...
-Do a demo merger. combines multiple demos of same game...
+
 MAYBE: detect unintentional kills? where killer wasnt looking at victim? kinda pointless tho due to bs/dbs
 some way to filter out afk kills and weirdo shit in ffa
-Dont keep old stuff, it makes stuff slow the bigger the files are. clear the maps regularly, e.g. kills and speeds
 track highest place anyone's ever been!
-track kills where killer jumped over someone else's head. and how many heads? or just. track headjumps before the kill.
 detect allahu akhbar
 detect mutual kills (kills each other on same frame)
-detect amount of people surrounding the kill in past 5 seconds (for nice scenes with lots of ppl)
 TODO: For democombiner: regarding reuse of entities for events. also make sure to update the blockedEntities array whenever a slot gets freed. Don't reuse the slot earlier. Also: Don't reserve a slot if it is currently blocked.
 Also make sure that when reusing entity or player slots, event bits and such are handled properly? 
 use tinfo for health/armor if available.
@@ -37,17 +28,13 @@ copy door entities. but only copy them from one demo otherwise its chaos. some w
 record speed at exact time of death (bc some attacks like ydfa stop u dead in tracks and the number ends up misleading)
 add option to extrapolate/predict using only gravity&velocity when demobot has cut away from kill. wont detect ground ofc, but could at least allow to salvage the scene.
 find highest amount of mines at same time
-MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures
 MAYBE current stance of victim? not important tho.
 captureS: save kills/rets during run. overall fastest speed during run. kills in last 5 seconds. PARTIALLY DONE
-also: get longer-span killstreaks with spans longer than 3s, but mark them as such. or rather: maybe make separate detections or sth? 3,5,7,9 seconds span. hmm. or: 3 second main but allow a bit in between?
+
+detect BC kills? 
 
 
 
-BC/Ret that leads to captures...
-
-
-check: leads to capture? can do that now
 
 for everything: save highest amount of consecutive lost packets?
 some more info about mine kills? to recognize cool ones?
@@ -55,7 +42,7 @@ For g2 ents, maybe dont copy events?
 Do KG2 for g2animents when demo ends. KINDA DONE BUT DOESNT REALLY WORK
 What about dead bodies of ET_GRAPPLE?
 log highest count of sentries/mines ever
-detect mine boosts/backflip before kills?
+
 Make the G2 entity part optional. Aka. If there is still a free player spot, put the player in normal. Otherwise force him into g2. But how to predict that? How to make sure the next demo that loads won't then be missing player spots? I guess we start deleting the potential g2 ones if that happens. "moving them over" if you will?
 Likewise, if a player absolutely cannot fit in, make him a g2ent and throw a warning.
 track percentage visible as capper?
@@ -64,7 +51,7 @@ allow killing sprees that simply count without time by the amount of kills witho
 track airtime before kill/cap?
 TODO: DON'T use GetCurrentEntities in DemoDefragCombiner. In fact probably make that stuff private. Interpolation/seekahead could interfere with it. Also don't let it use the normal EndReached(). Its working through sheer luck atm.
 for combiner, try median of local lows instead of global low?
-detect & remember last boost & speed gain
+
 fix yet another error with event not being copied in democombiner - that dadler kill between red pillars, flag return.
 uhm ... shots from turrets? copy over
 use std::lower_Bound and similar to speed up search through vectors/maps
@@ -124,8 +111,6 @@ Demo Compressor: Add Reed Solomon correction.
 Use https://github.com/quiet/libcorrect ?
 
 IMPORTANT: Don't do dm15detected!!!
-
-
 get from jk2mv: demoCheckFor103
 
 
@@ -152,8 +137,10 @@ detect teamkills
 - offer to put some tables/stats in extra .db file
 - option to stop detecting dooms and or restrict them when variouus force powwers are active (aka dont detect saber doom if player was nowhere near other player as its likely a force puill or sth).
 - make killspree parameter accept number to say how many kills must be saber kills to accept it
-- bc leading to cap
 
+
+DemoReframer:
+- What about player state / player entity events? How to handle those? 
 
 DemoMerger:
 - Show scoreboard/Intermission (when reframing?)
@@ -168,6 +155,25 @@ check for @@@PLRENAME to track who is who and build a chain that allows to more 
 
 DONE: 
 
+detect & remember last boost & speed gain
+detect mine boosts/backflip before kills? ( done as well as i can i think , tho no specific mine boost detect )
+check: leads to capture? can do that now
+also: get longer-span killstreaks with spans longer than 3s, but mark them as such. or rather: maybe make separate detections or sth? 3,5,7,9 seconds span. hmm. or: 3 second main but allow a bit in between?
+MAYBE detect captures and also swoops (captures with very short hold time). could also try and detect how long it took to capture etc. find fastest capures (KINDA done or at least can be inferred from data)
+detect amount of people surrounding the kill in past 5 seconds (for nice scenes with lots of ppl)
+track kills where killer jumped over someone else's head. and how many heads? or just. track headjumps before the kill.
+Dont keep old stuff, it makes stuff slow the bigger the files are. clear the maps regularly, e.g. kills and speeds
+Maybe always remember last known full playerstate and copy some stuff from it...
+Do a demo merger. combines multiple demos of same game...
+solve CROUCH when info comes from entities.
+Obituary event makes zero sense atm... lol. Just using original clientnums that make no sense in the new demo- done ig?
+look at BG_EvaluateTrajectory for non player entity trajectories- done ig?
+and BG_PlayerStateToEntityStateExtraPolate and CG_AddToHistory for player entity trajectories - done ig?
+- bc leading to cap ( kinda, not specifically bc but kill/ret/killspree )
+lost packet count (kinda in the packet stats)
+keep date modified
+dbs speed
+- BC/Ret that leads to captures... (kinda, not BC just kills/killsprees)
 - make optional ultralong (18 second) killspree detection for fetchd DONE
 - jumps over people's heads DONE
 - clutch save DONE
