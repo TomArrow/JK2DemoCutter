@@ -465,7 +465,9 @@ public:
 			);
 
 			int ledToCaptures = 0;
+			int ledToCapturesAfter = 0;
 			int ledToTeamCaptures = 0;
+			int ledToTeamCapturesAfter = 0;
 
 			// string for SQL
 			std::stringstream ss;
@@ -474,9 +476,15 @@ public:
 				ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type]<< it->relativeTime;
 				if (trackResultingCaptures && it->type == METAEVENT_CAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track self (by killer) captures resulting from thing.
 					ledToCaptures++;
+					if (it->relativeTime >= 0) {
+						ledToCapturesAfter++;
+					}
 				}
 				if (trackResultingCaptures && it->type == METAEVENT_TEAMCAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track team captures resulting from thing.
 					ledToTeamCaptures++;
+					if (it->relativeTime >= 0) {
+						ledToTeamCapturesAfter++;
+					}
 				}
 			}
 			ss << "\"}";
@@ -496,23 +504,55 @@ public:
 
 			if (ledToCaptures >= 1) {
 				queryWrapper->batchMiddlePart << "_LTSC";
-				if (ledToCaptures > 1) {
-					queryWrapper->batchMiddlePart << ledToCaptures;
+				if (ledToCapturesAfter == ledToCaptures) {
+					queryWrapper->batchMiddlePart << "A";
+					if (ledToCaptures > 1) {
+						queryWrapper->batchMiddlePart << ledToCaptures;
+					}
+				}
+				else {
+					if (ledToCaptures > 1) {
+						queryWrapper->batchMiddlePart << ledToCaptures;
+					}
+					if (ledToCapturesAfter > 0) {
+						queryWrapper->batchMiddlePart << "_LTSCA";
+						if (ledToCapturesAfter > 1) {
+							queryWrapper->batchMiddlePart << ledToCapturesAfter;
+						}
+					}
 				}
 				queryWrapper->query.add("@resultingSelfCaptures", ledToCaptures);
+				queryWrapper->query.add("@resultingSelfCapturesAfter", ledToCapturesAfter);
 			}
 			else {
 				queryWrapper->query.add("@resultingSelfCaptures", SQLDelayedValue_NULL);
+				queryWrapper->query.add("@resultingSelfCapturesAfter", SQLDelayedValue_NULL);
 			}
 			if (ledToTeamCaptures >= 1) {
 				queryWrapper->batchMiddlePart << "_LTC";
-				if (ledToTeamCaptures > 1) {
-					queryWrapper->batchMiddlePart << ledToTeamCaptures;
+				if (ledToTeamCaptures == ledToTeamCapturesAfter) {
+					queryWrapper->batchMiddlePart << "A";
+					if (ledToTeamCaptures > 1) {
+						queryWrapper->batchMiddlePart << ledToTeamCaptures;
+					}
+				}
+				else {
+					if (ledToTeamCaptures > 1) {
+						queryWrapper->batchMiddlePart << ledToTeamCaptures;
+					}
+					if (ledToTeamCapturesAfter > 0) {
+						queryWrapper->batchMiddlePart << "_LTCA";
+						if (ledToTeamCapturesAfter > 1) {
+							queryWrapper->batchMiddlePart << ledToTeamCapturesAfter;
+						}
+					}
 				}
 				queryWrapper->query.add("@resultingCaptures", ledToTeamCaptures);
+				queryWrapper->query.add("@resultingCapturesAfter", ledToTeamCapturesAfter);
 			}
 			else {
 				queryWrapper->query.add("@resultingCaptures", SQLDelayedValue_NULL);
+				queryWrapper->query.add("@resultingCapturesAfter", SQLDelayedValue_NULL);
 			}
 		}
 		else {
@@ -1863,6 +1903,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"maxSpeedTargets	REAL,"
 		"resultingCaptures INTEGER,"
 		"resultingSelfCaptures INTEGER,"
+		"resultingCapturesAfter INTEGER,"
+		"resultingSelfCapturesAfter INTEGER,"
 		"metaEvents	TEXT,"
 		"demoName TEXT NOT NULL,"
 		"demoPath TEXT NOT NULL,"
@@ -1943,10 +1985,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
-		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,metaEvents,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
+		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,metaEvents,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
 		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
-		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@metaEvents,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
+		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@metaEvents,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";

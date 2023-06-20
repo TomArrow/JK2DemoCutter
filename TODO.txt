@@ -139,6 +139,8 @@ detect teamkills
 - make killspree parameter accept number to say how many kills must be saber kills to accept it
 
 
+- killsprees resulting caps: see for non-after caps, how many of the kills were before the cap?
+
 DemoReframer:
 - What about player state / player entity events? How to handle those? 
 
