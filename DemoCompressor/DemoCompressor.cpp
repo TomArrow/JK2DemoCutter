@@ -88,6 +88,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
+	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile, &demo.cut.Clc.demoCheckFor103);
 
 	/*char specialTypeChar = ext[3];
@@ -120,8 +122,6 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		Com_Printf("Failed to open %s for compressing.\n", oldName);
 		return qfalse;
 	}
-	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
-	memset(&demo, 0, sizeof(demo));
 
 	int messageOffset = 0;
 
@@ -223,6 +223,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		// parse the message
 		//
 		while (1) {
+			bool malformedMessageCaught = false;
 			byte cmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
 				Com_Printf("Demo cutter, read past end of server message.\n");
@@ -266,7 +267,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				readGamestate++;
 				break;
 			case svc_snapshot_general:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught)) {
+				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught, malformedMessageCaught)) {
 					goto cuterror;
 				}
 				/*if (messageOffset++ == 0) {

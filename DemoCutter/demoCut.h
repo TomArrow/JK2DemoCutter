@@ -144,6 +144,12 @@ int inline seh_filter_func(_EXCEPTION_POINTERS* exceptInfo) {
 #endif
 
 
+class malformed_message_exception : public std::runtime_error {
+public:
+	malformed_message_exception(const char* const message) throw() : std::runtime_error(message) {
+	}
+};
+
 /*
 struct parsedArguments_t {
 	std::vector<std::string> mainArgs;
@@ -4195,7 +4201,7 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, bool& SEHExceptionCaught);
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
-qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, qboolean writeOldSnap = qfalse);
+qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, bool& malformedMessage, qboolean writeOldSnap = qfalse);
 
 void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType);
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);

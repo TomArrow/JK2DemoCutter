@@ -390,7 +390,7 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 			}
 		}
 		msg->cursize = (msg->bit >> 3) + 1;
-#elif
+#else
 		value &= (0xffffffff>>(32-bits));
 		if (bits&7) {
 			int nbits;
@@ -491,7 +491,7 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 
 		msg->bit = bitIndex;
 		msg->readcount = (bitIndex >> 3) + 1;
-#elif
+#else
 		nbits = 0;
 		if (bits&7) {
 			nbits = bits&7;
@@ -1325,8 +1325,13 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 	}*/
 	lc = MSG_ReadByte(msg);
 
-	if (lc > numFields || lc < 0)
+	if (lc > numFields || lc < 0) {
+#if 0
+		throw malformed_message_exception(va("invalid entityState field count (got: %i, expecting: %i)", lc, numFields)); // It's more elegant but usually that demo is too broken to be saved and this won't be logged so better let it access violate. (for example overwriting other demo and such, tho we could try and find a way to save those)
+#else
 		Com_Error(ERR_DROP, "invalid entityState field count (got: %i, expecting: %i)", lc, numFields);
+#endif
+	}
 
 	// shownet 2/3 will interleave with other printed info, -1 will
 	// just print the delta records`

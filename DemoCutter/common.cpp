@@ -3424,7 +3424,7 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 	return qtrue;
 }
 
-static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap) {
+static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap, bool& malformedMessage) {
 	int len;
 	clSnapshot_t* oldSnap;
 	clSnapshot_t newSnap;
@@ -3474,22 +3474,31 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 			newSnap.valid = qtrue;	// valid delta parse
 		}
 	}
-	// read areamask
-	len = MSG_ReadByte(msg);
-	//if (len > sizeof(newSnap.areamask)) {
-	//	Com_Printf("demoCutParseSnapshot: Invalid size %d for areamask", len);
-	//	return qfalse;
-	//}
-	MSG_ReadData(msg, &newSnap.areamask, len);
-	// read playerinfo
-	MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse);
+	try {
+		// read areamask
+		len = MSG_ReadByte(msg);
+		//if (len > sizeof(newSnap.areamask)) {
+		//	Com_Printf("demoCutParseSnapshot: Invalid size %d for areamask", len);
+		//	return qfalse;
+		//}
+		MSG_ReadData(msg, &newSnap.areamask, len);
+		// read playerinfo
+		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse);
 
-	// JKA-specific
-	if ((demoType == DM_26 || demoType == DM_25) && newSnap.ps.m_iVehicleNum)
-		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
+		// JKA-specific
+		if ((demoType == DM_26 || demoType == DM_25) && newSnap.ps.m_iVehicleNum)
+			MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
 
-	// read packet entities
-	demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
+		// read packet entities
+		demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
+
+
+	}
+	catch (malformed_message_exception e) {
+		std::cout << "Malformed message caught. Trying to skip. (" << e.what() << ")\n";
+		malformedMessage = true;
+		return qfalse;
+	}
 	// if not valid, dump the entire thing now that it has
 	// been properly read
 	if (!newSnap.valid) {
@@ -3538,9 +3547,9 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 
 	return qtrue;
 }
-qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, qboolean writeOldSnap) {
+qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, bool& malformedMessage, qboolean writeOldSnap) {
 	__TRY{
-		return demoCutParseSnapshotReal(msg,clcCut,clCut,demoType,writeOldSnap);
+		return demoCutParseSnapshotReal(msg,clcCut,clCut,demoType,writeOldSnap, malformedMessage);
 	}
 	__EXCEPT{
 		SEHExceptionCaught = true;

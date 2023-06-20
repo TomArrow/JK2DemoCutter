@@ -77,6 +77,8 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	thisDemo.cut.Clc.demoCheckFor103 = qfalse;
 	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
 
+	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	memset(&thisDemo, 0, sizeof(thisDemo));
 	demoCutGetDemoType(sourceDemoFile, ext, &demoType, &isCompressedFile, &thisDemo.cut.Clc.demoCheckFor103);
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
@@ -107,8 +109,6 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 		Com_Printf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
-	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
-	memset(&thisDemo, 0, sizeof(thisDemo));
 	memset(&playerSeen, 0, sizeof(playerSeen));
 
 	readGamestate = 0;
@@ -367,6 +367,7 @@ readNext:
 	// parse the message
 	//
 	while (1) {
+		bool malformedMessageCaught = false;
 		byte cmd;
 		if (oldMsg.readcount > oldMsg.cursize) {
 			Com_Printf("Demo cutter, read past end of server message.\n");
@@ -418,7 +419,7 @@ readNext:
 			readGamestate++;
 			break;
 		case svc_snapshot_general:
-			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType, SEHExceptionCaught)) {
+			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType, SEHExceptionCaught, malformedMessageCaught)) {
 				return qfalse;
 			}
 

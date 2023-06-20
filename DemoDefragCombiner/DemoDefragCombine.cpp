@@ -42,6 +42,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	qboolean createCompressedOutput = qfalse;
 
+	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(outputName, ext, &demoType, &createCompressedOutput);
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
@@ -64,7 +65,6 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		ext = ".dm_15";
 	}*/
 
-	memset(&demo, 0, sizeof(demo));
 
 	std::vector<DemoReader> demoReaders;
 	std::cout << "loading up demos...";

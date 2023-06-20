@@ -2645,6 +2645,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		isCompressedFile = qtrue;
 	}*/
 
+	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
+	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile,&demo.cut.Clc.demoCheckFor103);
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
@@ -2674,6 +2676,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		return qfalse;
 	}
 
+	int oldSizeOriginal = oldSize;
 
 
 	sharedVars.oldPath = va("%s%s", oldName, ext);
@@ -2691,8 +2694,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	//time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 	sharedVars.oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 
-	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
-	memset(&demo, 0, sizeof(demo));
 
 	int messageOffset = 0;
 
@@ -2811,7 +2812,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		// parse the message
 		//
 		while (1) {
-
+			bool malformedMessageCaught = false;
 			int oldMsgOffset = oldMsg.readcount;
 
 			byte cmd;
@@ -2878,7 +2879,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				readGamestate++;
 				break;
 			case svc_snapshot_general:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught,qtrue)) {
+				malformedMessageCaught = false;
+				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught, malformedMessageCaught,qtrue)) {
+					if (malformedMessageCaught) {
+						std::cout << "Trying to continue after malformed message...\n";
+						goto cutcontinue;
+					}
 					goto cuterror;
 				}
 				currentPacketPeriodStats.angleChanges += (int)(demo.cut.Cl.oldSnap.ps.clientNum != demo.cut.Cl.snap.ps.clientNum); // I'm 14 and this is optimized.
@@ -4437,7 +4443,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										//if (!boosts[i].confirmed && VectorDistance(thisFrameInfo.playerPositions[boosts[i].boostedClientNum], boosts[i].startPosition) < boosts[i].minimumTravelDistance) continue;
 										if (!boosts[i].confirmed && !boosts[i].checkDistanceTraveled(thisFrameInfo.playerPositions[boosts[i].boostedClientNum])) continue;
 										
-										if (!boosts[i].checkFacingTowards(attacker)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
+										if (!((attacker < 0 || attacker >= max_clients) || boosts[i].checkFacingTowards(attacker))) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
 
 										boostCountVictim++;
 										doThis = qtrue;
@@ -5764,32 +5770,34 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 
-		if (oldSize == 0 || (opts.writeDemoPacketStats && currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) >= opts.writeDemoPacketStats))) {
+		if ( opts.writeDemoPacketStats && (oldSize == 0 || (currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) >= opts.writeDemoPacketStats)))) {
 
 			SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 			SQLDelayedQuery* query = &queryWrapper->query;
-
+			
+			int non0periodTotalTime = std::max(currentPacketPeriodStats.periodTotalTime, 1); // Avoid division by 0
+			int non0totalPacketCount = std::max(currentPacketPeriodStats.totalPacketCount, 1); // Avoid division by 0
 			SQLBIND_DELAYED(query, int, "@timeSinceLast", currentPacketPeriodStats.periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@skippedPacketsSinceLast", currentPacketPeriodStats.droppedPackets);
 			SQLBIND_DELAYED(query, int, "@bytesSinceLast", currentPacketPeriodStats.totalPacketsSize);
-			SQLBIND_DELAYED(query, int, "@bytesPerSecond", 1000*currentPacketPeriodStats.totalPacketsSize/ currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@bytesPerSecond", 1000*currentPacketPeriodStats.totalPacketsSize/ non0periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@snapshotBytesSinceLast", currentPacketPeriodStats.totalSnapshotSize);
-			SQLBIND_DELAYED(query, int, "@snapshotBytesPerSecond", 1000 * currentPacketPeriodStats.totalSnapshotSize / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@snapshotBytesPerSecond", 1000 * currentPacketPeriodStats.totalSnapshotSize / non0periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@serverCommandBytesSinceLast", currentPacketPeriodStats.totalServerCommandSize);
-			SQLBIND_DELAYED(query, int, "@serverCommandBytesPerSecond", 1000 * currentPacketPeriodStats.totalServerCommandSize / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@serverCommandBytesPerSecond", 1000 * currentPacketPeriodStats.totalServerCommandSize / non0periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@packetsSinceLast", currentPacketPeriodStats.totalPacketCount);
-			SQLBIND_DELAYED(query, double, "@packetsPerSecond", 1000.0* (double)currentPacketPeriodStats.totalPacketCount/ (double)currentPacketPeriodStats.periodTotalTime);
-			SQLBIND_DELAYED(query, int, "@bytesPerPacket", currentPacketPeriodStats.totalPacketsSize /currentPacketPeriodStats.totalPacketCount);
+			SQLBIND_DELAYED(query, double, "@packetsPerSecond", 1000.0* (double)currentPacketPeriodStats.totalPacketCount/ (double)non0periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@bytesPerPacket", currentPacketPeriodStats.totalPacketsSize / non0totalPacketCount);
 			SQLBIND_DELAYED(query, int, "@periodMaxPacketSize", currentPacketPeriodStats.maxPacketSize);
 			SQLBIND_DELAYED(query, int, "@periodMinPacketSize", currentPacketPeriodStats.minPacketSize);
 
 			SQLBIND_DELAYED(query, int, "@nonDeltaSnapsSinceLast", currentPacketPeriodStats.nonDeltaSnapshotCount);
-			SQLBIND_DELAYED(query, int, "@nonDeltaSnapsPerSecond", 1000  * currentPacketPeriodStats.nonDeltaSnapshotCount / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@nonDeltaSnapsPerSecond", 1000  * currentPacketPeriodStats.nonDeltaSnapshotCount / non0periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@angleChangesSinceLast", currentPacketPeriodStats.angleChanges);
-			SQLBIND_DELAYED(query, int, "@angleChangesPerSecond", 1000 * currentPacketPeriodStats.angleChanges / currentPacketPeriodStats.periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@angleChangesPerSecond", 1000 * currentPacketPeriodStats.angleChanges / non0periodTotalTime);
 			SQLBIND_DELAYED(query, int, "@entitiesSinceLast", currentPacketPeriodStats.entitiesReceivedTotal);
-			SQLBIND_DELAYED(query, int, "@entitiesPerSecond", 1000 * currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.periodTotalTime);
-			SQLBIND_DELAYED(query, int, "@entitiesPerPacket", currentPacketPeriodStats.entitiesReceivedTotal / currentPacketPeriodStats.totalPacketCount);
+			SQLBIND_DELAYED(query, int, "@entitiesPerSecond", 1000 * currentPacketPeriodStats.entitiesReceivedTotal / non0periodTotalTime);
+			SQLBIND_DELAYED(query, int, "@entitiesPerPacket", currentPacketPeriodStats.entitiesReceivedTotal / non0totalPacketCount);
 
 			SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
 			SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
