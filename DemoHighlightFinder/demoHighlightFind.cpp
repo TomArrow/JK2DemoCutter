@@ -1642,8 +1642,9 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	int sqlResult = 0;
-	while ((sqlResult = sqlite3_open("killDatabase.db", &io.killDb)) != SQLITE_OK) {
-		std::cerr << DPrintFLocation << ":" << "error opening killDatabase.db ("<< sqlResult << "): "<< sqlite3_errmsg(io.killDb)<< ". Trying again in 1000ms." << "\n";
+	int readonlyResult = 0;
+	while ((sqlResult = sqlite3_open("killDatabase.db", &io.killDb)) != SQLITE_OK || (readonlyResult=sqlite3_db_readonly(io.killDb, "main"))) {
+		std::cerr << DPrintFLocation << ":" << "error opening killDatabase.db for read/write ("<< sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb) << ". Trying again in 1000ms." << "\n";
 		sqlite3_close(io.killDb);
 		io.killDb = NULL;
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -2021,8 +2022,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	if (opts.writeDemoPacketStats) {
 
-		while ((sqlResult = sqlite3_open("demoStats.db", &io.demoStatsDb)) != SQLITE_OK) {
-			std::cerr << DPrintFLocation << ":" << "error opening demoStats.db (" << sqlResult << "): " << sqlite3_errmsg(io.demoStatsDb) << ". Trying again in 1000ms." << "\n";
+		while ((sqlResult = sqlite3_open("demoStats.db", &io.demoStatsDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.demoStatsDb, "main"))) {
+			std::cerr << DPrintFLocation << ":" << "error opening demoStats.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.demoStatsDb) << ". Trying again in 1000ms." << "\n";
 			sqlite3_close(io.demoStatsDb);
 			io.demoStatsDb = NULL;
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -2070,8 +2071,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 
 	if (opts.entityDataToDb) {
-		while ((sqlResult = sqlite3_open("entityDataDb.db", &io.entityDataDb)) != SQLITE_OK) {
-			std::cerr << DPrintFLocation << ":" << "error opening entityDataDb.db (" << sqlResult << "): " << sqlite3_errmsg(io.entityDataDb) << ". Trying again in 1000ms." << "\n";
+		while ((sqlResult = sqlite3_open("entityDataDb.db", &io.entityDataDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.entityDataDb, "main"))) {
+			std::cerr << DPrintFLocation << ":" << "error opening entityDataDb.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.entityDataDb) << ". Trying again in 1000ms." << "\n";
 			sqlite3_close(io.entityDataDb);
 			io.entityDataDb = NULL;
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -2080,8 +2081,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 
 #ifdef DEBUGSTATSDB
-	while ((sqlResult = sqlite3_open("debugStatsDb.db", &io.debugStatsDb)) != SQLITE_OK) {
-		std::cerr << DPrintFLocation << ":" << "error opening debugStatsDb.db (" << sqlResult << "): " << sqlite3_errmsg(io.debugStatsDb) << ". Trying again in 1000ms." << "\n";
+	while ((sqlResult = sqlite3_open("debugStatsDb.db", &io.debugStatsDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.debugStatsDb, "main"))) {
+		std::cerr << DPrintFLocation << ":" << "error opening debugStatsDb.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.debugStatsDb) << ". Trying again in 1000ms." << "\n";
 		sqlite3_close(io.debugStatsDb);
 		io.debugStatsDb = NULL;
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -2352,16 +2353,17 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		}
 	}
 
-	openAndSetupDb(io,opts);
-
-	qboolean successStatisticsSave = qfalse;
-	if (!SEHExceptionCaught || !wasDoingSQLiteExecution) {
-		successStatisticsSave = saveStatisticsToDb(io, wasDoingSQLiteExecution, sharedVars,SEHExceptionCaught); // This will only return false if there's an exception.
-	}
-
 	// Acquire the mutex for saving stuff here
 	nes::named_mutex mutex{ "DemoHighlightFinder_postAnalysis_dataSaving" };
 	std::unique_lock lock{ mutex };
+
+	openAndSetupDb(io,opts);
+
+	qboolean successStatisticsSave = qfalse;
+	if (!SEHExceptionCaught || !wasDoingSQLiteExecution) { // this... kinda old with how it was previously. can prolly simplify. todo.
+		successStatisticsSave = saveStatisticsToDb(io, wasDoingSQLiteExecution, sharedVars,SEHExceptionCaught); // This will only return false if there's an exception.
+	}
+
 
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
