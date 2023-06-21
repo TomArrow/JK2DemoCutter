@@ -106,7 +106,7 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	}*/
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue,isCompressedFile);
 	if (!oldHandle) {
-		Com_Printf("Failed to open %s for reading.\n", oldName);
+		Com_DPrintf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
 	memset(&playerSeen, 0, sizeof(playerSeen));
@@ -370,7 +370,7 @@ readNext:
 		bool malformedMessageCaught = false;
 		byte cmd;
 		if (oldMsg.readcount > oldMsg.cursize) {
-			Com_Printf("Demo cutter, read past end of server message.\n");
+			Com_DPrintf("Demo cutter, read past end of server message.\n");
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
@@ -391,7 +391,7 @@ readNext:
 		// other commands
 		switch (cmd) {
 		default:
-			Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
+			Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 			return qfalse;
 		case svc_nop_general:
 			break;

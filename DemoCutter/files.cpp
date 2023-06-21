@@ -127,13 +127,13 @@ int FS_Write(const void* buffer, int len, fileHandle_t h, qboolean ignoreCompres
 				tries = 1;
 			}
 			else {
-				Com_Printf("FS_Write: 0 bytes written\n");
+				Com_DPrintf("FS_Write: 0 bytes written\n");
 				return 0;
 			}
 		}
 
 		if (written == -1) {
-			Com_Printf("FS_Write: -1 bytes written\n");
+			Com_DPrintf("FS_Write: -1 bytes written\n");
 			return 0;
 		}
 

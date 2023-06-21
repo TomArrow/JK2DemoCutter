@@ -506,7 +506,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	newHandle = FS_FOpenFileWrite(newName,createCompressedOutput ? FILECOMPRESSION_LZMA : FILECOMPRESSION_NONE, qfalse);
 	if (!newHandle) {
-		Com_Printf("Failed to open %s for target cutting.\n", newName);
+		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
 	}
 
@@ -1285,7 +1285,7 @@ int main(int argc, char** argv) {
 		Com_Printf("Demo %s got successfully combined in %.5f seconds \n", scriptName, seconds);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get combined or combined with errors\n", scriptName);
+		Com_DPrintf("Demo %s has failed to get combined or combined with errors\n", scriptName);
 	}
 #ifdef DEBUG
 	std::cin.get();

@@ -267,7 +267,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	}*/
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue,isCompressedFile);
 	if (!oldHandle) {
-		Com_Printf("Failed to open %s for reading.\n", oldName);
+		Com_DPrintf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
 	memset(basePlayerStates, 0, sizeof(basePlayerStates));
@@ -1418,14 +1418,14 @@ readNext:
 	}
 	/* Read the sequence number */
 	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4) {
-		Com_Printf("[NOTE] Demo cutter, reading sequence number failed.\n");
+		Com_DPrintf("[NOTE] Demo cutter, reading sequence number failed.\n");
 		return qfalse;
 	}
 	thisDemo.cut.Clc.serverMessageSequence = LittleLong(thisDemo.cut.Clc.serverMessageSequence);
 	oldSize -= 4;
 	/* Read the message size */
 	if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4) {
-		Com_Printf("[NOTE] Demo cutter, reading message size failed.\n");
+		Com_DPrintf("[NOTE] Demo cutter, reading message size failed.\n");
 		return qfalse;
 	}
 	oldMsg.cursize = LittleLong(oldMsg.cursize);
@@ -1436,12 +1436,12 @@ readNext:
 		return qfalse;
 	}
 	if (oldMsg.cursize > oldMsg.maxsize) {
-		Com_Printf("[NOTE] Demo cutter, message size above maxsize.\n");
+		Com_DPrintf("[NOTE] Demo cutter, message size above maxsize.\n");
 		return qfalse;
 	}
 	/* Read the actual message */
 	if (FS_Read(&oldMsg, oldHandle) != oldMsg.cursize) {
-		Com_Printf("[NOTE] Demo cutter, reading actual message failed.\n");
+		Com_DPrintf("[NOTE] Demo cutter, reading actual message failed.\n");
 		return qfalse;
 	}
 	oldSize -= oldMsg.cursize;
@@ -1456,7 +1456,7 @@ readNext:
 		bool malformedMessageCaught = false;
 		byte cmd;
 		if (oldMsg.readcount > oldMsg.cursize) {
-			Com_Printf("Demo cutter, read past end of server message.\n");
+			Com_DPrintf("Demo cutter, read past end of server message.\n");
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
@@ -1477,7 +1477,7 @@ readNext:
 		// other commands
 		switch (cmd) {
 		default:
-			Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
+			Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 			return qfalse;
 		case svc_nop_general:
 			break;
@@ -1494,7 +1494,7 @@ readNext:
 			//	goto cutcomplete;
 			//}
 			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType, SEHExceptionCaught)) {
-				Com_Printf("[NOTE] Demo cutter, parsing gamestate failed.\n");
+				Com_DPrintf("[NOTE] Demo cutter, parsing gamestate failed.\n");
 				return qfalse;
 			}
 			generateBasePlayerStates();
@@ -1508,7 +1508,7 @@ readNext:
 			break;
 		case svc_snapshot_general:
 			if (!demoCutParseSnapshot(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, demoType, SEHExceptionCaught,malformedMessageCaught,qtrue)) {
-				Com_Printf("[NOTE] Demo cutter, parsing snapshot failed.\n");
+				Com_DPrintf("[NOTE] Demo cutter, parsing snapshot failed.\n");
 				return qfalse;
 			}
 
@@ -1796,7 +1796,7 @@ readNext:
 
 		if (!strcmp(cmd, "cs")) {
 			if (!demoCutConfigstringModified(&thisDemo.cut.Cl,demoType)) {
-				Com_Printf("[NOTE] Demo cutter, configstring parsing failed.\n");
+				Com_DPrintf("[NOTE] Demo cutter, configstring parsing failed.\n");
 				return qfalse;
 			}
 			hadConfigStringChanges = qtrue;

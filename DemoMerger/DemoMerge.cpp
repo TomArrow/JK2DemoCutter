@@ -223,7 +223,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 	newHandle = FS_FOpenFileWrite(newName,createCompressedOutput ? FILECOMPRESSION_LZMA : FILECOMPRESSION_NONE);
 	if (!newHandle) {
-		Com_Printf("Failed to open %s for target cutting.\n", newName);
+		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
 	}
 
@@ -895,7 +895,7 @@ int main(int argcO, char** argvO) {
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
+		Com_DPrintf("Demo %s has failed to get cut or cut with errors\n", demoName);
 	}
 #ifdef DEBUG
 	std::cin.get();

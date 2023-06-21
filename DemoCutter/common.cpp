@@ -88,6 +88,9 @@ void QDECL Com_Printf(const char* fmt, ...) {
 
 	std::cout << msg;
 }
+
+const char* DPrintFLocation = NULL;
+
 void QDECL Com_DPrintf(const char* fmt, ...) {
 #ifdef DEBUG
 	va_list		argptr;
@@ -98,7 +101,12 @@ void QDECL Com_DPrintf(const char* fmt, ...) {
 	vsprintf_s(msg,sizeof(msg), fmt, argptr);
 	va_end(argptr);
 
-	std::cout << msg;
+	if (DPrintFLocation) {
+		std::cerr << DPrintFLocation << ":" << msg;
+	}
+	else {
+		std::cerr << msg;
+	}
 #endif
 }
 void QDECL Com_Error(int ignore, const char* fmt, ...) {
@@ -110,7 +118,7 @@ void QDECL Com_Error(int ignore, const char* fmt, ...) {
 	vsprintf_s(msg,sizeof(msg), fmt, argptr);
 	va_end(argptr);
 
-	std::cout << msg;
+	std::cerr << msg;
 }
 char* Cmd_ArgsFrom(int arg) {
 	static	char		cmd_args[BIG_INFO_STRING];
@@ -167,7 +175,7 @@ void QDECL Com_sprintf(char* dest,int size, const char* fmt, ...) {
 	len = Q_vsnprintf(dest,size, size, fmt, argptr);
 	va_end(argptr);
 	if (len >= size) {
-		Com_Printf("Com_sprintf: overflow of %i in %i\n", len, size);
+		Com_DPrintf("Com_sprintf: overflow of %i in %i\n", len, size);
 #ifdef	_DEBUG
 		//__asm {
 		//	int 3;
@@ -527,17 +535,17 @@ qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* 
 	}
 
 	if (strchr(key, '\\') || strchr(value, '\\')) {
-		Com_Printf("Can't use keys or values with a \\\n");
+		Com_DPrintf("Can't use keys or values with a \\\n");
 		return qfalse;
 	}
 
 	if (strchr(key, ';') || strchr(value, ';')) {
-		Com_Printf("Can't use keys or values with a semicolon\n");
+		Com_DPrintf("Can't use keys or values with a semicolon\n");
 		return qfalse;
 	}
 
 	if (strchr(key, '\"') || strchr(value, '\"')) {
-		Com_Printf("Can't use keys or values with a \"\n");
+		Com_DPrintf("Can't use keys or values with a \"\n");
 		return qfalse;
 	}
 
@@ -550,7 +558,7 @@ qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* 
 
 	// q3infoboom exploit
 	if (strlen(newi) + strlen(s) >= MAX_INFO_STRING) {
-		Com_Printf("Info string length exceeded\n");
+		Com_DPrintf("Info string length exceeded\n");
 		return qfalse;
 	}
 
@@ -576,17 +584,17 @@ void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char*
 	}
 
 	if (strchr(key, '\\') || strchr(value, '\\')) {
-		Com_Printf("Can't use keys or values with a \\\n");
+		Com_DPrintf("Can't use keys or values with a \\\n");
 		return;
 	}
 
 	if (strchr(key, ';') || strchr(value, ';')) {
-		Com_Printf("Can't use keys or values with a semicolon\n");
+		Com_DPrintf("Can't use keys or values with a semicolon\n");
 		return;
 	}
 
 	if (strchr(key, '\"') || strchr(value, '\"')) {
-		Com_Printf("Can't use keys or values with a \"\n");
+		Com_DPrintf("Can't use keys or values with a \"\n");
 		return;
 	}
 
@@ -599,7 +607,7 @@ void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char*
 
 	// q3infoboom exploit
 	if (strlen(newi) + strlen(s) >= BIG_INFO_STRING) {
-		Com_Printf("BIG Info string length exceeded\n");
+		Com_DPrintf("BIG Info string length exceeded\n");
 		return;
 	}
 
@@ -3248,13 +3256,13 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 			start = msg->readcount;
 			i = MSG_ReadShort(msg);
 			if (i < 0 || i >= maxAllowedConfigString) {
-				Com_Printf("configstring > MAX_CONFIGSTRINGS");
+				Com_DPrintf("configstring > MAX_CONFIGSTRINGS");
 				return qfalse;
 			}
 			s = MSG_ReadBigString(msg);
 			len = strlen(s);
 			if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-				Com_Printf("MAX_GAMESTATE_CHARS exceeded");
+				Com_DPrintf("MAX_GAMESTATE_CHARS exceeded");
 				return qfalse;
 			}
 
@@ -3278,7 +3286,7 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 		else if (cmd == svc_baseline_general) {
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 			if (newnum < 0 || newnum >= MAX_GENTITIES) {
-				Com_Printf("Baseline number out of range: %i", newnum);
+				Com_DPrintf("Baseline number out of range: %i", newnum);
 				return qfalse;
 			}
 			Com_Memset(&nullstate, 0, sizeof(nullstate));
@@ -3286,7 +3294,7 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType);
 		}
 		else {
-			Com_Printf("demoCutParseGameState: bad command byte");
+			Com_DPrintf("demoCutParseGameState: bad command byte");
 			return qfalse;
 		}
 	}
@@ -3387,7 +3395,7 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
 	int maxAllowedConfigString = getMaxConfigStrings(demoType);
 	if (index < 0 || index >= maxAllowedConfigString) {
-		Com_Printf("demoCutConfigstringModified: bad index %i", index);
+		Com_DPrintf("demoCutConfigstringModified: bad index %i", index);
 		return qtrue;
 	}
 	// get everything after "cs <num>"
@@ -3413,7 +3421,7 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 		}
 		len = strlen(dup);
 		if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-			Com_Printf("MAX_GAMESTATE_CHARS exceeded on %d:%s", index, s);
+			Com_DPrintf("MAX_GAMESTATE_CHARS exceeded on %d:%s", index, s);
 			return qfalse;
 		}
 		// append it to the gameState string buffer
@@ -3454,18 +3462,18 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 			// should never happen
 			oldSnap = &clCut->snapshots[clcCut->lastValidSnap & PACKET_MASK];
 			lastOneNum = clcCut->lastValidSnap;
-			Com_Printf("Delta from invalid frame (not supposed to happen!). Trying to use last valid snap.\n");
+			Com_DPrintf("Delta from invalid frame (not supposed to happen!). Trying to use last valid snap.\n");
 		}
 
 		if (!oldSnap->valid) {
 			// should never happen
-			Com_Printf("Delta from invalid frame (not supposed to happen!).\n");
+			Com_DPrintf("Delta from invalid frame (not supposed to happen!).\n");
 		}
 		//else if (oldSnap->messageNum != newSnap.deltaNum) {
 		else if (oldSnap->messageNum != lastOneNum) {
 			// The frame that the server did the delta from
 			// is too old, so we can't reconstruct it properly.
-			Com_Printf("Delta frame too old.\n");
+			Com_DPrintf("Delta frame too old.\n");
 		}
 		else if (clCut->parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128) {
 			Com_DPrintf("Delta parseEntitiesNum too old.\n");
@@ -3923,7 +3931,7 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 	int maxAllowedConfigString = getMaxConfigStrings(demoType);
 
 	if (index < 0 || index >= maxAllowedConfigString) {
-		Com_Printf("demoCutConfigstringModifiedManual: bad index %i", index);
+		Com_DPrintf("demoCutConfigstringModifiedManual: bad index %i", index);
 		return qtrue;
 	}
 	// get everything after "cs <num>"
@@ -3949,7 +3957,7 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 		}
 		len = strlen(dup);
 		if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
-			Com_Printf("MAX_GAMESTATE_CHARS exceeded on %d:%s", configStringNum, value);
+			Com_DPrintf("MAX_GAMESTATE_CHARS exceeded on %d:%s", configStringNum, value);
 			return qfalse;
 		}
 		// append it to the gameState string buffer
@@ -4162,7 +4170,7 @@ int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, cli
 	}
 
 	if (i == max) {
-		Com_Printf("G_FindConfigstringIndex: overflow");
+		Com_DPrintf("G_FindConfigstringIndex: overflow");
 		return 0;
 		//G_Error("G_FindConfigstringIndex: overflow");
 	}

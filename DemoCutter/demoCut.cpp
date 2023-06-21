@@ -329,7 +329,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	const char* oldPath = va("%s%s", oldName, ext);
 	oldSize = FS_FOpenFileRead(oldPath, &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed,qtrue);
 	if (!oldHandle) {
-		Com_Printf("Failed to open %s for cutting.\n", oldName);
+		Com_DPrintf("Failed to open %s for cutting.\n", oldName);
 		return qfalse;
 	}
 
@@ -391,7 +391,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			bool malformedMessageCaught = false;
 			byte cmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
-				Com_Printf("Demo cutter, read past end of server message.\n");
+				Com_DPrintf("Demo cutter, read past end of server message.\n");
 				goto cuterror;
 			}
 			cmd = MSG_ReadByte(&oldMsg);
@@ -443,7 +443,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			// other commands
 			switch (cmd) {
 			default:
-				Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
+				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 				goto cuterror;
 			case svc_nop_general:
 				break;
@@ -455,7 +455,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			case svc_gamestate_general:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
 				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[CS_LEVEL_START_TIME]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange,mapRestartCounter,NULL)) {
-					Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
+					Com_DPrintf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					goto cutcomplete;
 				}
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, SEHExceptionCaught)) {
@@ -485,7 +485,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					}}
 					newHandle = FS_FOpenFileWrite(newName, compressionSchemeUsed, qfalse); // Maintain the compression scheme of the original file
 					if (!newHandle) {
-						Com_Printf("Failed to open %s for target cutting.\n", newName);
+						Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 						return qfalse;
 					}
 				}
@@ -789,7 +789,7 @@ int main(int argcO, char** argvO) {
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get cut or cut with errors\n", demoName);
+		Com_DPrintf("Demo %s has failed to get cut or cut with errors\n", demoName);
 	}
 	if (mustDeleteOutputName) {
 		delete[] outputName;

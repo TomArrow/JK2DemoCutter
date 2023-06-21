@@ -119,7 +119,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	}*/
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
-		Com_Printf("Failed to open %s for compressing.\n", oldName);
+		Com_DPrintf("Failed to open %s for compressing.\n", oldName);
 		return qfalse;
 	}
 
@@ -156,7 +156,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 	newHandle = FS_FOpenFileWrite(newName,createCompressedOutput ? FILECOMPRESSION_LZMA : FILECOMPRESSION_NONE, qfalse);
 	if (!newHandle) {
-		Com_Printf("Failed to open %s for target cutting.\n", newName);
+		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
 	}
 	
@@ -226,7 +226,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			bool malformedMessageCaught = false;
 			byte cmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
-				Com_Printf("Demo cutter, read past end of server message.\n");
+				Com_DPrintf("Demo cutter, read past end of server message.\n");
 				goto cuterror;
 			}
 			cmd = MSG_ReadByte(&oldMsg);
@@ -245,7 +245,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			// other commands
 			switch (cmd) {
 			default:
-				Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
+				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 				goto cuterror;
 			case svc_nop_general:
 				break;
@@ -457,7 +457,7 @@ int main(int argc, char** argv) {
 		Com_Printf("Demo %s got successfully compressed in %.5f seconds \n", demoName, seconds);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get compressed or compressed with errors\n", demoName);
+		Com_DPrintf("Demo %s has failed to get compressed or compressed with errors\n", demoName);
 	}
 #ifdef DEBUG
 	std::cin.get();

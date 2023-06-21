@@ -1641,7 +1641,13 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
-	sqlite3_open("killDatabase.db", &io.killDb);
+	int sqlResult = 0;
+	while ((sqlResult = sqlite3_open("killDatabase.db", &io.killDb)) != SQLITE_OK) {
+		std::cerr << DPrintFLocation << ":" << "error opening killDatabase.db ("<< sqlResult << "): "<< sqlite3_errmsg(io.killDb)<< ". Trying again in 1000ms." << "\n";
+		sqlite3_close(io.killDb);
+		io.killDb = NULL;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	}
 	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
@@ -2014,7 +2020,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 
 	if (opts.writeDemoPacketStats) {
-		sqlite3_open("demoStats.db", &io.demoStatsDb);
+
+		while ((sqlResult = sqlite3_open("demoStats.db", &io.demoStatsDb)) != SQLITE_OK) {
+			std::cerr << DPrintFLocation << ":" << "error opening demoStats.db (" << sqlResult << "): " << sqlite3_errmsg(io.demoStatsDb) << ". Trying again in 1000ms." << "\n";
+			sqlite3_close(io.demoStatsDb);
+			io.demoStatsDb = NULL;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
 		sqlite3_exec(io.demoStatsDb, "CREATE TABLE demoPacketStats ("
 			"demoTime INTEGER NOT NULL,"
 			"serverTime INTEGER NOT NULL,"
@@ -2058,12 +2070,22 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 
 	if (opts.entityDataToDb) {
-		sqlite3_open("entityDataDb.db", &io.entityDataDb);
+		while ((sqlResult = sqlite3_open("entityDataDb.db", &io.entityDataDb)) != SQLITE_OK) {
+			std::cerr << DPrintFLocation << ":" << "error opening entityDataDb.db (" << sqlResult << "): " << sqlite3_errmsg(io.entityDataDb) << ". Trying again in 1000ms." << "\n";
+			sqlite3_close(io.entityDataDb);
+			io.entityDataDb = NULL;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
 	}
 
 
 #ifdef DEBUGSTATSDB
-	sqlite3_open("debugStatsDb.db", &io.debugStatsDb);
+	while ((sqlResult = sqlite3_open("debugStatsDb.db", &io.debugStatsDb)) != SQLITE_OK) {
+		std::cerr << DPrintFLocation << ":" << "error opening debugStatsDb.db (" << sqlResult << "): " << sqlite3_errmsg(io.debugStatsDb) << ". Trying again in 1000ms." << "\n";
+		sqlite3_close(io.debugStatsDb);
+		io.debugStatsDb = NULL;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	}
 
 	sqlite3_exec(io.debugStatsDb, "CREATE TABLE animStances ("
 		"demoVersion INTEGER NOT NULL,"
@@ -2096,14 +2118,14 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		(*it)->query.bind(io.insertAnimStanceStatement);
 		int queryResult = sqlite3_step(io.insertAnimStanceStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting anim stance into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+			std::cerr << "Error inserting anim stance into database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertAnimStanceStatement);
 
 		(*it)->query.bind(io.updateAnimStanceCountStatement);
 		queryResult = sqlite3_step(io.updateAnimStanceCountStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating anim stance count in database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+			std::cerr << "Error updating anim stance count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.updateAnimStanceCountStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2119,7 +2141,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #ifndef DEBUG
 			if (queryResult != SQLITE_CONSTRAINT)
 #endif
-				std::cout << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb) << " (" << queryResult << ")" << "\n";
+				std::cerr << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb) << " (" << queryResult << ")" << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2131,7 +2153,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertAngleStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting kill angle into database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error inserting kill angle into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertAngleStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2145,7 +2167,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertSpreeStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting killing spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error inserting killing spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertSpreeStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2159,12 +2181,12 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		int queryResult = sqlite3_step(io.insertCaptureStatement);
 		uint64_t insertedId = -1;
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting capture into database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error inserting capture into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		else {
 			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
 			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-				std::cout << "Error retrieving inserted capture id from database: " << sqlite3_errmsg(io.killDb) << "\n";
+				std::cerr << "Error retrieving inserted capture id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 			}
 			else {
 				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
@@ -2184,7 +2206,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertDefragRunStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting defrag run into database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error inserting defrag run into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertDefragRunStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2199,12 +2221,12 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		int queryResult = sqlite3_step(io.insertLaughsStatement);
 		uint64_t insertedId = -1;
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting laugh spree into database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error inserting laugh spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		else {
 			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
 			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-				std::cout << "Error retrieving inserted laughs id from database: " << sqlite3_errmsg(io.killDb) << "\n";
+				std::cerr << "Error retrieving inserted laughs id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 			}
 			else {
 				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
@@ -2225,7 +2247,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting player demo stats into database: " << sqlite3_errmsg(io.debugStatsDb) << "\n";
+			std::cerr << "Error inserting player demo stats into database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertPlayerDemoStatsStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2238,7 +2260,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			//wasDoingSQLiteExecution = true;
 			int queryResult = sqlite3_step(io.insertPacketStatsStatement);
 			if (queryResult != SQLITE_DONE) {
-				std::cout << "Error inserting packet stats into database: " << sqlite3_errmsg(io.demoStatsDb) << "\n";
+				std::cerr << "Error inserting packet stats into database: " << queryResult << ":" << sqlite3_errmsg(io.demoStatsDb) << "(" << DPrintFLocation << ")" << "\n";
 			}
 			sqlite3_reset(io.insertPacketStatsStatement);
 			//wasDoingSQLiteExecution = false;
@@ -2252,12 +2274,12 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertPlayerModelStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error inserting player model into database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error inserting player model into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertPlayerModelStatement);
 		queryResult = sqlite3_step(io.updatePlayerModelCountStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cout << "Error updating player model count in database: " << sqlite3_errmsg(io.killDb) << "\n";
+			std::cerr << "Error updating player model count in database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.updatePlayerModelCountStatement);
 		//wasDoingSQLiteExecution = false;
@@ -2714,7 +2736,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	}*/
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
-		Com_Printf("Failed to open %s for reading.\n", oldName);
+		Com_DPrintf("Failed to open %s for reading.\n", oldName);
 		return qfalse;
 	}
 
@@ -2859,7 +2881,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 			byte cmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
-				Com_Printf("Demo cutter, read past end of server message.\n");
+				Com_DPrintf("Demo cutter, read past end of server message.\n");
 				goto cuterror;
 			}
 			cmd = MSG_ReadByte(&oldMsg);
@@ -2880,7 +2902,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			// other commands
 			switch (cmd) {
 			default:
-				Com_Printf("ERROR: CL_ParseServerMessage: Illegible server message\n");
+				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 				goto cuterror;
 			case svc_nop_general:
 				break;
@@ -6061,13 +6083,14 @@ int main(int argcO, char** argvO) {
 
 	Com_Printf("Looking at %s.\n", demoName); 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
+	DPrintFLocation = demoName;
 	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat", searchMode, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Highlights successfully found in %.5f seconds.\n",seconds);
 	}
 	else {
-		Com_Printf("Finding highlights in demo %s has resulted in errors\n", demoName);
+		Com_DPrintf("Finding highlights in demo %s has resulted in errors\n", demoName);
 	}
 #ifdef DEBUG
 	std::cin.get();

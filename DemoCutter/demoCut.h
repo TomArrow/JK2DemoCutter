@@ -26,6 +26,8 @@
 #include "animsStanceMappings.h"
 
 
+extern const char* DPrintFLocation;
+
 #ifdef _WIN32
 #define WINDOWS // For popl library
 #endif

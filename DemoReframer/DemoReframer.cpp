@@ -137,7 +137,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 	newHandle = FS_FOpenFileWrite(newName,createCompressedOutput ? FILECOMPRESSION_LZMA :FILECOMPRESSION_NONE);
 	if (!newHandle) {
-		Com_Printf("Failed to open %s for target cutting.\n", newName);
+		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
 	}
 
@@ -395,7 +395,7 @@ int main(int argc, char** argv) {
 		Com_Printf("Demo %s got successfully reframed in %.5f seconds\n", demoName,seconds);
 	}
 	else {
-		Com_Printf("Demo %s has failed to get reframed or reframed with errors\n", demoName);
+		Com_DPrintf("Demo %s has failed to get reframed or reframed with errors\n", demoName);
 	}
 	delete[] filteredOutputName;
 #ifdef DEBUG
