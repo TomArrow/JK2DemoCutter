@@ -91,8 +91,9 @@ void QDECL Com_Printf(const char* fmt, ...) {
 
 const char* DPrintFLocation = NULL;
 
+// Just using this for error output now. :P :) XD
 void QDECL Com_DPrintf(const char* fmt, ...) {
-#ifdef DEBUG
+//#ifdef DEBUG
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
 
@@ -107,7 +108,7 @@ void QDECL Com_DPrintf(const char* fmt, ...) {
 	else {
 		std::cerr << msg;
 	}
-#endif
+//#endif
 }
 void QDECL Com_Error(int ignore, const char* fmt, ...) {
 	va_list		argptr;
@@ -118,7 +119,12 @@ void QDECL Com_Error(int ignore, const char* fmt, ...) {
 	vsprintf_s(msg,sizeof(msg), fmt, argptr);
 	va_end(argptr);
 
-	std::cerr << msg;
+	if (DPrintFLocation) {
+		std::cerr << DPrintFLocation << ":" << msg;
+	}
+	else {
+		std::cerr << msg;
+	}
 }
 char* Cmd_ArgsFrom(int arg) {
 	static	char		cmd_args[BIG_INFO_STRING];
