@@ -1039,6 +1039,16 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 
 	int g_weaponDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
 
+	// JKA:
+	// Online forum says 65523 is saber only
+	// CTF Haven uses 57339
+	// I think difference is: The former allows saber and disallows tripmines, while the latter has those flipped. 
+	// And you actually get a saber even if saber is disabled, not sure why.
+	// But, neither of these two disallow WP_BRYAR_OLD or WP_EMPLACED_GUN (16 and 17). Not sure why.
+	// Logically speaking maybe those should be disabled too, but my task is to analyze demos, not to complain
+	// to server owners since they can't retroactively change it either, so the demos are what they are.
+	// 
+	// Helpful btw: http://www.bradgoodman.com/bittool/
 
 	int i = 0;
 	int numWeapons = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NUM_WEAPONS_GENERAL,demoType);
@@ -1049,6 +1059,8 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_THERMAL_GENERAL,demoType),
 		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TRIP_MINE_GENERAL,demoType),
 		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_DET_PACK_GENERAL,demoType),
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_BRYAR_OLD_GENERAL,demoType), // Not sure about this one but it also often ends up enabled even though it's saber-only
+		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_EMPLACED_GUN_GENERAL,demoType), // I think this is just a mounted gun and is typically not disallowed in the weapondisable
 		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TURRET_GENERAL,demoType)
 	};
 	int allowedSaberIshWeaponsCount = sizeof(allowedSaberIshWeapons) / sizeof(allowedSaberIshWeapons[0]);
@@ -1060,7 +1072,9 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 			// Check if it is one of the allowed weapons
 			bool thisWeaponIsOk = false;
 			for (int b = 0; b < allowedSaberIshWeaponsCount; b++) {
-				if (i == allowedSaberIshWeapons[b]) thisWeaponIsOk = true;
+				if (i == allowedSaberIshWeapons[b]) {
+					thisWeaponIsOk = true;
+				}
 			}
 			if (!thisWeaponIsOk) {
 				gameIsSaberOnlyIsh = false;
