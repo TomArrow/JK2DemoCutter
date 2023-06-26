@@ -1049,6 +1049,7 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 	// to server owners since they can't retroactively change it either, so the demos are what they are.
 	// 
 	// Helpful btw: http://www.bradgoodman.com/bittool/
+	// Some other mentions: 524279 (all but saber is blocked), 65531 (all but saber and above 15 blocked)
 
 	int i = 0;
 	int numWeapons = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NUM_WEAPONS_GENERAL,demoType);
@@ -1376,7 +1377,8 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 			//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@variant", variant.c_str());
 		}
 		else {
-			SQLBIND_DELAYED_NULL(query, "@variant");
+			SQLBIND_DELAYED_TEXT(query, "@variant", ""); // I wanted this to be NULL, I really did. But turns out, SQLite lets you have multiple NULL values without triggering a unique constraint. Cringe. So we just go with empty space.
+			//SQLBIND_DELAYED_NULL(query, "@variant");
 			//SQLBIND_DELAYED_NULL(io.updatePlayerModelCountStatement, "@variant");
 		}
 
