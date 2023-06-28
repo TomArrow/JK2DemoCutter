@@ -36,6 +36,11 @@ detect BC kills?
 
 
 
+democutter can mess up capture count/game time. idk why. even after pauses where it would be ordinarily reset. strange.
+
+
+
+
 for everything: save highest amount of consecutive lost packets?
 some more info about mine kills? to recognize cool ones?
 For g2 ents, maybe dont copy events?
