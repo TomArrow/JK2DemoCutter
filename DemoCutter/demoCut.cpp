@@ -225,7 +225,8 @@ demoTime_t timeParse(std::string timeText) {
 
 
 
-qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
+//qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
+qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const std::vector<std::string>* metaDataStrings, bool noForcedMeta) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -253,12 +254,14 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	bool			SEHExceptionCaught = false;
 	//mvprotocol_t	protocol;
 
+	qboolean demoCutStartsAtZero = (qboolean)(startTime.type == DEMOTIME && startTime.time == 0 && startTime.skips == 0);
+
 	int64_t originalFileAbsoluteCutOffset = 0;
 
 	rapidjson::Document* jsonMetaDocument = NULL;
 	rapidjson::Document* jsonPreviousMetaDocument = NULL;
 
-	if (jsonMetaData) {
+	/*if (jsonMetaData) {
 		jsonMetaDocument = new rapidjson::Document();
 		if (jsonMetaDocument->Parse(jsonMetaData).HasParseError() || !jsonMetaDocument->IsObject()) {
 			std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
@@ -267,7 +270,40 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		if (jsonMetaDocument->HasMember("oco")) {
 			originalFileAbsoluteCutOffset = (*jsonMetaDocument)["oco"].GetInt64();
 		}
+	}*/
+	if (metaDataStrings->size() > 1) {
+		jsonMetaDocument = new rapidjson::Document();
+		jsonMetaDocument->SetObject();
+		for (int i = 0; i < metaDataStrings->size(); i++) {
+
+			rapidjson::Document* tmpMetaDoc = new rapidjson::Document();
+			if (tmpMetaDoc->Parse((*metaDataStrings)[i].c_str()).HasParseError() || !tmpMetaDoc->IsObject()) {
+				std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
+				return qfalse;
+			}
+			for (rapidjson::Value::MemberIterator it = tmpMetaDoc->MemberBegin(); it != tmpMetaDoc->MemberEnd(); it++) {
+				if (it->name.GetString()[0] == '_') {
+					std::cout << "Metadata member name '" << it->name.GetString() << "' is invalid. Names starting with underscore are reserved for old metadata in re-cut demos.\n";
+					return qfalse;
+				}
+				if (!jsonMetaDocument->HasMember(it->name)) {
+					jsonMetaDocument->AddMember(it->name, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+				}
+				else {
+					std::cout << "Metadata member '" << it->name.GetString() << "' provided more than once. Error.\n";
+					return qfalse;
+				}
+			}
+		}
 	}
+	else if (metaDataStrings->size() == 1) {
+		jsonMetaDocument = new rapidjson::Document();
+		if (jsonMetaDocument->Parse((*metaDataStrings)[0].c_str()).HasParseError() || !jsonMetaDocument->IsObject()) {
+			std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
+			return qfalse;
+		}
+	}
+
 
 	// Since not in MME:
 	/*if (!play) {
@@ -342,6 +378,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	qboolean wasFirstCommandByte = qfalse;
 	qboolean firstCommandByteRead = qfalse;
+
+	qboolean originalCutOffsetRead = qfalse;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
@@ -419,10 +457,32 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 							jsonMetaDocument->SetObject();
 						}
 
+						if (jsonPreviousMetaDocument->HasMember("oco") && !originalCutOffsetRead) {
+							originalFileAbsoluteCutOffset += (*jsonPreviousMetaDocument)["oco"].GetInt64();
+							originalCutOffsetRead = qtrue;
+						}
+
 						for (rapidjson::Value::MemberIterator it = jsonPreviousMetaDocument->MemberBegin(); it != jsonPreviousMetaDocument->MemberEnd(); it++) {
-							if (!jsonMetaDocument->HasMember(it->name)) {
-								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo copied to new demo.\n";
-								jsonMetaDocument->AddMember(it->name, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+							
+							const char* newName = NULL;
+							
+							if (demoCutStartsAtZero || it->name == "of" || it->name == "oco" || it->name == "odm" || it->name == "oip" || it->name == "ost" || it->name == "wr") {
+								newName = it->name.GetString();
+							} else {
+								// We add "_" before the name because a lot of metadata can potentially stop being meaningful once we do a cut to the file with existing metadata,
+								// since metadata can contain stuff relative to positioning of events inside a demo and metadata can be completely custom.
+								// We thus indicate the "generation" of the metadata by the amount of underscores before it.
+								// But if the demo cut is starting at 0, we can keep the original name.
+								// Also, metadata we KNOW to be ok to copy we keep (like original filename)
+								newName = va("_%s", it->name.GetString());
+							}
+
+							if (!jsonMetaDocument->HasMember(newName)) {
+
+								rapidjson::Value newNameRapid;
+								newNameRapid.SetString(newName,strlen(newName));
+								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo copied to new demo as " << newName << ".\n";
+								jsonMetaDocument->AddMember(newNameRapid, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
 							}
 							else {
 								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo overridden by new metadata. Discarding.\n";
@@ -780,10 +840,15 @@ int main(int argcO, char** argvO) {
 		endTime = timeParse(args[3].c_str());
 	}
 
-	std::string metaData = m->is_set() ? m->value() : "";
+	std::vector<std::string> metaDataStrings;
+	for (int i = 0; i < m->count(); i++) {
+		metaDataStrings.push_back(m->value(i));
+	}
+	//std::string metaData = m->is_set() ? m->value() : "";
 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
-	if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL, n->is_set())) {
+	//if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL, n->is_set())) {
+	if (demoCut(demoName, startTime, endTime, outputName, &metaDataStrings, n->is_set())) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);

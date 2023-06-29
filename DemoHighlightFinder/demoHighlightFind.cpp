@@ -1572,6 +1572,8 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 		batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
 		batSS2 << targetFilename2Filtered << "\" " << startTime << " " << endTime;
+		batSS2 << (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
+
 		queryWrapper->batchString1 = batSS.str();
 		queryWrapper->batchString2 = batSS2.str();
 
@@ -1645,6 +1647,7 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 			batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 			batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 			queryWrapper->batchString1 = batSS.str();
+			queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
 			delete[] targetFilenameFiltered;
 			if (!opts.noFindOutput)  std::cout << targetFilename << "\n";
@@ -4790,6 +4793,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							batSS << "\nrem hash: " << hash_hex_string;
 							batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered; 
 							batSS2 << targetFilename2Filtered << "\" " << startTime << " " << endTime;
+							batSS2 << (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
+
 							angleQueryWrapper->batchString1 = batSS.str();
 							angleQueryWrapper->batchString2 = batSS2.str();
 							
@@ -5148,6 +5153,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
 							batSS << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 							queryWrapper->batchString1 = batSS.str();
+							queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 							
 							delete[] targetFilenameFiltered;
 							if (!opts.noFindOutput)  std::cout << targetFilename << "\n";
@@ -5827,6 +5833,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					batSS << "\nrem demoCurrentTime: "<< demoCurrentTime;
 					batSS << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 					queryWrapper->batchString1 = batSS.str();
+					queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
