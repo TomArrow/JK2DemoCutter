@@ -43,9 +43,13 @@ struct ioHandles_t {
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_stmt* insertStatement;
 	sqlite3_stmt* insertAngleStatement;
+	sqlite3_stmt* selectLastInsertRowIdStatement;
+
+	// statsDb
+	sqlite3* statsDb;
 	sqlite3_stmt* insertPlayerModelStatement;
 	sqlite3_stmt* updatePlayerModelCountStatement;
-	sqlite3_stmt* selectLastInsertRowIdStatement;
+	sqlite3_stmt* selectStatsLastInsertRowIdStatement;
 	sqlite3_stmt* insertPlayerDemoStatsStatement;
 
 	// Debugstatsdb
@@ -1668,6 +1672,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		io.killDb = NULL;
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
+
+	while ((sqlResult = sqlite3_open("statistics.db", &io.statsDb)) != SQLITE_OK || (readonlyResult=sqlite3_db_readonly(io.statsDb, "main"))) {
+		std::cerr << DPrintFLocation << ":" << "error opening stats.db for read/write ("<< sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb) << ". Trying again in 1000ms." << "\n";
+		sqlite3_close(io.statsDb);
+		io.statsDb = NULL;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	}
 	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
 		"hash	TEXT,"
 		"shorthash	TEXT,"
@@ -1941,7 +1952,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//"PRIMARY KEY(hash)"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE playerModels ("
+	sqlite3_exec(io.statsDb, "CREATE TABLE playerModels ("
 		"map	TEXT NOT NULL,"
 		"baseModel	TEXT NOT NULL,"
 		"variant	TEXT,"
@@ -1949,7 +1960,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"PRIMARY KEY(map,baseModel,variant)"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE playerDemoStats ("
+	sqlite3_exec(io.statsDb, "CREATE TABLE playerDemoStats ("
 		"map	TEXT NOT NULL,"
 		"playerName TEXT NOT NULL,"
 		"playerNameStripped TEXT NOT NULL,"
@@ -2019,23 +2030,25 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
 
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerModelStatement, NULL);
+	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerModelStatement, NULL);
 	preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
 
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
+	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
 	preparedStatementText = "SELECT last_insert_rowid();";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectLastInsertRowIdStatement, NULL);
+	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectStatsLastInsertRowIdStatement, NULL);
 
 	preparedStatementText = "INSERT INTO playerDemoStats "
 		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
 		" VALUES "
 		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
 
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
+	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
 
 
 	sqlite3_exec(io.killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	sqlite3_exec(io.statsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
 
 
@@ -2432,6 +2445,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 
 		sqlite3_exec(io.killDb, "COMMIT;", NULL, NULL, NULL);
+		sqlite3_exec(io.statsDb, "COMMIT;", NULL, NULL, NULL);
 		sqlite3_finalize(io.insertLaughsStatement);
 		sqlite3_finalize(io.insertDefragRunStatement);
 		sqlite3_finalize(io.insertCaptureStatement);
@@ -2441,8 +2455,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		sqlite3_finalize(io.insertPlayerModelStatement);
 		sqlite3_finalize(io.updatePlayerModelCountStatement);
 		sqlite3_finalize(io.selectLastInsertRowIdStatement);
+		sqlite3_finalize(io.selectStatsLastInsertRowIdStatement);
 		sqlite3_finalize(io.insertPlayerDemoStatsStatement);
 		sqlite3_close(io.killDb);
+		sqlite3_close(io.statsDb);
 
 		if (opts.writeDemoPacketStats) {
 			sqlite3_exec(io.demoStatsDb, "COMMIT;", NULL, NULL, NULL);

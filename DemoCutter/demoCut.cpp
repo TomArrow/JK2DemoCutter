@@ -466,7 +466,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 							
 							const char* newName = NULL;
 							
-							if (demoCutStartsAtZero || it->name == "of" || it->name == "oco" || it->name == "odm" || it->name == "oip" || it->name == "ost" || it->name == "wr") {
+							if (demoCutStartsAtZero || it->name == "of" || it->name == "oco" || it->name == "odm" || it->name == "oip" || it->name == "ost") {
 								newName = it->name.GetString();
 							} else {
 								// We add "_" before the name because a lot of metadata can potentially stop being meaningful once we do a cut to the file with existing metadata,
