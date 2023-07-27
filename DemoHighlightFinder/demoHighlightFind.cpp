@@ -2944,7 +2944,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			case svc_nop_general:
 				break;
 			case svc_serverCommand_general:
-				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc,SEHExceptionCaught)) {
+				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType,SEHExceptionCaught)) {
 					goto cuterror;
 				}
 				currentPacketPeriodStats.totalServerCommandSize += oldMsg.readcount - oldMsgOffset;
@@ -4099,11 +4099,71 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										break;
 
 									// Q3
+									case MOD_SHOTGUN_GENERAL:
+										modInfo << "_SHOTGUN";
+										break;
+									case MOD_GAUNTLET_GENERAL:
+										modInfo << "_GAUNTLET";
+										break;
+									case MOD_MACHINEGUN_GENERAL:
+										modInfo << "_MG";
+										break;
+									case MOD_GRENADE_GENERAL:
+										modInfo << "_GREN";
+										break;
+									case MOD_GRENADE_SPLASH_GENERAL:
+										modInfo << "_GRENSPL";
+										break;
+									case MOD_PLASMA_GENERAL:
+										modInfo << "_PLAS";
+										break;
+									case MOD_PLASMA_SPLASH_GENERAL:
+										modInfo << "_PLASSPL";
+										break;
+									case MOD_RAILGUN_GENERAL:
+										modInfo << "_RAIL";
+										break;
+									case MOD_LIGHTNING_GENERAL:
+										modInfo << "_LIGHTNG";
+										break;
+									case MOD_BFG_GENERAL:
+										modInfo << "_BFG";
+										break;
+									case MOD_BFG_SPLASH_GENERAL:
+										modInfo << "_BFGSPL";
+										break;
+									case MOD_NAIL_GENERAL:
+										modInfo << "_NAIL";
+										break;
+									case MOD_CHAINGUN_GENERAL:
+										modInfo << "_CHAINGUN";
+										break;
+									case MOD_PROXIMITY_MINE_GENERAL:
+										modInfo << "_PROXMINE";
+										break;
 									case MOD_KAMIKAZE_GENERAL:
 										modInfo << "_KAMIKAZE";
 										break;
 									case MOD_JUICED_GENERAL:
 										modInfo << "_JUICED";
+										break;
+									case MOD_GRAPPLE_GENERAL:
+										modInfo << "_GRAPPLE";
+										break;
+									case MOD_SWITCH_TEAMS_GENERAL:
+										modInfo << "_SWITCHTEAM";
+										break;
+									case MOD_THAW_GENERAL:
+										modInfo << "_THAW";
+										break;
+									case MOD_LIGHTNING_DISCHARGE_GENERAL:
+										modInfo << "_LIGHTNGDISCHRG";
+										break;
+									case MOD_HMG_GENERAL:
+										modInfo << "_HMG";
+										break;
+									case MOD_RAILGUN_HEADSHOT_GENERAL:
+										modInfo << "_RAILHEADSHOT";
 										break;
 								}
 								if(needMoreInfo)
@@ -4298,6 +4358,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										break;
 									case WP_CHAINGUN_GENERAL:
 										modInfo << "_CHAINGUN";
+										break;
+									case WP_HEAVY_MACHINEGUN_GENERAL:
+										modInfo << "_HMG";
 										break;
 
 									default:

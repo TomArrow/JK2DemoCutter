@@ -3370,10 +3370,10 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	}
 }
 
-static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t* clcCut) {
+static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType) {
 	int index;
 	int seq = MSG_ReadLong(msg);
-	char* s = MSG_ReadString(msg);
+	char* s = MSG_ReadString(msg, demoType);
 	if (clcCut->serverCommandSequence >= seq) {
 		return;
 	}
@@ -3381,9 +3381,9 @@ static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t*
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
 	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
 }
-qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, bool& SEHExceptionCaught) {
+qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught) {
 	__TRY{
-		demoCutParseCommandStringReal(msg,clcCut);
+		demoCutParseCommandStringReal(msg,clcCut, demoType);
 		return qtrue;
 	}
 	__EXCEPT{
@@ -3694,7 +3694,7 @@ void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* cl
 	for (int i = 0; i < metaMarkerLength; i++) {
 		MSG_WriteByte(&buf,postEOFMetadataMarker[i]);
 	}
-	MSG_WriteBigString(&buf, metaData);
+	MSG_WriteBigString(&buf, metaData, demoType);
 
 
 	// finished writing the client packet
@@ -3782,7 +3782,7 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 		s = clCut->gameState.stringData + clCut->gameState.stringOffsets[i];
 		MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_configstring_general, demoType));
 		MSG_WriteShort(&buf, i);
-		MSG_WriteBigString(&buf, s);
+		MSG_WriteBigString(&buf, s, demoType);
 	}
 	// baselines
 	Com_Memset(&nullstate, 0, sizeof(nullstate));
@@ -3865,7 +3865,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
 		MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general,demoType));
 		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
-		MSG_WriteString(msg, command);
+		MSG_WriteString(msg, command, demoType);
 	}
 	// this is the snapshot we are creating
 	frame = &clCut->snap;
@@ -4095,7 +4095,7 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	for (int i = 0; i < newCommands->size(); i++) {
 		MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general,demoType));
 		MSG_WriteLong(msg, ++clcCut->serverCommandSequence/* + serverCommandOffset*/);
-		MSG_WriteString(msg, (*newCommands)[i].c_str());
+		MSG_WriteString(msg, (*newCommands)[i].c_str(), demoType);
 	}
 	// this is the snapshot we are creating
 	frame = &clCut->snap;
@@ -4290,6 +4290,21 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 	else if (!_stricmp(normalizedExt, ".dm_68")) {
 
 		*demoType = DM_68;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
+	else if (!_stricmp(normalizedExt, ".dm_73")) {
+
+		*demoType = DM_73;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
+	else if (!_stricmp(normalizedExt, ".dm_90")) {
+
+		*demoType = DM_90;
+		//strncpy_s(normalizedExt,7, ".dm_26", 6);
+	}
+	else if (!_stricmp(normalizedExt, ".dm_91")) {
+
+		*demoType = DM_91;
 		//strncpy_s(normalizedExt,7, ".dm_26", 6);
 	} else {
 
@@ -4703,6 +4718,135 @@ static gameInfo_t gameInfos[] = {
 		MAX_CONFIGSTRINGS_Q3,
 		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3},
 		MAX_CLIENTS_Q3
+	},{ // Quake live based on QL
+		DM_73,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general,
+			// svc_extension follows a svc_EOF, followed by another svc_* ...
+			//  this keeps legacy clients compatible.
+			svc_extension_general,
+			svc_voip_general,     // not wrapped in USE_VOIP, so this value is reserved.
+		},
+		{
+			{
+				{},
+				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},qlWeaponToJK2Map,sizeof(qlWeaponToJK2Map) / sizeof(qlWeaponToJK2Map[0])}},
+				{qlWeaponToGeneralMap,sizeof(qlWeaponToGeneralMap) / sizeof(qlWeaponToGeneralMap[0])},
+			},{
+				{},
+				{qlModToGeneralMap,sizeof(qlModToGeneralMap) / sizeof(qlModToGeneralMap[0])},
+			},
+			{{},{lsMoveNOSABERToGeneral,sizeof(lsMoveNOSABERToGeneral) / sizeof(lsMoveNOSABERToGeneral[0])}},
+			{{},{qldm73ItemListToGeneral,sizeof(qldm73ItemListToGeneral) / sizeof(qldm73ItemListToGeneral[0])}},
+			{
+				{{{DM_15_1_03,DM_16},qlAnimToDM16,sizeof(qlAnimToDM16) / sizeof(qlAnimToDM16[0])}},
+				{qlAnimsToGeneral,sizeof(qlAnimsToGeneral) / sizeof(qlAnimsToGeneral[0])},
+			},
+			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
+		},
+		{
+			{entityStateFieldsQL73,sizeof(entityStateFieldsQL73) / sizeof(entityStateFieldsQL73[0]),},
+			{playerStateFieldsQLDM73,sizeof(playerStateFieldsQLDM73) / sizeof(playerStateFieldsQLDM73[0]),}
+		},
+		MAX_CONFIGSTRINGS_QL,
+		{CS_MODELS_QL,CS_SOUNDS_QL,CS_PLAYERS_QL,ET_EVENTS_QL,-1,ANIM_TOGGLEBIT_QL,CS_LEVEL_START_TIME_QL},
+		MAX_CLIENTS_QL
+	},{ // Quake live based on QL
+		DM_90,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general,
+			// svc_extension follows a svc_EOF, followed by another svc_* ...
+			//  this keeps legacy clients compatible.
+			svc_extension_general,
+			svc_voip_general,     // not wrapped in USE_VOIP, so this value is reserved.
+		},
+		{
+			{
+				{},
+				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},qlWeaponToJK2Map,sizeof(qlWeaponToJK2Map) / sizeof(qlWeaponToJK2Map[0])}},
+				{qlWeaponToGeneralMap,sizeof(qlWeaponToGeneralMap) / sizeof(qlWeaponToGeneralMap[0])},
+			},{
+				{},
+				{qlModToGeneralMap,sizeof(qlModToGeneralMap) / sizeof(qlModToGeneralMap[0])},
+			},
+			{{},{lsMoveNOSABERToGeneral,sizeof(lsMoveNOSABERToGeneral) / sizeof(lsMoveNOSABERToGeneral[0])}},
+			{{},{qldm90ItemListToGeneral,sizeof(qldm90ItemListToGeneral) / sizeof(qldm90ItemListToGeneral[0])}},
+			{
+				{{{DM_15_1_03,DM_16},qlAnimToDM16,sizeof(qlAnimToDM16) / sizeof(qlAnimToDM16[0])}},
+				{qlAnimsToGeneral,sizeof(qlAnimsToGeneral) / sizeof(qlAnimsToGeneral[0])},
+			},
+			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
+		},
+		{
+			{entityStateFieldsQLDM90,sizeof(entityStateFieldsQLDM90) / sizeof(entityStateFieldsQLDM90[0]),},
+			{PlayerStateFieldsQLDM90,sizeof(PlayerStateFieldsQLDM90) / sizeof(PlayerStateFieldsQLDM90[0]),}
+		},
+		MAX_CONFIGSTRINGS_QL,
+		{CS_MODELS_QL,CS_SOUNDS_QL,CS_PLAYERS_QL,ET_EVENTS_QL,-1,ANIM_TOGGLEBIT_QL,CS_LEVEL_START_TIME_QL},
+		MAX_CLIENTS_QL
+	},{ // Quake live based on QL
+		DM_91,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_EOF_general,
+			// svc_extension follows a svc_EOF, followed by another svc_* ...
+			//  this keeps legacy clients compatible.
+			svc_extension_general,
+			svc_voip_general,     // not wrapped in USE_VOIP, so this value is reserved.
+		},
+		{
+			{
+				{},
+				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},qlWeaponToJK2Map,sizeof(qlWeaponToJK2Map) / sizeof(qlWeaponToJK2Map[0])}},
+				{qlWeaponToGeneralMap,sizeof(qlWeaponToGeneralMap) / sizeof(qlWeaponToGeneralMap[0])},
+			},{
+				{},
+				{qlModToGeneralMap,sizeof(qlModToGeneralMap) / sizeof(qlModToGeneralMap[0])},
+			},
+			{{},{lsMoveNOSABERToGeneral,sizeof(lsMoveNOSABERToGeneral) / sizeof(lsMoveNOSABERToGeneral[0])}},
+			{{},{qldm91ItemListToGeneral,sizeof(qldm91ItemListToGeneral) / sizeof(qldm91ItemListToGeneral[0])}},
+			{
+				{{{DM_15_1_03,DM_16},qlAnimToDM16,sizeof(qlAnimToDM16) / sizeof(qlAnimToDM16[0])}},
+				{qlAnimsToGeneral,sizeof(qlAnimsToGeneral) / sizeof(qlAnimsToGeneral[0])},
+			},
+			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
+		},
+		{
+			{entityStateFieldsQLDM91,sizeof(entityStateFieldsQLDM91) / sizeof(entityStateFieldsQLDM91[0]),},
+			{PlayerStateFieldsQLDM91,sizeof(PlayerStateFieldsQLDM91) / sizeof(PlayerStateFieldsQLDM91[0]),}
+		},
+		MAX_CONFIGSTRINGS_QL,
+		{CS_MODELS_QL,CS_SOUNDS_QL,CS_PLAYERS_QL,ET_EVENTS_QL,-1,ANIM_TOGGLEBIT_QL,CS_LEVEL_START_TIME_QL},
+		MAX_CLIENTS_QL
 	},
 };
 
@@ -4734,6 +4878,7 @@ void initializeGameInfos() {
 			if (!gameInfos[i].constants.ef_missile_stick) gameInfos[i].constants.ef_missile_stick = EF_MISSILE_STICK;
 			if (gameInfos[i].constants.ef_missile_stick == -1) gameInfos[i].constants.ef_missile_stick = NULL; // Q3 for example doesn't have mixxile stick at all.
 			if (!gameInfos[i].constants.anim_togglebit) gameInfos[i].constants.anim_togglebit = ANIM_TOGGLEBIT;
+			if (!gameInfos[i].constants.cs_level_start_time) gameInfos[i].constants.cs_level_start_time = CS_LEVEL_START_TIME;
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 
 			// BTw for dynamically created arrays here: We don't care about destroying them. They are created one time at startup and that's it. When program closes they disappear too.

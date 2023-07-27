@@ -1,6 +1,8 @@
 save horizontal speeds separately!!!!!
 
 
+// TODO Parse com_protocol for quake games in case they decide to override protocol despite demo name...
+
 
 q3 ideas:
 duel: detect duel kills where u came back from a huge health/armor disadvantage to ur opponent

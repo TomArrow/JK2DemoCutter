@@ -396,7 +396,7 @@ readNext:
 		case svc_nop_general:
 			break;
 		case svc_serverCommand_general:
-			if (!demoCutParseCommandString(&oldMsg, &thisDemo.cut.Clc, SEHExceptionCaught)) {
+			if (!demoCutParseCommandString(&oldMsg, &thisDemo.cut.Clc, demoType, SEHExceptionCaught)) {
 				return qfalse;
 			}
 			break;

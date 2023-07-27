@@ -591,7 +591,7 @@ void MSG_WriteFloat( msg_t *sb, float f ) {
 	MSG_WriteBits( sb, dat.l, 32 );
 }
 
-void MSG_WriteString( msg_t *sb, const char *s ) {
+void MSG_WriteString( msg_t *sb, const char *s, demoType_t demoType ) {
 	if ( !s ) {
 		MSG_WriteData (sb, "", 1);
 	} else {
@@ -608,16 +608,22 @@ void MSG_WriteString( msg_t *sb, const char *s ) {
 
 		// get rid of 0xff chars, because old clients don't like them
 		for ( i = 0 ; i < l ; i++ ) {
-			if ( ((byte *)string)[i] > 127 ) {
+			if (demoType < DM_91 && ((byte *)string)[i] > 127 ) {
 				string[i] = '.';
 			}
+
+			// TODO: This is from wolfcamql for quake live ig. Idk.
+			// ok to check each byte when parsing UTF-8 since '%' (0x25) isn't a valid UTF-8 byte
+			/*if (string[i] == '%') {
+				string[i] = '.';
+			}*/
 		}
 
 		MSG_WriteData (sb, string, l+1);
 	}
 }
 
-void MSG_WriteBigString( msg_t *sb, const char *s ) {
+void MSG_WriteBigString( msg_t *sb, const char *s, demoType_t demoType) {
 	if ( !s ) {
 		MSG_WriteData (sb, "", 1);
 	} else {
@@ -634,9 +640,15 @@ void MSG_WriteBigString( msg_t *sb, const char *s ) {
 
 		// get rid of 0xff chars, because old clients don't like them
 		for ( i = 0 ; i < l ; i++ ) {
-			if ( ((byte *)string)[i] > 127 ) {
+			if (demoType < DM_91 && ((byte *)string)[i] > 127 ) {
 				string[i] = '.';
 			}
+
+			// TODO: This is from wolfcamql for quake live ig. Idk.
+			// ok to check each byte when parsing UTF-8 since '%' (0x25) isn't a valid UTF-8 byte
+			/*if (string[i] == '%') {
+				string[i] = '.';
+			}*/
 		}
 
 		MSG_WriteData (sb, string, l+1);
@@ -728,7 +740,7 @@ float MSG_ReadFloat( msg_t *msg ) {
 	return dat.f;	
 }
 
-char *MSG_ReadString( msg_t *msg ) {
+char *MSG_ReadString( msg_t *msg, demoType_t demoType ) {
 	static char	string[MAX_STRING_CHARS];
 	int		l,c;
 	
@@ -743,7 +755,7 @@ char *MSG_ReadString( msg_t *msg ) {
 			c = '.';
 		}
 		// don't allow higher ascii values
-		if ( c > 127 ) {
+		if ( c > 127 && demoType < DM_91 ) { // Quake live stuff. Quake live DM_91 supports UTF-8?
 			c = '.';
 		}
 
@@ -788,7 +800,7 @@ char *MSG_ReadBigString( msg_t *msg ) {
 	return string;
 }
 
-char *MSG_ReadStringLine( msg_t *msg ) {
+char *MSG_ReadStringLine( msg_t *msg/*, demoType_t demoType*/) {
 	static char	string[MAX_STRING_CHARS];
 	int		l,c;
 
@@ -802,6 +814,16 @@ char *MSG_ReadStringLine( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		}
+
+		// UTF-8
+		// TODO: wolfcamql wants to do this here but this wasn't here before. Should I add it?
+		/*if (demoType < 91) {
+			// don't allow higher ascii values
+			if (c > 127) {
+				c = '.';
+			}
+		}*/
+
 		string[l] = c;
 		l++;
 	} while (l < sizeof(string)-1);

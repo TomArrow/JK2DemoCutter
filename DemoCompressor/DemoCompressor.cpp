@@ -250,7 +250,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			case svc_nop_general:
 				break;
 			case svc_serverCommand_general:
-				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, SEHExceptionCaught)) {
+				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType, SEHExceptionCaught)) {
 					goto cuterror;
 				}
 				break;

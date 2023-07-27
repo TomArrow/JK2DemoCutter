@@ -199,6 +199,9 @@ enum demoType_t {
 	DM_66, // Q3 v1.29 - v1.30 - not currently implemented
 	DM_67, // Q3 v1.31 - not currently implemented
 	DM_68, // Q3 v1.32 - not currently implemented
+	DM_73, // Quake Live
+	DM_90, // Quake Live 
+	DM_91, // Quake Live 
 	DEMOTYPE_COUNT
 };
 
@@ -1478,8 +1481,8 @@ void MSG_WriteShort(msg_t* sb, int c);
 void MSG_WriteSShort(msg_t* sb, int c);
 void MSG_WriteLong(msg_t* sb, int c);
 void MSG_WriteFloat(msg_t* sb, float f);
-void MSG_WriteString(msg_t* sb, const char* s);
-void MSG_WriteBigString(msg_t* sb, const char* s);
+void MSG_WriteString(msg_t* sb, const char* s, demoType_t demoType);
+void MSG_WriteBigString(msg_t* sb, const char* s, demoType_t demoType);
 void MSG_WriteAngle16(msg_t* sb, float f);
 
 void	MSG_BeginReading(msg_t* sb);
@@ -1493,7 +1496,7 @@ int		MSG_ReadShort(msg_t* sb);
 int		MSG_ReadSShort(msg_t* sb);
 int		MSG_ReadLong(msg_t* sb);
 float	MSG_ReadFloat(msg_t* sb);
-char* MSG_ReadString(msg_t* sb);
+char* MSG_ReadString(msg_t* sb, demoType_t demoType);
 char* MSG_ReadBigString(msg_t* sb);
 char* MSG_ReadStringLine(msg_t* sb);
 float	MSG_ReadAngle16(msg_t* sb);
@@ -1643,6 +1646,10 @@ enum svc_ops_e_general {
 	svc_newpeer_general,				//jsw//inform current clients about new player
 	svc_removepeer_general,				//jsw//inform current clients about dying player
 	svc_xbInfo_general,					//jsw//update client with current server xbOnlineInfo
+
+	// Quake Live
+	svc_extension_general,
+	svc_voip_general,
 
 	svc_EOF_general,
 	svc_ops_general_count
@@ -2161,7 +2168,29 @@ typedef enum {
 	EV_INVUL_IMPACT_GENERAL,
 	EV_JUICED_GENERAL,
 	EV_LIGHTNINGBOLT_GENERAL,
-	EV_TAUNT_PATROL,
+
+	// QL Specific
+	EV_DROP_WEAPON_GENERAL,
+	EV_DROWN_GENERAL,
+	EV_POWERUP_ARMOR_REGEN_GENERAL,
+	EV_FOOTSTEP_SNOW_GENERAL,
+	EV_FOOTSTEP_WOOD_GENERAL,
+	EV_ITEM_PICKUP_SPEC_GENERAL,
+	EV_OVERTIME_GENERAL,
+	EV_GAMEOVER_GENERAL,
+	EV_THAW_PLAYER_GENERAL,
+	EV_THAW_TICK_GENERAL,
+	EV_HEADSHOT_GENERAL,
+	EV_POI_GENERAL,
+	EV_RACE_START_GENERAL,
+	EV_RACE_CHECKPOINT_GENERAL,
+	EV_RACE_END_GENERAL,
+	EV_DAMAGEPLUM_GENERAL,
+	EV_AWARD_GENERAL,
+	EV_INFECTED_GENERAL,
+	EV_NEW_HIGH_SCORE_GENERAL,
+	EV_STEP_20_GENERAL,
+	EV_STEP_24_GENERAL,
 
 	// JK2SP specific:
 	EV_WATER_GURP1_GENERAL,	// need air 1
@@ -2488,6 +2517,13 @@ typedef enum {
 //#endif
 	MOD_GRAPPLE_GENERAL,
 
+	//quake live:
+	MOD_SWITCH_TEAMS_GENERAL,  // 29
+	MOD_THAW_GENERAL,
+	MOD_LIGHTNING_DISCHARGE_GENERAL,  // demo?
+	MOD_HMG_GENERAL,
+	MOD_RAILGUN_HEADSHOT_GENERAL,
+
 	//jk2sp:
 	MOD_BLASTER_ALT_GENERAL,
 	MOD_SNIPER_GENERAL, // this is when energy crackle kills yu?!?
@@ -2624,6 +2660,9 @@ typedef enum {
 	WP_NAILGUN_GENERAL,
 	WP_PROX_LAUNCHER_GENERAL,
 	WP_CHAINGUN_GENERAL,
+
+	// ql
+	WP_HEAVY_MACHINEGUN_GENERAL,
 
 	// Jk2sp
 	WP_BOT_LASER_GENERAL,		// Probe droid	- Laser blast
@@ -3490,6 +3529,7 @@ typedef enum {
 	ITEMLIST_ITEM_ARMOR_SHARD_GENERAL,
 	ITEMLIST_ITEM_ARMOR_COMBAT_GENERAL,
 	ITEMLIST_ITEM_ARMOR_BODY_GENERAL,
+	ITEMLIST_ITEM_ARMOR_JACKET_GENERAL, // Quake Live
 	ITEMLIST_ITEM_HEALTH_SMALL_GENERAL,
 	ITEMLIST_ITEM_HEALTH_GENERAL,
 	ITEMLIST_ITEM_HEALTH_LARGE_GENERAL,
@@ -3528,11 +3568,22 @@ typedef enum {
 	ITEMLIST_ITEM_SCOUT_GENERAL,
 	ITEMLIST_ITEM_GUARD_GENERAL,
 	ITEMLIST_ITEM_DOUBLER_GENERAL,
+	ITEMLIST_ITEM_ARMORREGEN_GENERAL, // Quake Live
 	ITEMLIST_ITEM_AMMOREGEN_GENERAL,
 	ITEMLIST_WEAPON_NAILGUN_GENERAL,
 	ITEMLIST_WEAPON_PROX_LAUNCHER_GENERAL,
 	ITEMLIST_WEAPON_CHAINGUN_GENERAL,
 	ITEMLIST_ITEM_BATTERY_GENERAL,
+
+	// Quake Live:
+	ITEMLIST_ITEM_SPAWNARMOR_GENERAL,
+	ITEMLIST_WEAP_HMG_GENERAL,
+	ITEMLIST_AMMO_HMG_GENERAL,
+	ITEMLIST_AMMO_PACK_GENERAL,
+	ITEMLIST_ITEM_KEY_SILVER_GENERAL,
+	ITEMLIST_ITEM_KEY_GOLD_GENERAL,
+	ITEMLIST_ITEM_KEY_MASTER_GENERAL,
+
 	// JK2 SP:
 	ITEMLIST_WEAPON_ATST_MAIN_GENERAL,
 	ITEMLIST_WEAPON_ATST_SIDE_GENERAL,
@@ -4200,7 +4251,7 @@ inline bool snapshotInfosSnapNumPredicate(const std::pair<int, SnapshotInfo> &it
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, bool& SEHExceptionCaught);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
-qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, bool& SEHExceptionCaught);
+qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught);
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
 qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, bool& malformedMessage, qboolean writeOldSnap = qfalse);
@@ -4279,6 +4330,7 @@ struct gameConstantsInfo_t {
 	int	et_events;
 	int ef_missile_stick;
 	int anim_togglebit;
+	int cs_level_start_time;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -4394,6 +4446,9 @@ inline int getCS_MODELS(demoType_t demoType) {
 }
 inline int getCS_SOUNDS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.cs_sounds;
+}
+inline int getCS_LEVEL_START_TIME(demoType_t demoType) {
+	return gameInfosMapped[demoType]->constants.cs_level_start_time;
 }
 inline int getET_EVENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.et_events;

@@ -106,7 +106,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		}
 	}
 	
-	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_LEVEL_START_TIME, "10000", demoType);
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, getCS_LEVEL_START_TIME(demoType), "10000", demoType);
 
 	// Add "fake demo" server name.
 	char infoCopy[MAX_INFO_STRING];
