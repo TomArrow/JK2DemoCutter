@@ -1,3 +1,13 @@
+save horizontal speeds separately!!!!!
+
+
+
+q3 ideas:
+duel: detect duel kills where u came back from a huge health/armor disadvantage to ur opponent
+rockets: detect distance and jump height (ALSO FIX THE JUMP HEIGHT BTW, USE EV_JUMP)
+rocket: travel duration
+
+
 make laughs a meta event?
 
 lost packet count (global count for demo?)
@@ -31,8 +41,19 @@ find highest amount of mines at same time
 MAYBE current stance of victim? not important tho.
 captureS: save kills/rets during run. overall fastest speed during run. kills in last 5 seconds. PARTIALLY DONE
 
+
+how i can actually do slowmotion maybe: commandtime slowing! like with lag!
+
 detect BC kills? 
 
+
+- Get HEALTH from: teaminfo and ESP: plaerstate shenanigans and EV_PAIN tracking etc
+
+what doess saberattackchaincount do?
+
+
+
+ctf autospectatorcam?
 
 
 

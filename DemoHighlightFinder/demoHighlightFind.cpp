@@ -4041,6 +4041,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									case MOD_FALLING_GENERAL:
 										modInfo << "_DOOM";
 										break;
+									case MOD_MELEE_GENERAL: // Kicked
+										modInfo << "_KICK";
+										break;
 									case MOD_SUICIDE_GENERAL:
 										modInfo << "_SUIC";
 										break;
