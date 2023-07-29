@@ -7,6 +7,7 @@
 #include <chrono>
 #include <jkaStuff.h>
 #include "otherGameStuff.h"
+#include "otherGameStuff2.h"
 
 #include "popl.hpp"
 

@@ -649,6 +649,18 @@ typedef enum
 #define MAX_INVENTORY			15		// See INV_MAX
 // JK2 SP stuff end
 
+
+// xkan, 1/10/2003 - adapted from original SP
+typedef enum
+{
+	AISTATE_RELAXED,
+	AISTATE_QUERY,
+	AISTATE_ALERT,
+	AISTATE_COMBAT,
+
+	MAX_AISTATES
+} aistateEnum_t;
+
 typedef struct playerState_s {
 	int			commandTime;	// cmd->serverTime of last executed command
 	int			pm_type;
@@ -948,6 +960,12 @@ typedef struct playerState_s {
 	int ammoclip[64];
 	int holdable[16];
 
+	// ET
+	int nextWeapon;
+	int identifyClient; // NERVE - SMF
+	int identifyClientHealth;
+	aistateEnum_t aiStateET;          // xkan, 1/10/2003
+
 	// Quake Live (according to uber demo tools):
 	int doubleJumped; /* qboolean */
 	int jumpTime;
@@ -1189,6 +1207,9 @@ typedef struct entityState_s {
 	int effect3Time;
 	int aiState;
 	int animMovetype;  /* clients can't derive movetype of other clients for anim scripting system */
+
+	// ET
+	int nextWeapon;
 
 
 	// Quake Live (according to uber demo tools)
@@ -2191,6 +2212,86 @@ typedef enum {
 	EV_NEW_HIGH_SCORE_GENERAL,
 	EV_STEP_20_GENERAL,
 	EV_STEP_24_GENERAL,
+
+	// ET specific:
+	EV_FOOTSTEP_GRASS_GENERAL,
+	EV_FOOTSTEP_GRAVEL_GENERAL,
+	EV_FOOTSTEP_ROOF_GENERAL,
+	EV_FOOTSTEP_CARPET_GENERAL,
+	EV_FALL_NDIE_GENERAL,
+	EV_FALL_DMG_10_GENERAL,
+	EV_FALL_DMG_15_GENERAL,
+	EV_FALL_DMG_25_GENERAL,
+	EV_FALL_DMG_50_GENERAL,
+	EV_ITEM_PICKUP_QUIET_GENERAL,   // (SA) same_GENERAL, but don't play the default pickup sound as it was specified in the ent
+	EV_WEAPONSWITCHED_GENERAL,
+	EV_EMPTYCLIP_GENERAL,
+	EV_FILL_CLIP_GENERAL,
+	EV_MG42_FIXED_GENERAL, // JPW NERVE
+	EV_WEAP_OVERHEAT_GENERAL,
+	EV_CHANGE_WEAPON_2_GENERAL,
+	EV_FIRE_WEAPONB_GENERAL,
+	EV_FIRE_WEAPON_LASTSHOT_GENERAL,
+	EV_NOFIRE_UNDERWATER_GENERAL,
+	EV_FIRE_WEAPON_MG42_GENERAL,
+	EV_FIRE_WEAPON_MOUNTEDMG42_GENERAL,
+	EV_GENERAL_SOUND_VOLUME_GENERAL,
+	EV_GLOBAL_CLIENT_SOUND_GENERAL, // DHM - Nerve :: no attenuation_GENERAL, only plays for specified client
+	EV_FX_SOUND_GENERAL,
+	EV_VENOM_GENERAL,
+	EV_LOSE_HAT_GENERAL,            //----(SA)
+	EV_CROUCH_PAIN_GENERAL,
+	EV_STOPSTREAMINGSOUND_GENERAL, // JPW NERVE swiped from sherman
+	EV_SMOKE_GENERAL,
+	EV_SPARKS_GENERAL,
+	EV_SPARKS_ELECTRIC_GENERAL,
+	EV_EXPLODE_GENERAL,     // func_explosive
+	EV_RUBBLE_GENERAL,
+	EV_EFFECT_GENERAL,      // target_effect
+	EV_MORTAREFX_GENERAL,   // mortar firing
+	EV_SPINUP_GENERAL,  // JPW NERVE panzerfaust preamble
+	EV_SNOW_ON_GENERAL,
+	EV_SNOW_OFF_GENERAL,
+	EV_MISSILE_MISS_SMALL_GENERAL,
+	EV_MISSILE_MISS_LARGE_GENERAL,
+	EV_MORTAR_IMPACT_GENERAL,
+	EV_MORTAR_MISS_GENERAL,
+	EV_SPIT_HIT_GENERAL,
+	EV_SPIT_MISS_GENERAL,
+	EV_SHARD_GENERAL,
+	EV_JUNK_GENERAL,
+	EV_EMITTER_GENERAL, //----(SA)	added // generic particle emitter that uses client-side particle scripts
+	EV_OILPARTICLES_GENERAL,
+	EV_OILSLICK_GENERAL,
+	EV_OILSLICKREMOVE_GENERAL,
+	EV_MG42EFX_GENERAL,
+	EV_FLAKGUN1_GENERAL,
+	EV_FLAKGUN2_GENERAL,
+	EV_FLAKGUN3_GENERAL,
+	EV_FLAKGUN4_GENERAL,
+	EV_EXERT1_GENERAL,
+	EV_EXERT2_GENERAL,
+	EV_EXERT3_GENERAL,
+	EV_SNOWFLURRY_GENERAL,
+	EV_CONCUSSIVE_GENERAL,
+	EV_DUST_GENERAL,
+	EV_RUMBLE_EFX_GENERAL,
+	EV_GUNSPARKS_GENERAL,
+	EV_FLAMETHROWER_EFFECT_GENERAL,
+	EV_POPUP_GENERAL,
+	EV_POPUPBOOK_GENERAL,
+	EV_GIVEPAGE_GENERAL,
+	EV_MG42BULLET_HIT_FLESH_GENERAL,    // Arnout: these two send the seed as well
+	EV_MG42BULLET_HIT_WALL_GENERAL,
+	EV_SHAKE_GENERAL,
+	EV_DISGUISE_SOUND_GENERAL,
+	EV_BUILDDECAYED_SOUND_GENERAL,
+	EV_FIRE_WEAPON_AAGUN_GENERAL,
+	EV_ALERT_SPEAKER_GENERAL,
+	EV_POPUPMESSAGE_GENERAL,
+	EV_ARTYMESSAGE_GENERAL,
+	EV_AIRSTRIKEMESSAGE_GENERAL,
+	EV_MEDIC_CALL_GENERAL,
 
 	// JK2SP specific:
 	EV_WATER_GURP1_GENERAL,	// need air 1

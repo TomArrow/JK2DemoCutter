@@ -1,6 +1,7 @@
 #include "demoCut.h"
 #include "jkaStuff.h"
 #include "otherGameStuff.h"
+#include "otherGameStuff2.h"
 #include "DemoReaderLight.h"
 #define PCRE2_STATIC
 #include "jpcre2.hpp"

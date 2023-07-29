@@ -3,6 +3,7 @@
 #include "demoCut.h"
 #include "jkaStuff.h"
 #include "otherGameStuff.h"
+#include "otherGameStuff2.h"
 #include "stateFields.h"
 
 #ifdef _DONETPROFILE_

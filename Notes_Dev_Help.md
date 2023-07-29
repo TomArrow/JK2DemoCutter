@@ -17,3 +17,8 @@ Step 2: Convert to uppercase.
 
 Step 3: Add ```ITEMLIST_NONE_GENERAL``` at start and ```ITEMLIST_NUM_TOTAL_GENERAL ``` at end. Done.
 
+## Helper regex for NETF/PSF parsing
+
+```.*?(?:NETF|PSF)\s*\(\s*([^\s)]+)\s*\),\s*([^\s}]+)```
+
+Use $1 for fieldname and $2 for bitstuff

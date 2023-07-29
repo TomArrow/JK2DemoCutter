@@ -3,6 +3,7 @@
 #include <math.h>
 #include <jkaStuff.h>
 #include "otherGameStuff.h"
+#include "otherGameStuff2.h"
 #include "jk2spStuff.h"
 #include <stateFields.h>
 #include <sstream>
