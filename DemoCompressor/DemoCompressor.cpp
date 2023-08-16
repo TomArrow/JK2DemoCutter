@@ -84,13 +84,15 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//else
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
-	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
+	//strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
 	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
-	strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
-	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile, &demo.cut.Clc.demoCheckFor103);
+	demoCutGetDemoType(sourceDemoFile,ext, oldName,&demoType,&isCompressedFile, &demo.cut.Clc);
+
+	strcpy_s(originalExt, sizeof(originalExt), ext);
 
 	/*char specialTypeChar = ext[3];
 	ext[3] = '_';
@@ -125,12 +127,23 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 	int messageOffset = 0;
 
-	if (createCompressedOutput) {
-		ext[3] = 'c';
+	if (demoType >= DM3_MOHAA_PROT_6 && demoType <= DM3_MOHAA_PROT_15) { // TODO handle this smarter in some central place, ideally in demoCutGetDemoType
+		if (createCompressedOutput) {
+			strcpy_s(ext, sizeof(ext), ".dm3_c");
+		}
+		else {
+			strcpy_s(ext, sizeof(ext), ".dm3");
+		}
 	}
 	else {
-		ext[3] = '_';
+		if (createCompressedOutput) {
+			ext[3] = 'c';
+		}
+		else {
+			ext[3] = '_';
+		}
 	}
+
 
 	// Open new file
 	{int dupeIterator = 0;

@@ -114,9 +114,9 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	demoType_t		demoType;
 	qboolean createCompressedOutput;
 
-	strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
+	//strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 
-	demoCutGetDemoType(outputName,ext,&demoType,&createCompressedOutput);
+	demoCutGetDemoType(outputName,ext, outputNameNoExt ,&demoType,&createCompressedOutput);
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
 		demoType = DM_15;

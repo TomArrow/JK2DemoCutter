@@ -38,12 +38,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	//char originalExt[7]{};
 	demoType_t		demoType;
 
-	strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
+	//strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 
 	qboolean createCompressedOutput = qfalse;
 
 	memset(&demo, 0, sizeof(demo));
-	demoCutGetDemoType(outputName, ext, &demoType, &createCompressedOutput);
+	demoCutGetDemoType(outputName, ext, outputNameNoExt, &demoType, &createCompressedOutput);
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
 		demoType = DM_15;

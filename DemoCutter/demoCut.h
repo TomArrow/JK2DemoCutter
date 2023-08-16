@@ -176,7 +176,16 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 
 
 
+// OpenMOHAA
+#define NUM_BONE_CONTROLLERS 5
+#define MAX_FRAMEINFOS			16
+typedef struct frameInfo_s {
+	int index;
+	float time;
+	float weight;
+} frameInfoMOHAA_t;
 
+// OpenMOHAA end
 
 
 
@@ -189,6 +198,12 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 
 enum demoType_t {
 	DEMOTYPE_NONE,
+	DM3_MOHAA_PROT_6, // MOHAA "MIN"
+	//DM3_MOHAA_PROT_7, // MOHAA
+	//DM3_MOHAA_PROT_8, // MOHAA
+	DM3_MOHAA_PROT_15, // MOHTA "MIN"
+	//DM3_MOHAA_PROT_16, // MOHTA
+	//DM3_MOHAA_PROT_17, // MOHTA
 	DM_14, // My JK2 Single Player demo work-in-progress
 	DM_15,
 	DM_15_1_03,
@@ -265,7 +280,7 @@ typedef struct _iobuf
 #define	MAX_PS_EVENTS			2
 
 // bit field limits
-#define	MAX_STATS				16
+#define	MAX_STATS				32 //16 is for jk and all others. 32 is mohaa
 #define	MAX_PERSISTANT			16
 #define	MAX_POWERUPS			16
 #define	MAX_WEAPONS				16		
@@ -336,7 +351,8 @@ typedef struct _iobuf
 #define	CS_SOUNDS				(CS_MODELS+MAX_MODELS)
 #define	CS_PLAYERS				(CS_SOUNDS+MAX_SOUNDS)
 
-#define	MAX_GAMESTATE_CHARS	16000
+//#define	MAX_GAMESTATE_CHARS	16000
+#define	MAX_GAMESTATE_CHARS	41952 // Mohaa is hungry...
 
 
 
@@ -498,7 +514,8 @@ typedef enum {
 	MAX_JOYSTICK_AXIS
 } joystickAxis_t;
 
-#define MAX_CONFIGSTRINGS_MAX 1700 // Highest I found anywhere (JKA). We gotta be able to hold it all.
+//#define MAX_CONFIGSTRINGS_MAX 1700 // Highest I found anywhere (JKA). We gotta be able to hold it all.
+#define MAX_CONFIGSTRINGS_MAX 2736 // Highest I found anywhere (MOHAA). We gotta be able to hold it all.
 
 typedef struct {
 	int			stringOffsets[MAX_CONFIGSTRINGS_MAX];
@@ -662,26 +679,35 @@ typedef enum
 } aistateEnum_t;
 
 typedef struct playerState_s {
+	// Shared between games:
+
 	int			commandTime;	// cmd->serverTime of last executed command
+	vec3_t		origin;
+	vec3_t		viewangles;		// for fixed views
+	vec3_t		velocity;
+	int			speed;
+	int			delta_angles[3];	// add to command angles to get view direction
+									// changed by spawns, rotating objects, and teleporters
+	int			viewheight;
+	int			groundEntityNum;// ENTITYNUM_NONE = in air
+	int			gravity;
+	int			clientNum;		// ranges from 0 to MAX_CLIENTS-1
 	int			pm_type;
 	int			bobCycle;		// for view bobbing and footstep generation
-	int			pm_flags;		// ducked, jump_held, etc
 	int			pm_time;
 
-	vec3_t		origin;
-	vec3_t		velocity;
+
+
+	// JK2/jk3:
+	int			pm_flags;		// ducked, jump_held, etc
+
 	int			weaponTime;
 	int			weaponChargeTime;
 	int			weaponChargeSubtractTime;
-	int			gravity;
-	int			speed;
 	int			basespeed; //used in prediction to know base server g_speed value when modifying speed between updates
-	int			delta_angles[3];	// add to command angles to get view direction
-									// changed by spawns, rotating objects, and teleporters
 
 	int			useTime;
 
-	int			groundEntityNum;// ENTITYNUM_NONE = in air
 
 	int			legsTimer;		// don't change low priority animations until this runs out
 	int			legsAnim;		// mask off ANIM_TOGGLEBIT
@@ -706,12 +732,9 @@ typedef struct playerState_s {
 	int			externalEventParm;
 	int			externalEventTime;
 
-	int			clientNum;		// ranges from 0 to MAX_CLIENTS-1
 	int			weapon;			// copied to entityState_t->weapon
 	int			weaponstate;
 
-	vec3_t		viewangles;		// for fixed views
-	int			viewheight;
 
 	// damage feedback
 	int			damageEvent;	// when it changes, latch the other parms
@@ -731,6 +754,8 @@ typedef struct playerState_s {
 	int			persistant[MAX_PERSISTANT];	// stats that aren't cleared on death
 	int			powerups[MAX_POWERUPS];	// level.time that the powerup runs out
 	int			ammo[MAX_WEAPONS];
+
+
 
 	int			generic1;
 	int			loopSound;
@@ -863,140 +888,216 @@ typedef struct playerState_s {
 	vec3_t		lastHitLoc;
 
 
+	// Shared among games:
 
-	// JKA Specific:
-	vec3_t		moveDir; //NOT sent over the net - nor should it be.
-	float		speedJKA;
-	int			slopeRecalcTime; //this is NOT sent across the net and is maintained seperately on game and cgame in pmove code.
-	qboolean	legsFlip; //set to opposite when the same anim needs restarting, sent over in only 1 bit. Cleaner and makes porting easier than having that god forsaken ANIM_TOGGLEBIT.
-	qboolean	torsoFlip;
-	int			eFlags2;		// copied to entityState_t->eFlags2, EF2_??? used much less frequently
-	int			saberLockHitCheckTime; //so we don't allow more than 1 push per server frame
-	int			saberLockHitIncrementTime; //so we don't add a hit per attack button press more than once per server frame
-	int			saberHolsteredJKA;
-	int			heldByClient; //can only be a client index - this client should be holding onto my arm using IK stuff.
-	int			ragAttach; //attach to ent while ragging
-	int			iModelScale;
-	int			brokenLimbs;
-	//for looking at an entity's origin (NPCs and players)
-	qboolean	hasLookTarget;
-	int			lookTarget;
-	int			customRGBA[4];
-	int			standheight;
-	int			crouchheight;
-	//If non-0, this is the index of the vehicle a player/NPC is riding.
-	int			m_iVehicleNum;
-	//lovely hack for keeping vehicle orientation in sync with prediction
-	vec3_t		vehOrientation;
-	qboolean	vehBoarding;
-	int			vehSurfaces;
-	//vehicle turnaround stuff (need this in ps so it doesn't jerk too much in prediction)
-	int			vehTurnaroundIndex;
-	int			vehTurnaroundTime;
-	//vehicle has weapons linked
-	qboolean	vehWeaponsLinked;
-	//when hyperspacing, you just go forward really fast for HYPERSPACE_TIME
-	int			hyperSpaceTime;
-	vec3_t		hyperSpaceAngles;
-	//hacking when > time
-	int			hackingTime;
-	//actual hack amount - only for the proper percentage display when
-	//drawing progress bar (is there a less bandwidth-eating way to do
-	//this without a lot of hassle?)
-	int			hackingBaseTime;
-	//keeps track of jetpack fuel
-	int			jetpackFuel;
-	//keeps track of cloak fuel
-	int			cloakFuel;
-	//rww - spare values specifically for use by mod authors.
-	//See psf_overrides.txt if you want to increase the send
-	//amount of any of these above 1 bit.
-	int			userInt1;
-	int			userInt2;
-	int			userInt3;
-	float		userFloat1;
-	float		userFloat2;
-	float		userFloat3;
-	vec3_t		userVec1;
-	vec3_t		userVec2;
-#ifdef _ONEBIT_COMBO
-	int			deltaOneBits;
-	int			deltaNumBits;
-#endif
-
-
-	// RTCW (according to uber demo tools):
-
-	/* for weapons that don't fire immediately when 'fire' is hit (grenades, venom, ...) */
-	int weaponDelay;
-	/* for delayed grenade throwing. this is set to a #define for grenade */
-	/* lifetime when the attack button goes down, then when attack is released * /
-	/* this is the amount of time left before the grenade goes off */
-	/* (or if it gets to 0 while in player's hand, it explodes) */
-	int grenadeTimeLeft;
-	float leanf;             /* amount of 'lean' when player is looking around corner */
-	int weapons[2];          /* 64 bits for weapons held */
-	int weapAnim;            /* mask off ANIM_TOGGLEBIT */
-	vec3_t mins, maxs;
-	float crouchMaxZ;
-	float crouchViewHeight, standViewHeight, deadViewHeight;
-	float runSpeedScale, sprintSpeedScale, crouchSpeedScale; /* variable movement speed */
-	int viewlocked;          /* view locking for mg42 */
-	int viewlocked_entNum;
-	/* need this to fix friction problems with slow zombies whereby */
-	/* the friction prevents them from accelerating to their full potential */
-	float friction;
-	int aiChar;              /* AI character id is used for weapon association */
-	int teamNum;
-	int gunfx;
-	int sprintTime;
-	int aimSpreadScale;      /* 0-255 increases with angular movement */
-	int onFireStart;         /* burning effect is required for view blending effect */
-	int classWeaponTime;
-	int serverCursorHint;    /* what type of cursor hint the server is dictating */
-	int serverCursorHintVal; /* a value (0-255) associated with the above */
-	int curWeapHeat;         /* for the currently selected weapon */
-	int aiState;
-	int ammoclip[64];
-	int holdable[16];
-
-	// ET
-	int nextWeapon;
-	int identifyClient; // NERVE - SMF
-	int identifyClientHealth;
-	aistateEnum_t aiStateET;          // xkan, 1/10/2003
-
-	// Quake Live (according to uber demo tools):
-	int doubleJumped; /* qboolean */
-	int jumpTime;
-	int weaponPrimary;
-	int crouchTime;
-	int crouchSlideTime;
-	int location;
 	int fov;
-	int forwardmove;
-	int rightmove;
-	int upmove;
+	float friction;
+	
+	union {
+		
+		struct { // 208 bytes
+			// JKA Specific:
+			vec3_t		moveDir; //NOT sent over the net - nor should it be.
+			float		speedJKA;
+			int			slopeRecalcTime; //this is NOT sent across the net and is maintained seperately on game and cgame in pmove code.
+			qboolean	legsFlip; //set to opposite when the same anim needs restarting, sent over in only 1 bit. Cleaner and makes porting easier than having that god forsaken ANIM_TOGGLEBIT.
+			qboolean	torsoFlip;
+			int			eFlags2;		// copied to entityState_t->eFlags2, EF2_??? used much less frequently
+			int			saberLockHitCheckTime; //so we don't allow more than 1 push per server frame
+			int			saberLockHitIncrementTime; //so we don't add a hit per attack button press more than once per server frame
+			int			saberHolsteredJKA;
+			int			heldByClient; //can only be a client index - this client should be holding onto my arm using IK stuff.
+			int			ragAttach; //attach to ent while ragging
+			int			iModelScale;
+			int			brokenLimbs;
+			//for looking at an entity's origin (NPCs and players)
+			qboolean	hasLookTarget;
+			int			lookTarget;
+			int			customRGBA[4];
+			int			standheight;
+			int			crouchheight;
+			//If non-0, this is the index of the vehicle a player/NPC is riding.
+			int			m_iVehicleNum;
+			//lovely hack for keeping vehicle orientation in sync with prediction
+			vec3_t		vehOrientation;
+			qboolean	vehBoarding;
+			int			vehSurfaces;
+			//vehicle turnaround stuff (need this in ps so it doesn't jerk too much in prediction)
+			int			vehTurnaroundIndex;
+			int			vehTurnaroundTime;
+			//vehicle has weapons linked
+			qboolean	vehWeaponsLinked;
+			//when hyperspacing, you just go forward really fast for HYPERSPACE_TIME
+			int			hyperSpaceTime;
+			vec3_t		hyperSpaceAngles;
+			//hacking when > time
+			int			hackingTime;
+			//actual hack amount - only for the proper percentage display when
+			//drawing progress bar (is there a less bandwidth-eating way to do
+			//this without a lot of hassle?)
+			int			hackingBaseTime;
+			//keeps track of jetpack fuel
+			int			jetpackFuel;
+			//keeps track of cloak fuel
+			int			cloakFuel;
+			//rww - spare values specifically for use by mod authors.
+			//See psf_overrides.txt if you want to increase the send
+			//amount of any of these above 1 bit.
+			int			userInt1;
+			int			userInt2;
+			int			userInt3;
+			float		userFloat1;
+			float		userFloat2;
+			float		userFloat3;
+			vec3_t		userVec1;
+			vec3_t		userVec2;
+#ifdef _ONEBIT_COMBO
+			int			deltaOneBits;
+			int			deltaNumBits;
+#endif
+		};
 
-	// JK2 SP stuff
-	int			leanofs;
-	int			batteryCharge;
-	saber_colors_t	saberColor;
-	float		saberLength;
-	float		saberLengthMax;
-	int			forcePowersActive;	//prediction needs to know this
-	int			vehicleModel;	// For overriding your playermodel with a drivable vehicle
-	int			viewEntity;		// For overriding player movement controls and vieworg
-	vec3_t		serverViewOrg;
-	int			inventory[MAX_INVENTORY];
+		struct {
+
+			union {
+				struct { // 132 bytes
+					// RTCW (according to uber demo tools):
+
+					// for weapons that don't fire immediately when 'fire' is hit (grenades, venom, ...)
+					int weaponDelay;
+					// for delayed grenade throwing. this is set to a #define for grenade
+					// lifetime when the attack button goes down, then when attack is released
+					// this is the amount of time left before the grenade goes off
+					// (or if it gets to 0 while in player's hand, it explodes)
+					int grenadeTimeLeft;
+					float leanf;             // amount of 'lean' when player is looking around corner
+					int weapons[2];          // 64 bits for weapons held
+					int weapAnim;            // mask off ANIM_TOGGLEBIT
+					vec3_t mins, maxs;
+					float crouchMaxZ;
+					float crouchViewHeight, standViewHeight, deadViewHeight;
+					float runSpeedScale, sprintSpeedScale, crouchSpeedScale; // variable movement speed
+					int viewlocked;          // view locking for mg42
+					int viewlocked_entNum;
+					// need this to fix friction problems with slow zombies whereby
+					// the friction prevents them from accelerating to their full potential
+					int aiChar;              // AI character id is used for weapon association
+					int teamNum;
+					int gunfx;
+					int sprintTime;
+					int aimSpreadScale;      // 0-255 increases with angular movement
+					int onFireStart;         // burning effect is required for view blending effect
+					int classWeaponTime;
+					int serverCursorHint;    // what type of cursor hint the server is dictating
+					int serverCursorHintVal; // a value (0-255) associated with the above
+					int curWeapHeat;         // for the currently selected weapon
+					int aiState;
+					//int ammoclip[64]; // Not needed for net comms
+					//int holdable[16]; // Not needed for net comms
+					
+					// ET
+					int nextWeapon;
+					int identifyClient; // NERVE - SMF
+					int identifyClientHealth;
+					aistateEnum_t aiStateET;          // xkan, 1/10/2003
+				};
+
+				struct { // 160 bytes
+					
+					// Quake Live (according to uber demo tools):
+					int doubleJumped; // qboolean 
+					int jumpTime;
+					int weaponPrimary;
+					int crouchTime;
+					int crouchSlideTime;
+					int location;
+					int forwardmove;
+					int rightmove;
+					int upmove;
+
+					// JK2 SP stuff
+					int			leanofs;
+					int			batteryCharge;
+					saber_colors_t	saberColor;
+					float		saberLength;
+					float		saberLengthMax;
+					int			forcePowersActive;	//prediction needs to know this
+					int			vehicleModel;	// For overriding your playermodel with a drivable vehicle
+					int			viewEntity;		// For overriding player movement controls and vieworg
+					vec3_t		serverViewOrg;
+					int			inventory[MAX_INVENTORY];
+				};
+			};
+		};
+		
+		
+
+
+		struct { // 136 bytes (not counting the stats-like fields)
+			// OpenMOHAA:
+			int			net_pm_flags;	// ducked, jump_held, etc
+			int			feetfalling;
+
+			float		fLeanAngle;
+			int			iNetViewModelAnim;
+			int			iViewModelAnimChanged;
+
+			int			current_music_mood;
+			int			fallback_music_mood;
+			float		music_volume;
+			float		music_volume_fade_time;
+			int			reverb_type;
+			float		reverb_level;
+			float		blend[4];
+			float		camera_origin[3];
+			float		camera_angles[3];
+			float		camera_time;
+			float		camera_offset[3];
+			float		camera_posofs[3];
+			int			camera_flags;
+			float		damage_angles[3];
+			// Team Assault
+			int			radarInfo;
+			qboolean	voted;
+
+			// stats-like fields:
+			int			activeItems[8]; // MOHAA
+			int			ammo_name_index[16]; // MOHAA
+			int			ammo_amount[16]; // MOHAA
+			int			max_ammo_amount[16]; // MOHAA
+		};
+	};
+
+	
+
+	
+
+
+
+
+	
 
 } playerState_t;
+
+typedef struct server_sound_s { // MOHAA
+	vec3_t origin;
+	int entity_number;
+	int channel;
+	short int sound_index;
+	float volume;
+	float min_dist;
+	float maxDist;
+	float pitch;
+	qboolean stop_flag;
+	qboolean streamed;
+} server_sound_t;
 
 typedef struct {
 	qboolean		valid;			// cleared if delta parsing was invalid
 	int				snapFlags;		// rate delayed and dropped commands
 
 	int				serverTime;		// server time the message is valid for (in msec)
+	int				serverTimeResidual; // MOHAA
 
 	int				messageNum;		// copied from netchan->incoming_sequence
 	int				deltaNum;		// messageNum the delta is from
@@ -1012,6 +1113,9 @@ typedef struct {
 
 	int				serverCommandNum;		// execute all commands up to this before
 											// making the snapshot current
+
+	int				number_of_sounds; // MOHAA
+	server_sound_t	sounds[64]; // MOHAA
 } clSnapshot_t;
 
 typedef struct usercmd_s {
@@ -1042,201 +1146,259 @@ typedef struct {
 	vec3_t	trDelta;			// velocity, etc
 } trajectory_t;
 
+
+// Be extra(!!) careful here because of the unions.
+// TODO: This was done kinda manually after the fact. Try and automate this union making stuff somehow.
 typedef struct entityState_s {
+
+	// shared in both MOHAA and other games
 	int		number;			// entity index
 	int		eType;			// entityType_t
 	int		eFlags;
-
 	trajectory_t	pos;	// for calculating position
 	trajectory_t	apos;	// for calculating angles
-
-	int		time;
-	int		time2;
-
+	int		modelindex;
+	int		constantLight;	// r + (g<<8) + (b<<16) + (intensity<<24)
+	int		solid;			// for client side prediction, trap_linkentity sets this properly
 	vec3_t	origin;
 	vec3_t	origin2;
-
-	vec3_t	angles;
-	vec3_t	angles2;
-
-	//rww - these were originally because we shared g2 info client and server side. Now they
-	//just get used as generic values everywhere.
-	int		bolt1;
-	int		bolt2;
-
-	//rww - this is necessary for determining player visibility during a jedi mindtrick
-	int		trickedentindex; //0-15
-	int		trickedentindex2; //16-32
-	int		trickedentindex3; //33-48
-	int		trickedentindex4; //49-64
-
-	float	speed;
-
-	int		fireflag;
-
-	int		genericenemyindex;
-
-	int		activeForcePass;
-
-	int		emplacedOwner;
-
-	int		otherEntityNum;	// shotgun sources, etc
-	int		otherEntityNum2;
-
-	int		groundEntityNum;	// -1 = in air
-
-	int		constantLight;	// r + (g<<8) + (b<<16) + (intensity<<24)
 	int		loopSound;		// constantly loop this sound
-
-	int		modelGhoul2;
-	int		g2radius;
-	int		modelindex;
-	int		modelindex2;
+	int		groundEntityNum;	// -1 = in air
 	int		clientNum;		// 0 to (MAX_CLIENTS - 1), for players and corpses
-	int		frame;
+	
 
-	qboolean	saberInFlight;
-	int			saberEntityNum;
-	int			saberMove;
-	int			forcePowersActive;
+	union { 
 
-	qboolean	isJediMaster;
+		// The extra fields of MOHAA alone are as big as the extra fields of many other games combined. So we unionize MOHAA extra fields and extra fields of other games. Since an entitystate can only belong to one game at a time
+		// Let's just hope this doesn't come back to bite us in the ass. But saving a lot of memory this way seems like an alluring idea.
+		
+		// Non-MOHAA games:
+		struct { // 396 bytes (2023-08-08), slightly below the MOHAA struct.
+			
+			// JK2:
+			int		time;
+			int		time2;
 
-	int		solid;			// for client side prediction, trap_linkentity sets this properly
+			vec3_t	angles;
+			vec3_t	angles2;
 
-	int		event;			// impulse events -- muzzle flashes, footsteps, etc
-	int		eventParm;
+			//rww - these were originally because we shared g2 info client and server side. Now they
+			//just get used as generic values everywhere.
+			int		bolt1;
+			int		bolt2;
 
-	// so crosshair knows what it's looking at
-	int			owner;
-	int			teamowner;
-	qboolean	shouldtarget;
+			//rww - this is necessary for determining player visibility during a jedi mindtrick
+			int		trickedentindex; //0-15
+			int		trickedentindex2; //16-32
+			int		trickedentindex3; //33-48
+			int		trickedentindex4; //49-64
 
-	// for players
-	int		powerups;		// bit flags
-	int		weapon;			// determines weapon and flash model, etc
-	int		legsAnim;		// mask off ANIM_TOGGLEBIT
-	int		torsoAnim;		// mask off ANIM_TOGGLEBIT
+			float	speed;
 
-	int		forceFrame;		//if non-zero, force the anim frame
+			int		fireflag;
 
-	int		generic1;
+			int		genericenemyindex;
 
+			int		activeForcePass;
 
-	// JKA-specific:
-	int		eFlags2;		// EF2_??? used much less frequently
-	qboolean	loopIsSoundset; //qtrue if the loopSound index is actually a soundset index
-	int		soundSetIndex;
-	int			saberHolstered;//sent in only only 2 bits - should be 0, 1 or 2
-	qboolean	isPortalEnt; //this needs to be seperate for all entities I guess, which is why I couldn't reuse another value.
-	qboolean	legsFlip; //set to opposite when the same anim needs restarting, sent over in only 1 bit. Cleaner and makes porting easier than having that god forsaken ANIM_TOGGLEBIT.
-	qboolean	torsoFlip;
-	int		heldByClient; //can only be a client index - this client should be holding onto my arm using IK stuff.
-	int		ragAttach; //attach to ent while ragging
-	int		iModelScale; //rww - transfer a percentage of the normal scale in a single int instead of 3 x-y-z scale values
-	int		brokenLimbs;
-	int		boltToPlayer; //set to index of a real client+1 to bolt the ent to that client. Must be a real client, NOT an NPC.
-	//for looking at an entity's origin (NPCs and players)
-	qboolean	hasLookTarget;
-	int			lookTarget;
-	int			customRGBA[4];
-	//I didn't want to do this, but I.. have no choice. However, we aren't setting this for all ents or anything,
-	//only ones we want health knowledge about on cgame (like siege objective breakables) -rww
-	int			health;
-	int			maxhealth; //so I know how to draw the stupid health bar
-	//NPC-SPECIFIC FIELDS
-	//------------------------------------------------------------
-	int		npcSaber1;
-	int		npcSaber2;
-	//index values for each type of sound, gets the folder the sounds
-	//are in. I wish there were a better way to do this,
-	int		csSounds_Std;
-	int		csSounds_Combat;
-	int		csSounds_Extra;
-	int		csSounds_Jedi;
-	int		surfacesOn; //a bitflag of corresponding surfaces from a lookup table. These surfaces will be forced on.
-	int		surfacesOff; //same as above, but forced off instead.
-	//Allow up to 4 PCJ lookup values to be stored here.
-	//The resolve to configstrings which contain the name of the
-	//desired bone.
-	int		boneIndex1;
-	int		boneIndex2;
-	int		boneIndex3;
-	int		boneIndex4;
-	//packed with x, y, z orientations for bone angles
-	int		boneOrient;
-	//I.. feel bad for doing this, but NPCs really just need to
-	//be able to control this sort of thing from the server sometimes.
-	//At least it's at the end so this stuff is never going to get sent
-	//over for anything that isn't an NPC.
-	vec3_t	boneAngles1; //angles of boneIndex1
-	vec3_t	boneAngles2; //angles of boneIndex2
-	vec3_t	boneAngles3; //angles of boneIndex3
-	vec3_t	boneAngles4; //angles of boneIndex4
-	int		NPC_class; //we need to see what it is on the client for a few effects.
-	//If non-0, this is the index of the vehicle a player/NPC is riding.
-	int		m_iVehicleNum;
-	//rww - spare values specifically for use by mod authors.
-	//See netf_overrides.txt if you want to increase the send
-	//amount of any of these above 1 bit.
-	int			userInt1;
-	int			userInt2;
-	int			userInt3;
-	float		userFloat1;
-	float		userFloat2;
-	float		userFloat3;
-	vec3_t		userVec1;
-	vec3_t		userVec2;
+			int		emplacedOwner;
 
-
-	// RTCW (according to uber demo tools)
-	int dl_intensity;  /* used for coronas */
-	int eventSequence; /* pmove generated events */
-	int events[4];
-	int eventParms[4];
-	int density;       /* for particle effects */
-	/* to pass along additional information for damage effects for players */
-	/* also used for cursorhints for non-player entities */
-	int dmgFlags;
-	int onFireStart;
-	int onFireEnd;
-	int aiChar;
-	int teamNum;
-	int effect1Time;
-	int effect2Time;
-	int effect3Time;
-	int aiState;
-	int animMovetype;  /* clients can't derive movetype of other clients for anim scripting system */
-
-	// ET
-	int nextWeapon;
-
-
-	// Quake Live (according to uber demo tools)
-	int pos_gravity;  /* part of idEntityStateBase::pos trajectory */
-	int apos_gravity; /* part of idEntityStateBase::apos trajectory */
-	int jumpTime;
-	int doubleJumped; /* qboolean */
-	//int health; // Already exists through jka
-	int armor;
-	int location;
-
-
-	// JK2 SP Stuff
-	int		modelindex3;
-	int		legsAnimTimer;	// don't change low priority animations on legs until this runs out
-	int		torsoAnimTimer;	// don't change low priority animations on torso until this runs out
-	int		scale;			//Scale players
-	qboolean	saberActive;
-	int		vehicleModel;	// For overriding your playermodel with a drivable vehicle
-	vec3_t	modelScale;		// used to scale models in any axis
-	//Ghoul2 stuff for jk2sp:
-	int		radius;			// used for culling all the ghoul models attached to this ent NOTE - this is automatically scaled by Ghoul2 if/when you scale the model. This is a 100% size value
-	int		boltInfo;		// info used for bolting entities to Ghoul2 models - NOT used for bolting ghoul2 models to themselves, more for stuff like bolting effects to ghoul2 models
+			int		otherEntityNum;	// shotgun sources, etc
+			int		otherEntityNum2;
 
 
 
+			int		modelGhoul2;
+			int		g2radius;
+			int		modelindex2;
+			int		frame;
 
+			qboolean	saberInFlight;
+			int			saberEntityNum;
+			int			saberMove;
+			int			forcePowersActive;
+
+			qboolean	isJediMaster;
+
+
+			int		event;			// impulse events -- muzzle flashes, footsteps, etc
+			int		eventParm;
+
+			// so crosshair knows what it's looking at
+			int			owner;
+			int			teamowner;
+			qboolean	shouldtarget;
+
+			// for players
+			int		powerups;		// bit flags
+			int		weapon;			// determines weapon and flash model, etc
+			int		legsAnim;		// mask off ANIM_TOGGLEBIT
+			int		torsoAnim;		// mask off ANIM_TOGGLEBIT
+
+			int		forceFrame;		//if non-zero, force the anim frame
+
+			int		generic1;
+
+
+			union {
+
+				// Shared between JKA and other games:
+				int			health;
+
+				// JKA
+				struct {
+					// JKA-specific:
+					int		eFlags2;		// EF2_??? used much less frequently
+					qboolean	loopIsSoundset; //qtrue if the loopSound index is actually a soundset index
+					int		soundSetIndex;
+					int			saberHolstered;//sent in only only 2 bits - should be 0, 1 or 2
+					qboolean	isPortalEnt; //this needs to be seperate for all entities I guess, which is why I couldn't reuse another value.
+					qboolean	legsFlip; //set to opposite when the same anim needs restarting, sent over in only 1 bit. Cleaner and makes porting easier than having that god forsaken ANIM_TOGGLEBIT.
+					qboolean	torsoFlip;
+					int		heldByClient; //can only be a client index - this client should be holding onto my arm using IK stuff.
+					int		ragAttach; //attach to ent while ragging
+					int		iModelScale; //rww - transfer a percentage of the normal scale in a single int instead of 3 x-y-z scale values
+					int		brokenLimbs;
+					int		boltToPlayer; //set to index of a real client+1 to bolt the ent to that client. Must be a real client, NOT an NPC.
+					//for looking at an entity's origin (NPCs and players)
+					qboolean	hasLookTarget;
+					int			lookTarget;
+					int			customRGBA[4];
+					//I didn't want to do this, but I.. have no choice. However, we aren't setting this for all ents or anything,
+					//only ones we want health knowledge about on cgame (like siege objective breakables) -rww
+					
+					int			maxhealth; //so I know how to draw the stupid health bar
+					//NPC-SPECIFIC FIELDS
+					//------------------------------------------------------------
+					int		npcSaber1;
+					int		npcSaber2;
+					//index values for each type of sound, gets the folder the sounds
+					//are in. I wish there were a better way to do this,
+					int		csSounds_Std;
+					int		csSounds_Combat;
+					int		csSounds_Extra;
+					int		csSounds_Jedi;
+					int		surfacesOn; //a bitflag of corresponding surfaces from a lookup table. These surfaces will be forced on.
+					int		surfacesOff; //same as above, but forced off instead.
+					//Allow up to 4 PCJ lookup values to be stored here.
+					//The resolve to configstrings which contain the name of the
+					//desired bone.
+					int		boneIndex1;
+					int		boneIndex2;
+					int		boneIndex3;
+					int		boneIndex4;
+					//packed with x, y, z orientations for bone angles
+					int		boneOrient;
+					//I.. feel bad for doing this, but NPCs really just need to
+					//be able to control this sort of thing from the server sometimes.
+					//At least it's at the end so this stuff is never going to get sent
+					//over for anything that isn't an NPC.
+					vec3_t	boneAngles1; //angles of boneIndex1
+					vec3_t	boneAngles2; //angles of boneIndex2
+					vec3_t	boneAngles3; //angles of boneIndex3
+					vec3_t	boneAngles4; //angles of boneIndex4
+					int		NPC_class; //we need to see what it is on the client for a few effects.
+					//If non-0, this is the index of the vehicle a player/NPC is riding.
+					int		m_iVehicleNum;
+					//rww - spare values specifically for use by mod authors.
+					//See netf_overrides.txt if you want to increase the send
+					//amount of any of these above 1 bit.
+					int			userInt1;
+					int			userInt2;
+					int			userInt3;
+					float		userFloat1;
+					float		userFloat2;
+					float		userFloat3;
+					vec3_t		userVec1;
+					vec3_t		userVec2;
+				};
+
+				// Non JKA
+				struct {
+					// RTCW (according to uber demo tools)
+					int dl_intensity;  // used for coronas 
+					int eventSequence; // pmove generated events 
+					int events[4];
+					int eventParms[4];
+					int density;       // for particle effects 
+					// to pass along additional information for damage effects for players 
+					// also used for cursorhints for non-player entities 
+					int dmgFlags;
+					int onFireStart;
+					int onFireEnd;
+					int aiChar;
+					int teamNum;
+					int effect1Time;
+					int effect2Time;
+					int effect3Time;
+					int aiState;
+					int animMovetype;  // clients can't derive movetype of other clients for anim scripting system 
+
+					// ET
+					int nextWeapon;
+
+
+					// Quake Live (according to uber demo tools)
+					int pos_gravity;  // part of idEntityStateBase::pos trajectory
+					int apos_gravity; // part of idEntityStateBase::apos trajectory 
+					int jumpTime;
+					int doubleJumped; // qboolean 
+					//int health; // Already exists through jka
+					int armor;
+					int location;
+
+
+					// JK2 SP Stuff
+					int		modelindex3;
+					int		legsAnimTimer;	// don't change low priority animations on legs until this runs out
+					int		torsoAnimTimer;	// don't change low priority animations on torso until this runs out
+					int		scale;			//Scale players
+					qboolean	saberActive;
+					int		vehicleModel;	// For overriding your playermodel with a drivable vehicle
+					vec3_t	modelScale;		// used to scale models in any axis
+					//Ghoul2 stuff for jk2sp:
+					int		radius;			// used for culling all the ghoul models attached to this ent NOTE - this is automatically scaled by Ghoul2 if/when you scale the model. This is a 100% size value
+					int		boltInfo;		// info used for bolting entities to Ghoul2 models - NOT used for bolting ghoul2 models to themselves, more for stuff like bolting effects to ghoul2 models
+
+				};
+			};
+			
+
+		}; 
+
+
+
+
+		// OpenMOHAA
+		struct { // This struct alone is 412 bytes
+			//vec3_t	netorigin;// Replacing this in netfields with the trajectory one
+			//vec3_t	netangles; // Replacing this in netfields with the trajectory one
+			float	loopSoundVolume;
+			float	loopSoundMinDist;
+			float	loopSoundMaxDist;
+			float	loopSoundPitch;
+			int		loopSoundFlags;
+			int		parent;
+			int		tag_num;
+			qboolean	attach_use_angles;
+			vec3_t		attach_offset;
+			int		beam_entnum;
+			int		usageIndex;
+			int		skinNum;
+			int		wasframe;
+			frameInfoMOHAA_t frameInfo[MAX_FRAMEINFOS];
+			float	actionWeight;
+			int		bone_tag[NUM_BONE_CONTROLLERS];
+			vec3_t	bone_angles[NUM_BONE_CONTROLLERS];
+			byte	surfaces[32];
+			float	alpha;
+			int		renderfx;
+			float	shader_data[2];
+			float	shader_time;
+			vec3_t	eyeVector;
+			float	scaleMOHAA;
+		};
+	};
 } entityState_t;
 
 typedef struct {
@@ -1251,6 +1413,9 @@ typedef struct {
 	int			oldFrameServerTime;	// to check tournament restarts
 	int			serverTimeDelta;	// cl.serverTime = cls.realtime + cl.serverTimeDelta
 									// this value changes as net lag varies
+
+	float		serverFrameTime;	// MOHAA
+
 	qboolean	extrapolatedSnapshot;	// set if any cgame frame has been forced to extrapolate
 									// cleared when CL_AdjustTimeDelta looks at it
 	qboolean	newSnapshots;		// set on parse of any valid packet
@@ -1439,6 +1604,7 @@ typedef struct {
 	fileHandle_t	demofile;
 	qboolean	newDemoPlayer;
 	qboolean	demoCheckFor103;
+	qboolean	demoCheckProtocol;
 
 	int			lastKnownCommandTime; // For DemoReaderLight
 
@@ -1518,7 +1684,7 @@ int		MSG_ReadSShort(msg_t* sb);
 int		MSG_ReadLong(msg_t* sb);
 float	MSG_ReadFloat(msg_t* sb);
 char* MSG_ReadString(msg_t* sb, demoType_t demoType);
-char* MSG_ReadBigString(msg_t* sb);
+char* MSG_ReadBigString(msg_t* sb, demoType_t demoType);
 char* MSG_ReadStringLine(msg_t* sb);
 float	MSG_ReadAngle16(msg_t* sb);
 void	MSG_ReadData(msg_t* sb, void* buffer, int size);
@@ -1533,7 +1699,7 @@ void MSG_ReadDeltaUsercmdKey(msg_t* msg, int key, usercmd_t* from, usercmd_t* to
 void MSG_WriteDeltaEntity(msg_t* msg, struct entityState_s* from, struct entityState_s* to
 	, qboolean force, demoType_t demoType);
 void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
-	int number, demoType_t demoType);
+	int number, demoType_t demoType, float frameTime); // frameTime is for MOHAA
 
 void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean isVehiclePS, demoType_t demoType);
 void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS);
@@ -1541,8 +1707,14 @@ void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct pla
 
 void MSG_ReportChangeVectors_f(void);
 
-
-
+// MOHAA
+void MSG_GetNullEntityState(entityState_t* nullState);
+unsigned short MSG_ReadEntityNum(msg_t* sb, demoType_t demoType);
+float MSG_ReadServerFrameTime(msg_t* msg, demoType_t demoType, clientActive_t* clCut);
+void MSG_ReadSounds(msg_t* msg, server_sound_t* sounds, int* snapshot_number_of_sounds);
+float MSG_ReadCoord(msg_t* msg);
+void MSG_ReadDir(msg_t* msg, vec3_t dir);
+void CL_ParseCGMessageMOHAA(msg_t* msg, demoType_t demoType);
 
 /* This is based on the Adaptive Huffman algorithm described in Sayood's Data
  * Compression book.  The ranks are not actually stored, but implicitly defined
@@ -1671,6 +1843,11 @@ enum svc_ops_e_general {
 	// Quake Live
 	svc_extension_general,
 	svc_voip_general,
+
+	// MOHAA
+	svc_centerprint_general,
+	svc_locprint_general,
+	svc_cgameMessage_general,
 
 	svc_EOF_general,
 	svc_ops_general_count
@@ -3908,12 +4085,26 @@ qboolean inline BG_SaberInSpecialAttack(int anim, demoType_t demoType)
 	return qfalse;
 }
 
-
+typedef enum netFieldType_e { // OpenMOHAA
+	regular,
+	angle,
+	animTime,
+	animWeight,
+	scale,
+	alpha,
+	coord,
+	// This field was introduced in TA.
+	coordExtra,
+	velocity,
+	// not sure what is this, but it's only present in the Mac build (since AA)
+	simple
+} netFieldType_t;
 
 typedef struct {
 	const char* name;
 	size_t		offset;
 	int		bits;		// 0 = float
+	netFieldType_t type; // OpenMOHAA only.
 } netField_t;
 
 // using the stringizing operator to save typing...
@@ -3930,7 +4121,9 @@ typedef struct {
 #define	PSF(x) #x,(size_t)&((playerState_t*)0)->x
 #endif 
 
-
+static const vec3_t	vec3_origin = { 0,0,0 };
+#define NUMVERTEXNORMALS	162
+void ByteToDir(int b, vec3_t dir);
 void vectoangles(const vec3_t value1, vec3_t angles);
 
 void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
@@ -4356,11 +4549,12 @@ qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoT
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
 qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, bool& malformedMessage, qboolean writeOldSnap = qfalse);
+qboolean demoCutParseMOHAASVC(msg_t* msg, demoType_t demoType, byte cmd, bool& SEHExceptionCaught);
 
 void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType);
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
-const char* demoCutReadPossibleMetadata(msg_t* msg);
+const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);
@@ -4375,7 +4569,12 @@ int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* co
 int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
-qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t* demoType, qboolean* isCompressed, qboolean* checkFor103 = NULL);
+qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut = NULL);
+
+
+
+
+
 
 
 

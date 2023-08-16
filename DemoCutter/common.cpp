@@ -3000,7 +3000,98 @@ const float forceJumpStrength[NUM_FORCE_POWER_LEVELS] =
 };
 
 
+static vec3_t	bytedirs[NUMVERTEXNORMALS] =
+{
+{-0.525731f, 0.000000f, 0.850651f}, {-0.442863f, 0.238856f, 0.864188f},
+{-0.295242f, 0.000000f, 0.955423f}, {-0.309017f, 0.500000f, 0.809017f},
+{-0.162460f, 0.262866f, 0.951056f}, {0.000000f, 0.000000f, 1.000000f},
+{0.000000f, 0.850651f, 0.525731f}, {-0.147621f, 0.716567f, 0.681718f},
+{0.147621f, 0.716567f, 0.681718f}, {0.000000f, 0.525731f, 0.850651f},
+{0.309017f, 0.500000f, 0.809017f}, {0.525731f, 0.000000f, 0.850651f},
+{0.295242f, 0.000000f, 0.955423f}, {0.442863f, 0.238856f, 0.864188f},
+{0.162460f, 0.262866f, 0.951056f}, {-0.681718f, 0.147621f, 0.716567f},
+{-0.809017f, 0.309017f, 0.500000f},{-0.587785f, 0.425325f, 0.688191f},
+{-0.850651f, 0.525731f, 0.000000f},{-0.864188f, 0.442863f, 0.238856f},
+{-0.716567f, 0.681718f, 0.147621f},{-0.688191f, 0.587785f, 0.425325f},
+{-0.500000f, 0.809017f, 0.309017f}, {-0.238856f, 0.864188f, 0.442863f},
+{-0.425325f, 0.688191f, 0.587785f}, {-0.716567f, 0.681718f, -0.147621f},
+{-0.500000f, 0.809017f, -0.309017f}, {-0.525731f, 0.850651f, 0.000000f},
+{0.000000f, 0.850651f, -0.525731f}, {-0.238856f, 0.864188f, -0.442863f},
+{0.000000f, 0.955423f, -0.295242f}, {-0.262866f, 0.951056f, -0.162460f},
+{0.000000f, 1.000000f, 0.000000f}, {0.000000f, 0.955423f, 0.295242f},
+{-0.262866f, 0.951056f, 0.162460f}, {0.238856f, 0.864188f, 0.442863f},
+{0.262866f, 0.951056f, 0.162460f}, {0.500000f, 0.809017f, 0.309017f},
+{0.238856f, 0.864188f, -0.442863f},{0.262866f, 0.951056f, -0.162460f},
+{0.500000f, 0.809017f, -0.309017f},{0.850651f, 0.525731f, 0.000000f},
+{0.716567f, 0.681718f, 0.147621f}, {0.716567f, 0.681718f, -0.147621f},
+{0.525731f, 0.850651f, 0.000000f}, {0.425325f, 0.688191f, 0.587785f},
+{0.864188f, 0.442863f, 0.238856f}, {0.688191f, 0.587785f, 0.425325f},
+{0.809017f, 0.309017f, 0.500000f}, {0.681718f, 0.147621f, 0.716567f},
+{0.587785f, 0.425325f, 0.688191f}, {0.955423f, 0.295242f, 0.000000f},
+{1.000000f, 0.000000f, 0.000000f}, {0.951056f, 0.162460f, 0.262866f},
+{0.850651f, -0.525731f, 0.000000f},{0.955423f, -0.295242f, 0.000000f},
+{0.864188f, -0.442863f, 0.238856f}, {0.951056f, -0.162460f, 0.262866f},
+{0.809017f, -0.309017f, 0.500000f}, {0.681718f, -0.147621f, 0.716567f},
+{0.850651f, 0.000000f, 0.525731f}, {0.864188f, 0.442863f, -0.238856f},
+{0.809017f, 0.309017f, -0.500000f}, {0.951056f, 0.162460f, -0.262866f},
+{0.525731f, 0.000000f, -0.850651f}, {0.681718f, 0.147621f, -0.716567f},
+{0.681718f, -0.147621f, -0.716567f},{0.850651f, 0.000000f, -0.525731f},
+{0.809017f, -0.309017f, -0.500000f}, {0.864188f, -0.442863f, -0.238856f},
+{0.951056f, -0.162460f, -0.262866f}, {0.147621f, 0.716567f, -0.681718f},
+{0.309017f, 0.500000f, -0.809017f}, {0.425325f, 0.688191f, -0.587785f},
+{0.442863f, 0.238856f, -0.864188f}, {0.587785f, 0.425325f, -0.688191f},
+{0.688191f, 0.587785f, -0.425325f}, {-0.147621f, 0.716567f, -0.681718f},
+{-0.309017f, 0.500000f, -0.809017f}, {0.000000f, 0.525731f, -0.850651f},
+{-0.525731f, 0.000000f, -0.850651f}, {-0.442863f, 0.238856f, -0.864188f},
+{-0.295242f, 0.000000f, -0.955423f}, {-0.162460f, 0.262866f, -0.951056f},
+{0.000000f, 0.000000f, -1.000000f}, {0.295242f, 0.000000f, -0.955423f},
+{0.162460f, 0.262866f, -0.951056f}, {-0.442863f, -0.238856f, -0.864188f},
+{-0.309017f, -0.500000f, -0.809017f}, {-0.162460f, -0.262866f, -0.951056f},
+{0.000000f, -0.850651f, -0.525731f}, {-0.147621f, -0.716567f, -0.681718f},
+{0.147621f, -0.716567f, -0.681718f}, {0.000000f, -0.525731f, -0.850651f},
+{0.309017f, -0.500000f, -0.809017f}, {0.442863f, -0.238856f, -0.864188f},
+{0.162460f, -0.262866f, -0.951056f}, {0.238856f, -0.864188f, -0.442863f},
+{0.500000f, -0.809017f, -0.309017f}, {0.425325f, -0.688191f, -0.587785f},
+{0.716567f, -0.681718f, -0.147621f}, {0.688191f, -0.587785f, -0.425325f},
+{0.587785f, -0.425325f, -0.688191f}, {0.000000f, -0.955423f, -0.295242f},
+{0.000000f, -1.000000f, 0.000000f}, {0.262866f, -0.951056f, -0.162460f},
+{0.000000f, -0.850651f, 0.525731f}, {0.000000f, -0.955423f, 0.295242f},
+{0.238856f, -0.864188f, 0.442863f}, {0.262866f, -0.951056f, 0.162460f},
+{0.500000f, -0.809017f, 0.309017f}, {0.716567f, -0.681718f, 0.147621f},
+{0.525731f, -0.850651f, 0.000000f}, {-0.238856f, -0.864188f, -0.442863f},
+{-0.500000f, -0.809017f, -0.309017f}, {-0.262866f, -0.951056f, -0.162460f},
+{-0.850651f, -0.525731f, 0.000000f}, {-0.716567f, -0.681718f, -0.147621f},
+{-0.716567f, -0.681718f, 0.147621f}, {-0.525731f, -0.850651f, 0.000000f},
+{-0.500000f, -0.809017f, 0.309017f}, {-0.238856f, -0.864188f, 0.442863f},
+{-0.262866f, -0.951056f, 0.162460f}, {-0.864188f, -0.442863f, 0.238856f},
+{-0.809017f, -0.309017f, 0.500000f}, {-0.688191f, -0.587785f, 0.425325f},
+{-0.681718f, -0.147621f, 0.716567f}, {-0.442863f, -0.238856f, 0.864188f},
+{-0.587785f, -0.425325f, 0.688191f}, {-0.309017f, -0.500000f, 0.809017f},
+{-0.147621f, -0.716567f, 0.681718f}, {-0.425325f, -0.688191f, 0.587785f},
+{-0.162460f, -0.262866f, 0.951056f}, {0.442863f, -0.238856f, 0.864188f},
+{0.162460f, -0.262866f, 0.951056f}, {0.309017f, -0.500000f, 0.809017f},
+{0.147621f, -0.716567f, 0.681718f}, {0.000000f, -0.525731f, 0.850651f},
+{0.425325f, -0.688191f, 0.587785f}, {0.587785f, -0.425325f, 0.688191f},
+{0.688191f, -0.587785f, 0.425325f}, {-0.955423f, 0.295242f, 0.000000f},
+{-0.951056f, 0.162460f, 0.262866f}, {-1.000000f, 0.000000f, 0.000000f},
+{-0.850651f, 0.000000f, 0.525731f}, {-0.955423f, -0.295242f, 0.000000f},
+{-0.951056f, -0.162460f, 0.262866f}, {-0.864188f, 0.442863f, -0.238856f},
+{-0.951056f, 0.162460f, -0.262866f}, {-0.809017f, 0.309017f, -0.500000f},
+{-0.864188f, -0.442863f, -0.238856f}, {-0.951056f, -0.162460f, -0.262866f},
+{-0.809017f, -0.309017f, -0.500000f}, {-0.681718f, 0.147621f, -0.716567f},
+{-0.681718f, -0.147621f, -0.716567f}, {-0.850651f, 0.000000f, -0.525731f},
+{-0.688191f, 0.587785f, -0.425325f}, {-0.587785f, 0.425325f, -0.688191f},
+{-0.425325f, 0.688191f, -0.587785f}, {-0.425325f, -0.688191f, -0.587785f},
+{-0.587785f, -0.425325f, -0.688191f}, {-0.688191f, -0.587785f, -0.425325f}
+};
 
+void ByteToDir(int b, vec3_t dir) {
+	if (b < 0 || b >= NUMVERTEXNORMALS) {
+		VectorCopy(vec3_origin, dir);
+		return;
+	}
+	VectorCopy(bytedirs[b], dir);
+}
 
 void vectoangles(const vec3_t value1, vec3_t angles) {
 	float	forward;
@@ -3169,8 +3260,825 @@ void AnglesSubtract(vec3_t v1, vec3_t v2, vec3_t v3) {
 
 
 
+// MOHAA: 
+// TODO: Do something with these values so they don't get lost. (Important?)
+void CL_ParseLocationprint(msg_t* msg, demoType_t demoType) {
+	int x, y;
+	char* string;
 
+	x = MSG_ReadShort(msg);
+	y = MSG_ReadShort(msg);
+	//string = MSG_ReadScrambledString(msg);
+	string = MSG_ReadString(msg, demoType);
 
+	//UI_UpdateLocationPrint(x, y, string, 1.0);
+}
+
+void CL_ParseCenterprint(msg_t* msg, demoType_t demoType) {
+	char* string;
+
+	//string = MSG_ReadScrambledString(msg);
+	string = MSG_ReadString(msg, demoType);
+
+	// FIXME
+	//UI_UpdateCenterPrint(string, 1.0);
+}
+#define MAX_IMPACTS              64
+void CG_ParseCGMessage_ver_15(msg_t* msg, demoType_t demoType)
+{
+	int    i;
+	int    iType;
+	int    iLarge;
+	int    iInfo;
+	int    iCount;
+	char* szTmp;
+	vec3_t vStart, vEnd, vTmp;
+	vec3_t vEndArray[MAX_IMPACTS];
+	float  alpha;
+
+	qboolean bMoreCGameMessages = qtrue;
+	while (bMoreCGameMessages) {
+		iType = MSG_ReadBits(msg,6);
+
+		switch (iType) {
+		case 1:
+		case 2:
+		case 5:
+			if (iType == 1) {
+				vTmp[0] = MSG_ReadCoord(msg);
+				vTmp[1] = MSG_ReadCoord(msg);
+				vTmp[2] = MSG_ReadCoord(msg);
+			}
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+
+			if (iType != 1) {
+				vTmp[0] = vStart[0];
+				vTmp[1] = vStart[1];
+				vTmp[2] = vStart[2];
+			}
+
+			vEndArray[0][0] = MSG_ReadCoord(msg);
+			vEndArray[0][1] = MSG_ReadCoord(msg);
+			vEndArray[0][2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,2);
+			if (MSG_ReadBits(msg,1)) {
+				int iAlpha = MSG_ReadBits(msg,10);
+				alpha = (float)iAlpha / 512.0;
+				if (alpha < 0.002f) {
+					alpha = 0.002f;
+				}
+			}
+			else {
+				alpha = 1.0f;
+			}
+
+			if (iType == 1) {
+				//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qfalse, qtrue, alpha);
+			}
+			else if (iType == 2) {
+				//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qfalse, qtrue, alpha);
+			}
+			else {
+				//CG_MakeBubbleTrail(vStart, vEndArray[0], iLarge, alpha);
+			}
+
+			break;
+		case 3:
+		case 4:
+			if (iType == 3) {
+				vTmp[0] = MSG_ReadCoord(msg);
+				vTmp[1] = MSG_ReadCoord(msg);
+				vTmp[2] = MSG_ReadCoord(msg);
+				iInfo = MSG_ReadBits(msg,6);
+			}
+			else {
+				iInfo = 0;
+			}
+
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,2);
+			if (MSG_ReadBits(msg,1)) {
+				int iAlpha = MSG_ReadBits(msg,10);
+				alpha = (float)iAlpha / 512.0;
+				if (alpha < 0.002f) {
+					alpha = 0.002f;
+				}
+			}
+			else {
+				alpha = 1.0f;
+			}
+
+			iCount = MSG_ReadBits(msg,6);
+			for (i = 0; i < iCount; ++i) {
+				vEndArray[i][0] = MSG_ReadCoord(msg);
+				vEndArray[i][1] = MSG_ReadCoord(msg);
+				vEndArray[i][2] = MSG_ReadCoord(msg);
+			}
+
+			if (iCount) {
+				//CG_MakeBulletTracer(vTmp, vStart, vEndArray, iCount, iLarge, iInfo, qtrue, alpha);
+			}
+			break;
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			MSG_ReadDir(msg,vEnd);
+			iLarge = MSG_ReadBits(msg,2);
+
+			/*switch (iType) {
+			case 6:
+				if (wall_impact_count < MAX_IMPACTS) {
+					VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+					VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+					wall_impact_large[wall_impact_count] = iLarge;
+					wall_impact_type[wall_impact_count] = -1;
+					wall_impact_count++;
+				}
+				break;
+			case 7:
+				if (wall_impact_count < MAX_IMPACTS) {
+					VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+					VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+					wall_impact_large[wall_impact_count] = iLarge;
+					wall_impact_type[wall_impact_count] = 6;
+					wall_impact_count++;
+				}
+				break;
+			case 8:
+				if (flesh_impact_count < MAX_IMPACTS) {
+					// negative
+					VectorNegate(vEnd, vEnd);
+					VectorCopy(vStart, flesh_impact_pos[flesh_impact_count]);
+					VectorCopy(vEnd, flesh_impact_norm[flesh_impact_count]);
+					flesh_impact_large[flesh_impact_count] = iLarge;
+					flesh_impact_count++;
+				}
+				break;
+			case 9:
+				if (flesh_impact_count < MAX_IMPACTS) {
+					// negative
+					VectorNegate(vEnd, vEnd);
+					VectorCopy(vStart, flesh_impact_pos[flesh_impact_count]);
+					VectorCopy(vEnd, flesh_impact_norm[flesh_impact_count]);
+					flesh_impact_large[flesh_impact_count] = iLarge;
+					flesh_impact_count++;
+				}
+				break;
+			case 10:
+				if (wall_impact_count < MAX_IMPACTS) {
+					VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+					VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+					wall_impact_large[wall_impact_count] = iLarge;
+					wall_impact_type[wall_impact_count] = 2;
+					wall_impact_count++;
+				}
+				break;
+			case 11:
+				if (wall_impact_count < MAX_IMPACTS) {
+					VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+					VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+					wall_impact_large[wall_impact_count] = iLarge;
+					wall_impact_type[wall_impact_count] = 4;
+					wall_impact_count++;
+				}
+				break;
+			default:
+				continue;
+			}*/
+			break;
+
+		case 12:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEnd[0] = MSG_ReadCoord(msg);
+			vEnd[1] = MSG_ReadCoord(msg);
+			vEnd[2] = MSG_ReadCoord(msg);
+			//CG_MeleeImpact(vStart, vEnd);
+			break;
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			//CG_MakeExplosionEffect(vStart, iType);
+			break;
+		case 18:
+		case 19:
+		case 20:
+		case 21:
+		case 22:
+		case 23:
+		case 24:
+		case 25:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			MSG_ReadDir(msg,vEnd);
+
+			//sfxManager.MakeEffect_Normal(iType + SFX_EXP_GREN_PUDDLE, vStart, vEnd);
+			break;
+
+		case 26:
+		case 27:
+		{
+			//str    sEffect;
+			char   cTmp[8];
+			vec3_t axis[3];
+
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadByte(msg);
+			// get the integer as string
+			snprintf(cTmp, sizeof(cTmp), "%d", iLarge);
+
+			if (iType == 26) {
+				//sEffect = "models/fx/crates/debris_";
+			}
+			else {
+				//sEffect = "models/fx/windows/debris_";
+			}
+
+			//sEffect += cTmp;
+			//sEffect += ".tik";
+
+			VectorSet(axis[0], 0, 0, 1);
+			VectorSet(axis[1], 0, 1, 0);
+			VectorSet(axis[2], 1, 0, 0);
+
+			//cgi.R_SpawnEffectModel(sEffect.c_str(), vStart, axis);
+		}
+		break;
+
+		case 28:
+			vTmp[0] = MSG_ReadCoord(msg);
+			vTmp[1] = MSG_ReadCoord(msg);
+			vTmp[2] = MSG_ReadCoord(msg);
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEndArray[0][0] = MSG_ReadCoord(msg);
+			vEndArray[0][1] = MSG_ReadCoord(msg);
+			vEndArray[0][2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,2);
+			if (MSG_ReadBits(msg,1)) {
+				int iAlpha = MSG_ReadBits(msg,10);
+				alpha = (float)iAlpha / 512.0;
+				if (alpha < 0.002f) {
+					alpha = 0.002f;
+				}
+			}
+			else {
+				alpha = 1.0f;
+			}
+
+			//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qtrue, qtrue, alpha);
+			break;
+
+		case 29:
+			memset(vTmp, 0, sizeof(vTmp));
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEndArray[0][0] = MSG_ReadCoord(msg);
+			vEndArray[0][1] = MSG_ReadCoord(msg);
+			vEndArray[0][2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+			if (MSG_ReadBits(msg,1)) {
+				int iAlpha = MSG_ReadBits(msg,10);
+				alpha = (float)iAlpha / 512.0;
+				if (alpha < 0.002f) {
+					alpha = 0.002f;
+				}
+			}
+			else {
+				alpha = 1.0f;
+			}
+
+			//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qfalse, qtrue, alpha);
+			break;
+
+		case 30:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadString(msg, demoType);//strcpy(cgi.HudDrawElements[iInfo].shaderName, MSG_ReadString(msg));
+			//cgi.HudDrawElements[iInfo].string[0] = 0;
+			//cgi.HudDrawElements[iInfo].pFont = NULL;
+			//cgi.HudDrawElements[iInfo].fontName[0] = 0;
+			// set the shader
+			//CG_HudDrawShader(iInfo);
+			break;
+
+		case 31:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadBits(msg, 2);//cgi.HudDrawElements[iInfo].iHorizontalAlign = MSG_ReadBits(msg,2);
+			MSG_ReadBits(msg, 2);//cgi.HudDrawElements[iInfo].iVerticalAlign = MSG_ReadBits(msg,2);
+			break;
+
+		case 32:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iX = MSG_ReadShort(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iY = MSG_ReadShort(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iWidth = MSG_ReadShort(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iHeight = MSG_ReadShort(msg);
+			break;
+
+		case 33:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadBits(msg, 1);//cgi.HudDrawElements[iInfo].bVirtualScreen = MSG_ReadBits(msg,1);
+			break;
+
+		case 34:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[0] = MSG_ReadByte(msg) / 255.0;
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[1] = MSG_ReadByte(msg) / 255.0;
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[2] = MSG_ReadByte(msg) / 255.0;
+			break;
+
+		case 35:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[3] = MSG_ReadByte(msg) / 255.0;
+			break;
+
+		case 36:
+			iInfo = MSG_ReadByte(msg);
+			//cgi.HudDrawElements[iInfo].hShader = 0;
+			MSG_ReadString(msg,demoType);//strcpy(cgi.HudDrawElements[iInfo].string, MSG_ReadString(msg));
+			break;
+
+		case 37:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadString(msg, demoType);//strcpy(cgi.HudDrawElements[iInfo].fontName, MSG_ReadString(msg));
+			//cgi.HudDrawElements[iInfo].hShader = 0;
+			//cgi.HudDrawElements[iInfo].shaderName[0] = 0;
+			// load the font
+			//CG_HudDrawFont(iInfo);
+			break;
+
+		case 38:
+		case 39:
+		{
+			int iOldEnt;
+
+			//iOldEnt = current_entity_number;
+			//current_entity_number = cg.snap->ps.clientNum;
+			//if (iType == 36) {
+			//	commandManager.PlaySound("dm_kill_notify", NULL, CHAN_LOCAL, 2.0, -1, -1, 1);
+			//}
+			//else {
+			//	commandManager.PlaySound("dm_hit_notify", NULL, CHAN_LOCAL, 2.0, -1, -1, 1);
+			//}
+
+			//current_entity_number = iOldEnt;
+		}
+		break;
+
+		case 40:
+		{
+			int iOldEnt;
+
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+			iInfo = MSG_ReadBits(msg,6);
+			szTmp = MSG_ReadString(msg,demoType);
+
+			//iOldEnt = current_entity_number;
+
+			//if (iLarge) {
+			//	current_entity_number = iInfo;
+			//
+			//	commandManager.PlaySound(szTmp, vStart, CHAN_LOCAL, -1, -1, -1, 0);
+			//}
+			//else {
+			//	current_entity_number = cg.snap->ps.clientNum;
+			//
+			//	commandManager.PlaySound(szTmp, vStart, CHAN_AUTO, -1, -1, -1, 1);
+			//}
+		
+			//current_entity_number = iOldEnt;
+		}
+		break;
+		case 41:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEnd[0] = MSG_ReadCoord(msg);
+			vEnd[1] = MSG_ReadCoord(msg);
+			vEnd[2] = MSG_ReadCoord(msg);
+			MSG_ReadByte(msg);
+			MSG_ReadByte(msg);
+			VectorSubtract(vEnd, vStart, vTmp);
+
+			// FIXME: unimplemented
+			// ?? can't figure out what is this
+			break;
+		default:
+			//cgi.Error(ERR_DROP, "CG_ParseCGMessage: Unknown CGM message type");
+			break;
+		}
+
+		bMoreCGameMessages = (qboolean)MSG_ReadBits(msg,1);
+	}
+}
+
+void CG_ParseCGMessage_ver_6(msg_t* msg, demoType_t demoType)
+{
+	int    i;
+	int    iType;
+	int    iLarge;
+	int    iInfo;
+	int    iCount;
+	char* szTmp;
+	vec3_t vStart, vEnd, vTmp;
+	vec3_t vEndArray[MAX_IMPACTS];
+
+	qboolean bMoreCGameMessages = qtrue;
+	while (bMoreCGameMessages) {
+		iType = MSG_ReadBits(msg,6);
+
+		switch (iType) {
+		case 1:
+		case 2:
+		case 5:
+			if (iType == 1) {
+				vTmp[0] = MSG_ReadCoord(msg);
+				vTmp[1] = MSG_ReadCoord(msg);
+				vTmp[2] = MSG_ReadCoord(msg);
+			}
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+
+			if (iType != 1) {
+				vTmp[0] = vStart[0];
+				vTmp[1] = vStart[1];
+				vTmp[2] = vStart[2];
+			}
+
+			vEndArray[0][0] = MSG_ReadCoord(msg);
+			vEndArray[0][1] = MSG_ReadCoord(msg);
+			vEndArray[0][2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+
+			if (iType == 1) {
+				//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qfalse, qtrue);
+			}
+			else if (iType == 2) {
+				//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qfalse, qtrue);
+			}
+			else {
+				//CG_MakeBubbleTrail(vStart, vEndArray[0], iLarge);
+			}
+
+			break;
+		case 3:
+		case 4:
+			if (iType == 3) {
+				vTmp[0] = MSG_ReadCoord(msg);
+				vTmp[1] = MSG_ReadCoord(msg);
+				vTmp[2] = MSG_ReadCoord(msg);
+				iInfo = MSG_ReadBits(msg,6);
+			}
+			else {
+				iInfo = 0;
+			}
+
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+			iCount = MSG_ReadBits(msg,6);
+			for (i = 0; i < iCount; ++i) {
+				vEndArray[i][0] = MSG_ReadCoord(msg);
+				vEndArray[i][1] = MSG_ReadCoord(msg);
+				vEndArray[i][2] = MSG_ReadCoord(msg);
+			}
+
+			if (iCount) {
+				//CG_MakeBulletTracer(vTmp, vStart, vEndArray, iCount, iLarge, iInfo, qtrue);
+			}
+			break;
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+		case 10:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			MSG_ReadDir(msg,vEnd);
+			iLarge = MSG_ReadBits(msg,1);
+
+			switch (iType) {
+			case 6:
+				//if (wall_impact_count < MAX_IMPACTS) {
+				//	VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+				//	VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+				//	wall_impact_large[wall_impact_count] = iLarge;
+				//	wall_impact_type[wall_impact_count] = 0;
+				//	wall_impact_count++;
+				//}
+				break;
+			case 7:
+				//if (flesh_impact_count < MAX_IMPACTS) {
+					// negative
+				//	VectorNegate(vEnd, vEnd);
+				//	VectorCopy(vStart, flesh_impact_pos[flesh_impact_count]);
+				//	VectorCopy(vEnd, flesh_impact_norm[flesh_impact_count]);
+				//	flesh_impact_large[flesh_impact_count] = iLarge;
+				//	flesh_impact_count++;
+				//}
+				break;
+			case 8:
+				//if (flesh_impact_count < MAX_IMPACTS) {
+					// negative
+				//	VectorNegate(vEnd, vEnd);
+				//	VectorCopy(vStart, flesh_impact_pos[flesh_impact_count]);
+				//	VectorCopy(vEnd, flesh_impact_norm[flesh_impact_count]);
+				//	flesh_impact_large[flesh_impact_count] = iLarge;
+				//	flesh_impact_count++;
+				//}
+				break;
+			case 9:
+				//if (wall_impact_count < MAX_IMPACTS) {
+				//	VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+				//	VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+				//	wall_impact_large[wall_impact_count] = iLarge;
+				//	wall_impact_type[wall_impact_count] = (iLarge != 0) + 2;
+				//	wall_impact_count++;
+				//}
+				break;
+			case 10:
+				//if (wall_impact_count < MAX_IMPACTS) {
+				//	VectorCopy(vStart, wall_impact_pos[wall_impact_count]);
+				//	VectorCopy(vEnd, wall_impact_norm[wall_impact_count]);
+				//	wall_impact_large[wall_impact_count] = iLarge;
+				//	wall_impact_type[wall_impact_count] = (iLarge != 0) + 4;
+				//	wall_impact_count++;
+				//}
+				break;
+			default:
+				continue;
+			}
+			break;
+
+		case 11:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEnd[0] = MSG_ReadCoord(msg);
+			vEnd[1] = MSG_ReadCoord(msg);
+			vEnd[2] = MSG_ReadCoord(msg);
+			//CG_MeleeImpact(vStart, vEnd);
+			break;
+		case 12:
+		case 13:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			//CG_MakeExplosionEffect(vStart, iType);
+			break;
+		case 15:
+		case 16:
+		case 17:
+		case 18:
+		case 19:
+		case 20:
+		case 21:
+		case 22:
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			MSG_ReadDir(msg,vEnd);
+
+			//sfxManager.MakeEffect_Normal(iType + SFX_EXP_GREN_PUDDLE, vStart, vEnd);
+			break;
+
+		case 23:
+		case 24:
+		{
+			//str    sEffect;
+			char   cTmp[8];
+			vec3_t axis[3];
+
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadByte(msg);
+			// get the integer as string
+			snprintf(cTmp, sizeof(cTmp), "%d", iLarge);
+
+			if (iType == 23) {
+				//sEffect = "models/fx/crates/debris_";
+			}
+			else {
+				//sEffect = "models/fx/windows/debris_";
+			}
+
+			//sEffect += cTmp;
+			//sEffect += ".tik";
+
+			VectorSet(axis[0], 0, 0, 1);
+			VectorSet(axis[1], 0, 1, 0);
+			VectorSet(axis[2], 1, 0, 0);
+
+			//cgi.R_SpawnEffectModel(sEffect.c_str(), vStart, axis);
+		}
+		break;
+
+		case 25:
+			vTmp[0] = MSG_ReadCoord(msg);
+			vTmp[1] = MSG_ReadCoord(msg);
+			vTmp[2] = MSG_ReadCoord(msg);
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEndArray[0][0] = MSG_ReadCoord(msg);
+			vEndArray[0][1] = MSG_ReadCoord(msg);
+			vEndArray[0][2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+
+			//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qtrue, qtrue);
+			break;
+
+		case 26:
+			memset(vTmp, 0, sizeof(vTmp));
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			vEndArray[0][0] = MSG_ReadCoord(msg);
+			vEndArray[0][1] = MSG_ReadCoord(msg);
+			vEndArray[0][2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+
+			//CG_MakeBulletTracer(vTmp, vStart, vEndArray, 1, iLarge, qfalse, qtrue);
+			break;
+
+		case 27:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadString(msg,demoType);//strcpy(cgi.HudDrawElements[iInfo].shaderName, MSG_ReadString());
+			//cgi.HudDrawElements[iInfo].string[0] = 0;
+			//cgi.HudDrawElements[iInfo].pFont = NULL;
+			//cgi.HudDrawElements[iInfo].fontName[0] = 0;
+			// set the shader
+			//CG_HudDrawShader(iInfo);
+			break;
+
+		case 28:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadBits(msg, 2); //cgi.HudDrawElements[iInfo].iHorizontalAlign = MSG_ReadBits(msg,2);
+			MSG_ReadBits(msg, 2);  // cgi.HudDrawElements[iInfo].iVerticalAlign = MSG_ReadBits(msg,2);
+			break;
+
+		case 29:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iX = MSG_ReadShort(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iY = MSG_ReadShort(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iWidth = MSG_ReadShort(msg);
+			MSG_ReadShort(msg);//cgi.HudDrawElements[iInfo].iHeight = MSG_ReadShort(msg);
+			break;
+
+		case 30:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadBits(msg,1);//cgi.HudDrawElements[iInfo].bVirtualScreen = MSG_ReadBits(1);
+			break;
+
+		case 31:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[0] = MSG_ReadByte() / 255.0;
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[1] = MSG_ReadByte() / 255.0;
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[2] = MSG_ReadByte() / 255.0;
+			break;
+
+		case 32:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadByte(msg);//cgi.HudDrawElements[iInfo].vColor[3] = MSG_ReadByte() / 255.0;
+			break;
+
+		case 33:
+			iInfo = MSG_ReadByte(msg);
+			//cgi.HudDrawElements[iInfo].hShader = 0;
+			MSG_ReadString(msg,demoType);//strcpy(cgi.HudDrawElements[iInfo].string, MSG_ReadString());
+			break;
+
+		case 34:
+			iInfo = MSG_ReadByte(msg);
+			MSG_ReadString(msg,demoType);//strcpy(cgi.HudDrawElements[iInfo].fontName, MSG_ReadString());
+			//cgi.HudDrawElements[iInfo].hShader = 0;
+			//cgi.HudDrawElements[iInfo].shaderName[0] = 0;
+			// load the font
+			//CG_HudDrawFont(iInfo);
+			break;
+
+		case 35:
+		case 36:
+		{
+			//int iOldEnt;
+
+			//iOldEnt = current_entity_number;
+			//current_entity_number = cg.snap->ps.clientNum;
+			//if (iType == 36) {
+			//	commandManager.PlaySound("dm_kill_notify", NULL, CHAN_LOCAL, 2.0, -1, -1, 1);
+			//}
+			//else {
+			//	commandManager.PlaySound("dm_hit_notify", NULL, CHAN_LOCAL, 2.0, -1, -1, 1);
+			//}
+
+			//current_entity_number = iOldEnt;
+		}
+		break;
+
+		case 37:
+		{
+			int iOldEnt;
+
+			vStart[0] = MSG_ReadCoord(msg);
+			vStart[1] = MSG_ReadCoord(msg);
+			vStart[2] = MSG_ReadCoord(msg);
+			iLarge = MSG_ReadBits(msg,1);
+			iInfo = MSG_ReadBits(msg,6);
+			szTmp = MSG_ReadString(msg,demoType);
+
+			//iOldEnt = current_entity_number;
+
+			//if (iLarge) {
+			//	current_entity_number = iInfo;
+			//
+			//	commandManager.PlaySound(szTmp, vStart, CHAN_LOCAL, -1, -1, -1, 0);
+			//}
+			//else {
+			//	current_entity_number = cg.snap->ps.clientNum;
+			//
+			//	commandManager.PlaySound(szTmp, vStart, CHAN_AUTO, -1, -1, -1, 1);
+			//}
+
+			//current_entity_number = iOldEnt;
+		}
+		break;
+		default:
+			//cgi.Error(ERR_DROP, "CG_ParseCGMessage: Unknown CGM message type");
+			break;
+		}
+
+		bMoreCGameMessages = (qboolean)MSG_ReadBits(msg,1);
+	}
+}
+
+void CL_ParseCGMessageMOHAA(msg_t* msg, demoType_t demoType) {
+	//cl_currentMSG = msg;
+	//cge->CG_ParseCGMessage();
+	if (demoType == DM3_MOHAA_PROT_15) {
+		CG_ParseCGMessage_ver_15(msg, demoType);
+	}
+	else {
+		CG_ParseCGMessage_ver_6(msg, demoType);
+	}
+
+}
+
+qboolean demoCutParseMOHAASVCReal(msg_t* msg, demoType_t demoType, byte cmd) {
+	switch (cmd) {
+
+	case svc_centerprint_general:
+		CL_ParseCenterprint(msg, demoType);
+		break;
+	case svc_locprint_general:
+		CL_ParseLocationprint(msg, demoType);
+		break;
+	case svc_cgameMessage_general:
+		CL_ParseCGMessageMOHAA(msg, demoType);
+		break;
+	}
+	return qtrue;
+}
+qboolean demoCutParseMOHAASVC(msg_t* msg, demoType_t demoType, byte cmd, bool& SEHExceptionCaught) {
+	__TRY{
+		return demoCutParseMOHAASVCReal(msg,demoType,cmd);
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
+}
+//
+//
+// MOHAA end
+//
+//
 
 
 qboolean CL_ServerVersionIs103(const char* versionstr) {
@@ -3242,20 +4150,27 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 	entityState_t* es;
 	int				newnum;
 	entityState_t	nullstate;
-	int				cmd;
+	int				cmd,ocmd;
 	char* s;
+
+	bool isMOHAADemo = *demoType == DM3_MOHAA_PROT_6 || *demoType == DM3_MOHAA_PROT_15;
 
 	//int svc_EOF_realCMD = *demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
 	//int maxAllowedConfigString = *demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
 	int maxAllowedConfigString = getMaxConfigStrings(*demoType);
 
 	clcCut->connectPacketCount = 0;
-	Com_Memset(clCut, 0, sizeof(*clCut));
+
+	if (!isMOHAADemo) {
+		// wtf?
+		Com_Memset(clCut, 0, sizeof(*clCut));
+	}
+
 	clcCut->serverCommandSequence = MSG_ReadLong(msg);
 	clCut->gameState.dataCount = 1;
 	while (1) {
-		cmd = MSG_ReadByte(msg);
-		cmd = generalizeGameSVCOp(cmd,*demoType);
+		ocmd = MSG_ReadByte(msg);
+		cmd = generalizeGameSVCOp(ocmd,*demoType);
 		if (cmd == svc_EOF_general) {
 			break;
 		}
@@ -3267,7 +4182,7 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 				Com_DPrintf("configstring > MAX_CONFIGSTRINGS");
 				return qfalse;
 			}
-			s = MSG_ReadBigString(msg);
+			s = MSG_ReadBigString(msg, *demoType);
 			len = strlen(s);
 			if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
 				Com_DPrintf("MAX_GAMESTATE_CHARS exceeded");
@@ -3285,6 +4200,31 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 
 				clcCut->demoCheckFor103 = qfalse; //No need to check this again while playing the demo.
 			}
+			if (clcCut->demoCheckProtocol && i == CS_SERVERINFO && *demoType == DM3_MOHAA_PROT_6) {
+				// Medal of Honor .dm3 file format. Check protocol version because the demo file ending is same for all.
+				// This is produced by stock MOH with unlocked demo functionality. OpenMOHAA has different naming.
+				char* protocolString = Info_ValueForKey(s, BIG_INFO_STRING, "protocol");
+				int protocol = atoi(protocolString);
+				switch (protocol) {
+					case 0:
+						throw std::logic_error("MOH demo without protocol in CS_SERVERINFO");
+					case 6:
+					case 7:
+					case 8:
+						*demoType = DM3_MOHAA_PROT_6;
+						break;
+					case 15:
+					case 16:
+					case 17:
+						*demoType = DM3_MOHAA_PROT_15;
+						break;
+					default:
+						throw std::logic_error(va("MOH demo with unknown protocol %s", protocolString));
+						break;
+				}
+
+				clcCut->demoCheckProtocol = qfalse; //No need to check this again while playing the demo.
+			}
 
 			// append it to the gameState string buffer
 			clCut->gameState.stringOffsets[i] = clCut->gameState.dataCount;
@@ -3292,22 +4232,36 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 			clCut->gameState.dataCount += len + 1;
 		}
 		else if (cmd == svc_baseline_general) {
-			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
+			if (isMOHAADemo) {
+				newnum = MSG_ReadEntityNum(msg, *demoType);
+			}
+			else {
+				newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
+			}
 			if (newnum < 0 || newnum >= MAX_GENTITIES) {
 				Com_DPrintf("Baseline number out of range: %i", newnum);
 				return qfalse;
 			}
-			Com_Memset(&nullstate, 0, sizeof(nullstate));
+			if (isMOHAADemo) {
+				MSG_GetNullEntityState(&nullstate);
+			}
+			else {
+				Com_Memset(&nullstate, 0, sizeof(nullstate));
+			}
 			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType);
+			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType, 0.0f);
 		}
 		else {
-			Com_DPrintf("demoCutParseGameState: bad command byte");
+			Com_DPrintf("demoCutParseGameState: bad command byte %d (%d)", cmd, ocmd);
 			return qfalse;
 		}
 	}
 	clcCut->clientNum = MSG_ReadLong(msg);
 	clcCut->checksumFeed = MSG_ReadLong(msg);
+
+	if (isMOHAADemo) {
+		clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut);
+	}
 
 	// RMG stuff (JKA specific)
 	if (*demoType == DM_26 || *demoType == DM_25) {
@@ -3356,11 +4310,11 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 		}
 		else if (oldnum == newnum) {
 			oldindex++;
-			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType);
+			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType, clCut->serverFrameTime); // serverFrameTime stuff is MOHAA
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		else if (oldnum > newnum) {
-			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType);
+			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType, clCut->serverFrameTime); // serverFrameTime stuff is MOHAA
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 		}
 		if (newstate->number == MAX_GENTITIES - 1)
@@ -3447,10 +4401,16 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 	int deltaNum;
 	int oldMessageNum;
 	int i, packetNum;
+
+	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_6 || demoType == DM3_MOHAA_PROT_15;
+
 	Com_Memset(&newSnap, 0, sizeof(newSnap));
 	clCut->lastSnapshotFinishedParsing = qfalse;
 	newSnap.serverCommandNum = clcCut->serverCommandSequence;
 	newSnap.serverTime = MSG_ReadLong(msg);
+	if (isMOHAADemo) {
+		newSnap.serverTimeResidual = MSG_ReadByte(msg);
+	}
 	//cl_paused->modified = qfalse;
 	newSnap.messageNum = clcCut->serverMessageSequence;
 	deltaNum = MSG_ReadByte(msg);
@@ -3508,6 +4468,9 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 		// read packet entities
 		demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
 
+		if (isMOHAADemo) {
+			MSG_ReadSounds(msg, newSnap.sounds, &newSnap.number_of_sounds);
+		}
 
 	}
 	catch (malformed_message_exception e) {
@@ -3719,7 +4682,7 @@ void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* cl
 	}
 }
 
-const char* demoCutReadPossibleMetadata(msg_t* msg) {
+const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 
 	// Normal demo readers will quit here. For all intents and purposes this demo message is over. But we're gonna put the metadata here now. Since it comes after svc_EOF, nobody will ever be bothered by it 
 	// but we can read it if we want to.
@@ -3746,7 +4709,7 @@ const char* demoCutReadPossibleMetadata(msg_t* msg) {
 			return NULL;
 		}
 	}
-	return MSG_ReadBigString(msg);
+	return MSG_ReadBigString(msg, demoType);
 }
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
@@ -4221,35 +5184,101 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 
 
 
-qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t* demoType, qboolean* isCompressed, qboolean* checkFor103) {
+qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut) {
 
 	char normalizedExt[7]{};
-	strncpy_s(extOutput, 7, (char*)demoFile + strlen(demoFile) - 6, 6);
-	strncpy_s(normalizedExt, sizeof(normalizedExt), (char*)demoFile + strlen(demoFile) - 6, 6);
-	//strncpy_s(originalExtOutput, 7, (char*)demoFile + strlen(demoFile) - 6, 6);
 
-	normalizedExt[0] = '.';
+	int lastChar = strlen(demoFile)-1;
 
-	char specialTypeChar = normalizedExt[3];
-	normalizedExt[3] = '_';
 
-	*isCompressed = qfalse;
-	if (specialTypeChar == 'c') {
-		*isCompressed = qtrue;
+	int lastDot = -1;
+	for (int i = lastChar; i >= 0; i--) {
+		if (demoFile[i] == '.') {
+			lastDot = i;
+			break;
+		}
 	}
 
-	if (checkFor103) {
-		*checkFor103 = qfalse;
+	if (lastDot == -1) {
+		if (lastChar < 6) {
+			goto demoCutGetTypeReturnDefaultFaulted2;
+		}
+		else {
+			goto demoCutGetTypeReturnDefaultFaulted;
+		}
+	}
+	else if (lastDot == 0) {
+		goto demoCutGetTypeReturnDefaultFaulted2;
+	}
+	else if (lastDot == lastChar) {
+		goto demoCutGetTypeReturnDefaultFaulted2;
+	}
+
+	if (outputNameNoExt) {
+		//strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), demoFile, strlen(demoFile) - 6);
+		//strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), demoFile, lastDot);
+		strncpy_s(outputNameNoExt, MAX_OSPATH, demoFile, lastDot);
+	}
+	if (extOutput) {
+		//strncpy_s(extOutput, 7, (char*)demoFile + strlen(demoFile) - 6, 6);
+		strncpy_s(extOutput, 7, (char*)demoFile + lastDot, lastChar-lastDot+1);
+	}
+
+	if (strlen(extOutput) < 4) { // Because need to change [3] to create compressed versions... i know its shit. TODO.
+		goto demoCutGetTypeReturnDefaultFaulted2;
+	}
+
+	bool isStandardDemoNameFormat = extOutput[1] == 'd' && extOutput[2] == 'm' && (extOutput[3] == '_' || extOutput[3] == 'c') && extOutput[4] >= '0' && extOutput[4] <= '9' && extOutput[5] >= '0' && extOutput[5] <= '9';
+
+	//strncpy_s(normalizedExt, sizeof(normalizedExt), (char*)demoFile + strlen(demoFile) - 6, 6);
+	strncpy_s(normalizedExt, sizeof(normalizedExt), (char*)demoFile + lastDot, lastChar - lastDot + 1);
+	//strncpy_s(originalExtOutput, 7, (char*)demoFile + strlen(demoFile) - 6, 6);
+
+	*isCompressed = qfalse;
+	if (isStandardDemoNameFormat) {
+		normalizedExt[0] = '.';
+
+		char specialTypeChar = normalizedExt[3];
+		normalizedExt[3] = '_';
+
+		if (specialTypeChar == 'c') {
+			*isCompressed = qtrue;
+		}
+	}
+	else {
+		// Special handling further down.
+	}
+
+	if (clcCut) {
+		clcCut->demoCheckFor103 = qfalse;
 	}
 
 	if (!*normalizedExt) { // This cant really happen anyway can it?
 		*demoType = DM_15;
 		//strncpy_s(normalizedExt, 7, ".dm_15", 6);
-		if (checkFor103) {
-			*checkFor103 = qtrue;
+		if (clcCut) {
+			clcCut->demoCheckFor103 = qtrue;
 		}
 		return qfalse;
 	}
+
+	// Medal of Honor
+	else if (!_stricmp(normalizedExt, ".dm3")) {
+
+		*demoType = DM3_MOHAA_PROT_6;
+		if (clcCut) {
+			clcCut->demoCheckProtocol = qtrue;
+		}
+	}
+	else if (!_stricmp(normalizedExt, ".dm3_c")) {
+
+		*demoType = DM3_MOHAA_PROT_6;
+		if (clcCut) {
+			clcCut->demoCheckProtocol = qtrue;
+		}
+		*isCompressed = qtrue;
+	}
+
 	else if (!_stricmp(normalizedExt, ".dm_14")) {
 
 		*demoType = DM_14;
@@ -4259,8 +5288,8 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 		*demoType = DM_15;
 		//strncpy_s(normalizedExt, 7, ".dm_15", 6);
-		if (checkFor103) {
-			*checkFor103 = qtrue;
+		if (clcCut) {
+			clcCut->demoCheckFor103 = qtrue;
 		}
 	}
 	else if (!_stricmp(normalizedExt, ".dm_16")) {
@@ -4311,13 +5340,28 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 		*demoType = DM_15;
 		//strncpy_s(normalizedExt, 7, ".dm_15", 6);
-		if (checkFor103) {
-			*checkFor103 = qtrue;
+		if (clcCut) {
+			clcCut->demoCheckFor103 = qtrue;
 		}
 		return qfalse;
 	}
 
 	return qtrue;
+
+demoCutGetTypeReturnDefaultFaulted:
+	if (outputNameNoExt) {
+		strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), demoFile, strlen(demoFile) - 6);
+	}
+	if (extOutput) {
+		strncpy_s(extOutput, 7, (char*)demoFile + strlen(demoFile) - 6, 6);
+	}
+demoCutGetTypeReturnDefaultFaulted2:
+	*demoType = DM_15;
+	//strncpy_s(normalizedExt, 7, ".dm_15", 6);
+	if (clcCut) {
+		clcCut->demoCheckFor103 = qtrue;
+	}
+	return qfalse;
 }
 
 
@@ -4345,7 +5389,50 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], demoType_t*
 
 
 static gameInfo_t gameInfos[] = {
-	 {
+	{ // MOHAA
+		DM3_MOHAA_PROT_6, 
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_centerprint_general,
+			svc_locprint_general,
+			svc_cgameMessage_general,
+			svc_EOF_general
+		},
+		{
+			{
+				{},
+				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
+			},{
+				{{{DM_15,DM_15_1_03,DM_16},qlWeaponToJK2Map,sizeof(qlWeaponToJK2Map) / sizeof(qlWeaponToJK2Map[0])}},
+				{qlWeaponToGeneralMap,sizeof(qlWeaponToGeneralMap) / sizeof(qlWeaponToGeneralMap[0])},
+			},{
+				{},
+				{qlModToGeneralMap,sizeof(qlModToGeneralMap) / sizeof(qlModToGeneralMap[0])},
+			},
+			{{},{lsMoveNOSABERToGeneral,sizeof(lsMoveNOSABERToGeneral) / sizeof(lsMoveNOSABERToGeneral[0])}},
+			{{},{qldm91ItemListToGeneral,sizeof(qldm91ItemListToGeneral) / sizeof(qldm91ItemListToGeneral[0])}},
+			{
+				{{{DM_15_1_03,DM_16},qlAnimToDM16,sizeof(qlAnimToDM16) / sizeof(qlAnimToDM16[0])}},
+				{qlAnimsToGeneral,sizeof(qlAnimsToGeneral) / sizeof(qlAnimsToGeneral[0])},
+			},
+			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
+		},
+		{
+			{entityStateFieldsMOHAA_ver_6,sizeof(entityStateFieldsMOHAA_ver_6) / sizeof(entityStateFieldsMOHAA_ver_6[0]),},
+			{playerStateFieldsMOHAA_ver_6,sizeof(playerStateFieldsMOHAA_ver_6) / sizeof(playerStateFieldsMOHAA_ver_6[0]),}
+		},
+		MAX_CONFIGSTRINGS_MOH,
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH},
+		MAX_CLIENTS_MOH
+	},
+	{
 		DM_14,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
 		{
 			svc_bad_general,

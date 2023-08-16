@@ -356,11 +356,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	//char originalExt[7]{};
 	demoType_t		demoType;
 
-	strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 
 	qboolean createCompressedOutput = qfalse;
 
-	demoCutGetDemoType(outputName, ext, &demoType, &createCompressedOutput);
+	demoCutGetDemoType(outputName, ext, outputNameNoExt, &demoType, &createCompressedOutput);
 
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {

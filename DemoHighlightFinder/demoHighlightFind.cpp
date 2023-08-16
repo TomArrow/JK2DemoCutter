@@ -2735,7 +2735,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	//else
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
-	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
+	//strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
 	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
@@ -2748,7 +2748,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
-	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile,&demo.cut.Clc.demoCheckFor103);
+	demoCutGetDemoType(sourceDemoFile,ext, oldName,&demoType,&isCompressedFile,&demo.cut.Clc);
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 
@@ -2812,6 +2812,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	// I was using NUM_TEAMS_MAX first but I'm not sure if some mods might not assign too high team values for random reasons. So this is safer.
 	entityState_t* droppedFlagEntities[MAX_TEAMS]{};
 	entityState_t* baseFlagEntities[MAX_TEAMS]{};
+
+	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
 
 	int oldSequenceNum=0;
 	//	Com_SetLoadingMsg("Cutting the demo...");
@@ -2916,13 +2918,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			bool malformedMessageCaught = false;
 			int oldMsgOffset = oldMsg.readcount;
 
-			byte cmd;
+			byte cmd, ocmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
 				Com_DPrintf("Demo cutter, read past end of server message.\n");
 				goto cuterror;
 			}
-			cmd = MSG_ReadByte(&oldMsg);
-			cmd = generalizeGameSVCOp(cmd, demoType);
+			ocmd = MSG_ReadByte(&oldMsg);
+			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
 				break;
 			}
@@ -2938,8 +2940,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 			// other commands
 			switch (cmd) {
+			case svc_centerprint_general:
+			case svc_locprint_general:
+			case svc_cgameMessage_general:
+				if (isMOHAADemo) {
+					demoCutParseMOHAASVC(&oldMsg, demoType, cmd, SEHExceptionCaught);
+					break;
+				}
 			default:
-				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
+				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message %d (%d) \n",cmd,ocmd);
 				goto cuterror;
 			case svc_nop_general:
 				break;
@@ -6063,7 +6072,7 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	char			ext[7]{};
 	demoType_t		demoType;
 	qboolean		isCompressedFile = qfalse;
-	demoCutGetDemoType(sourceDemoFile, ext, &demoType, &isCompressedFile);
+	demoCutGetDemoType(sourceDemoFile, ext, NULL, &demoType, &isCompressedFile);
 	int maxClientsHere = getMAX_CLIENTS(demoType);
 	switch (maxClientsHere) {
 	case 1: // JK 2 SP

@@ -29,10 +29,12 @@ typedef enum SQLDelayedValue_NULL_t {
 // Does this even make sense? Would C++ even allow this? I'm not sure, I'm tired.
 class SQLDelayedValue { 
 	SQLDelayedValueType type = SQLVALUE_TYPE_NULL;
-	int64_t intValue = 0;
-	double doubleValue = 0;
+	union {
+		std::string* stringValue = NULL;
+		int64_t intValue;
+		double doubleValue;
+	};
 	std::string* columnNameValue = NULL;
-	std::string* stringValue = NULL;
 public:
 
 	

@@ -50,9 +50,9 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 	// TODO Deal with extensions better, kind of annoying, also what about 1.03 detection?
 
-	strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
+	//strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 
-	demoCutGetDemoType(outputName,ext,&demoType, &createCompressedOutput);
+	demoCutGetDemoType(outputName,ext, outputNameNoExt ,&demoType, &createCompressedOutput);
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
 		demoType = DM_15;

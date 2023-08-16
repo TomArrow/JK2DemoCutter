@@ -10,6 +10,14 @@ rockets: detect distance and jump height (ALSO FIX THE JUMP HEIGHT BTW, USE EV_J
 rocket: travel duration
 
 
+
+tayst: Player speed at grab and / or at cap?
+
+
+
+reframe: movementkeys?
+
+
 make laughs a meta event?
 
 lost packet count (global count for demo?)

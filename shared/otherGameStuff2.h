@@ -3,6 +3,7 @@
 
 #include "anims.h"
 #include "demoCut.h"
+#include "tsl/htrie_map.h"
 
 #define ANIM_BITS 10
 
@@ -454,6 +455,678 @@ const static int etEventToGeneralMap[] = {
 	EV_MEDIC_CALL_GENERAL,
 	EV_ENTITY_EVENT_COUNT_GENERAL,//EV_MAX_EVENTS_GENERAL   // just added as an 'endcap'
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// OpenMOHAA
+
+#define	MAX_ACTIVEITEMS			8
+#define	MAX_AMMO				16
+#define	MAX_AMMO_AMOUNT			16
+#define MAX_MAX_AMMO_AMOUNT		16
+
+#define	MAX_CONFIGSTRINGS_MOH	2736
+
+#define	ANIM_TOGGLEBIT_MOH		(1<<9)
+
+#define	MAX_CLIENTS_MOH			64		// absolute limit
+#define MAX_LOCATIONS_MOH		64
+#define	MAX_MODELS_MOH			1024		// these are sent over the net as 8 bits
+#define	MAX_SOUNDS_MOH			512		// so they cannot be blindly increased
+#define MAX_OBJECTIVES_MOH		20
+#define MAX_LIGHTSTYLES_MOH		32
+#define MAX_WEAPONS_MOH			48
+
+#define	CS_MESSAGE_MOH				2		// from the map worldspawn's message field
+#define	CS_SAVENAME_MOH				3		// current save
+#define	CS_MOTD_MOH					4		// g_motd string for server message of the day
+#define	CS_WARMUP_MOH				5		// server time when the match will be restarted
+
+// 2 values were removed in team tactics
+#define	CS_MUSIC_MOH				6		// MUSIC_NewSoundtrack(cs)
+#define CS_FOGINFO_MOH				7		// cg.farplane_cull cg.farplane_distance cg.farplane_color[3]
+#define CS_SKYINFO_MOH				8		// cg.sky_alpha cg.sky_portal
+
+#define	CS_GAME_VERSION_MOH			9
+#define	CS_LEVEL_START_TIME_MOH		10		// so the timer only shows the current level cgs.levelStartTime
+
+#define CS_CURRENT_OBJECTIVE_MOH	11
+
+#define CS_RAIN_DENSITY_MOH			12		// cg.rain
+#define CS_RAIN_SPEED_MOH			13
+#define CS_RAIN_SPEEDVARY_MOH		14
+#define CS_RAIN_SLANT_MOH			15
+#define CS_RAIN_LENGTH_MOH			16
+#define CS_RAIN_MINDIST_MOH			17
+#define CS_RAIN_WIDTH_MOH			18
+#define CS_RAIN_SHADER_MOH			19
+#define CS_RAIN_NUMSHADERS_MOH		20
+
+//
+// Team tactics
+//
+#define CS_VOTE_TIME_MOH			21
+#define CS_VOTE_STRING_MOH			22
+#define CS_VOTE_YES_MOH				23
+#define CS_VOTE_NO_MOH				24
+#define CS_VOTE_UNDECIDED_MOH		25
+//
+
+#define CS_MATCHEND_MOH				26		// cgs.matchEndTime
+
+#define	CS_MODELS_MOH				32
+#define CS_OBJECTIVES_MOH			(CS_MODELS_MOH+MAX_MODELS_MOH) // 1056
+#define	CS_SOUNDS_MOH				(CS_OBJECTIVES_MOH+MAX_OBJECTIVES_MOH) // 1076
+
+#define CS_IMAGES_MOH				(CS_SOUNDS_MOH+MAX_SOUNDS_MOH) // 1588
+#define MAX_IMAGES_MOH				64
+
+#define CS_LIGHTSTYLES_MOH			(CS_IMAGES_MOH+MAX_IMAGES_MOH) //1652
+#define CS_PLAYERS_MOH				(CS_LIGHTSTYLES_MOH+MAX_LIGHTSTYLES_MOH) // 1684
+
+#define CS_WEAPONS_MOH				(CS_PLAYERS_MOH+MAX_CLIENTS_MOH) // su44 was here
+#define CS_TEAMS_MOH				1892
+#define CS_GENERAL_STRINGS_MOH		1893
+#define CS_SPECTATORS_MOH			1894
+#define CS_ALLIES_MOH				1895
+#define CS_AXIS_MOH					1896
+#define CS_SOUNDTRACK_MOH			1881
+
+#define CS_TEAMINFO_MOH				1
+
+#define CS_MAX_MOH					(CS_PARTICLES_MOH+MAX_LOCATIONS_MOH) // ? Why is CS_PARTICLES not defined in OpenMOHAA? Weird. I'll just carry this weirdness over.
+#if (CS_MAX_MOH) > MAX_CONFIGSTRINGS_MOH
+#error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
+#endif
+
+typedef enum {
+	ET_MODELANIM_SKEL_MOH,
+	ET_MODELANIM_MOH,
+	ET_VEHICLE_MOH,
+	ET_PLAYER_MOH,
+	ET_ITEM_MOH,
+	ET_GENERAL_MOH,
+	ET_MISSILE_MOH,
+	ET_MOVER_MOH,
+	ET_BEAM_MOH,
+	ET_MULTIBEAM_MOH,
+	ET_PORTAL_MOH,
+	ET_EVENT_ONLY_MOH,
+	ET_RAIN_MOH,
+	ET_LEAF_MOH,
+	ET_SPEAKER_MOH,
+	ET_PUSH_TRIGGER_MOH,
+	ET_TELEPORT_TRIGGER_MOH,
+	ET_DECAL_MOH,
+	ET_EMITTER_MOH,
+	ET_ROPE_MOH,
+	ET_EVENTS_MOH,
+	ET_EXEC_COMMANDS_MOH
+} entityTypeMOH_t;
+
+
+
+static const netField_t	entityStateFieldsMOHAA_ver_15[] =
+{
+{ NETF(pos.trBase[0]), 0, netFieldType_t::coord },//{ NETF(netorigin[0]), 0, netFieldType_t::coord },
+{ NETF(pos.trBase[1]), 0, netFieldType_t::coord },//{ NETF(netorigin[1]), 0, netFieldType_t::coord },
+{ NETF(apos.trBase[1]), 12, netFieldType_t::angle },//{ NETF(netangles[1]), 12, netFieldType_t::angle },
+{ NETF(frameInfo[0].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[1].time), 15, netFieldType_t::animTime },
+{ NETF(bone_angles[0][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[3][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[1][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[2][0]), -13, netFieldType_t::angle },
+{ NETF(pos.trBase[2]), 0, netFieldType_t::coord },//{ NETF(netorigin[2]), 0, netFieldType_t::coord },
+{ NETF(frameInfo[0].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[1].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[2].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[3].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[0].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[1].index), 12, netFieldType_t::regular },
+{ NETF(actionWeight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[2].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[3].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[2].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[3].index), 12, netFieldType_t::regular },
+{ NETF(eType), 8, netFieldType_t::regular },
+{ NETF(modelindex), 16, netFieldType_t::regular },
+{ NETF(parent), 16, netFieldType_t::regular },
+{ NETF(constantLight), 32, netFieldType_t::regular },
+{ NETF(renderfx), 32, netFieldType_t::regular },
+{ NETF(bone_tag[0]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[1]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[2]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[3]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[4]), -8, netFieldType_t::regular },
+{ NETF(scaleMOHAA), 10, netFieldType_t::scale },
+{ NETF(alpha), 8, netFieldType_t::alpha },
+{ NETF(usageIndex), 16, netFieldType_t::regular },
+{ NETF(eFlags), 16, netFieldType_t::regular },
+{ NETF(solid), 32, netFieldType_t::regular },
+{ NETF(apos.trBase[2]), 12, netFieldType_t::angle },//{ NETF(netangles[2]), 12, netFieldType_t::angle },
+{ NETF(apos.trBase[0]), 12, netFieldType_t::angle },//{ NETF(netangles[0]), 12, netFieldType_t::angle },
+{ NETF(tag_num), 10, netFieldType_t::regular },
+{ NETF(bone_angles[1][2]), -13, netFieldType_t::angle },
+{ NETF(attach_use_angles), 1, netFieldType_t::regular },
+{ NETF(origin2[1]), 0, netFieldType_t::coord },
+{ NETF(origin2[0]), 0, netFieldType_t::coord },
+{ NETF(origin2[2]), 0, netFieldType_t::coord },
+{ NETF(bone_angles[0][2]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[2][2]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[3][2]), -13, netFieldType_t::angle },
+{ NETF(surfaces[0]), 8, netFieldType_t::regular },
+{ NETF(surfaces[1]), 8, netFieldType_t::regular },
+{ NETF(surfaces[2]), 8, netFieldType_t::regular },
+{ NETF(surfaces[3]), 8, netFieldType_t::regular },
+{ NETF(bone_angles[0][1]), -13, netFieldType_t::angle },
+{ NETF(surfaces[4]), 8, netFieldType_t::regular },
+{ NETF(surfaces[5]), 8, netFieldType_t::regular },
+{ NETF(pos.trTime), 32, netFieldType_t::regular },
+{ NETF(pos.trDelta[0]), 0, netFieldType_t::velocity },
+{ NETF(pos.trDelta[1]), 0, netFieldType_t::velocity },
+{ NETF(pos.trDelta[2]), 0, netFieldType_t::velocity },
+{ NETF(loopSound), 16, netFieldType_t::regular },
+{ NETF(loopSoundVolume), 0, netFieldType_t::regular },
+{ NETF(loopSoundMinDist), 0, netFieldType_t::regular },
+{ NETF(loopSoundMaxDist), 0, netFieldType_t::regular },
+{ NETF(loopSoundPitch), 0, netFieldType_t::regular },
+{ NETF(loopSoundFlags), 8, netFieldType_t::regular },
+{ NETF(attach_offset[0]), 0, netFieldType_t::regular },
+{ NETF(attach_offset[1]), 0, netFieldType_t::regular },
+{ NETF(attach_offset[2]), 0, netFieldType_t::regular },
+{ NETF(beam_entnum), 16, netFieldType_t::regular },
+{ NETF(skinNum), 16, netFieldType_t::regular },
+{ NETF(wasframe), 10, netFieldType_t::regular },
+{ NETF(frameInfo[4].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[5].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[6].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[7].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[8].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[9].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[10].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[11].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[12].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[13].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[14].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[15].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[4].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[5].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[6].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[7].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[8].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[9].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[10].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[11].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[12].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[13].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[14].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[15].time), 15, netFieldType_t::animTime },
+{ NETF(frameInfo[4].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[5].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[6].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[7].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[8].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[9].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[10].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[11].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[12].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[13].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[14].weight), 8, netFieldType_t::animWeight },
+{ NETF(frameInfo[15].weight), 8, netFieldType_t::animWeight },
+{ NETF(bone_angles[1][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[2][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[3][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[4][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[4][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[4][2]), -13, netFieldType_t::angle },
+{ NETF(clientNum), 8, netFieldType_t::regular },
+{ NETF(groundEntityNum), GENTITYNUM_BITS, netFieldType_t::regular },
+{ NETF(shader_data[0]), 0, netFieldType_t::regular },
+{ NETF(shader_data[1]), 0, netFieldType_t::regular },
+{ NETF(shader_time), 0, netFieldType_t::regular },
+{ NETF(eyeVector[0]), 0, netFieldType_t::regular },
+{ NETF(eyeVector[1]), 0, netFieldType_t::regular },
+{ NETF(eyeVector[2]), 0, netFieldType_t::regular },
+{ NETF(surfaces[6]), 8, netFieldType_t::regular },
+{ NETF(surfaces[7]), 8, netFieldType_t::regular },
+{ NETF(surfaces[8]), 8, netFieldType_t::regular },
+{ NETF(surfaces[9]), 8, netFieldType_t::regular },
+{ NETF(surfaces[10]), 8, netFieldType_t::regular },
+{ NETF(surfaces[11]), 8, netFieldType_t::regular },
+{ NETF(surfaces[12]), 8, netFieldType_t::regular },
+{ NETF(surfaces[13]), 8, netFieldType_t::regular },
+{ NETF(surfaces[14]), 8, netFieldType_t::regular },
+{ NETF(surfaces[15]), 8, netFieldType_t::regular },
+{ NETF(surfaces[16]), 8, netFieldType_t::regular },
+{ NETF(surfaces[17]), 8, netFieldType_t::regular },
+{ NETF(surfaces[18]), 8, netFieldType_t::regular },
+{ NETF(surfaces[19]), 8, netFieldType_t::regular },
+{ NETF(surfaces[20]), 8, netFieldType_t::regular },
+{ NETF(surfaces[21]), 8, netFieldType_t::regular },
+{ NETF(surfaces[22]), 8, netFieldType_t::regular },
+{ NETF(surfaces[23]), 8, netFieldType_t::regular },
+{ NETF(surfaces[24]), 8, netFieldType_t::regular },
+{ NETF(surfaces[25]), 8, netFieldType_t::regular },
+{ NETF(surfaces[26]), 8, netFieldType_t::regular },
+{ NETF(surfaces[27]), 8, netFieldType_t::regular },
+{ NETF(surfaces[28]), 8, netFieldType_t::regular },
+{ NETF(surfaces[29]), 8, netFieldType_t::regular },
+{ NETF(surfaces[30]), 8, netFieldType_t::regular },
+{ NETF(surfaces[31]), 8, netFieldType_t::regular }
+};
+
+static const netField_t	entityStateFieldsMOHAA_ver_6[] =
+{
+{ NETF(pos.trBase[0]), 0, netFieldType_t::coord },
+{ NETF(pos.trBase[1]), 0, netFieldType_t::coord },
+{ NETF(apos.trBase[1]), 12, netFieldType_t::angle },
+{ NETF(frameInfo[0].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[1].time), 0, netFieldType_t::animTime },
+{ NETF(bone_angles[0][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[3][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[1][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[2][0]), -13, netFieldType_t::angle },
+{ NETF(pos.trBase[2]), 0, netFieldType_t::coord },
+{ NETF(frameInfo[0].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[1].weight), 0, netFieldType_t::animWeight},
+{ NETF(frameInfo[2].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[3].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[0].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[1].index), 12, netFieldType_t::regular },
+{ NETF(actionWeight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[2].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[3].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[2].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[3].index), 12, netFieldType_t::regular },
+{ NETF(eType), 8, netFieldType_t::regular },
+{ NETF(modelindex), 16, netFieldType_t::regular },
+{ NETF(parent), 16, netFieldType_t::regular },
+{ NETF(constantLight), 32, netFieldType_t::regular },
+{ NETF(renderfx), 32, netFieldType_t::regular },
+{ NETF(bone_tag[0]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[1]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[2]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[3]), -8, netFieldType_t::regular },
+{ NETF(bone_tag[4]), -8, netFieldType_t::regular },
+{ NETF(scaleMOHAA), 0, netFieldType_t::scale },
+{ NETF(alpha), 0, netFieldType_t::alpha },
+{ NETF(usageIndex), 16, netFieldType_t::regular },
+{ NETF(eFlags), 16, netFieldType_t::regular },
+{ NETF(solid), 32, netFieldType_t::regular },
+{ NETF(apos.trBase[2]), 12, netFieldType_t::angle },
+{ NETF(apos.trBase[0]), 12, netFieldType_t::angle },
+{ NETF(tag_num), 10, netFieldType_t::regular },
+{ NETF(bone_angles[1][2]), -13, netFieldType_t::angle },
+{ NETF(attach_use_angles), 1, netFieldType_t::regular },
+{ NETF(origin2[1]), 0, netFieldType_t::coord },
+{ NETF(origin2[0]), 0, netFieldType_t::coord },
+{ NETF(origin2[2]), 0, netFieldType_t::coord },
+{ NETF(bone_angles[0][2]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[2][2]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[3][2]), -13, netFieldType_t::angle },
+{ NETF(surfaces[0]), 8, netFieldType_t::regular },
+{ NETF(surfaces[1]), 8, netFieldType_t::regular },
+{ NETF(surfaces[2]), 8, netFieldType_t::regular },
+{ NETF(surfaces[3]), 8, netFieldType_t::regular },
+{ NETF(bone_angles[0][1]), -13, netFieldType_t::angle },
+{ NETF(surfaces[4]), 8, netFieldType_t::regular },
+{ NETF(surfaces[5]), 8, netFieldType_t::regular },
+{ NETF(pos.trTime), 32, netFieldType_t::regular },
+{ NETF(pos.trDelta[0]), 0, netFieldType_t::velocity },
+{ NETF(pos.trDelta[1]), 0, netFieldType_t::velocity },
+{ NETF(pos.trDelta[2]), 0, netFieldType_t::velocity },
+{ NETF(loopSound), 16, netFieldType_t::regular },
+{ NETF(loopSoundVolume), 0, netFieldType_t::regular },
+{ NETF(loopSoundMinDist), 0, netFieldType_t::regular },
+{ NETF(loopSoundMaxDist), 0, netFieldType_t::regular },
+{ NETF(loopSoundPitch), 0, netFieldType_t::regular },
+{ NETF(loopSoundFlags), 8, netFieldType_t::regular },
+{ NETF(attach_offset[0]), 0, netFieldType_t::regular },
+{ NETF(attach_offset[1]), 0, netFieldType_t::regular },
+{ NETF(attach_offset[2]), 0, netFieldType_t::regular },
+{ NETF(beam_entnum), 16, netFieldType_t::regular },
+{ NETF(skinNum), 16, netFieldType_t::regular },
+{ NETF(wasframe), 10, netFieldType_t::regular },
+{ NETF(frameInfo[4].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[5].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[6].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[7].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[8].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[9].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[10].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[11].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[12].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[13].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[14].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[15].index), 12, netFieldType_t::regular },
+{ NETF(frameInfo[4].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[5].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[6].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[7].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[8].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[9].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[10].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[11].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[12].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[13].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[14].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[15].time), 0, netFieldType_t::animTime },
+{ NETF(frameInfo[4].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[5].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[6].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[7].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[8].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[9].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[10].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[11].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[12].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[13].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[14].weight), 0, netFieldType_t::animWeight },
+{ NETF(frameInfo[15].weight), 0, netFieldType_t::animWeight },
+{ NETF(bone_angles[1][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[2][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[3][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[4][0]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[4][1]), -13, netFieldType_t::angle },
+{ NETF(bone_angles[4][2]), -13, netFieldType_t::angle },
+{ NETF(clientNum), 8, netFieldType_t::regular },
+{ NETF(groundEntityNum), GENTITYNUM_BITS, netFieldType_t::regular },
+{ NETF(shader_data[0]), 0, netFieldType_t::regular },
+{ NETF(shader_data[1]), 0, netFieldType_t::regular },
+{ NETF(shader_time), 0, netFieldType_t::regular },
+{ NETF(eyeVector[0]), 0, netFieldType_t::regular },
+{ NETF(eyeVector[1]), 0, netFieldType_t::regular },
+{ NETF(eyeVector[2]), 0, netFieldType_t::regular },
+{ NETF(surfaces[6]), 8, netFieldType_t::regular },
+{ NETF(surfaces[7]), 8, netFieldType_t::regular },
+{ NETF(surfaces[8]), 8, netFieldType_t::regular },
+{ NETF(surfaces[9]), 8, netFieldType_t::regular },
+{ NETF(surfaces[10]), 8, netFieldType_t::regular },
+{ NETF(surfaces[11]), 8, netFieldType_t::regular },
+{ NETF(surfaces[12]), 8, netFieldType_t::regular },
+{ NETF(surfaces[13]), 8, netFieldType_t::regular },
+{ NETF(surfaces[14]), 8, netFieldType_t::regular },
+{ NETF(surfaces[15]), 8, netFieldType_t::regular },
+{ NETF(surfaces[16]), 8, netFieldType_t::regular },
+{ NETF(surfaces[17]), 8, netFieldType_t::regular },
+{ NETF(surfaces[18]), 8, netFieldType_t::regular },
+{ NETF(surfaces[19]), 8, netFieldType_t::regular },
+{ NETF(surfaces[20]), 8, netFieldType_t::regular },
+{ NETF(surfaces[21]), 8, netFieldType_t::regular },
+{ NETF(surfaces[22]), 8, netFieldType_t::regular },
+{ NETF(surfaces[23]), 8, netFieldType_t::regular },
+{ NETF(surfaces[24]), 8, netFieldType_t::regular },
+{ NETF(surfaces[25]), 8, netFieldType_t::regular },
+{ NETF(surfaces[26]), 8, netFieldType_t::regular },
+{ NETF(surfaces[27]), 8, netFieldType_t::regular },
+{ NETF(surfaces[28]), 8, netFieldType_t::regular },
+{ NETF(surfaces[29]), 8, netFieldType_t::regular },
+{ NETF(surfaces[30]), 8, netFieldType_t::regular },
+{ NETF(surfaces[31]), 8, netFieldType_t::regular }
+};
+
+static const netField_t	playerStateFieldsMOHAA_ver_15[] =
+{
+{ PSF(commandTime), 32, netFieldType_t::regular },
+{ PSF(origin[0]), 0, netFieldType_t::coordExtra },
+{ PSF(origin[1]), 0, netFieldType_t::coordExtra },
+{ PSF(viewangles[1]), 0, netFieldType_t::regular },
+{ PSF(velocity[1]), 0, netFieldType_t::velocity },
+{ PSF(velocity[0]), 0, netFieldType_t::velocity },
+{ PSF(viewangles[0]), 0, netFieldType_t::regular },
+{ PSF(origin[2]), 0, netFieldType_t::coordExtra },
+{ PSF(velocity[2]), 0, netFieldType_t::velocity },
+{ PSF(iViewModelAnimChanged), 2, netFieldType_t::regular },
+{ PSF(damage_angles[0]), -13, netFieldType_t::angle },
+{ PSF(damage_angles[1]), -13, netFieldType_t::angle },
+{ PSF(damage_angles[2]), -13, netFieldType_t::angle },
+{ PSF(speed), 16, netFieldType_t::regular },
+{ PSF(delta_angles[1]), 16, netFieldType_t::regular },
+{ PSF(viewheight), -8, netFieldType_t::regular },
+{ PSF(groundEntityNum), GENTITYNUM_BITS, netFieldType_t::regular },
+{ PSF(delta_angles[0]), 16, netFieldType_t::regular },
+{ PSF(iNetViewModelAnim), 4, netFieldType_t::regular },
+{ PSF(fov), 0, netFieldType_t::regular },
+{ PSF(current_music_mood), 8, netFieldType_t::regular },
+{ PSF(gravity), 16, netFieldType_t::regular },
+{ PSF(fallback_music_mood), 8, netFieldType_t::regular },
+{ PSF(music_volume), 0, netFieldType_t::regular },
+{ PSF(net_pm_flags), 16, netFieldType_t::regular },
+{ PSF(clientNum), 8, netFieldType_t::regular },
+{ PSF(fLeanAngle), 0, netFieldType_t::regular },
+{ PSF(blend[3]), 0, netFieldType_t::regular },
+{ PSF(blend[0]), 0, netFieldType_t::regular },
+{ PSF(pm_type), 8, netFieldType_t::regular },
+{ PSF(feetfalling), 8, netFieldType_t::regular },
+{ PSF(radarInfo), 26, netFieldType_t::regular },
+{ PSF(camera_angles[0]), 16, netFieldType_t::angle },
+{ PSF(camera_angles[1]), 16, netFieldType_t::angle },
+{ PSF(camera_angles[2]), 16, netFieldType_t::angle },
+{ PSF(camera_origin[0]), 0, netFieldType_t::coordExtra },
+{ PSF(camera_origin[1]), 0, netFieldType_t::coordExtra },
+{ PSF(camera_origin[2]), 0, netFieldType_t::coordExtra },
+{ PSF(camera_posofs[0]), 0, netFieldType_t::coordExtra },
+{ PSF(camera_posofs[2]), 0, netFieldType_t::coordExtra },
+{ PSF(camera_time), 0, netFieldType_t::regular },
+{ PSF(voted), 1, netFieldType_t::regular },
+{ PSF(bobCycle), 8, netFieldType_t::regular },
+{ PSF(delta_angles[2]), 16, netFieldType_t::regular },
+{ PSF(viewangles[2]), 0, netFieldType_t::regular },
+{ PSF(music_volume_fade_time), 0, netFieldType_t::regular },
+{ PSF(reverb_type), 6, netFieldType_t::regular },
+{ PSF(reverb_level), 0, netFieldType_t::regular },
+{ PSF(blend[1]), 0, netFieldType_t::regular },
+{ PSF(blend[2]), 0, netFieldType_t::regular },
+{ PSF(camera_offset[0]), 0, netFieldType_t::regular },
+{ PSF(camera_offset[1]), 0, netFieldType_t::regular },
+{ PSF(camera_offset[2]), 0, netFieldType_t::regular },
+{ PSF(camera_posofs[1]), 0, netFieldType_t::coordExtra },
+{ PSF(camera_flags), 16, netFieldType_t::regular }
+};
+
+const static netField_t	playerStateFieldsMOHAA_ver_6[] =
+{
+{ PSF(commandTime), 32, netFieldType_t::regular },
+{ PSF(origin[0]), 0, netFieldType_t::coord },
+{ PSF(origin[1]), 0, netFieldType_t::coord },
+{ PSF(viewangles[1]), 0, netFieldType_t::regular },
+{ PSF(velocity[1]), 0, netFieldType_t::velocity },
+{ PSF(velocity[0]), 0, netFieldType_t::velocity },
+{ PSF(viewangles[0]), 0, netFieldType_t::regular },
+{ PSF(pm_time), -16, netFieldType_t::regular },
+//{ PSF(weaponTime), -16, netFieldType_t::regular },
+{ PSF(origin[2]), 0, netFieldType_t::coord },
+{ PSF(velocity[2]), 0, netFieldType_t::velocity },
+{ PSF(iViewModelAnimChanged), 2, netFieldType_t::regular },
+{ PSF(damage_angles[0]), -13, netFieldType_t::angle },
+{ PSF(damage_angles[1]), -13, netFieldType_t::angle },
+{ PSF(damage_angles[2]), -13, netFieldType_t::angle },
+{ PSF(speed), 16, netFieldType_t::regular },
+{ PSF(delta_angles[1]), 16, netFieldType_t::regular },
+{ PSF(viewheight), -8, netFieldType_t::regular },
+{ PSF(groundEntityNum), GENTITYNUM_BITS, netFieldType_t::regular },
+{ PSF(delta_angles[0]), 16, netFieldType_t::regular },
+{ PSF(iNetViewModelAnim), 4, netFieldType_t::regular },
+{ PSF(fov), 0, netFieldType_t::regular },
+{ PSF(current_music_mood), 8, netFieldType_t::regular },
+{ PSF(gravity), 16, netFieldType_t::regular },
+{ PSF(fallback_music_mood), 8, netFieldType_t::regular },
+{ PSF(music_volume), 0, netFieldType_t::regular },
+{ PSF(net_pm_flags), 16, netFieldType_t::regular },
+{ PSF(clientNum), 8, netFieldType_t::regular },
+{ PSF(fLeanAngle), 0, netFieldType_t::regular },
+{ PSF(blend[3]), 0, netFieldType_t::regular },
+{ PSF(blend[0]), 0, netFieldType_t::regular },
+{ PSF(pm_type), 8, netFieldType_t::regular },
+{ PSF(feetfalling), 8, netFieldType_t::regular },
+{ PSF(camera_angles[0]), 16, netFieldType_t::angle },
+{ PSF(camera_angles[1]), 16, netFieldType_t::angle },
+{ PSF(camera_angles[2]), 16, netFieldType_t::angle },
+{ PSF(camera_origin[0]), 0, netFieldType_t::coord },
+{ PSF(camera_origin[1]), 0, netFieldType_t::coord },
+{ PSF(camera_origin[2]), 0, netFieldType_t::coord },
+{ PSF(camera_posofs[0]), 0, netFieldType_t::coord },
+{ PSF(camera_posofs[2]), 0, netFieldType_t::coord },
+{ PSF(camera_time), 0, netFieldType_t::regular },
+{ PSF(bobCycle), 8, netFieldType_t::regular },
+{ PSF(delta_angles[2]), 16, netFieldType_t::regular },
+{ PSF(viewangles[2]), 0, netFieldType_t::regular },
+{ PSF(music_volume_fade_time), 0, netFieldType_t::regular },
+{ PSF(reverb_type), 6, netFieldType_t::regular },
+{ PSF(reverb_level), 0, netFieldType_t::regular },
+{ PSF(blend[1]), 0, netFieldType_t::regular },
+{ PSF(blend[2]), 0, netFieldType_t::regular },
+{ PSF(camera_offset[0]), 0, netFieldType_t::regular },
+{ PSF(camera_offset[1]), 0, netFieldType_t::regular },
+{ PSF(camera_offset[2]), 0, netFieldType_t::regular },
+{ PSF(camera_posofs[1]), 0, netFieldType_t::coord },
+{ PSF(camera_flags), 16, netFieldType_t::regular }
+};
+
+// means of death
+// su44: changed to MoHAA's
+typedef enum {
+	MOD_NONE_MOH,
+	MOD_SUICIDE_MOH,
+	MOD_CRUSH_MOH,
+	MOD_CRUSH_EVERY_FRAME_MOH,
+	MOD_TELEFRAG_MOH,
+	MOD_LAVA_MOH,
+	MOD_SLIME_MOH,
+	MOD_FALLING_MOH,
+	MOD_LAST_SELF_INFLICTED_MOH,
+	MOD_EXPLOSION_MOH,
+	MOD_EXPLODEWALL_MOH,
+	MOD_ELECTRIC_MOH,
+	MOD_ELECTRICWATER_MOH,
+	MOD_THROWNOBJECT_MOH,
+	MOD_GRENADE_MOH,
+	MOD_BEAM_MOH,
+	MOD_ROCKET_MOH,
+	MOD_IMPACT_MOH,
+	MOD_BULLET_MOH,
+	MOD_FAST_BULLET_MOH,
+	MOD_VEHICLE_MOH,
+	MOD_FIRE_MOH,
+	MOD_FLASHBANG_MOH,
+	MOD_ON_FIRE_MOH,
+	MOD_GIB_MOH,
+	MOD_IMPALE_MOH,
+	MOD_BASH_MOH,
+	MOD_SHOTGUN_MOH,
+	MOD_TOTAL_NUMBER_MOH,
+
+} meansOfDeathMOH_t;
+
+/*
+typedef struct mohParsedObituary_t {
+	qboolean isObituary;
+	int attacker;
+	int target;
+	meansOfDeathMOH_t meansOfDeath;
+
+};*/
+
+
+#define MOH_WEAPON_CLASS_PISTOL			(1<<0)
+#define MOH_WEAPON_CLASS_RIFLE			(1<<1)
+#define MOH_WEAPON_CLASS_SMG			(1<<2)
+#define MOH_WEAPON_CLASS_MG				(1<<3)
+#define MOH_WEAPON_CLASS_GRENADE		(1<<4)
+#define MOH_WEAPON_CLASS_HEAVY			(1<<5)
+#define MOH_WEAPON_CLASS_CANNON			(1<<6)
+#define MOH_WEAPON_CLASS_ITEM			(1<<7)
+#define MOH_WEAPON_CLASS_ITEM1			(1<<8)
+#define MOH_WEAPON_CLASS_ITEM2			(1<<9)
+#define MOH_WEAPON_CLASS_ITEM3			(1<<10)
+#define MOH_WEAPON_CLASS_ITEM4			(1<<11)
+#define MOH_WEAPON_CLASS_ANY_ITEM		(MOH_WEAPON_CLASS_ITEM|MOH_WEAPON_CLASS_ITEM1|MOH_WEAPON_CLASS_ITEM2|MOH_WEAPON_CLASS_ITEM3|MOH_WEAPON_CLASS_ITEM4)
+
+#define MOH_WEAPON_CLASS_PRIMARY		(!(MOH_WEAPON_CLASS_PISTOL|MOH_WEAPON_CLASS_GRENADE))
+#define MOH_WEAPON_CLASS_SECONDARY		(MOH_WEAPON_CLASS_PISTOL|MOH_WEAPON_CLASS_GRENADE)
+#define MOH_WEAPON_CLASS_THROWABLE		(MOH_WEAPON_CLASS_GRENADE|MOH_WEAPON_CLASS_ITEM)
+#define MOH_WEAPON_CLASS_MISC			(MOH_WEAPON_CLASS_CANNON|MOH_WEAPON_CLASS_ITEM|MOH_WEAPON_CLASS_ITEM1|MOH_WEAPON_CLASS_ITEM2|MOH_WEAPON_CLASS_ITEM3|MOH_WEAPON_CLASS_ITEM4)
+#define MOH_WEAPON_CLASS_ITEMINDEX		(MOH_WEAPON_CLASS_ITEM1|MOH_WEAPON_CLASS_ITEM2|MOH_WEAPON_CLASS_ITEM3|MOH_WEAPON_CLASS_ITEM4)
+
+
+typedef struct mohMeansOfDeath_t {
+	qboolean attackerExistsAndIsClient;
+	qboolean isSelfKill;
+	char* s2;
+	meansOfDeathMOH_t meansOfDeath;
+	int weaponClass;
+	qboolean wasZoomed;
+};
+
+static const tsl::htrie_map<char, mohMeansOfDeath_t> mohMeansOfDeathArray = {
+	// Client attacker
+	{"was crushes by",{qtrue,qfalse,"",MOD_CRUSH_MOH}},
+	{"was telefragged by",{qtrue,qfalse,"",MOD_TELEFRAG_MOH}},
+	{"was pushed over the edge by",{qtrue,qfalse,"",MOD_FALLING_MOH}},
+	{"was blown away by",{qtrue,qfalse,"",MOD_EXPLOSION_MOH}},
+	{"tripped on",{qtrue,qfalse,"'s' grenade",MOD_GRENADE_MOH}},
+	{"is picking",{qtrue,qfalse,"'s' shrapnel out of his teeth",MOD_GRENADE_MOH}},
+	{"took",{qtrue,qfalse,"'s rocket right in the kisser",MOD_ROCKET_MOH}},
+	{"took",{qtrue,qfalse,"'s rocket in the face",MOD_ROCKET_MOH}},
+	{"was knocked out by",{qtrue,qfalse,"",MOD_IMPACT_MOH}},
+	{"was shot by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH}},
+	{"was gunned down by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_PISTOL}},
+	{"was sniped by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE,qtrue}},
+	{"was rifled by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE}},
+	{"was perforated by",{qtrue,qfalse,"'s' SMG",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_SMG}},
+	{"was machine-gunned by",{qtrue,qfalse,"'s' SMG",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_MG}},
+	{"was run over by",{qtrue,qfalse,"",MOD_VEHICLE_MOH}},
+	{"was burned up by",{qtrue,qfalse,"",MOD_FIRE_MOH}}, // Can also be MOD_LAVA, MOD_SLIME, MOD_ON_FIRE
+	{"was impaled by",{qtrue,qfalse,"",MOD_IMPALE_MOH}},
+	{"was bashed by",{qtrue,qfalse,"",MOD_BASH_MOH}},
+	{"was clubbed by",{qtrue,qfalse,"",MOD_BASH_MOH}},
+	{"was hunted down by",{qtrue,qfalse,"",MOD_SHOTGUN_MOH}},
+	{"was pumped full of buckshot by",{qtrue,qfalse,"",MOD_SHOTGUN_MOH}},
+	{"was killed by",{qtrue,qfalse,"",MOD_NONE_MOH}},
+
+	// No client attacker
+	{"was burned to a crisp",{qfalse,qfalse,"",MOD_LAVA_MOH}}, // Could also be MOD_SLIME
+	{"cratered",{qfalse,qfalse,"",MOD_FALLING_MOH}},
+	{"blew up",{qfalse,qfalse,"",MOD_EXPLOSION_MOH}}, // Could also be MOD_GRENADE
+	{"caught a rocket",{qfalse,qfalse,"",MOD_ROCKET_MOH}},
+	{"was shot in the",{qfalse,qfalse,"",MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
+	{"was shot",{qfalse,qfalse,"",MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
+	{"died",{qfalse,qfalse,"",MOD_NONE_MOH}},
+
+	// Self kill
+	{"took himself out of commision",{qtrue,qtrue,"",MOD_SUICIDE_MOH}},
+	//{"was burned to a crisp",{qtrue,qtrue,"",MOD_LAVA_MOH}}, // Could also be MOD_SLIME // Can't tell this apart from no client attacker
+	//{"cratered",{qtrue,qtrue,"",MOD_FALLING_MOH}},  // Can't tell this apart from no client attacker
+	{"blew himself up",{qtrue,qtrue,"",MOD_EXPLOSION_MOH}},
+	{"played catch with himself",{qtrue,qtrue,"",MOD_GRENADE_MOH}},
+	{"tripped on his own grenade",{qtrue,qtrue,"",MOD_GRENADE_MOH}},
+	{"rocketed himself",{qtrue,qtrue,"",MOD_ROCKET_MOH}},
+	{"shot himself",{qtrue,qtrue,"",MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
+	{"shot himself in the",{qtrue,qtrue,"",MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
+	//{"died",{qtrue,qtrue,"",MOD_NONE_MOH}},  // Could also be MOD_FAST_BULLET  // Can't tell this apart from no client attacker
+
+
+};
+
 
 
 

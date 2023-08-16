@@ -238,11 +238,11 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	oldHandle = 0; // TODO if already loaded, gracefully close
 
 
-	strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
+	//strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
-	demoCutGetDemoType(sourceDemoFile, ext,&demoType,&isCompressedFile,&thisDemo.cut.Clc.demoCheckFor103);
+	demoCutGetDemoType(sourceDemoFile, ext, oldName ,&demoType,&isCompressedFile,&thisDemo.cut.Clc);
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
 	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;

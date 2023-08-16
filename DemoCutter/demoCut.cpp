@@ -321,9 +321,9 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	//	ext = va(".dm_%i", protocol);
 	//ext = Cvar_FindVar("mme_demoExt")->string;
 	demo.cut.Clc.demoCheckFor103 = qfalse;
-	strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
+	//strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
 	//ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
-	strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
 	qboolean isCompressedFile = qfalse;
@@ -332,7 +332,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
-	demoCutGetDemoType(sourceDemoFile,ext,&demoType,&isCompressedFile,&demo.cut.Clc.demoCheckFor103);
+	demoCutGetDemoType(sourceDemoFile,ext,oldName,&demoType,&isCompressedFile,&demo.cut.Clc);
 	/*
 	char specialTypeChar = ext[3];
 	ext[3] = '_';
@@ -440,7 +440,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				// TODO Check for svc_extension/svc_voip (ioq3/wolfcamql)
 				if (wasFirstCommandByte) {
 					// check for hidden meta content
-					const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg);
+					const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
 					if (maybeMeta) {
 
 						jsonPreviousMetaDocument = new rapidjson::Document();
