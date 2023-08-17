@@ -4874,6 +4874,9 @@ inline int specializeGameValue(int value, demoType_t targetDemoType) {
 	}
 }
 
+inline bool demoTypeIsMOHAA(demoType_t demoType) {
+	return demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
+}
 
 /*
 template<gameMappingType_t T>

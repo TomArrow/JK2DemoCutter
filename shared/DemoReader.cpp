@@ -20,11 +20,15 @@
 demoType_t DemoReader::getDemoType() {
 	return demoType;
 }
+bool DemoReader::isMOHAADemo() {
+	return demoTypeIsMOHAA(demoType);
+}
 int DemoReader::getMaxClients() {
 	return maxClientsThisDemo;
 }
 
 int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine) {
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 	std::string* thisPlayer = playerSearchString;
 	DemoReader* reader = this;
 	const char* tmpConfigString;
@@ -36,7 +40,7 @@ int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean pr
 		// It's a number. ClientNum. Just parse it.
 		clientNumHere = atoi(thisPlayer->c_str());
 		tmpConfigString = reader->GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
-		std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
+		std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, isMOHAADemo?"name":"n");
 		std::cout << *thisPlayer << " (interpreted as clientNum) matches '" << nameHere << "' (" << clientNumHere << ")";
 	}
 	else {
@@ -50,7 +54,7 @@ int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean pr
 		// Find matching player name
 		for (int c = 0; c < maxClientsThisDemo; c++) {
 			tmpConfigString = reader->GetPlayerConfigString(c, &tmpConfigStringMaxLength);
-			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, "n");
+			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength,isMOHAADemo?"name": "n");
 			std::string nameHereLower = nameHere;
 			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
 

@@ -922,6 +922,7 @@ demo_t			demo;
 
 template<unsigned int max_clients>
 void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
@@ -929,7 +930,7 @@ void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
 	for (int i = 0; i < max_clients; i++) {
 		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-		std::string playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
+		std::string playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
 
 		playerDemoStatsMapKey_t mapPointer(mapname, playerName, i); // We can think of this as something of a soft (not really hard enforced in database) primary key to distinguish players.
 		playerDemoStatsPointers[i] = &playerDemoStatsMap[mapPointer];
@@ -1394,7 +1395,8 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 
 template<unsigned int max_clients>
 void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts,bool& wasDoingSQLiteExecution) {
-
+	
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS || spreeInfo->countRets >= 2) { // gotta be at least 3 kills or 2 rets to count as killstreak
 		int countSaberKills = 0;
@@ -1409,7 +1411,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 			stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNumAttacker];
 			const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-			playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
+			playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo? "name": "n");
 		}
 		//playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + target];
 		//std::string victimname = Info_ValueForKey(playerInfo, "n");
@@ -2813,7 +2815,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	entityState_t* droppedFlagEntities[MAX_TEAMS]{};
 	entityState_t* baseFlagEntities[MAX_TEAMS]{};
 
-	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	int oldSequenceNum=0;
 	//	Com_SetLoadingMsg("Cutting the demo...");
@@ -4455,11 +4457,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							if (attacker >= 0 && attacker < max_clients) {
 								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + attacker];
 								playerInfo = demo.cut.Cl.gameState.stringData + offset;
-								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
+								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset,isMOHAADemo ? "name": "n");
 							}
 							offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + target];
 							playerInfo = demo.cut.Cl.gameState.stringData + offset;
-							std::string victimname = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- offset, "n");
+							std::string victimname = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- offset,isMOHAADemo?"name": "n");
 
 
 
@@ -4632,7 +4634,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									if (boosts[i].boosterClientNum != -1) {
 										int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + boosts[i].boosterClientNum];
 										const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
-										boosterName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
+										boosterName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset,isMOHAADemo ? "name": "n");
 									}
 									if (boosts[i].isEnemyBoost != -1) {
 										boostsStringStream << (boosts[i].isEnemyBoost ? (target == boosts[i].boosterClientNum ? " VICTIM]":" ENEMY]") :(boosts[i].boosterClientNum == attacker ? " SELF]" : " TEAM]"));
@@ -4967,7 +4969,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							if (playerNum >= 0 && playerNum < max_clients) {
 								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + playerNum];
 								playerInfo = demo.cut.Cl.gameState.stringData + offset;
-								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, "n");
+								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset,isMOHAADemo ?"name": "n");
 							}
 
 							bool playerIsVisible = false;
@@ -5831,7 +5833,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
 						const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-						std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "n");
+						std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset,isMOHAADemo?"name": "n");
 						if (playerNameCompare == playername) {
 							playerNumber = clientNum;
 						}

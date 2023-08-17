@@ -4153,7 +4153,7 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 	int				cmd,ocmd;
 	char* s;
 
-	bool isMOHAADemo = *demoType == DM3_MOHAA_PROT_6 || *demoType == DM3_MOHAA_PROT_15;
+	bool isMOHAADemo = demoTypeIsMOHAA(*demoType);
 
 	//int svc_EOF_realCMD = *demoType == DM_26 ? svc_EOF + 1 : svc_EOF;
 	//int maxAllowedConfigString = *demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
@@ -4402,7 +4402,7 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 	int oldMessageNum;
 	int i, packetNum;
 
-	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_6 || demoType == DM3_MOHAA_PROT_15;
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	Com_Memset(&newSnap, 0, sizeof(newSnap));
 	clCut->lastSnapshotFinishedParsing = qfalse;
@@ -5179,6 +5179,8 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 	entity->pos.trTime = newDemoTime;
 	entity->apos.trTime = newDemoTime;
 }
+
+
 
 
 

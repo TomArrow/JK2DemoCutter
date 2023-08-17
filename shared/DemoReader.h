@@ -165,6 +165,7 @@ public:
 	int getMaxClients();
 
 	demoType_t getDemoType();
+	bool isMOHAADemo();
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();
 	qboolean SeekToTime(double time);

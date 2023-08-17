@@ -636,7 +636,7 @@ void MSG_WriteFloat( msg_t *sb, float f ) {
 void MSG_WriteString( msg_t *sb, const char *s, demoType_t demoType ) {
 
 	bool isMOHAADemoWithScrambledString = demoType == DM3_MOHAA_PROT_15;
-	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if ( !s ) {
 		if (isMOHAADemoWithScrambledString) {
@@ -687,7 +687,7 @@ void MSG_WriteString( msg_t *sb, const char *s, demoType_t demoType ) {
 void MSG_WriteBigString( msg_t *sb, const char *s, demoType_t demoType) {
 
 	bool isMOHAADemoWithScrambledString = demoType == DM3_MOHAA_PROT_15;
-	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if ( !s ) {
 		if (isMOHAADemoWithScrambledString) {
@@ -2685,7 +2685,7 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 	int			trunc;
 	int			startBit, endBit;
 	
-	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_6 || demoType == DM3_MOHAA_PROT_15;
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if ( number < 0 || number >= MAX_GENTITIES) {
 		Com_Error( ERR_DROP, "Bad delta entity number: %i", number );
@@ -3173,7 +3173,7 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	int			trunc;
 	playerState_t	dummy;
 
-	bool isMOHAADemo = demoType == DM3_MOHAA_PROT_6 || demoType == DM3_MOHAA_PROT_15;
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if ( !from ) {
 		from = &dummy;
