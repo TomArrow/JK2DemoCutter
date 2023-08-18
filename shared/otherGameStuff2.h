@@ -557,6 +557,27 @@ const static int etEventToGeneralMap[] = {
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
 #endif
 
+// These _OLD values are for protocol 6,7,8, above ones are for protocol 15,16,17
+#define	CS_MUSIC_MOH_OLD				8		// MUSIC_NewSoundtrack(cs)
+#define CS_FOGINFO_MOH_OLD				9		// cg.farplane_cull cg.farplane_distance cg.farplane_color[3]
+#define CS_SKYINFO_MOH_OLD				10		// cg.sky_alpha cg.sky_portal
+
+#define	CS_GAME_VERSION_MOH_OLD			11
+#define	CS_LEVEL_START_TIME_MOH_OLD		12		// so the timer only shows the current level cgs.levelStartTime
+
+#define CS_CURRENT_OBJECTIVE_MOH_OLD	13
+
+#define CS_RAIN_DENSITY_MOH_OLD			14		// cg.rain
+#define CS_RAIN_SPEED_MOH_OLD			15
+#define CS_RAIN_SPEEDVARY_MOH_OLD		16
+#define CS_RAIN_SLANT_MOH_OLD			17
+#define CS_RAIN_LENGTH_MOH_OLD			18
+#define CS_RAIN_MINDIST_MOH_OLD			19
+#define CS_RAIN_WIDTH_MOH_OLD			20
+#define CS_RAIN_SHADER_MOH_OLD			21
+#define CS_RAIN_NUMSHADERS_MOH_OLD		22
+
+
 typedef enum {
 	ET_MODELANIM_SKEL_MOH,
 	ET_MODELANIM_MOH,
@@ -1046,6 +1067,63 @@ typedef struct mohParsedObituary_t {
 
 };*/
 
+static int mohaaModToGeneralMap[]{ // based on wolfcamql
+	MOD_UNKNOWN_GENERAL,//MOD_NONE_GENERAL,
+	MOD_SUICIDE_GENERAL,
+	MOD_CRUSH_GENERAL,
+	MOD_CRUSH_EVERY_FRAME_GENERAL,
+	MOD_TELEFRAG_GENERAL,
+	MOD_LAVA_GENERAL,
+	MOD_SLIME_GENERAL,
+	MOD_FALLING_GENERAL,
+	MOD_LAST_SELF_INFLICTED_GENERAL,
+	MOD_EXPLOSION_GENERAL,
+	MOD_EXPLODEWALL_GENERAL,
+	MOD_ELECTRIC_GENERAL,
+	MOD_ELECTRICWATER_GENERAL,
+	MOD_THROWNOBJECT_GENERAL,
+	MOD_GRENADE_GENERAL,
+	MOD_BEAM_GENERAL,
+	MOD_ROCKET_GENERAL,
+	MOD_IMPACT_GENERAL,
+	MOD_BULLET_GENERAL,
+	MOD_FAST_BULLET_GENERAL,
+	MOD_VEHICLE_GENERAL,
+	MOD_FIRE_GENERAL,
+	MOD_FLASHBANG_GENERAL,
+	MOD_ON_FIRE_GENERAL,
+	MOD_GIB_GENERAL,
+	MOD_IMPALE_GENERAL,
+	MOD_BASH_GENERAL,
+	MOD_SHOTGUN_GENERAL,
+	MOD_MAX_GENERAL,//MOD_TOTAL_NUMBER_GENERAL,
+};
+
+static const int mohaaEntityTypeToGeneral[]{ // based on wolfcamql
+	ET_MODELANIM_SKEL_GENERAL,
+	ET_MODELANIM_GENERAL,
+	ET_VEHICLE_GENERAL,
+	ET_PLAYER_GENERAL,
+	ET_ITEM_GENERAL,
+	ET_GENERAL_GENERAL,
+	ET_MISSILE_GENERAL,
+	ET_MOVER_GENERAL,
+	ET_BEAM_GENERAL,
+	ET_MULTIBEAM_GENERAL,
+	ET_PORTAL_GENERAL,
+	ET_EVENT_ONLY_GENERAL,
+	ET_RAIN_GENERAL,
+	ET_LEAF_GENERAL,
+	ET_SPEAKER_GENERAL,
+	ET_PUSH_TRIGGER_GENERAL,
+	ET_TELEPORT_TRIGGER_GENERAL,
+	ET_DECAL_GENERAL,
+	ET_EMITTER_GENERAL,
+	ET_ROPE_GENERAL,
+	ET_EVENTS_GENERAL,
+	ET_EXEC_COMMANDS_GENERAL
+};
+
 
 #define MOH_WEAPON_CLASS_PISTOL			(1<<0)
 #define MOH_WEAPON_CLASS_RIFLE			(1<<1)
@@ -1068,63 +1146,88 @@ typedef struct mohParsedObituary_t {
 #define MOH_WEAPON_CLASS_ITEMINDEX		(MOH_WEAPON_CLASS_ITEM1|MOH_WEAPON_CLASS_ITEM2|MOH_WEAPON_CLASS_ITEM3|MOH_WEAPON_CLASS_ITEM4)
 
 
+#define MOH_MAX_KILLMSG_S2_VARIATIONS 2
 typedef struct mohMeansOfDeath_t {
 	qboolean attackerExistsAndIsClient;
 	qboolean isSelfKill;
-	char* s2;
+	char* s2[MOH_MAX_KILLMSG_S2_VARIATIONS]; // 2 means maximum 2 variations. Increase if more needed.
 	meansOfDeathMOH_t meansOfDeath;
 	int weaponClass;
 	qboolean wasZoomed;
 };
 
+
+
+#define	MAX_NAME_LENGTH_MOHAA		32		// max length of a client name
 static const tsl::htrie_map<char, mohMeansOfDeath_t> mohMeansOfDeathArray = {
 	// Client attacker
-	{"was crushes by",{qtrue,qfalse,"",MOD_CRUSH_MOH}},
-	{"was telefragged by",{qtrue,qfalse,"",MOD_TELEFRAG_MOH}},
-	{"was pushed over the edge by",{qtrue,qfalse,"",MOD_FALLING_MOH}},
-	{"was blown away by",{qtrue,qfalse,"",MOD_EXPLOSION_MOH}},
-	{"tripped on",{qtrue,qfalse,"'s' grenade",MOD_GRENADE_MOH}},
-	{"is picking",{qtrue,qfalse,"'s' shrapnel out of his teeth",MOD_GRENADE_MOH}},
-	{"took",{qtrue,qfalse,"'s rocket right in the kisser",MOD_ROCKET_MOH}},
-	{"took",{qtrue,qfalse,"'s rocket in the face",MOD_ROCKET_MOH}},
-	{"was knocked out by",{qtrue,qfalse,"",MOD_IMPACT_MOH}},
-	{"was shot by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH}},
-	{"was gunned down by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_PISTOL}},
-	{"was sniped by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE,qtrue}},
-	{"was rifled by",{qtrue,qfalse,"",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE}},
-	{"was perforated by",{qtrue,qfalse,"'s' SMG",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_SMG}},
-	{"was machine-gunned by",{qtrue,qfalse,"'s' SMG",MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_MG}},
-	{"was run over by",{qtrue,qfalse,"",MOD_VEHICLE_MOH}},
-	{"was burned up by",{qtrue,qfalse,"",MOD_FIRE_MOH}}, // Can also be MOD_LAVA, MOD_SLIME, MOD_ON_FIRE
-	{"was impaled by",{qtrue,qfalse,"",MOD_IMPALE_MOH}},
-	{"was bashed by",{qtrue,qfalse,"",MOD_BASH_MOH}},
-	{"was clubbed by",{qtrue,qfalse,"",MOD_BASH_MOH}},
-	{"was hunted down by",{qtrue,qfalse,"",MOD_SHOTGUN_MOH}},
-	{"was pumped full of buckshot by",{qtrue,qfalse,"",MOD_SHOTGUN_MOH}},
-	{"was killed by",{qtrue,qfalse,"",MOD_NONE_MOH}},
+	{"was crushes by",{qtrue,qfalse,{},MOD_CRUSH_MOH}},
+	{"was telefragged by",{qtrue,qfalse,{},MOD_TELEFRAG_MOH}},
+	{"was pushed over the edge by",{qtrue,qfalse,{},MOD_FALLING_MOH}},
+	{"was blown away by",{qtrue,qfalse,{},MOD_EXPLOSION_MOH}},
+	{"tripped on",{qtrue,qfalse,{"'s grenade"},MOD_GRENADE_MOH}}, // OpenMOHAA misspells as "'s' grenade"
+	{"is picking",{qtrue,qfalse,{"'s shrapnel out of his teeth"},MOD_GRENADE_MOH}}, // OpenMOHAA misspells as "'s' shrapnel out of his teeth"
+	{"took",{qtrue,qfalse,{"'s rocket right in the kisser","'s rocket in the face"},MOD_ROCKET_MOH}},
+	{"was knocked out by",{qtrue,qfalse,{},MOD_IMPACT_MOH}},
+	{"was shot by",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH}},
+	{"was gunned down by",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_PISTOL}},
+	{"was sniped by",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE,qtrue}},
+	{"was rifled by",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE}},
+	{"was perforated by",{qtrue,qfalse,{"'s SMG"},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_SMG}}, // OpenMOHAA misspells as "'s' SMG"
+	{"was machine-gunned by",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_MG}},
+	{"was run over by",{qtrue,qfalse,{},MOD_VEHICLE_MOH}},
+	{"was burned up by",{qtrue,qfalse,{},MOD_FIRE_MOH}}, // Can also be MOD_LAVA, MOD_SLIME, MOD_ON_FIRE
+	{"was impaled by",{qtrue,qfalse,{},MOD_IMPALE_MOH}},
+	{"was bashed by",{qtrue,qfalse,{},MOD_BASH_MOH}},
+	{"was clubbed by",{qtrue,qfalse,{},MOD_BASH_MOH}},
+	{"was hunted down by",{qtrue,qfalse,{},MOD_SHOTGUN_MOH}},
+	{"was pumped full of buckshot by",{qtrue,qfalse,{},MOD_SHOTGUN_MOH}},
+	{"was killed by",{qtrue,qfalse,{},MOD_NONE_MOH}},
 
 	// No client attacker
-	{"was burned to a crisp",{qfalse,qfalse,"",MOD_LAVA_MOH}}, // Could also be MOD_SLIME
-	{"cratered",{qfalse,qfalse,"",MOD_FALLING_MOH}},
-	{"blew up",{qfalse,qfalse,"",MOD_EXPLOSION_MOH}}, // Could also be MOD_GRENADE
-	{"caught a rocket",{qfalse,qfalse,"",MOD_ROCKET_MOH}},
-	{"was shot in the",{qfalse,qfalse,"",MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
-	{"was shot",{qfalse,qfalse,"",MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
-	{"died",{qfalse,qfalse,"",MOD_NONE_MOH}},
+	{"was burned to a crisp",{qfalse,qfalse,{},MOD_LAVA_MOH}}, // Could also be MOD_SLIME
+	{"cratered",{qfalse,qfalse,{},MOD_FALLING_MOH}},
+	{"blew up",{qfalse,qfalse,{},MOD_EXPLOSION_MOH}}, // Could also be MOD_GRENADE
+	{"caught a rocket",{qfalse,qfalse,{},MOD_ROCKET_MOH}},
+	{"was shot in the",{qfalse,qfalse,{},MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
+	{"was shot",{qfalse,qfalse,{},MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
+	{"died",{qfalse,qfalse,{},MOD_NONE_MOH}},
 
 	// Self kill
-	{"took himself out of commision",{qtrue,qtrue,"",MOD_SUICIDE_MOH}},
+	{"took himself out of commision",{qtrue,qtrue,{},MOD_SUICIDE_MOH}},
 	//{"was burned to a crisp",{qtrue,qtrue,"",MOD_LAVA_MOH}}, // Could also be MOD_SLIME // Can't tell this apart from no client attacker
 	//{"cratered",{qtrue,qtrue,"",MOD_FALLING_MOH}},  // Can't tell this apart from no client attacker
-	{"blew himself up",{qtrue,qtrue,"",MOD_EXPLOSION_MOH}},
-	{"played catch with himself",{qtrue,qtrue,"",MOD_GRENADE_MOH}},
-	{"tripped on his own grenade",{qtrue,qtrue,"",MOD_GRENADE_MOH}},
-	{"rocketed himself",{qtrue,qtrue,"",MOD_ROCKET_MOH}},
-	{"shot himself",{qtrue,qtrue,"",MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
-	{"shot himself in the",{qtrue,qtrue,"",MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
+	{"blew himself up",{qtrue,qtrue,{},MOD_EXPLOSION_MOH}},
+	{"played catch with himself",{qtrue,qtrue,{},MOD_GRENADE_MOH}},
+	{"tripped on his own grenade",{qtrue,qtrue,{},MOD_GRENADE_MOH}},
+	{"rocketed himself",{qtrue,qtrue,{},MOD_ROCKET_MOH}},
+	{"shot himself",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
+	{"shot himself in the",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	//{"died",{qtrue,qtrue,"",MOD_NONE_MOH}},  // Could also be MOD_FAST_BULLET  // Can't tell this apart from no client attacker
 
 
+};
+
+static const tsl::htrie_map<char, int> mohKillLocationArray = {
+	{"head",0},
+	{"helmet",1},
+	{"neck",2},
+	{"upper torso",3},
+	{"middle torso",4},
+	{"lower torso",5},
+	{"pelvis",6},
+	{"upper right arm",7},
+	{"upper left arm",8},
+	{"upper right leg",9},
+	{"upper left leg",10},
+	{"lower right arm",11},
+	{"lower left arm",12},
+	{"lower right leg",13},
+	{"lower left leg",14},
+	{"right hand",15},
+	{"left hand",16},
+	{"right foot",17},
+	{"left foot",18},
 };
 
 

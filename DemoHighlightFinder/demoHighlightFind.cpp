@@ -20,6 +20,7 @@
 
 #include <mutex>
 #include "named_mutex.hpp"
+#include "tsl/htrie_map.h"
 
 #define DEBUGSTATSDB
 
@@ -199,6 +200,7 @@ LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
 int playerFirstVisible[MAX_CLIENTS_MAX];
 int playerFirstFollowed[MAX_CLIENTS_MAX];
 int playerFirstFollowedOrVisible[MAX_CLIENTS_MAX];
+int playerLastSeen[MAX_CLIENTS_MAX];
 int recentFlagHoldTimes[MAX_CLIENTS_MAX];
 int playerVisibleFrames[MAX_CLIENTS_MAX];
 int playerVisibleClientFrames[MAX_CLIENTS_MAX];
@@ -919,10 +921,20 @@ enum highlightSearchMode_t {
 demo_t			demo;
 
 
+tsl::htrie_map<char, int> playerNamesToClientNums;
+qboolean clientNameIsDuplicate[MAX_CLIENTS_MAX];
 
+// This also updates the playerNamesToClientNums trie
 template<unsigned int max_clients>
 void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
+
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
+	if (isMOHAADemo) {
+		playerNamesToClientNums.clear();
+		Com_Memset(clientNameIsDuplicate, 0, sizeof(clientNameIsDuplicate));
+	}
+
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
 	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
@@ -931,6 +943,23 @@ void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
 		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
+
+		if (isMOHAADemo && *playerInfo) { // Don't insert non existing players.
+			auto existingName = playerNamesToClientNums.find(playerName.c_str());
+			if (existingName != playerNamesToClientNums.end()) {
+				int otherClientNum = existingName.value();
+				clientNameIsDuplicate[otherClientNum] = qtrue;
+				clientNameIsDuplicate[i] = qtrue;
+				if (playerLastSeen[i] > playerLastSeen[otherClientNum]) {
+					// Prioritize this player because he was seen more recently (duplicates could be lagged out connections). SHITTY solution, especially since it's only triggered during CS change.
+					// TODO FIX THIS omg
+					playerNamesToClientNums[playerName.c_str()] = i;
+				}
+			}
+			else {
+				playerNamesToClientNums[playerName.c_str()] = i; // The lowest client number with that name will be accepted... kinda dumb but idk.
+			}
+		}
 
 		playerDemoStatsMapKey_t mapPointer(mapname, playerName, i); // We can think of this as something of a soft (not really hard enforced in database) primary key to distinguish players.
 		playerDemoStatsPointers[i] = &playerDemoStatsMap[mapPointer];
@@ -5486,6 +5515,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						playerFirstFollowed[p] = -1;
 					}
 					if (clientVisibleOrFollowed) {
+						playerLastSeen[p] = demoCurrentTime;
 						if (playerFirstFollowedOrVisible[p] == -1) {
 							playerFirstFollowedOrVisible[p] = demo.cut.Cl.snap.serverTime;
 						}
@@ -5762,6 +5792,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
 				
+				if (isMOHAADemo) {
+					parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
+				}
 
 				//jp::VecNum vec_num;
 				//jp::RegexMatch rm;

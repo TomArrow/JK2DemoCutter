@@ -826,6 +826,7 @@ char *MSG_ReadString( msg_t *msg, demoType_t demoType ) {
 	static char	string[MAX_STRING_CHARS];
 	int		l,c;
 
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 	bool isMOHAADemoWithScrambledString = demoType == DM3_MOHAA_PROT_15;
 
 	l = 0;
@@ -847,7 +848,7 @@ char *MSG_ReadString( msg_t *msg, demoType_t demoType ) {
 			c = '.';
 		}
 		// don't allow higher ascii values
-		if ( c > 127 && demoType < DM_91 ) { // Quake live stuff. Quake live DM_91 supports UTF-8?
+		if ( c > 127 && demoType < DM_91 && !isMOHAADemo) { // Quake live stuff. Quake live DM_91 supports UTF-8? Also MOHAA doesn't "dot" the rest
 			c = '.';
 		}
 

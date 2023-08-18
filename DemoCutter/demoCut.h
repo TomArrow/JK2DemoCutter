@@ -25,6 +25,7 @@
 #include "anims.h"
 #include "animsStanceMappings.h"
 
+#include "tsl/htrie_map.h"
 
 extern const char* DPrintFLocation;
 
@@ -1905,6 +1906,19 @@ typedef enum {
 	ET_THINKER_GENERAL,
 	ET_CLOUD_GENERAL,
 
+	// MOHAA
+	ET_MODELANIM_SKEL_GENERAL,
+	ET_MODELANIM_GENERAL,
+	ET_VEHICLE_GENERAL,
+	ET_MULTIBEAM_GENERAL,
+	ET_EVENT_ONLY_GENERAL,
+	ET_RAIN_GENERAL,
+	ET_LEAF_GENERAL,
+	ET_DECAL_GENERAL,
+	ET_EMITTER_GENERAL,
+	ET_ROPE_GENERAL,
+	ET_EXEC_COMMANDS_GENERAL,
+
 	ET_EVENTS_GENERAL
 } entityType_general_t;
 
@@ -2816,6 +2830,24 @@ typedef enum {
 	MOD_ENERGY_GENERAL,
 	MOD_ENERGY_SPLASH_GENERAL,
 	MOD_IMPACT_GENERAL,
+	
+	// MOHAA:
+	MOD_CRUSH_EVERY_FRAME_GENERAL, 
+	MOD_LAST_SELF_INFLICTED_GENERAL,
+	MOD_EXPLOSION_GENERAL,
+	MOD_EXPLODEWALL_GENERAL,
+	MOD_ELECTRIC_GENERAL,
+	MOD_ELECTRICWATER_GENERAL,
+	MOD_THROWNOBJECT_GENERAL, 
+	MOD_BEAM_GENERAL,
+	MOD_BULLET_GENERAL,
+	MOD_FAST_BULLET_GENERAL,
+	MOD_FIRE_GENERAL,
+	MOD_FLASHBANG_GENERAL,
+	MOD_ON_FIRE_GENERAL,
+	MOD_GIB_GENERAL,
+	MOD_IMPALE_GENERAL,
+	MOD_BASH_GENERAL,
 
 	MOD_MAX_GENERAL,
 } meansOfDeath_t;
@@ -4906,6 +4938,9 @@ inline int generalizeWeapon(int weapon, demoType_t sourceDemoType) {
 inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, demoType_t targetDemoType) {
 	return specializedMappings[sourceDemoType][targetDemoType].weaponMapping.data[weapon];
 }*/
+
+
+entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
 
 
 #endif

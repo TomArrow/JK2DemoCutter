@@ -5183,6 +5183,186 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 
 
 
+#ifdef DEBUG
+#define DEBUG_MOHAA_STRINGMATCH
+//#define DEBUG_MOHAA_STRINGMATCH_FULL
+#endif
+
+
+template<class T>
+T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, char** message) {
+	if (!**message) {
+		return NULL; // Not a death message
+	}
+	else {
+		char partialString[MAX_NAME_LENGTH_MOHAA];
+		char possibleStringCompare[MAX_NAME_LENGTH_MOHAA];
+		
+		int matchCount = 99999;
+
+		int consecutiveCharCount = 0;
+		char* msgTmp = *message;
+		int msgLen = strlen(*message);
+		while (true) {
+			if ((*msgTmp == ' ' || *msgTmp == '\'' || *msgTmp == '\n') && consecutiveCharCount < MAX_NAME_LENGTH_MOHAA - 1) {
+				// If we are at a space or single quote, we need to just increment a single place
+				// because in theory it might be a space at the end of the time that we want to match
+				consecutiveCharCount++;
+				msgTmp++;
+			}
+			else {
+				while (*msgTmp && *msgTmp != ' ' && *msgTmp != '\'' && *msgTmp != '\n' && consecutiveCharCount < MAX_NAME_LENGTH_MOHAA - 1) {
+					consecutiveCharCount++;
+					msgTmp++;
+				}
+			}
+			strncpy_s(partialString, *message, consecutiveCharCount);
+			auto matchedStrings = stringMap->equal_prefix_range(partialString);
+			matchCount = 0;
+			auto realMatchIt = matchedStrings.first;
+			for (auto it = matchedStrings.first; it != matchedStrings.second; ++it) {
+				auto matchedStringHere = it.key();
+				if (matchedStringHere.size() <= msgLen) {
+
+					strncpy_s(possibleStringCompare, *message, matchedStringHere.size());
+					if (!_stricmp(possibleStringCompare, matchedStringHere.c_str())) {
+
+						realMatchIt = it;
+						matchCount++;
+					}
+				}
+			}
+
+			if (matchCount == 0) {
+#ifdef DEBUG_MOHAA_STRINGMATCH
+				std::cerr << "STRING MATCH FAIL, NO MATCH: "<< *message << "\n";
+#endif
+				return NULL;
+			}
+			else if (matchCount == 1) {
+#ifdef DEBUG_MOHAA_STRINGMATCH
+#ifdef DEBUG_MOHAA_STRINGMATCH_FULL
+				std::cout << "STRING MATCH:" << matchedNames.first.key() << "\n";
+#endif
+#endif
+				*message += realMatchIt.key().size(); // move the passed pointer forward so we skip perfectly past the matched name.
+				return (T*)&realMatchIt.value();
+			}
+			else if (*msgTmp && consecutiveCharCount < MAX_NAME_LENGTH_MOHAA-1){
+				// repeat the loop
+			}
+			else {
+#ifdef DEBUG_MOHAA_STRINGMATCH
+				std::cerr << "STRING MATCH FAIL, 2 MANY MATCH\n";
+#endif
+				return NULL;
+			}
+		}
+
+	}
+}
+
+
+entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientNumMap, char* message) {
+	if (*message != 4 && *message != 5) {
+		return NULL; // Not a death message
+	}
+	else {
+		static entityState_t tmpEs;
+
+		Com_Memset(&tmpEs,0,sizeof(tmpEs));
+
+		tmpEs.time = -1;
+
+		char* oMsg = message;
+		message++;
+		int* matchedPlayer1 = mohaaMatchString(playerMapClientNumMap,&message);
+		if (matchedPlayer1 == NULL) return NULL;
+
+		tmpEs.otherEntityNum = *matchedPlayer1; // target
+
+		message++; // Empty space
+
+		mohMeansOfDeath_t* mohMod = mohaaMatchString(&mohMeansOfDeathArray,&message);
+		if (mohMod == NULL) return NULL;
+
+		tmpEs.eventParm = mohMod->meansOfDeath;
+		tmpEs.weapon = mohMod->weaponClass; // Little special thing.
+
+		if (mohMod->isSelfKill) { 
+			tmpEs.otherEntityNum2 = *matchedPlayer1; // attacker
+		}
+		else if (!mohMod->attackerExistsAndIsClient) {
+			tmpEs.otherEntityNum2 = ENTITYNUM_WORLD; // attacker
+		}
+
+		if (!mohMod->attackerExistsAndIsClient || mohMod->isSelfKill) {
+			goto mohParseDeathMsgReturnEntityState;
+		}
+
+		message++; // Empty space
+
+		int* matchedPlayer2 = mohaaMatchString(playerMapClientNumMap, &message);
+		if (matchedPlayer2 == NULL) return NULL;
+
+		tmpEs.otherEntityNum2 = *matchedPlayer2; // attacker
+
+		char stringCompare[MAX_NAME_LENGTH_MOHAA];
+		int msgLen = strlen(message);
+		int s2Count = 0;
+		bool s2Match = false;
+		for (int i = 0; i < MOH_MAX_KILLMSG_S2_VARIATIONS; i++) {
+
+			if (mohMod->s2[i]) {
+				s2Count++;
+				int lenCompare = strlen(mohMod->s2[i]);
+				if (lenCompare <= msgLen) {
+
+					strncpy_s(stringCompare, message, lenCompare);
+					if (!_stricmp(stringCompare, mohMod->s2[i])) {
+
+						s2Match = true;
+						message += lenCompare;
+						msgLen -= lenCompare;
+						break;
+					}
+				}
+			}
+		}
+
+		if (s2Count && !s2Match) {
+			return NULL;
+		}
+
+
+		int killLocIntroLength = sizeof(" in the ") - 1;
+		if (killLocIntroLength > msgLen) {
+			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
+		}
+
+		strncpy_s(stringCompare, message, killLocIntroLength);
+		if (_stricmp(stringCompare, " in the ")) {
+			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
+		}
+
+		message += killLocIntroLength;
+
+		//int matchedPlayer2 = mohaaMatchPlayerName(playerMapClientNumMap, &message);
+		int* matchedKillLocation = mohaaMatchString(&mohKillLocationArray, &message);
+		if (matchedKillLocation == NULL) {
+			return NULL; // No match for the location but there SHOULD have been a match.
+		}
+
+		tmpEs.time = *matchedKillLocation; // Ugly but whatever.
+
+mohParseDeathMsgReturnEntityState:
+		entityState_t* retVal = new entityState_t{};
+		*retVal = tmpEs;
+		return retVal;
+	}
+}
+
+
 
 
 
@@ -5408,7 +5588,7 @@ static gameInfo_t gameInfos[] = {
 			svc_EOF_general
 		},
 		{
-			{
+			{ // MOHAA is very different from classic Q3 engine. A lot of these don't make sense for MOHAA so they're not really fixed up.
 				{},
 				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
 			},{
@@ -5416,7 +5596,7 @@ static gameInfo_t gameInfos[] = {
 				{qlWeaponToGeneralMap,sizeof(qlWeaponToGeneralMap) / sizeof(qlWeaponToGeneralMap[0])},
 			},{
 				{},
-				{qlModToGeneralMap,sizeof(qlModToGeneralMap) / sizeof(qlModToGeneralMap[0])},
+				{mohaaModToGeneralMap,sizeof(mohaaModToGeneralMap) / sizeof(mohaaModToGeneralMap[0])},
 			},
 			{{},{lsMoveNOSABERToGeneral,sizeof(lsMoveNOSABERToGeneral) / sizeof(lsMoveNOSABERToGeneral[0])}},
 			{{},{qldm91ItemListToGeneral,sizeof(qldm91ItemListToGeneral) / sizeof(qldm91ItemListToGeneral[0])}},
@@ -5424,14 +5604,14 @@ static gameInfo_t gameInfos[] = {
 				{{{DM_15_1_03,DM_16},qlAnimToDM16,sizeof(qlAnimToDM16) / sizeof(qlAnimToDM16[0])}},
 				{qlAnimsToGeneral,sizeof(qlAnimsToGeneral) / sizeof(qlAnimsToGeneral[0])},
 			},
-			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
+			{{},{mohaaEntityTypeToGeneral,sizeof(mohaaEntityTypeToGeneral) / sizeof(mohaaEntityTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsMOHAA_ver_6,sizeof(entityStateFieldsMOHAA_ver_6) / sizeof(entityStateFieldsMOHAA_ver_6[0]),},
 			{playerStateFieldsMOHAA_ver_6,sizeof(playerStateFieldsMOHAA_ver_6) / sizeof(playerStateFieldsMOHAA_ver_6[0]),}
 		},
 		MAX_CONFIGSTRINGS_MOH,
-		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH},
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH_OLD},
 		MAX_CLIENTS_MOH
 	},
 	{
