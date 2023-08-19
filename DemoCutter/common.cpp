@@ -5272,6 +5272,7 @@ entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientN
 
 		Com_Memset(&tmpEs,0,sizeof(tmpEs));
 
+		tmpEs.event = EV_OBITUARY_GENERAL;
 		tmpEs.time = -1;
 
 		char* oMsg = message;
@@ -5288,6 +5289,7 @@ entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientN
 
 		tmpEs.eventParm = mohMod->meansOfDeath;
 		tmpEs.weapon = mohMod->weaponClass; // Little special thing.
+		tmpEs.time2 = mohMod->wasZoomed;
 
 		if (mohMod->isSelfKill) { 
 			tmpEs.otherEntityNum2 = *matchedPlayer1; // attacker

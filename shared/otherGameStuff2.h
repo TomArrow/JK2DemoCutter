@@ -478,6 +478,32 @@ const static int etEventToGeneralMap[] = {
 
 // OpenMOHAA
 
+// entity subclass
+#define EF_ENTITY_MOH				(1<<0)
+#define EF_ANIMATE_MOH				(1<<1)
+#define EF_SENTIENT_MOH				(1<<2)
+#define EF_PLAYER_MOH				(1<<3)
+#define EF_ACTOR_MOH				(1<<4)
+#define EF_ITEM_MOH					(1<<5)
+#define EF_INVENTORYITEM_MOH		(1<<6)
+#define EF_WEAPON_MOH				(1<<7)
+#define EF_PROJECTILE_MOH			(1<<8)
+#define EF_DOOR_MOH					(1<<9)
+#define EF_CAMERA_MOH				(1<<10)
+#define EF_VEHICLE_MOH				(1<<11)
+#define EF_VEHICLETANK_MOH			(1<<12)
+#define EF_VEHICLETURRET_MOH		(1<<13)
+#define EF_TURRET_MOH				(1<<14)
+#define EF_PATHNODE_MOH				(1<<15)
+#define EF_WAYPOINT_MOH				(1<<16)
+#define EF_TEMPWAYPOINT_MOH			(1<<17)
+#define EF_VEHICLEPOINT_MOH			(1<<18)
+#define EF_SPLINEPATH_MOH			(1<<19)
+#define EF_CRATEOBJECT_MOH			(1<<20)
+#define EF_BOT_MOH					(1<<21)
+
+
+
 #define	MAX_ACTIVEITEMS			8
 #define	MAX_AMMO				16
 #define	MAX_AMMO_AMOUNT			16

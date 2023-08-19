@@ -1581,6 +1581,7 @@ typedef struct {
 
 	// reliable messages received from server
 	int			serverCommandSequence;
+	int			lastPreExecutedServerCommand;		// last server command grabbed or executed with CL_GetServerCommand
 	int			lastExecutedServerCommand;		// last server command grabbed or executed with CL_GetServerCommand
 	char		serverCommands[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS];
 
