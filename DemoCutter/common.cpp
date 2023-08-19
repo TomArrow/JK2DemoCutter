@@ -1360,6 +1360,65 @@ std::map <int, std::string>  saberStyleNames
 };
 
 
+std::unordered_map <std::string, int>  mohaaWeaponModelMap
+{
+	std::make_pair("NONE",WPREFIX_NONE), // ?
+	std::make_pair("models/items/papers.tik",WPREFIX_PAPERS), // ????
+	std::make_pair("models/items/papers2.tik",WPREFIX_PAPERS), // ????
+	std::make_pair("models/weapons/colt45.tik",WPREFIX_COLT45),
+	std::make_pair("models/weapons/p38.tik",WPREFIX_P38),
+	std::make_pair("models/weapons/silencedpistol.tik",WPREFIX_HISTANDARD),
+	std::make_pair("models/weapons/m1_garand.tik",WPREFIX_GARAND),
+	std::make_pair("models/weapons/kar98.tik",WPREFIX_KAR98),
+	std::make_pair("models/weapons/kar98sniper.tik",WPREFIX_KAR98SNIPER),
+	std::make_pair("models/weapons/springfield.tik",WPREFIX_SPRINGFIELD),
+	std::make_pair("models/weapons/thompsonsmg.tik",WPREFIX_THOMPSON),
+	std::make_pair("models/weapons/mp40.tik",WPREFIX_MP40),
+	std::make_pair("models/weapons/bar.tik",WPREFIX_BAR),
+	std::make_pair("models/weapons/mp44.tik",WPREFIX_MP44),
+	std::make_pair("models/weapons/m2frag_grenade.tik",WPREFIX_FRAGGRENADE),
+	std::make_pair("models/weapons/steilhandgranate.tik",WPREFIX_STIELHANDGRANATE),
+	std::make_pair("models/weapons/bazooka.tik",WPREFIX_BAZOOKA),
+	std::make_pair("models/weapons/panzerschreck.tik",WPREFIX_PANZERSCHRECK),
+	std::make_pair("models/weapons/shotgun.tik",WPREFIX_SHOTGUN),
+	std::make_pair("UNARMED",WPREFIX_UNARMED), // ??
+	//
+	// Team Assault and Team Tactics weapons
+	std::make_pair("models/weapons/mg42carryable.tik",WPREFIX_MG42_PORTABLE),
+	std::make_pair("models/weapons/webley_revolver.tik",WPREFIX_WEBLEY),
+	std::make_pair("models/weapons/nagant_revolver.tik",WPREFIX_NAGANTREV),
+	std::make_pair("models/weapons/mosin_nagant_rifle.tik",-1), // ???
+	std::make_pair("models/weapons/It_W_Beretta.tik",WPREFIX_BERETTA),
+	std::make_pair("models/weapons/enfield.tik",WPREFIX_ENFIELD),
+	std::make_pair("models/weapons/svt_rifle.tik",WPREFIX_SVT),
+	std::make_pair("models/weapons/mosin_nagant_rifle.tik",WPREFIX_MOSIN),
+	std::make_pair("models/weapons/Mosin_Nagant_Rifle_lite.tik",WPREFIX_MOSIN), //? is that a real thing?
+	std::make_pair("models/weapons/g43.tik",WPREFIX_G43),
+	std::make_pair("models/weapons/Uk_W_L42A1.tik",WPREFIX_ENFIELDL42A),
+	std::make_pair("models/weapons/It_W_Carcano.tik",WPREFIX_CARCANO),
+	std::make_pair("models/weapons/delisle.tik",WPREFIX_DELISLE),
+	std::make_pair("models/weapons/sten.tik",WPREFIX_STEN),
+	std::make_pair("models/weapons/ppsh_smg.tik",WPREFIX_PPSH),
+	std::make_pair("models/weapons/It_W_Moschetto.tik",WPREFIX_MOSCHETTO),
+	std::make_pair("FG42",WPREFIX_FG42), // ?
+	std::make_pair("models/weapons/Uk_W_Vickers.tik",WPREFIX_VICKERS),
+	std::make_pair("models/weapons/It_W_Breda.tik",WPREFIX_BREDA),
+	std::make_pair("models/weapons/Russian_F1_grenade.tik",WPREFIX_F1_GRENADE),
+	std::make_pair("models/weapons/mills_grenade.tik",WPREFIX_MILLS_GRENADE),
+	std::make_pair("models/weapons/nebelhandgranate.tik",WPREFIX_NEBELHANDGRANATE),
+	std::make_pair("models/weapons/M18_smoke_grenade.tik",WPREFIX_M18_SMOKE_GRENADE),
+	std::make_pair("models/weapons/RDG-1_Smoke_grenade.tik",WPREFIX_RDG1_SMOKE_GRENADE),
+	std::make_pair("models/weapons/It_W_Bomba.tik",WPREFIX_BOMBA),
+	std::make_pair("models/weapons/It_W_BombaBreda.tik",WPREFIX_BOMBA_BREDA),
+	std::make_pair("models/weapons/Landmine.tik",WPREFIX_MINE),
+	std::make_pair("models/weapons/US_W_MineDetector.tik",WPREFIX_MINE_DETECTOR),
+	std::make_pair("models/weapons/Gr_W_MineDetector.tik",WPREFIX_MINE_DETECTOR_AXIS),
+	std::make_pair("DETONATOR",WPREFIX_DETONATOR), // ?
+	std::make_pair("models/weapons/kar98_mortar.tik",WPREFIX_KAR98_MORTAR),
+	std::make_pair("models/weapons/Uk_W_Piat.tik",WPREFIX_PIAT)
+};
+
+
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime, qboolean clientSideStyleEventConversion) {
 	int		i;
 
@@ -5594,8 +5653,8 @@ static gameInfo_t gameInfos[] = {
 				{},
 				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
 			},{
-				{{{DM_15,DM_15_1_03,DM_16},qlWeaponToJK2Map,sizeof(qlWeaponToJK2Map) / sizeof(qlWeaponToJK2Map[0])}},
-				{qlWeaponToGeneralMap,sizeof(qlWeaponToGeneralMap) / sizeof(qlWeaponToGeneralMap[0])},
+				{},
+				{mohWeaponsToGeneral,sizeof(mohWeaponsToGeneral) / sizeof(mohWeaponsToGeneral[0])}, // MOH doesn't REALLY have a weapons enum and doesn't network weapon index either. Just basing it on the WPREFIX_ enum.
 			},{
 				{},
 				{mohaaModToGeneralMap,sizeof(mohaaModToGeneralMap) / sizeof(mohaaModToGeneralMap[0])},

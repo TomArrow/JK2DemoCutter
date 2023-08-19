@@ -18,6 +18,7 @@
 #include <cstring>
 #include <algorithm>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <sstream>
 
@@ -2793,7 +2794,7 @@ typedef enum {
 	MOD_SHOTGUN_GENERAL,
 	MOD_GAUNTLET_GENERAL,
 	MOD_MACHINEGUN_GENERAL,
-	MOD_GRENADE_GENERAL,
+	MOD_GRENADELAUNCHER_GENERAL,
 	MOD_GRENADE_SPLASH_GENERAL,
 	MOD_PLASMA_GENERAL,
 	MOD_PLASMA_SPLASH_GENERAL,
@@ -2839,7 +2840,8 @@ typedef enum {
 	MOD_EXPLODEWALL_GENERAL,
 	MOD_ELECTRIC_GENERAL,
 	MOD_ELECTRICWATER_GENERAL,
-	MOD_THROWNOBJECT_GENERAL, 
+	MOD_THROWNOBJECT_GENERAL,
+	MOD_GRENADE_GENERAL,
 	MOD_BEAM_GENERAL,
 	MOD_BULLET_GENERAL,
 	MOD_FAST_BULLET_GENERAL,
@@ -2982,6 +2984,55 @@ typedef enum {
 	WP_TIE_FIGHTER_GENERAL,
 	WP_RAPID_FIRE_CONC_GENERAL,
 	WP_BLASTER_PISTOL_GENERAL,	// apparently some enemy only version of the blaster
+
+	// MOH (moh doesn't REALLY have a WP_... array, we base it on the WPREFIX_ array)
+	WP_PAPERS_GENERAL,
+	WP_COLT45_GENERAL,
+	WP_P38_GENERAL,
+	WP_HISTANDARD_GENERAL,
+	WP_GARAND_GENERAL,
+	WP_KAR98_GENERAL,
+	WP_KAR98SNIPER_GENERAL,
+	WP_SPRINGFIELD_GENERAL,
+	WP_THOMPSON_GENERAL,
+	WP_MP40_GENERAL,
+	WP_BAR_GENERAL,
+	WP_MP44_GENERAL,
+	WP_FRAGGRENADE_GENERAL,
+	WP_STIELHANDGRANATE_GENERAL,
+	WP_BAZOOKA_GENERAL,
+	WP_PANZERSCHRECK_GENERAL, 
+	WP_UNARMED_GENERAL,
+	WP_MG42_PORTABLE_GENERAL,
+	WP_WEBLEY_GENERAL,
+	WP_NAGANTREV_GENERAL,
+	WP_BERETTA_GENERAL,
+	WP_ENFIELD_GENERAL,
+	WP_SVT_GENERAL,
+	WP_MOSIN_GENERAL,
+	WP_G43_GENERAL,
+	WP_ENFIELDL42A_GENERAL,
+	WP_CARCANO_GENERAL,
+	WP_DELISLE_GENERAL,
+	WP_STEN_GENERAL,
+	WP_PPSH_GENERAL,
+	WP_MOSCHETTO_GENERAL,
+	WP_FG42_GENERAL,
+	WP_VICKERS_GENERAL,
+	WP_BREDA_GENERAL,
+	WP_F1_GRENADE_GENERAL,
+	WP_MILLS_GRENADE_GENERAL,
+	WP_NEBELHANDGRANATE_GENERAL,
+	WP_M18_SMOKE_GRENADE_GENERAL,
+	WP_RDG1_SMOKE_GRENADE_GENERAL,
+	WP_BOMBA_GENERAL,
+	WP_BOMBA_BREDA_GENERAL,
+	WP_MINE_GENERAL,
+	WP_MINE_DETECTOR_GENERAL,
+	WP_MINE_DETECTOR_AXIS_GENERAL,
+	WP_DETONATOR_GENERAL,
+	WP_KAR98_MORTAR_GENERAL,
+	WP_PIAT_GENERAL,
 
 	WP_NUM_WEAPONS_GENERAL,
 } weapon_t;
@@ -3569,6 +3620,7 @@ static const int saberMoveJK2ToGeneral[] {
 
 extern std::map <int, std::string>  saberMoveNames_general;
 extern std::map <int, std::string>  saberStyleNames;
+extern std::unordered_map <std::string, int>  mohaaWeaponModelMap;
 
 typedef struct
 {
@@ -4873,7 +4925,7 @@ inline int generalizeGameValue(int value, demoType_t sourceDemoType) {
 			return ET_EVENTS_GENERAL + gameInfosMapped[sourceDemoType]->mappings[GMAP_EVENTS].mapping.get<A>(value - gameInfosMapped[sourceDemoType]->constants.et_events);
 		}
 		else {
-			return gameInfosMapped[sourceDemoType]->mappings[T].reversedMapping.get<A>(value);
+			return gameInfosMapped[sourceDemoType]->mappings[T].mapping.get<A>(value);
 		}
 	}
 	else if constexpr (T == GMAP_ANIMATIONS) {

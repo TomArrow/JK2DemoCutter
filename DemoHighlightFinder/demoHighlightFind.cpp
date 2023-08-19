@@ -202,6 +202,10 @@ bool gameIsSaberOnlyIsh = false; // Saber only-ish. The basic question this answ
 bool gameAllowsDoomingForcePowers = false; // Stuff like push/pull is allowed in this game. Hence if we are detecting saber kills that lead to dooms/suic, we need to try to exclude a few kills that might just be push/pull/grip etc
 int sentryModelIndex = -1; // Model index of sentry, so we don't have to do string comparison all the time
 
+int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
+int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
+int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
+//int mohaaPlayerWeaponTagNum[MAX_CLIENTS_MAX];
 LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
 int playerFirstVisible[MAX_CLIENTS_MAX];
 int playerFirstFollowed[MAX_CLIENTS_MAX];
@@ -2714,6 +2718,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
 	Com_Memset(playerVisibleFrames,0,sizeof(playerVisibleFrames));
 	Com_Memset(playerVisibleClientFrames,0,sizeof(playerVisibleClientFrames));
+	Com_Memset(mohaaPlayerWeapon,0,sizeof(mohaaPlayerWeapon));
+	Com_Memset(mohaaPlayerWeaponModelIndex,0,sizeof(mohaaPlayerWeaponModelIndex));
+	for (int i = 0; i < max_clients; i++) {
+		mohaaPlayerWeaponModelIndex[i] = -1;
+	}
+	Com_Memset(mohaaPlayerWeaponModelIndexThisFrame,0,sizeof(mohaaPlayerWeaponModelIndexThisFrame));
+	//Com_Memset(mohaaPlayerWeaponTagNum,0,sizeof(mohaaPlayerWeaponTagNum));
 	Com_Memset(playerFirstVisible,0,sizeof(playerFirstVisible));
 	Com_Memset(playerFirstFollowed,0,sizeof(playerFirstFollowed));
 	Com_Memset(playerFirstFollowedOrVisible,0,sizeof(playerFirstFollowedOrVisible));
@@ -3084,6 +3095,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				Com_Memset(droppedFlagEntities, 0, sizeof(droppedFlagEntities));
 				Com_Memset(baseFlagEntities, 0, sizeof(baseFlagEntities));
+				//Com_Memset(mohaaPlayerWeaponTagNum, 0, sizeof(mohaaPlayerWeaponTagNum));
+				for (int i = 0; i < max_clients; i++) {
+					mohaaPlayerWeaponModelIndexThisFrame[i] = -1;
+				}
 
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
@@ -3316,6 +3331,46 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								relevantArray[TEAM_FREE] = thisEs;
 								break;
 						}
+					}
+					else if (isMOHAADemo && thisEs->parent > 0 && thisEs->parent < max_clients && generalizedEntityType == ET_ITEM_GENERAL && (thisEs->eFlags & EF_SENTIENT_MOH)/* && && (thisEs->eFlags & EF_WEAPON_MOH)*/) { // Don't ask me why weapons have EF_SENTIENT and not EF_WEAPON...
+						
+						//static int tagNumUsage[1000]{};
+						//tagNumUsage[thisEs->tag_num]++;
+						// Magic tag numbers. Seem to be the ones for main held weapon. 22 and 55. Used by far the most.
+						// There is others that happen to be used sometimes like 14 for snipers. I'm guessing that means they're strapped onto someone's back or sth because the snipers can also have 22/55
+						// General observed usage (with sample count as example): 
+						// 
+						// 3 (47), 5(400), 6(191), 14 (11555), 22 (347807), 23 (11), 29 (6024), 40 (1243), 52 (90908)
+						if(thisEs->tag_num == 52 || thisEs->tag_num == 22){
+
+							int configStringBaseIndex = getCS_MODELS(demoType); //(demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
+							if (mohaaPlayerWeaponModelIndexThisFrame[thisEs->parent] != -1) {
+								int offset = demo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + mohaaPlayerWeaponModelIndexThisFrame[thisEs->parent]];
+								char* modelName2 = demo.cut.Cl.gameState.stringData + offset;
+								offset = demo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + thisEs->modelindex];
+								char* modelName = demo.cut.Cl.gameState.stringData + offset;
+								std::cerr << "Weird. MOHAA weapon for player found twice. Duplicate? " << modelName << " vs. " << modelName2 <<"\n";
+							}
+							if (thisEs->modelindex != mohaaPlayerWeaponModelIndex[thisEs->parent]) {
+								// Model changed. Update weapons array.
+
+								// Detecting weapons players are carrying
+								int offset = demo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + thisEs->modelindex];
+								//if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+								std::string weaponModel = demo.cut.Cl.gameState.stringData + offset;
+								auto foundModel = mohaaWeaponModelMap.find(weaponModel);
+								if (foundModel != mohaaWeaponModelMap.end()) {
+									mohaaPlayerWeapon[thisEs->parent] = generalizeGameValue<GMAP_WEAPONS, UNSAFE>(foundModel->second, demoType);
+								}
+								else {
+									mohaaPlayerWeapon[thisEs->parent] = WP_NONE_GENERAL;
+								}
+								
+							}
+							mohaaPlayerWeaponModelIndexThisFrame[thisEs->parent] = thisEs->modelindex;
+							mohaaPlayerWeaponModelIndex[thisEs->parent] = thisEs->modelindex;
+						}
+
 					}
 				}
 
@@ -4063,7 +4118,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								//|| mod == MOD_CONC_ALT_GENERAL
 								// 
 								// Q3
-								|| mod == MOD_GRENADE_GENERAL
+								|| mod == MOD_GRENADELAUNCHER_GENERAL
 								|| mod == MOD_GRENADE_SPLASH_GENERAL
 								|| mod == MOD_KAMIKAZE_GENERAL
 								//|| mod == MOD_PLASMA_GENERAL, // Idk if i should count plasma as explosive... not really?
@@ -4071,6 +4126,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								//|| mod == MOD_BFG_GENERAL
 								//|| mod == MOD_BFG_SPLASH_GENERAL // Bfg is kinda explosive for gibbing purposes, but not really in terms im interested in here?
 								|| mod == MOD_PROXIMITY_MINE_GENERAL
+
+								// MOHAA
+								|| mod == MOD_GRENADE_GENERAL
+								|| mod == MOD_EXPLOSION_GENERAL
+								|| mod == MOD_EXPLODEWALL_GENERAL
+								|| mod == MOD_GRENADE_GENERAL
+								|| mod == MOD_GRENADE_GENERAL
 								);
 							thisKill.mod = (meansOfDeath_t)mod; // Hmm. Use generalized? Or normal. Tough question. investigate
 
@@ -4360,6 +4422,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										probableKillingWeapon = (weapon_t)generalizeGameValue<GMAP_WEAPONS, SAFE>(attackerEntity->weapon, demoType); // Safe just in case theres some weird killer entity with weird values. Not a big deal inside this kill analysis part, wont be huge perfrmance impact
 									}
 								}
+								else {
+									// TODO does this work for main player too?
+									probableKillingWeapon = attacker >= 0 && attacker <=max_clients ? (weapon_t)mohaaPlayerWeapon[attacker] : WP_NONE_GENERAL;
+								}
 							}
 
 							char* mohHitLocationString = NULL;
@@ -4449,202 +4515,348 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (needMoreInfo) {
 
-								if (isMOHAADemo) {
-									// Dunno how to get weapon in MOHAA atm.
-								}
-								else {
 
-									switch (probableKillingWeapon) {
-										case WP_SABER_GENERAL:
-											isSaberKill = true;
-											if (attackerIsFollowed) {
+								switch (probableKillingWeapon) {
+									case WP_SABER_GENERAL:
+										isSaberKill = true;
+										if (attackerIsFollowed) {
 
-												modInfo << saberMoveNames_general[psGeneralSaberMove];
+											modInfo << saberMoveNames_general[psGeneralSaberMove];
+											if (!modInfo.str().size()) {
+												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
+											}
+											else {
+												// It's a special attack.
+												// Save speed at which it was executed.
+												modInfo << "_" << (int)thisKill.speedatSaberMoveChange << "u";
+											}
+
+										}
+										else {
+
+											if (attackerEntity) {
+												modInfo << saberMoveNames_general[generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(attackerEntity->saberMove,demoType)];
 												if (!modInfo.str().size()) {
-													modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
+													// THIS IS INVALID!
+													int saberStance = attackerEntity->fireflag;
+													if (saberStance == 0) {
+														// Server removed this info to prevent cheating I guess...
+														// Let's make a guess.
+														byte stanceProbability = 0; // 0-100
+														int likelyStance = getLikelyStanceFromTorsoAnim(attackerEntity->torsoAnim, demoType, &stanceProbability);
+														if (stanceProbability == 100) {
+															modInfo << saberStyleNames[likelyStance] << "_G";
+														}
+														else {
+															modInfo << saberStyleNames[likelyStance] << "_G" << (int)stanceProbability;
+														}
+													}
+													else {
+
+														modInfo << saberStyleNames[saberStance];
+													}
+													
 												}
 												else {
 													// It's a special attack.
 													// Save speed at which it was executed.
-													modInfo << "_" << (int)thisKill.speedatSaberMoveChange << "u";
+													modInfo <<"_" << (int)thisKill.speedatSaberMoveChange<<"u";
 												}
-
 											}
 											else {
-
-												if (attackerEntity) {
-													modInfo << saberMoveNames_general[generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(attackerEntity->saberMove,demoType)];
-													if (!modInfo.str().size()) {
-														// THIS IS INVALID!
-														int saberStance = attackerEntity->fireflag;
-														if (saberStance == 0) {
-															// Server removed this info to prevent cheating I guess...
-															// Let's make a guess.
-															byte stanceProbability = 0; // 0-100
-															int likelyStance = getLikelyStanceFromTorsoAnim(attackerEntity->torsoAnim, demoType, &stanceProbability);
-															if (stanceProbability == 100) {
-																modInfo << saberStyleNames[likelyStance] << "_G";
-															}
-															else {
-																modInfo << saberStyleNames[likelyStance] << "_G" << (int)stanceProbability;
-															}
-														}
-														else {
-
-															modInfo << saberStyleNames[saberStance];
-														}
+												modInfo << "_SABER";
+											}
+										}
+										// Is the current saber move the follow up move of a bounce, deflect, parry, deflect, knockaway etc?
+										//if ((playerLastSaberMove[attacker].lastLastSaberMove >= LS_K1_T_ && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL)
+										//	|| (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_D1_B_)
+										//	) {
+										if (playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral >= LS_B1_BR_GENERAL && playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral <= LS_REFLECT_LL_GENERAL) {
+											if (playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral].chain_attack || playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral].chain_idle) {
+												// yep this is a chain from a parry or such.
+												// not sure if we should include the stuff like broken parry which is followed by idle saber,
+												// but i guess a broken parry followed by a burn kill could be fun to know too
+												modInfo << "_FR";
+												modInfo << saberMoveNames_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral];
+											}
+										}
+										// DFA from parry? If our attack is a DFA or other pre-swing attack resulting from a parry (well basically there's only dfa and yellow dfa I think that qualify)
+										// BUT: This doesnt find them all for some reason. Idk why. Maybe sometimes they arent true parry dfas. Who knows. Often theres nothing in the sabermove history with a saber move above 74, but rather transitions and whatnot
+										else if (playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral >= LS_A_JUMP_T__B__GENERAL && playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral <= LS_A_FLIP_SLASH_GENERAL) {
+											if (playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral >= LS_B1_BR_GENERAL && playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral <= LS_REFLECT_LL_GENERAL) {
+												if (playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral].chain_attack || playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral].chain_idle) {
 													
+													qboolean isSlowDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == LS_A_JUMP_T__B__GENERAL && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_DFA_DETECT_SLOW_THRESHOLD);
+													qboolean isSlowYDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral != LS_A_JUMP_T__B__GENERAL && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_YDFA_DETECT_SLOW_THRESHOLD);
+													if (isSlowDfa || isSlowYDfa) {
+														// We are interested mostly in those very fast parry DFAs
+														// If its a dfa from a parry that takes a while to connect.. meh
+														// Because it could just be a DFA as a result of fighting someone else and then it hits the other person after a second. 
+														// Or its a dfa that the other person runs into again after a second. Not really that fascinating.
+														// So we make it clear its a slow one by marking it _FRSL
+														modInfo << "_FRSL";
 													}
 													else {
-														// It's a special attack.
-														// Save speed at which it was executed.
-														modInfo <<"_" << (int)thisKill.speedatSaberMoveChange<<"u";
+														modInfo << "_FR";
 													}
-												}
-												else {
-													modInfo << "_SABER";
-												}
-											}
-											// Is the current saber move the follow up move of a bounce, deflect, parry, deflect, knockaway etc?
-											//if ((playerLastSaberMove[attacker].lastLastSaberMove >= LS_K1_T_ && playerLastSaberMove[attacker].lastLastSaberMove <= LS_REFLECT_LL)
-											//	|| (playerLastSaberMove[attacker].lastLastSaberMove >= LS_B1_BR && playerLastSaberMove[attacker].lastLastSaberMove <= LS_D1_B_)
-											//	) {
-											if (playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral >= LS_B1_BR_GENERAL && playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral <= LS_REFLECT_LL_GENERAL) {
-												if (playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral].chain_attack || playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral].chain_idle) {
-													// yep this is a chain from a parry or such.
-													// not sure if we should include the stuff like broken parry which is followed by idle saber,
-													// but i guess a broken parry followed by a burn kill could be fun to know too
-													modInfo << "_FR";
-													modInfo << saberMoveNames_general[playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral];
-												}
-											}
-											// DFA from parry? If our attack is a DFA or other pre-swing attack resulting from a parry (well basically there's only dfa and yellow dfa I think that qualify)
-											// BUT: This doesnt find them all for some reason. Idk why. Maybe sometimes they arent true parry dfas. Who knows. Often theres nothing in the sabermove history with a saber move above 74, but rather transitions and whatnot
-											else if (playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral >= LS_A_JUMP_T__B__GENERAL && playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral <= LS_A_FLIP_SLASH_GENERAL) {
-												if (playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral >= LS_B1_BR_GENERAL && playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral <= LS_REFLECT_LL_GENERAL) {
-													if (playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral].chain_attack || playerLastSaberMove[attacker].lastSaberMove[1].saberMoveGeneral == saberMoveData_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral].chain_idle) {
-													
-														qboolean isSlowDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral == LS_A_JUMP_T__B__GENERAL && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_DFA_DETECT_SLOW_THRESHOLD);
-														qboolean isSlowYDfa = (qboolean)(playerLastSaberMove[attacker].lastSaberMove[0].saberMoveGeneral != LS_A_JUMP_T__B__GENERAL && (demoCurrentTime - playerLastSaberMove[attacker].lastSaberMove[1].saberMoveChange) > PARRY_YDFA_DETECT_SLOW_THRESHOLD);
-														if (isSlowDfa || isSlowYDfa) {
-															// We are interested mostly in those very fast parry DFAs
-															// If its a dfa from a parry that takes a while to connect.. meh
-															// Because it could just be a DFA as a result of fighting someone else and then it hits the other person after a second. 
-															// Or its a dfa that the other person runs into again after a second. Not really that fascinating.
-															// So we make it clear its a slow one by marking it _FRSL
-															modInfo << "_FRSL";
-														}
-														else {
-															modInfo << "_FR";
-														}
-														modInfo << saberMoveNames_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral];
+													modInfo << saberMoveNames_general[playerLastSaberMove[attacker].lastSaberMove[2].saberMoveGeneral];
 
-													}
 												}
 											}
-											if (thisKill.timeSinceBackflip != -1 && thisKill.timeSinceBackflip < 1000) {
-												modInfo << "_BF";
-											}
-											break;
-										case WP_STUN_BATON_GENERAL:
-											modInfo << "_STUN";
-											break;
-										case WP_BRYAR_PISTOL_GENERAL:
-											modInfo << "_BRYAR";
-											break;
-										case WP_BLASTER_GENERAL:
-											modInfo << "_BLASTER";
-											break;
-										case WP_DISRUPTOR_GENERAL:
-											modInfo << "_DISRUPTOR";
-											break;
-										case WP_BOWCASTER_GENERAL:
-											modInfo << "_BOWCAST";
-											break;
-										case WP_REPEATER_GENERAL:
-											modInfo << "_REPEATER";
-											break;
-										case WP_DEMP2_GENERAL:
-											modInfo << "_DEMP2";
-											break;
-										case WP_FLECHETTE_GENERAL:
-											modInfo << "_FLECH";
-											break;
-										case WP_ROCKET_LAUNCHER_GENERAL:
-											modInfo << "_ROCKET";
-											break;
-										case WP_THERMAL_GENERAL:
-											modInfo << "_THERMAL";
-											break;
-										case WP_TRIP_MINE_GENERAL:
-											modInfo << "_MINE";
-											break;
-										case WP_DET_PACK_GENERAL:
-											modInfo << "_DTPCK";
-											break;
-										case WP_EMPLACED_GUN_GENERAL:
-											modInfo << "_EMPLACED";
-											break;
-										case WP_TURRET_GENERAL:
-											modInfo << "_TURRET";
-											break;
+										}
+										if (thisKill.timeSinceBackflip != -1 && thisKill.timeSinceBackflip < 1000) {
+											modInfo << "_BF";
+										}
+										break;
+									case WP_STUN_BATON_GENERAL:
+										modInfo << "_STUN";
+										break;
+									case WP_BRYAR_PISTOL_GENERAL:
+										modInfo << "_BRYAR";
+										break;
+									case WP_BLASTER_GENERAL:
+										modInfo << "_BLASTER";
+										break;
+									case WP_DISRUPTOR_GENERAL:
+										modInfo << "_DISRUPTOR";
+										break;
+									case WP_BOWCASTER_GENERAL:
+										modInfo << "_BOWCAST";
+										break;
+									case WP_REPEATER_GENERAL:
+										modInfo << "_REPEATER";
+										break;
+									case WP_DEMP2_GENERAL:
+										modInfo << "_DEMP2";
+										break;
+									case WP_FLECHETTE_GENERAL:
+										modInfo << "_FLECH";
+										break;
+									case WP_ROCKET_LAUNCHER_GENERAL:
+										modInfo << "_ROCKET";
+										break;
+									case WP_THERMAL_GENERAL:
+										modInfo << "_THERMAL";
+										break;
+									case WP_TRIP_MINE_GENERAL:
+										modInfo << "_MINE";
+										break;
+									case WP_DET_PACK_GENERAL:
+										modInfo << "_DTPCK";
+										break;
+									case WP_EMPLACED_GUN_GENERAL:
+										modInfo << "_EMPLACED";
+										break;
+									case WP_TURRET_GENERAL:
+										modInfo << "_TURRET";
+										break;
 									
-										//JK 3
-										case WP_MELEE_GENERAL:
-											modInfo << "_MELEE";
-											break;
-										case WP_CONCUSSION_GENERAL:
-											modInfo << "_CONC";
-											break;
-										case WP_BRYAR_OLD_GENERAL:
-											modInfo << "_BRYAROLD";
-											break;
+									//JK 3
+									case WP_MELEE_GENERAL:
+										modInfo << "_MELEE";
+										break;
+									case WP_CONCUSSION_GENERAL:
+										modInfo << "_CONC";
+										break;
+									case WP_BRYAR_OLD_GENERAL:
+										modInfo << "_BRYAROLD";
+										break;
 									
-										//q3
-										case WP_GAUNTLET_GENERAL:
-											modInfo << "_GAUNTLET";
-											break;
-										case WP_MACHINEGUN_GENERAL:
-											modInfo << "_MACHINEGUN";
-											break;
-										case WP_SHOTGUN_GENERAL:
-											modInfo << "_SHOTGUN";
-											break;
-										case WP_GRENADE_LAUNCHER_GENERAL:
-											modInfo << "_GRENLAUNCH";
-											break;
-										case WP_LIGHTNING_GENERAL:
-											modInfo << "_LIGHTNING";
-											break;
-										case WP_RAILGUN_GENERAL:
-											modInfo << "_RAILGUN";
-											break;
-										case WP_PLASMAGUN_GENERAL:
-											modInfo << "_PLASMA";
-											break;
-										case WP_BFG_GENERAL:
-											modInfo << "_BFG";
-											break;
-										case WP_GRAPPLING_HOOK_GENERAL:
-											modInfo << "_GRAPPLE";
-											break;
-										case WP_NAILGUN_GENERAL:
-											modInfo << "_NAILGUN";
-											break;
-										case WP_PROX_LAUNCHER_GENERAL:
-											modInfo << "_PROXMINE";
-											break;
-										case WP_CHAINGUN_GENERAL:
-											modInfo << "_CHAINGUN";
-											break;
-										case WP_HEAVY_MACHINEGUN_GENERAL:
-											modInfo << "_HMG";
-											break;
+									//q3
+									case WP_GAUNTLET_GENERAL:
+										modInfo << "_GAUNTLET";
+										break;
+									case WP_MACHINEGUN_GENERAL:
+										modInfo << "_MACHINEGUN";
+										break;
+									case WP_SHOTGUN_GENERAL:
+										modInfo << "_SHOTGUN";
+										break;
+									case WP_GRENADE_LAUNCHER_GENERAL:
+										modInfo << "_GRENLAUNCH";
+										break;
+									case WP_LIGHTNING_GENERAL:
+										modInfo << "_LIGHTNING";
+										break;
+									case WP_RAILGUN_GENERAL:
+										modInfo << "_RAILGUN";
+										break;
+									case WP_PLASMAGUN_GENERAL:
+										modInfo << "_PLASMA";
+										break;
+									case WP_BFG_GENERAL:
+										modInfo << "_BFG";
+										break;
+									case WP_GRAPPLING_HOOK_GENERAL:
+										modInfo << "_GRAPPLE";
+										break;
+									case WP_NAILGUN_GENERAL:
+										modInfo << "_NAILGUN";
+										break;
+									case WP_PROX_LAUNCHER_GENERAL:
+										modInfo << "_PROXMINE";
+										break;
+									case WP_CHAINGUN_GENERAL:
+										modInfo << "_CHAINGUN";
+										break;
+									case WP_HEAVY_MACHINEGUN_GENERAL:
+										modInfo << "_HMG";
+										break;
 
-										default:
-											break;
-									}
+									// MOHAA
+									case WP_NONE_GENERAL:
+										modInfo << "_WEIRD";
+										break;
+									case WP_PAPERS_GENERAL:
+										modInfo << "_PAPERS";
+										break;
+									case WP_COLT45_GENERAL:
+										modInfo << "_COLT45";
+										break;
+									case WP_P38_GENERAL:
+										modInfo << "_P38";
+										break;
+									case WP_HISTANDARD_GENERAL:
+										modInfo << "_HISTANDARD";
+										break;
+									case WP_GARAND_GENERAL:
+										modInfo << "_GARAND";
+										break;
+									case WP_KAR98_GENERAL:
+										modInfo << "_KAR98";
+										break;
+									case WP_KAR98SNIPER_GENERAL:
+										modInfo << "_KAR98SNIPER";
+										break;
+									case WP_SPRINGFIELD_GENERAL:
+										modInfo << "_SPRINGFIELD";
+										break;
+									case WP_THOMPSON_GENERAL:
+										modInfo << "_THOMPSON";
+										break;
+									case WP_MP40_GENERAL:
+										modInfo << "_MP40";
+										break;
+									case WP_BAR_GENERAL:
+										modInfo << "_BAR";
+										break;
+									case WP_MP44_GENERAL:
+										modInfo << "_MP44";
+										break;
+									case WP_FRAGGRENADE_GENERAL:
+										modInfo << "_FRAGGRENADE";
+										break;
+									case WP_STIELHANDGRANATE_GENERAL:
+										modInfo << "_STIELHANDGRANATE";
+										break;
+									case WP_BAZOOKA_GENERAL:
+										modInfo << "_BAZOOKA";
+										break;
+									case WP_PANZERSCHRECK_GENERAL:
+										modInfo << "_PANZERSCHRECK";
+										break;
+									case WP_UNARMED_GENERAL:
+										modInfo << "_UNARMED";
+										break;
+
+									// MOH
+									// Team Assault and Team Tactics weapons
+									case WP_MG42_PORTABLE_GENERAL:
+										modInfo << "_MG42_PORTABLE";
+										break;
+									case WP_WEBLEY_GENERAL:
+										modInfo << "_WEBLEY";
+										break;
+									case WP_NAGANTREV_GENERAL:
+										modInfo << "_NAGANTREV";
+										break;
+									case WP_BERETTA_GENERAL:
+										modInfo << "_BERETTA";
+										break;
+									case WP_ENFIELD_GENERAL:
+										modInfo << "_ENFIELD";
+										break;
+									case WP_SVT_GENERAL:
+										modInfo << "_SVT";
+										break;
+									case WP_MOSIN_GENERAL:
+										modInfo << "_MOSIN";
+										break;
+									case WP_G43_GENERAL:
+										modInfo << "_G43";
+										break;
+									case WP_ENFIELDL42A_GENERAL:
+										modInfo << "_ENFIELDL42A";
+										break;
+									case WP_CARCANO_GENERAL:
+										modInfo << "_CARCANO";
+										break;
+									case WP_DELISLE_GENERAL:
+										modInfo << "_DELISLE";
+										break;
+									case WP_STEN_GENERAL:
+										modInfo << "_STEN";
+										break;
+									case WP_PPSH_GENERAL:
+										modInfo << "_PPSH";
+										break;
+									case WP_MOSCHETTO_GENERAL:
+										modInfo << "_MOSCHETTO";
+										break;
+									case WP_FG42_GENERAL:
+										modInfo << "_FG42";
+										break;
+									case WP_VICKERS_GENERAL:
+										modInfo << "_VICKERS";
+										break;
+									case WP_BREDA_GENERAL:
+										modInfo << "_BREDA";
+										break;
+									case WP_F1_GRENADE_GENERAL:
+										modInfo << "_F1_GRENADE";
+										break;
+									case WP_MILLS_GRENADE_GENERAL:
+										modInfo << "_MILLS_GRENADE";
+										break;
+									case WP_NEBELHANDGRANATE_GENERAL:
+										modInfo << "_NEBELHANDGRANATE";
+										break;
+									case WP_M18_SMOKE_GRENADE_GENERAL:
+										modInfo << "_M18_SMOKE_GRENADE";
+										break;
+									case WP_RDG1_SMOKE_GRENADE_GENERAL:
+										modInfo << "_RDG1_SMOKE_GRENADE";
+										break;
+									case WP_BOMBA_GENERAL:
+										modInfo << "_BOMBA";
+										break;
+									case WP_BOMBA_BREDA_GENERAL:
+										modInfo << "_BOMBA_BREDA";
+										break;
+									case WP_MINE_GENERAL:
+										modInfo << "_MINE";
+										break;
+									case WP_MINE_DETECTOR_GENERAL:
+										modInfo << "_MINE_DETECTOR";
+										break;
+									case WP_MINE_DETECTOR_AXIS_GENERAL:
+										modInfo << "_MINE_DETECTOR_AXIS";
+										break;
+									case WP_DETONATOR_GENERAL:
+										modInfo << "_DETONATOR";
+										break;
+									case WP_KAR98_MORTAR_GENERAL:
+										modInfo << "_KAR98_MORTAR";
+										break;
+									case WP_PIAT_GENERAL:
+										modInfo << "_PIAT";
+										break;
+
+
+									default:
+										break;
 								}
+								
 							}
 
 							if (mod = MOD_SUICIDE_GENERAL && attacker == target) { 
