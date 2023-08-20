@@ -1467,13 +1467,14 @@ typedef struct {
 	int			serverId;			// included in each client message so the server
 												// can tell if it is for a prior map_restart
 	// big stuff at end of structure so most offsets are 15 bits or less
-	clSnapshot_t	snapshots[PACKET_BACKUP];
 
 	entityState_t	entityBaselines[MAX_GENTITIES];	// for delta compression when not in previous frame
 
 	entityState_t	parseEntities[MAX_PARSE_ENTITIES];
 
-	char* mSharedMemory;
+	clSnapshot_t	snapshots[PACKET_BACKUP];
+
+	//char* mSharedMemory;
 } clientActive_t;
 
 
@@ -1700,11 +1701,11 @@ void MSG_WriteDeltaUsercmdKey(msg_t* msg, int key, usercmd_t* from, usercmd_t* t
 void MSG_ReadDeltaUsercmdKey(msg_t* msg, int key, usercmd_t* from, usercmd_t* to);
 
 void MSG_WriteDeltaEntity(msg_t* msg, struct entityState_s* from, struct entityState_s* to
-	, qboolean force, demoType_t demoType);
+	, qboolean force, demoType_t demoType, float frameTime); // frameTime is for MOHAA
 void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
 	int number, demoType_t demoType, float frameTime); // frameTime is for MOHAA
 
-void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean isVehiclePS, demoType_t demoType);
+void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean isVehiclePS, demoType_t demoType, float frameTime); // frametime is for MOHAA
 void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS);
 
 
@@ -1713,8 +1714,9 @@ void MSG_ReportChangeVectors_f(void);
 // MOHAA
 void MSG_GetNullEntityState(entityState_t* nullState);
 unsigned short MSG_ReadEntityNum(msg_t* sb, demoType_t demoType);
-float MSG_ReadServerFrameTime(msg_t* msg, demoType_t demoType, clientActive_t* clCut);
+float MSG_ReadServerFrameTime(msg_t* msg, demoType_t demoType, clientActive_t* clCut, qboolean forceConfigStringMethod);
 void MSG_ReadSounds(msg_t* msg, server_sound_t* sounds, int* snapshot_number_of_sounds);
+void MSG_WriteSounds(msg_t* msg, server_sound_t* sounds, int snapshot_number_of_sounds);
 float MSG_ReadCoord(msg_t* msg);
 void MSG_ReadDir(msg_t* msg, vec3_t dir);
 void CL_ParseCGMessageMOHAA(msg_t* msg, demoType_t demoType);
@@ -4627,7 +4629,7 @@ inline bool snapshotInfosSnapNumPredicate(const std::pair<int, SnapshotInfo> &it
 };
 
 //qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
-qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, bool& SEHExceptionCaught);
+qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader, bool& SEHExceptionCaught);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
 qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught);

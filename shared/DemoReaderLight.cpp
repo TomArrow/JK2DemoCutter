@@ -408,7 +408,7 @@ readNext:
 			//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 			//	goto cutcomplete;
 			//}
-			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType, SEHExceptionCaught)) {
+			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
 				return qfalse;
 			}
 			//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);

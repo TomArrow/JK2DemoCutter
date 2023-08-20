@@ -273,7 +273,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 				//	goto cutcomplete;
 				//}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, &demoType, SEHExceptionCaught)) {
+				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, &demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
 					goto cuterror;
 				}
 				

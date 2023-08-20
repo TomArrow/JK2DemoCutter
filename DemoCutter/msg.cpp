@@ -1295,13 +1295,13 @@ float MSG_ReadServerFrameTime_ver_15(msg_t* msg) {
 
 float MSG_ReadServerFrameTime_ver_6(msg_t* msg, clientActive_t* clCut) {
 
-	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
+	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO]; // OpenMohaa has CS_SYSTEMINFO but sv_fps is in CS_SERVERINFO
 	int maxLength = sizeof(demo.cut.Cl.gameState.stringData) - stringOffset;
-	return 1.f / atof(Info_ValueForKey(clCut->gameState.stringData + clCut->gameState.stringOffsets[CS_SYSTEMINFO], maxLength, "sv_fps"));
+	return 1.f / atof(Info_ValueForKey(clCut->gameState.stringData + clCut->gameState.stringOffsets[CS_SERVERINFO], maxLength, "sv_fps")); // OpenMohaa has CS_SYSTEMINFO but sv_fps is in CS_SERVERINFO
 }
 
-float MSG_ReadServerFrameTime(msg_t* msg, demoType_t demoType, clientActive_t* clCut) {
-	if (demoType==DM3_MOHAA_PROT_15) {
+float MSG_ReadServerFrameTime(msg_t* msg, demoType_t demoType, clientActive_t* clCut, qboolean forceConfigStringMethod) {
+	if (demoType==DM3_MOHAA_PROT_15 && !forceConfigStringMethod) {
 		return MSG_ReadServerFrameTime_ver_15(msg);
 	}
 	else {
@@ -2460,6 +2460,77 @@ void MSG_WritePackedSimple(msg_t* msg, int value, int bits)
 
 /*
 ==================
+MSG_WriteSounds
+
+write the sounds to the snapshot...
+1:1 translated from assembly code
+==================
+*/
+void MSG_WriteSounds(msg_t* msg, server_sound_t* sounds, int snapshot_number_of_sounds) {
+
+	int		i;
+
+	if (!snapshot_number_of_sounds) {
+		MSG_WriteBits(msg, 0, 1);
+	}
+	else {
+		MSG_WriteBits(msg, 1, 1);
+		MSG_WriteBits(msg, snapshot_number_of_sounds, 7);
+
+		for (i = 0; i < snapshot_number_of_sounds; i++) {
+			if (!sounds[i].stop_flag) {
+				MSG_WriteBits(msg, 0, 1);
+				MSG_WriteBits(msg, sounds[i].streamed, 1);
+
+				if (sounds[i].origin[0] == 0.0f && sounds[i].origin[1] == 0.0f && sounds[i].origin[2] == 0.0f)
+					MSG_WriteBits(msg, 0, 1);
+				else {
+					MSG_WriteBits(msg, 1, 1);
+					MSG_WriteFloat(msg, sounds[i].origin[0]);
+					MSG_WriteFloat(msg, sounds[i].origin[1]);
+					MSG_WriteFloat(msg, sounds[i].origin[2]);
+				}
+				MSG_WriteBits(msg, sounds[i].entity_number, 11);
+				MSG_WriteBits(msg, sounds[i].channel, 7);
+				MSG_WriteBits(msg, sounds[i].sound_index, 9);
+
+				if (sounds[i].volume != -1.0f) {
+					MSG_WriteBits(msg, 1, 1);
+					MSG_WriteFloat(msg, sounds[i].volume);
+				}
+				else {
+					MSG_WriteBits(msg, 0, 1);
+				}
+
+				if (sounds[i].min_dist != -1.0f) {
+					MSG_WriteBits(msg, 1, 1);
+					MSG_WriteFloat(msg, sounds[i].min_dist);
+				}
+				else {
+					MSG_WriteBits(msg, 0, 1);
+				}
+
+				if (sounds[i].pitch != -1.0f) {
+					MSG_WriteBits(msg, 1, 1);
+					MSG_WriteFloat(msg, sounds[i].pitch);
+				}
+				else {
+					MSG_WriteBits(msg, 0, 1);
+				}
+
+				MSG_WriteFloat(msg, sounds[i].maxDist);
+			}
+			else {
+				MSG_WriteBits(msg, 1, 1);
+				MSG_WriteBits(msg, sounds[i].entity_number, 10);
+				MSG_WriteBits(msg, sounds[i].channel, 7);
+			}
+		}
+	}
+}
+
+/*
+==================
 MSG_ReadSounds
 
 read the sounds from the snapshot...
@@ -2549,7 +2620,7 @@ identical, under the assumption that the in-order delta code will catch it.
 ==================
 */
 void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entityState_s *to, 
-						   qboolean force, demoType_t demoType) {
+						   qboolean force, demoType_t demoType, float frameTime) {
 	int			i, lc;
 	int			numFields;
 	const netField_t	*entityStateFieldsHere;
@@ -2557,6 +2628,9 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 	int			trunc;
 	float		fullFloat;
 	int			*fromF, *toF;
+	qboolean	deltasNeeded[146]; // MOHAA
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if (!getEntityStateFields(&entityStateFieldsHere, &numFields, demoType)) {
 		throw new std::exception("failed to get entitystatefields for writing");
@@ -2591,8 +2665,16 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 	for ( i = 0, field = entityStateFieldsHere; i < numFields ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
-		if ( *fromF != *toF ) {
-			lc = i+1;
+		if (isMOHAADemo) {
+			deltasNeeded[i] = MSG_DeltaNeeded(fromF, toF, field->type, field->bits);
+			if (deltasNeeded[i]) {
+				lc = i + 1;
+			}
+		}
+		else {
+			if (*fromF != *toF) {
+				lc = i + 1;
+			}
 		}
 	}
 
@@ -2608,7 +2690,7 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 		return;
 	}
 
-	MSG_WriteBits( msg, to->number, GENTITYNUM_BITS );
+	MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((to->number + 1) % GENTITYNUM_BITS) : to->number, GENTITYNUM_BITS ); // mohaa extensions apparently add 1 to the value and then subtract it when reading. idfk why.
 	MSG_WriteBits( msg, 0, 1 );			// not removed
 	MSG_WriteBits( msg, 1, 1 );			// we have a delta
 
@@ -2620,41 +2702,86 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 
-		if ( *fromF == *toF ) {
+		if ((!isMOHAADemo && *fromF == *toF) || (isMOHAADemo && !deltasNeeded[i]) ) {
 			MSG_WriteBits( msg, 0, 1 );	// no change
 			continue;
 		}
 
 		MSG_WriteBits( msg, 1, 1 );	// changed
 
-		if ( field->bits == 0 ) {
-			// float
-			fullFloat = *(float *)toF;
-			trunc = (int)fullFloat;
+		if (isMOHAADemo) {
+			switch (field->type) {
+				// normal style
+			case netFieldType_e::regular:
+				MSG_WriteRegular(msg, field->bits, toF,demoType);
+				break;
+			case netFieldType_e::angle:
+				MSG_WritePackedAngle(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::animTime:
+				MSG_WritePackedAnimTime(msg, *(float*)fromF, *(float*)toF, frameTime, field->bits, demoType);
+				break;
+			case netFieldType_e::animWeight:
+				MSG_WritePackedAnimWeight(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::scale:
+				MSG_WritePackedScale(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::alpha:
+				MSG_WritePackedAlpha(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::coord:
+				MSG_WritePackedCoord(msg, *(float*)fromF, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::coordExtra:
+				// Team Assault
+				MSG_WritePackedCoordExtra(msg, *(float*)fromF, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::velocity:
+				MSG_WritePackedVelocity(msg, *(float*)toF, field->bits);
+				break;
+			case netFieldType_e::simple:
+				MSG_WritePackedSimple(msg, *(int*)toF, field->bits);
+				break;
+			default:
+				Com_Error(ERR_DROP, "MSG_WriteDeltaEntity: unrecognized entity field type %i for field %i\n", field->bits, i);
+				break;
+			}
+		}
+		else {
+			if (field->bits == 0) {
+				// float
+				fullFloat = *(float*)toF;
+				trunc = (int)fullFloat;
 
-			if (fullFloat == 0.0f) {
-					MSG_WriteBits( msg, 0, 1 );
+				if (fullFloat == 0.0f) {
+					MSG_WriteBits(msg, 0, 1);
 					oldsize += FLOAT_INT_BITS;
-			} else {
-				MSG_WriteBits( msg, 1, 1 );
-				if ( trunc == fullFloat && trunc + FLOAT_INT_BIAS >= 0 && 
-					trunc + FLOAT_INT_BIAS < ( 1 << FLOAT_INT_BITS ) ) {
-					// send as small integer
-					MSG_WriteBits( msg, 0, 1 );
-					MSG_WriteBits( msg, trunc + FLOAT_INT_BIAS, FLOAT_INT_BITS );
-				} else {
-					// send as full floating point value
-					MSG_WriteBits( msg, 1, 1 );
-					MSG_WriteBits( msg, *toF, 32 );
+				}
+				else {
+					MSG_WriteBits(msg, 1, 1);
+					if (trunc == fullFloat && trunc + FLOAT_INT_BIAS >= 0 &&
+						trunc + FLOAT_INT_BIAS < (1 << FLOAT_INT_BITS)) {
+						// send as small integer
+						MSG_WriteBits(msg, 0, 1);
+						MSG_WriteBits(msg, trunc + FLOAT_INT_BIAS, FLOAT_INT_BITS);
+					}
+					else {
+						// send as full floating point value
+						MSG_WriteBits(msg, 1, 1);
+						MSG_WriteBits(msg, *toF, 32);
+					}
 				}
 			}
-		} else {
-			if (*toF == 0) {
-				MSG_WriteBits( msg, 0, 1 );
-			} else {
-				MSG_WriteBits( msg, 1, 1 );
-				// integer
-				MSG_WriteBits( msg, *toF, field->bits );
+			else {
+				if (*toF == 0) {
+					MSG_WriteBits(msg, 0, 1);
+				}
+				else {
+					MSG_WriteBits(msg, 1, 1);
+					// integer
+					MSG_WriteBits(msg, *toF, field->bits);
+				}
 			}
 		}
 	}
@@ -2897,12 +3024,15 @@ MSG_WriteDeltaPlayerstate
 
 =============
 */
-void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct playerState_s *to, qboolean isVehiclePS, demoType_t demoType) {
+void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct playerState_s *to, qboolean isVehiclePS, demoType_t demoType, float frameTime) {
 	int				i;
 	playerState_t	dummy;
 	int				statsbits;
 	int				persistantbits;
 	int				ammobits;
+	int				activeitemsbits;
+	int				ammo_amountbits;
+	int				max_ammo_amountbits;
 	int				powerupbits;
 	int				inventorybits;
 	int				numFields;
@@ -2912,6 +3042,8 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	int				*fromF, *toF;
 	float			fullFloat;
 	int				trunc, lc;
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	if (!from) {
 		from = &dummy;
@@ -2999,24 +3131,63 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		MSG_WriteBits( msg, 1, 1 );	// changed
 //		pcount[i]++;
 
-		if ( field->bits == 0 ) {
-			// float
-			fullFloat = *(float *)toF;
-			trunc = (int)fullFloat;
-
-			if ( trunc == fullFloat && trunc + FLOAT_INT_BIAS >= 0 && 
-				trunc + FLOAT_INT_BIAS < ( 1 << FLOAT_INT_BITS ) ) {
-				// send as small integer
-				MSG_WriteBits( msg, 0, 1 );
-				MSG_WriteBits( msg, trunc + FLOAT_INT_BIAS, FLOAT_INT_BITS );
-			} else {
-				// send as full floating point value
-				MSG_WriteBits( msg, 1, 1 );
-				MSG_WriteBits( msg, *toF, 32 );
+		if (isMOHAADemo) {
+			switch (field->type) {
+			case netFieldType_e::regular:
+				MSG_WriteRegularSimple(msg, field->bits, toF, demoType);
+				break;
+			case netFieldType_e::angle:
+				MSG_WritePackedAngle(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::animTime:
+				MSG_WritePackedAnimTime(msg, *(float*)fromF, *(float*)toF, frameTime, field->bits, demoType);
+				break;
+			case netFieldType_e::animWeight:
+				MSG_WritePackedAnimWeight(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::scale:
+				MSG_WritePackedScale(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::alpha:
+				MSG_WritePackedAlpha(msg, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::coord:
+				MSG_WritePackedCoord(msg, *(float*)fromF, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::coordExtra:
+				// Team Assault
+				MSG_WritePackedCoordExtra(msg, *(float*)fromF, *(float*)toF, field->bits, demoType);
+				break;
+			case netFieldType_e::velocity:
+				MSG_WritePackedVelocity(msg, *(float*)toF, field->bits);
+				break;
+			case netFieldType_e::simple:
+				MSG_WritePackedSimple(msg, *(int*)toF, field->bits);
+				break;
+			default:
+				break;
 			}
-		} else {
-			// integer
-			MSG_WriteBits( msg, *toF, field->bits );
+		}
+		else {
+			if ( field->bits == 0 ) {
+				// float
+				fullFloat = *(float *)toF;
+				trunc = (int)fullFloat;
+
+				if ( trunc == fullFloat && trunc + FLOAT_INT_BIAS >= 0 && 
+					trunc + FLOAT_INT_BIAS < ( 1 << FLOAT_INT_BITS ) ) {
+					// send as small integer
+					MSG_WriteBits( msg, 0, 1 );
+					MSG_WriteBits( msg, trunc + FLOAT_INT_BIAS, FLOAT_INT_BITS );
+				} else {
+					// send as full floating point value
+					MSG_WriteBits( msg, 1, 1 );
+					MSG_WriteBits( msg, *toF, 32 );
+				}
+			} else {
+				// integer
+				MSG_WriteBits( msg, *toF, field->bits );
+			}
 		}
 	}
 	c = msg->cursize - c;
@@ -3026,50 +3197,90 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	// send the arrays
 	//
 	statsbits = 0;
-	for (i=0 ; i<16 ; i++) {
+	int statCount = isMOHAADemo ? 32 : 16;
+	for (i=0 ; i< statCount; i++) {
 		if (to->stats[i] != from->stats[i]) {
 			statsbits |= 1<<i;
 		}
 	}
-	persistantbits = 0;
-	for (i=0 ; i<16 ; i++) {
-		if (to->persistant[i] != from->persistant[i]) {
-			persistantbits |= 1<<i;
-		}
-	}
-	ammobits = 0;
-	for (i=0 ; i<16 ; i++) {
-		if (to->ammo[i] != from->ammo[i]) {
-			ammobits |= 1<<i;
-		}
-	}
-	powerupbits = 0;
-	for (i=0 ; i<16 ; i++) {
-		if (to->powerups[i] != from->powerups[i]) {
-			powerupbits |= 1<<i;
-		}
-	}
-
-	if (demoType == DM_14) {
-		inventorybits = 0;
-		for (i = 0; i < MAX_INVENTORY; i++) {
-			if (to->inventory[i] != from->inventory[i]) {
-				inventorybits |= 1 << i;
+	if (isMOHAADemo) {
+		activeitemsbits = 0;
+		for (i = 0; i < MAX_ACTIVEITEMS; i++) {
+			if (to->activeItems[i] != from->activeItems[i]) {
+				activeitemsbits |= 1 << i;
 			}
 		}
+		ammo_amountbits = 0;
+		for (i = 0; i < MAX_AMMO_AMOUNT; i++) {
+			if (to->ammo_amount[i] != from->ammo_amount[i]) {
+				ammo_amountbits |= 1 << i;
+			}
+		}
+		ammobits = 0;
+		for (i = 0; i < MAX_WEAPONS; i++) {
+			if (to->ammo_name_index[i] != from->ammo_name_index[i]) {
+				ammobits |= 1 << i;
+			}
+		}
+		max_ammo_amountbits = 0;
+		for (i = 0; i < MAX_MAX_AMMO_AMOUNT; i++) {
+			if (to->max_ammo_amount[i] != from->max_ammo_amount[i]) {
+				max_ammo_amountbits |= 1 << i;
+			}
+		}
+		if (!statsbits && !activeitemsbits && !ammobits && !ammo_amountbits && !max_ammo_amountbits) {
+			MSG_WriteBits(msg, 0, 1);	// no change
+			oldsize += 5;
+			return;
+		}
+	}
+	else {
+		persistantbits = 0;
+		for (i = 0; i < 16; i++) {
+			if (to->persistant[i] != from->persistant[i]) {
+				persistantbits |= 1 << i;
+			}
+		}
+		ammobits = 0;
+		for (i = 0; i < 16; i++) {
+			if (to->ammo[i] != from->ammo[i]) {
+				ammobits |= 1 << i;
+			}
+		}
+		powerupbits = 0;
+		for (i = 0; i < 16; i++) {
+			if (to->powerups[i] != from->powerups[i]) {
+				powerupbits |= 1 << i;
+			}
+		}
+
+		if (demoType == DM_14) {
+			inventorybits = 0;
+			for (i = 0; i < MAX_INVENTORY; i++) {
+				if (to->inventory[i] != from->inventory[i]) {
+					inventorybits |= 1 << i;
+				}
+			}
+		}
+		if (!statsbits && !persistantbits && !ammobits && !powerupbits) {
+			MSG_WriteBits(msg, 0, 1);	// no change
+			oldsize += 4;
+			return;
+		}
 	}
 
-	if (!statsbits && !persistantbits && !ammobits && !powerupbits) {
-		MSG_WriteBits( msg, 0, 1 );	// no change
-		oldsize += 4;
-		return;
-	}
+	
 	MSG_WriteBits( msg, 1, 1 );	// changed
 
 	if ( statsbits ) {
 		MSG_WriteBits( msg, 1, 1 );	// changed
-		MSG_WriteShort( msg, statsbits );
-		for (i = 0; i < 16; i++) {
+		if (isMOHAADemo) {
+			MSG_WriteLong(msg, statsbits);
+		}
+		else {
+			MSG_WriteShort(msg, statsbits);
+		}
+		for (i = 0; i < statCount; i++) {
 
 			if (statsbits & (1 << i)) {
 				if (demoType == DM_26 || demoType == DM_25) {
@@ -3095,65 +3306,119 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		MSG_WriteBits( msg, 0, 1 );	// no change
 	}
 
+	if (isMOHAADemo) {
 
-	if ( persistantbits ) {
-		MSG_WriteBits( msg, 1, 1 );	// changed
-		MSG_WriteShort( msg, persistantbits );
-		for (i = 0; i < 16; i++) {
-			if (persistantbits & (1 << i)) {
-				if (demoType == DM_14) {
-					MSG_WriteSShort(msg, to->persistant[i]);
-				}
-				else {
-					MSG_WriteShort(msg, to->persistant[i]);
-				}
-			}
-		}
-	} else {
-		MSG_WriteBits( msg, 0, 1 );	// no change
-	}
-
-
-	if ( ammobits ) {
-		MSG_WriteBits( msg, 1, 1 );	// changed
-		MSG_WriteShort( msg, ammobits );
-		for (i = 0; i < 16; i++) {
-			if (ammobits & (1 << i)) {
-				if (demoType == DM_14) {
-					MSG_WriteSShort(msg, to->ammo[i]);
-				}
-				else {
-					MSG_WriteShort(msg, to->ammo[i]);
-				}
-			}
-		}
-	} else {
-		MSG_WriteBits( msg, 0, 1 );	// no change
-	}
-
-
-	if ( powerupbits ) {
-		MSG_WriteBits( msg, 1, 1 );	// changed
-		MSG_WriteShort( msg, powerupbits );
-		for (i=0 ; i<16 ; i++)
-			if (powerupbits & (1<<i) )
-				MSG_WriteLong( msg, to->powerups[i] );
-	} else {
-		MSG_WriteBits( msg, 0, 1 );	// no change
-	}
-
-	if (demoType == DM_14) {
-		if (inventorybits) {
+		if (activeitemsbits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
-			MSG_WriteShort(msg, inventorybits);
-			for (i = 0; i < 16; i++)
-				if (inventorybits & (1 << i))
-					MSG_WriteShort(msg, to->inventory[i]);
+			MSG_WriteBits(msg, activeitemsbits, MAX_ACTIVEITEMS);
+			for (i = 0; i < MAX_ACTIVEITEMS; i++)
+				if (activeitemsbits & (1 << i))
+					MSG_WriteShort(msg, to->activeItems[i]);
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
+
+		if (ammo_amountbits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteBits(msg, ammo_amountbits, MAX_AMMO_AMOUNT);
+			for (i = 0; i < MAX_AMMO_AMOUNT; i++)
+				if (ammo_amountbits & (1 << i))
+					MSG_WriteShort(msg, to->ammo_amount[i]);
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
+
+
+		if (ammobits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteBits(msg, ammobits, MAX_AMMO);
+			for (i = 0; i < MAX_AMMO; i++)
+				if (ammobits & (1 << i))
+					MSG_WriteShort(msg, to->ammo_name_index[i]);
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
+
+
+		if (max_ammo_amountbits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteBits(msg, max_ammo_amountbits, MAX_MAX_AMMO_AMOUNT);
+			for (i = 0; i < MAX_MAX_AMMO_AMOUNT; i++)
+				if (max_ammo_amountbits & (1 << i))
+					MSG_WriteShort(msg, to->max_ammo_amount[i]);
 		}
 		else {
 			MSG_WriteBits(msg, 0, 1);	// no change
 		}
 	}
+	else {
+
+		if (persistantbits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteShort(msg, persistantbits);
+			for (i = 0; i < 16; i++) {
+				if (persistantbits & (1 << i)) {
+					if (demoType == DM_14) {
+						MSG_WriteSShort(msg, to->persistant[i]);
+					}
+					else {
+						MSG_WriteShort(msg, to->persistant[i]);
+					}
+				}
+			}
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
+
+
+		if (ammobits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteShort(msg, ammobits);
+			for (i = 0; i < 16; i++) {
+				if (ammobits & (1 << i)) {
+					if (demoType == DM_14) {
+						MSG_WriteSShort(msg, to->ammo[i]);
+					}
+					else {
+						MSG_WriteShort(msg, to->ammo[i]);
+					}
+				}
+			}
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
+
+
+		if (powerupbits) {
+			MSG_WriteBits(msg, 1, 1);	// changed
+			MSG_WriteShort(msg, powerupbits);
+			for (i = 0; i < 16; i++)
+				if (powerupbits & (1 << i))
+					MSG_WriteLong(msg, to->powerups[i]);
+		}
+		else {
+			MSG_WriteBits(msg, 0, 1);	// no change
+		}
+
+		if (demoType == DM_14) {
+			if (inventorybits) {
+				MSG_WriteBits(msg, 1, 1);	// changed
+				MSG_WriteShort(msg, inventorybits);
+				for (i = 0; i < 16; i++)
+					if (inventorybits & (1 << i))
+						MSG_WriteShort(msg, to->inventory[i]);
+			}
+			else {
+				MSG_WriteBits(msg, 0, 1);	// no change
+			}
+		}
+	}
+	
 }
 
 

@@ -10,6 +10,9 @@ rockets: detect distance and jump height (ALSO FIX THE JUMP HEIGHT BTW, USE EV_J
 rocket: travel duration
 
 
+investigate what SNAPFLAG_RATE_DELAYED does
+
+
 
 tayst: Player speed at grab and / or at cap?
 

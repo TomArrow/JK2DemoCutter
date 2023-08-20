@@ -1498,7 +1498,7 @@ readNext:
 			//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 			//	goto cutcomplete;
 			//}
-			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType, SEHExceptionCaught)) {
+			if (!demoCutParseGamestate(&oldMsg, &thisDemo.cut.Clc, &thisDemo.cut.Cl, &demoType, (qboolean)(readGamestate==0), SEHExceptionCaught)) {
 				Com_DPrintf("[NOTE] Demo cutter, parsing gamestate failed.\n");
 				return qfalse;
 			}

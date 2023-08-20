@@ -116,6 +116,7 @@ public:
 	bool onlyLogCapturesWithSaberKills = false;
 	bool findSuperSlowKillStreaks = false;
 	bool noFindOutput = false;
+	bool testOnly = false;
 	int jumpMetaEventsLimit = 0;
 };
 
@@ -2426,6 +2427,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		}
 	}
 
+	if (opts.testOnly) return qtrue;
+
 	// Acquire the mutex for saving stuff here
 	nes::named_mutex mutex{ "DemoHighlightFinder_postAnalysis_dataSaving" };
 	std::unique_lock lock{ mutex };
@@ -3032,7 +3035,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 				//	goto cutcomplete;
 				//}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType,SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
+				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0),SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
 					goto cuterror;
 				}
 
@@ -6636,6 +6639,7 @@ int main(int argcO, char** argvO) {
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
+	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -6673,6 +6677,7 @@ int main(int argcO, char** argvO) {
 	opts.quickSkipNonSaberExclusive =  q->value();
 	opts.findSuperSlowKillStreaks = l->value();
 	opts.noFindOutput = n->value();
+	opts.testOnly = t->value();
 
 
 

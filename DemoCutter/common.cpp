@@ -4204,7 +4204,7 @@ void demoCutParseRMG(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clC
 //
 // Shared demo parsing functions
 //
-static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType) {
+static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader) {
 	int				i;
 	entityState_t* es;
 	int				newnum;
@@ -4221,8 +4221,14 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 	clcCut->connectPacketCount = 0;
 
 	if (!isMOHAADemo) {
-		// wtf?
 		Com_Memset(clCut, 0, sizeof(*clCut));
+	}
+	else {
+		// CRINGE
+		// I'm doing something wrong I think
+		// MOHAA demos just keep referencing old snaps, idk why. So I need to keep that info
+		// until I figure out wtf is going on.
+		Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
 	}
 
 	clcCut->serverCommandSequence = MSG_ReadLong(msg);
@@ -4308,7 +4314,8 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 				Com_Memset(&nullstate, 0, sizeof(nullstate));
 			}
 			es = &clCut->entityBaselines[newnum];
-			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType, 0.0f);
+			// TODO Does this make sense with serverFrameTime? OpenMOHAA just uses 0, but the actual engine uses the reference to serverFrameTime. idk. it probably just ends up being 0 for the first gamestate.
+			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType, clCut->serverFrameTime);
 		}
 		else {
 			Com_DPrintf("demoCutParseGameState: bad command byte %d (%d)", cmd, ocmd);
@@ -4319,7 +4326,15 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 	clcCut->checksumFeed = MSG_ReadLong(msg);
 
 	if (isMOHAADemo) {
-		clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut);
+		// Important note for DM3_MOHAA_PROT_15:
+		// If this is a real gamestate, serverFrameTime will yield a reasonable value.
+		// If however this is a gamestate written as a demo header in CL_Record_f,
+		// it will be missing this value and we get nonsense data here.
+		// Probably an oversight of the developers as they never intended to have demo recording
+		// really stable or functional. 
+		// Hence we pass the fourth argument "forceConfigStringMethod" if this is a demo header,
+		// but read normally if it's not (then it's a normal gamestate with that value intact).
+		clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut, isDemoHeader);
 	}
 
 	// RMG stuff (JKA specific)
@@ -4329,9 +4344,9 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 
 	return qtrue;
 }
-qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, bool& SEHExceptionCaught) {
+qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader, bool& SEHExceptionCaught) {
 	__TRY{
-		return demoCutParseGamestateReal(msg,clcCut,clCut,demoType);
+		return demoCutParseGamestateReal(msg,clcCut,clCut,demoType,isDemoHeader);
 	}
 	__EXCEPT{
 		SEHExceptionCaught = true;
@@ -4349,6 +4364,9 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	newSnap->parseEntitiesNum = clCut->parseEntitiesNum;
 	newSnap->numEntities = 0;
 	newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
+	if (demoType == DM3_MOHAA_PROT_15) {
+		newnum = (newnum - 1) % MAX_GENTITIES; // Idk why tf but that's how it is apparently.
+	}
 	while (1) {
 		// read the entity index number
 		if (oldSnap && oldindex < oldSnap->numEntities) {
@@ -4630,20 +4648,20 @@ void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg,
 			// delta update from old position
 			// because the force parm is qfalse, this will not result
 			// in any bytes being emited if the entity has not changed at all
-			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, demoType);
+			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, demoType, clCut->serverFrameTime);
 			oldindex++;
 			newindex++;
 			continue;
 		}
 		if (newnum < oldnum) {
 			// this is a new entity, send it from the baseline
-			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, demoType);
+			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue, demoType, clCut->serverFrameTime);
 			newindex++;
 			continue;
 		}
 		if (newnum > oldnum) {
 			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, demoType);
+			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, demoType, clCut->serverFrameTime);
 			oldindex++;
 			continue;
 		}
@@ -4781,6 +4799,8 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	entityState_t	nullstate;
 	char* s;
 
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
 	int maxAllowedConfigString = getMaxConfigStrings(demoType);
 
@@ -4808,14 +4828,19 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 		MSG_WriteBigString(&buf, s, demoType);
 	}
 	// baselines
-	Com_Memset(&nullstate, 0, sizeof(nullstate));
+	if (isMOHAADemo) {
+		MSG_GetNullEntityState(&nullstate);
+	}
+	else {
+		Com_Memset(&nullstate, 0, sizeof(nullstate));
+	}
 	for (i = 0; i < MAX_GENTITIES; i++) {
 		ent = &clCut->entityBaselines[i];
 		if (!ent->number) {
 			continue;
 		}
 		MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_baseline_general, demoType));
-		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue, demoType);
+		MSG_WriteDeltaEntity(&buf, &nullstate, ent, qtrue, demoType, clCut->serverFrameTime); // Is this correct? The serverFrameTime thing?
 	}
 	MSG_WriteByte(&buf, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	// finished writing the gamestate stuff
@@ -4823,6 +4848,14 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	MSG_WriteLong(&buf, clcCut->clientNum);
 	// write the checksum feed
 	MSG_WriteLong(&buf, clcCut->checksumFeed);
+
+	// This is supposed to be part of gamestate
+	// but it doesn't seem like the normal game writes this for the demo header either
+	// I guess just stay compatible here and do it the "wrong" way to not lead to a
+	// confusing amalgamation of demo formats?
+	//if (demoType == DM3_MOHAA_PROT_15) { 
+	//	MSG_WriteFloat(&buf, clCut->serverFrameTime);
+	//}
 
 	if (demoType == DM_26 || demoType == DM_25) {
 		// RMG stuff
@@ -4874,6 +4907,9 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	clSnapshot_t* frame, * oldframe;
 	int				lastframe = 0;
 	int				snapFlags;
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	if (raw) {
 		msgDataRaw.clear();
 		MSG_InitRaw(msg, &msgDataRaw);
@@ -4909,6 +4945,13 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	// send over the current server time so the client can drift
 	// its view of time to try to match
 	MSG_WriteLong(msg, frame->serverTime);
+
+	if (isMOHAADemo) {
+		if (frame->serverTimeResidual > 254) // TODO Is this handled well here/elsewhere? idk
+			MSG_WriteByte(msg, 255);
+		else MSG_WriteByte(msg, frame->serverTimeResidual);
+	}
+
 	// what we are delta'ing from
 	MSG_WriteByte(msg, lastframe);
 	snapFlags = frame->snapFlags;
@@ -4918,32 +4961,51 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
 	if (oldframe) {
-		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps,qfalse, demoType);
+		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps,qfalse, demoType, clCut->serverFrameTime);
 		if (demoType == DM_26 || demoType == DM_25) {
 			if (frame->ps.m_iVehicleNum) {
 				//then write the vehicle's playerstate too
 				if (!oldframe->ps.m_iVehicleNum) {
 					//if last frame didn't have vehicle, then the old vps isn't gonna delta
 					//properly (because our vps on the client could be anything)
-					MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue, demoType);
+					MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue, demoType, clCut->serverFrameTime);
 				}
 				else {
-					MSG_WriteDeltaPlayerstate(msg, &oldframe->vps, &frame->vps, qtrue, demoType);
+					MSG_WriteDeltaPlayerstate(msg, &oldframe->vps, &frame->vps, qtrue, demoType, clCut->serverFrameTime);
 				}
 			}
 		}
 	}
 	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse, demoType);
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse, demoType, clCut->serverFrameTime);
 		if (demoType == DM_26 || demoType == DM_25) {
 			if (frame->ps.m_iVehicleNum) {
 				//then write the vehicle's playerstate too
-				MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue,demoType);
+				MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue,demoType, clCut->serverFrameTime);
 			}
 		}
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
+
+	if (isMOHAADemo) {
+		MSG_WriteSounds(msg, frame->sounds, frame->number_of_sounds);
+
+		// TODO Maybe do this? Or naw? Not that important for now I guess
+		/*if (client->centerprint) {
+			if (client->locprint) {
+				MSG_WriteSVC(msg, svc_locprint);
+				MSG_WriteShort(msg, client->XOffset);
+				MSG_WriteShort(msg, client->YOffset);
+				MSG_WriteScrambledString(msg, client->centerprint);
+			}
+			else {
+				MSG_WriteSVC(msg, svc_centerprint);
+				MSG_WriteScrambledString(msg, client->centerprint);
+			}
+		}*/
+	}
+
 	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
@@ -5048,7 +5110,7 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 			// delta update from old position
 			// because the force parm is qfalse, this will not result
 			// in any bytes being emited if the entity has not changed at all
-			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, demoType);
+			MSG_WriteDeltaEntity(msg, oldent, newent, qfalse, demoType, clCut->serverFrameTime);
 			oldindex++;
 			oldIterator++;
 			newindex++;
@@ -5057,14 +5119,14 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 		}
 		if (newnum < oldnum) {
 			// this is a new entity, send it from the baseline
-			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue,demoType);
+			MSG_WriteDeltaEntity(msg, &clCut->entityBaselines[newnum], newent, qtrue,demoType, clCut->serverFrameTime);
 			newindex++;
 			newIterator++;
 			continue;
 		}
 		if (newnum > oldnum) {
 			// the old entity isn't present in the new message
-			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, demoType);
+			MSG_WriteDeltaEntity(msg, oldent, NULL, qtrue, demoType, clCut->serverFrameTime);
 			oldindex++;
 			oldIterator++;
 			continue;
@@ -5150,10 +5212,10 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
 	// delta encode the playerstate
 	if (doDelta) {
-		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps,qfalse, demoType);
+		MSG_WriteDeltaPlayerstate(msg, fromPS, &frame->ps,qfalse, demoType, clCut->serverFrameTime);
 	}
 	else {
-		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse,demoType );
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse,demoType, clCut->serverFrameTime);
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntitiesManual(msg, clCut, demoType, entities, fromEntities);

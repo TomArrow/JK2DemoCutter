@@ -376,6 +376,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		ext[3] = 'c';
 	}
 
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	qboolean wasFirstCommandByte = qfalse;
 	qboolean firstCommandByteRead = qfalse;
 
@@ -503,6 +505,13 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			}
 			// other commands
 			switch (cmd) {
+			case svc_centerprint_general:
+			case svc_locprint_general:
+			case svc_cgameMessage_general:
+				if (isMOHAADemo) {
+					demoCutParseMOHAASVC(&oldMsg, demoType, cmd, SEHExceptionCaught);
+					break;
+				}
 			default:
 				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 				goto cuterror;
@@ -519,7 +528,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					Com_DPrintf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					goto cutcomplete;
 				}
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, SEHExceptionCaught)) {
+				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
 					goto cuterror;
 				}
 				// Only open if none opened yet.
