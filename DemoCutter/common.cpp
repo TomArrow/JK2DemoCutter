@@ -1630,11 +1630,13 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	}
 
 	if (isMOHAADemo) {
-		VectorCopy(s->pos.trBase, ps->camera_origin);
-		VectorCopy(s->apos.trBase, ps->camera_angles);
 		ps->viewangles[0] = s->bone_angles[0][0] / 0.37f;
 		ps->viewangles[2] = s->bone_angles[0][2] / -0.4f;
+		ps->fLeanAngle = ps->viewangles[2];
 		ps->fovMOHAA = 80;
+		ps->stats[STAT_CROSSHAIR_MOH] = qtrue;
+		VectorCopy(ps->origin, ps->camera_origin);
+		VectorCopy(ps->viewangles, ps->camera_angles);
 	}
 
 
