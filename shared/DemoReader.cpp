@@ -20,7 +20,7 @@
 demoType_t DemoReader::getDemoType() {
 	return demoType;
 }
-bool DemoReader::isMOHAADemo() {
+bool DemoReader::isThisMOHAADemo() {
 	return demoTypeIsMOHAA(demoType);
 }
 int DemoReader::getMaxClients() {
@@ -247,6 +247,8 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
 	demoCutGetDemoType(sourceDemoFile, ext, oldName ,&demoType,&isCompressedFile,&thisDemo.cut.Clc);
+
+	isMOHAADemo = isThisMOHAADemo();
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
 	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
@@ -1481,6 +1483,13 @@ readNext:
 
 		// other commands
 		switch (cmd) {
+		case svc_centerprint_general:
+		case svc_locprint_general:
+		case svc_cgameMessage_general:
+			if (isMOHAADemo) {
+				demoCutParseMOHAASVC(&oldMsg, demoType, cmd, SEHExceptionCaught);
+				break;
+			}
 		default:
 			Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 			return qfalse;

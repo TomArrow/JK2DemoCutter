@@ -60,6 +60,7 @@ typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 
 class DemoReader {
 
+	bool	isMOHAADemo = false;
 	int		maxClientsThisDemo = MAX_CLIENTS;
 
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
@@ -165,7 +166,7 @@ public:
 	int getMaxClients();
 
 	demoType_t getDemoType();
-	bool isMOHAADemo();
+	bool isThisMOHAADemo();
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();
 	qboolean SeekToTime(double time);

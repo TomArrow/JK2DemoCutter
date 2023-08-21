@@ -1422,6 +1422,8 @@ std::unordered_map <std::string, int>  mohaaWeaponModelMap
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime, qboolean clientSideStyleEventConversion) {
 	int		i;
 
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	if (ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR) {
 		s->eType = specializeGameValue<GMAP_ENTITYTYPE,UNSAFE>(ET_INVISIBLE_GENERAL,demoType);
 	}
@@ -1430,6 +1432,10 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	}
 	else {
 		s->eType = specializeGameValue<GMAP_ENTITYTYPE, UNSAFE>(ET_PLAYER_GENERAL, demoType);;
+	}
+
+	if (isMOHAADemo) {
+		s->parent = ENTITYNUM_NONE;
 	}
 
 	s->number = ps->clientNum;
@@ -1603,6 +1609,8 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues, playerState_t* baseState, qboolean enhanceOnly) {
 	int		i;
 
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	if (!enhanceOnly) {
 		ps->clientNum = s->number;
 	}
@@ -1620,6 +1628,15 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	if (!enhanceOnly || VectorDistance(s->apos.trBase, ps->viewangles) > 2.0f) {  // If we are enhancing only: Entity values here are snapped (rounded) so they will reduce precision UNLESS we are moving sufficiently fast to justify using them anyway
 		VectorCopy(s->apos.trBase, ps->viewangles);
 	}
+
+	if (isMOHAADemo) {
+		VectorCopy(s->pos.trBase, ps->camera_origin);
+		VectorCopy(s->apos.trBase, ps->camera_angles);
+		ps->viewangles[0] = s->bone_angles[0][0] / 0.37f;
+		ps->viewangles[2] = s->bone_angles[0][2] / -0.4f;
+		ps->fovMOHAA = 80;
+	}
+
 
 	ps->legsFlip = s->legsFlip;// JK3
 	ps->torsoFlip = s->torsoFlip;// JK3
@@ -1782,7 +1799,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 				ps->viewheight = CROUCH_VIEWHEIGHT;
 			}
 			else {
-				ps->viewheight = DEFAULT_VIEWHEIGHT;
+				ps->viewheight = isMOHAADemo ? 82 : DEFAULT_VIEWHEIGHT;
 			}
 		}
 
@@ -5162,6 +5179,9 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	clSnapshot_t* frame;// , * oldframe;
 	int				lastframe = 0;
 	int				snapFlags;
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	if (raw) {
 		msgDataRaw.clear();
 		MSG_InitRaw(msg, &msgDataRaw);
@@ -5203,6 +5223,13 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	// send over the current server time so the client can drift
 	// its view of time to try to match
 	MSG_WriteLong(msg, frame->serverTime);
+
+	if (isMOHAADemo) {
+		if (frame->serverTimeResidual > 254) // TODO Is this handled well here/elsewhere? idk
+			MSG_WriteByte(msg, 255);
+		else MSG_WriteByte(msg, frame->serverTimeResidual);
+	}
+
 	// what we are delta'ing from
 	MSG_WriteByte(msg, lastframe);
 	snapFlags = frame->snapFlags;
@@ -5219,6 +5246,25 @@ void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, file
 	}
 	// delta encode the entities
 	demoCutEmitPacketEntitiesManual(msg, clCut, demoType, entities, fromEntities);
+
+	if (isMOHAADemo) {
+		MSG_WriteSounds(msg, frame->sounds, frame->number_of_sounds);
+
+		// TODO Maybe do this? Or naw? Not that important for now I guess
+		/*if (client->centerprint) {
+			if (client->locprint) {
+				MSG_WriteSVC(msg, svc_locprint);
+				MSG_WriteShort(msg, client->XOffset);
+				MSG_WriteShort(msg, client->YOffset);
+				MSG_WriteScrambledString(msg, client->centerprint);
+			}
+			else {
+				MSG_WriteSVC(msg, svc_centerprint);
+				MSG_WriteScrambledString(msg, client->centerprint);
+			}
+		}*/
+	}
+
 	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }

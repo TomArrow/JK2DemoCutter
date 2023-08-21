@@ -55,6 +55,13 @@ qboolean DemoReaderLight::PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapsh
 #endif
 
 
+demoType_t DemoReaderLight::getDemoType() {
+	return demoType;
+}
+bool DemoReaderLight::isThisMOHAADemo() {
+	return demoTypeIsMOHAA(demoType);
+}
+
 entityState_t* DemoReaderLight::findEntity(int number) {
 	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 
@@ -81,6 +88,8 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&thisDemo, 0, sizeof(thisDemo));
 	demoCutGetDemoType(sourceDemoFile, ext, oldName, &demoType, &isCompressedFile, &thisDemo.cut.Clc);
+
+	isMOHAADemo = isThisMOHAADemo();
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
 
@@ -391,6 +400,13 @@ readNext:
 
 		// other commands
 		switch (cmd) {
+		case svc_centerprint_general:
+		case svc_locprint_general:
+		case svc_cgameMessage_general:
+			if (isMOHAADemo) {
+				demoCutParseMOHAASVC(&oldMsg, demoType, cmd, SEHExceptionCaught);
+				break;
+			}
 		default:
 			Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
 			return qfalse;

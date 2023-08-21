@@ -52,7 +52,15 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 	//strncpy_s(outputNameNoExt, sizeof(outputNameNoExt), outputName, strlen(outputName) - 6);
 
+#if MOHAAANGLEDEBUG
+	float tmpBig=0, tmpSmall=0;
+	float tmpBigPS=0, tmpSmallPS=0;
+#endif
+
 	demoCutGetDemoType(outputName,ext, outputNameNoExt ,&demoType, &createCompressedOutput);
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
 		demoType = DM_15;
@@ -142,13 +150,16 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		return qfalse;
 	}
 
+	std::string playerSearchStdString = playerSearchString;
+	int reframeClientNum = demoReader->reader.getClientNumForDemo(&playerSearchStdString);
+
 	// Write demo header
+	if (isMOHAADemo) {
+		demo.cut.Clc.clientNum = reframeClientNum;
+	}
 	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType,createCompressedOutput);
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;
-
-	std::string playerSearchStdString = playerSearchString;
-	int reframeClientNum = demoReader->reader.getClientNumForDemo(&playerSearchStdString);
 
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	std::map<int, entityState_t> playerEntities;
@@ -219,18 +230,50 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 					}*/
 				}
 
-
+				//
+				// Note:
+				// MOHAA doesn't seem to send proper view angles for entities
+				// But it sends bone_angles and for bone_angles[0] (head) the equation is something like:
+				// bone_angle[0] = view_angle[0] -  0.90f * view_angle[0] * 0.70f
+				// So bone_angle/0.37f roughly gives us the proper view angle? Not sure though, have to verify.
+				//
+				//
 
 				// Copy all entities
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
 					if (it->first != mainPlayerPS.clientNum) {
 						//if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
+#if MOHAAANGLEDEBUG
+						if (it->second.number < 64) {
+							if (it->second.bone_angles[0][0]/0.37f < tmpSmall) {
+								tmpSmall = it->second.bone_angles[0][0] / 0.37f;
+							}
+							if (it->second.bone_angles[0][0] / 0.37f > tmpBig) {
+								tmpBig = it->second.bone_angles[0][0] / 0.37f;
+							}
+							//std::cout << it->second.apos.trBase[0] << "," << it->second.apos.trBase[1] << "," << it->second.apos.trBase[2] << "\n";
+							//std::cout << it->second.number << ": " << it->second.bone_angles[0][0] << "," << it->second.bone_angles[0][1] << "," << it->second.bone_angles[0][2] << "\n";
+							
+						}
+#endif
+							if (it->second.parent == reframeClientNum) {
+								continue;
+							}
 							playerEntities[it->first] = it->second;
 						//	entityIsInterpolated[it->first] = snapIsInterpolated;
 						//}
 					}
 				}
+#if MOHAAANGLEDEBUG
+				if (tmpPS.viewangles[0] < tmpSmallPS) {
+					tmpSmallPS = tmpPS.viewangles[0];
+				}
+				if (tmpPS.viewangles[0] > tmpBigPS) {
+					tmpBigPS = tmpPS.viewangles[0];
+				}
+				std::cout << tmpSmall << "," << tmpBig << ","<< tmpSmallPS << "," << tmpBigPS << "\n";
+#endif
 
 				if (tmpPS.clientNum != reframeClientNum) {
 					Com_Memset(&tmpES, 0, sizeof(tmpES));

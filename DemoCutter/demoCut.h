@@ -1035,10 +1035,11 @@ typedef struct playerState_s {
 		
 
 
-		struct { // 136 bytes (not counting the stats-like fields)
+		struct { // 140 bytes (not counting the stats-like fields)
 			// OpenMOHAA:
 			int			net_pm_flags;	// ducked, jump_held, etc
 			int			feetfalling;
+			float		fovMOHAA;
 
 			float		fLeanAngle;
 			int			iNetViewModelAnim;

@@ -462,7 +462,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					int maxLength;
 					const char* playerCS = demoReaders[i].reader.GetPlayerConfigString(p,&maxLength);
 					const char* playerTeam = Info_ValueForKey(playerCS,maxLength,"t");
-					const char* playerName = Info_ValueForKey(playerCS,maxLength,demoReaders[i].reader.isMOHAADemo() ? "name" :"n");
+					const char* playerName = Info_ValueForKey(playerCS,maxLength,demoReaders[i].reader.isThisMOHAADemo() ? "name" :"n");
 					if (strlen(playerTeam) && atoi(playerTeam) < TEAM_SPECTATOR) { // Don't copy non-existent players and don't copy spectators
 						if (playerExistsAsEntity[p]) {
 							demoReaders[i].playersToCopy.push_back({ p,(float)lowestPingsHere[p],asAnimEnts });

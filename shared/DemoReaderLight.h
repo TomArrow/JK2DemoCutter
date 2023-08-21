@@ -8,6 +8,7 @@
 
 class DemoReaderLight {
 
+	bool	isMOHAADemo = false;
 	int		maxClientsThisDemo;
 
 	std::map<int, int> lastEvent;
@@ -66,7 +67,8 @@ class DemoReaderLight {
 
 public:
 
-
+	demoType_t getDemoType();
+	bool isThisMOHAADemo();
 	qboolean SeekToTime(int time);
 	qboolean SeekToCommandTime(int serverTime);
 	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
