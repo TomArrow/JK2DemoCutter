@@ -230,6 +230,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 					}*/
 				}
 
+				mainPlayerPS.clientNum = reframeClientNum;
+
 				//
 				// Note:
 				// MOHAA doesn't seem to send proper view angles for entities
@@ -243,7 +245,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
 					//if (it->first != mainPlayerPS.clientNum) {
-					if (it->first != reframeClientNum) {
+					if (it->first != reframeClientNum || isMOHAADemo) {
 						//if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
 
 #if MOHAAANGLEDEBUG
@@ -259,9 +261,9 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 							
 						}
 #endif
-							if (isMOHAADemo && it->second.parent == reframeClientNum) {
-								continue;
-							}
+							//if (isMOHAADemo && it->second.parent == reframeClientNum) {
+							//	continue;
+							//}
 							playerEntities[it->first] = it->second;
 						//	entityIsInterpolated[it->first] = snapIsInterpolated;
 						//}

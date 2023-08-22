@@ -628,14 +628,18 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		if (isMOHAADemo) {
 			if (snap->mohaaPlayerWeapon[clientNum] != -1) {
 				int mohaaWeaponNum = specializeGameValue<GMAP_WEAPONS, UNSAFE>(snap->mohaaPlayerWeapon[clientNum], demoType);
-				const char* csWeaponName = mohWeaponsCSNames[mohaaWeaponNum];
+				const mohWeaponInfo_t* weaponInfo = &mohWeaponsInfo[mohaaWeaponNum];
+				const char* csWeaponName = weaponInfo->csName;
+				retVal.stats[STAT_EQUIPPED_WEAPON_MOH] = weaponInfo->weaponClassBitmask;
+				retVal.stats[STAT_WEAPONS_MOH] = weaponInfo->weaponClassBitmask;
 				if (*csWeaponName) { // Check for empty string
 
 					for (int i = CS_WEAPONS_MOH; i < CS_SOUNDTRACK_MOH; i++) { // from 1748 to 1881 but I think 1881 is too high of a limit actually but whatever, won't hurt.
 						const char* compareWeaponName = this->GetConfigString(i, NULL);
 						if (!_stricmp(csWeaponName, compareWeaponName)) {
 							retVal.activeItems[1] = i- CS_WEAPONS_MOH;
-							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_IDLE_MOH-1 : VM_ANIM_IDLE_MOH;
+							//retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_IDLE_MOH-1 : VM_ANIM_IDLE_MOH;
+							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_FIRE_MOH-1 : VM_ANIM_FIRE_MOH;
 							break;
 						}
 					}
