@@ -605,6 +605,44 @@ const static int etEventToGeneralMap[] = {
 #define CS_RAIN_NUMSHADERS_MOH_OLD		22
 
 
+#define	MINS_Z_MOH				0
+#define  MINS_X_MOH               -15
+#define  MINS_Y_MOH               -15
+#define  MAXS_X_MOH               15
+#define  MAXS_Y_MOH               15
+
+#define	MINS_Z_MOH				   0		// IneQuation: bounding box and viewheights to match MoHAA
+#define  MAXS_Z_MOH               96
+
+#define DEAD_MINS_Z_MOH				32
+#define CROUCH_MAXS_Z_MOH			49
+#define DEFAULT_VIEWHEIGHT_MOH		82
+#define CROUCH_RUN_VIEWHEIGHT_MOH	64
+#define JUMP_START_VIEWHEIGHT_MOH	52
+#define CROUCH_VIEWHEIGHT_MOH		48
+#define PRONE_VIEWHEIGHT_MOH		16
+#define DEAD_VIEWHEIGHT_MOH			8
+
+
+enum vmAnimMoh_e {
+	VM_ANIM_DISABLED_MOH,
+	VM_ANIM_IDLE_MOH,
+	VM_ANIM_CHARGE_MOH,
+	VM_ANIM_FIRE_MOH,
+	VM_ANIM_FIRE_SECONDARY_MOH,
+	VM_ANIM_RECHAMBER_MOH,
+	VM_ANIM_RELOAD_MOH,
+	VM_ANIM_RELOAD_SINGLE_MOH,
+	VM_ANIM_RELOAD_END_MOH,
+	VM_ANIM_PULLOUT_MOH,
+	VM_ANIM_PUTAWAY_MOH,
+	VM_ANIM_LADDERSTEP_MOH,
+	VM_ANIM_IDLE_0_MOH,
+	VM_ANIM_IDLE_1_MOH,
+	VM_ANIM_IDLE_2_MOH,
+};
+
+
 enum animPrefix_e {
 	WPREFIX_NONE,
 	WPREFIX_PAPERS,
@@ -711,6 +749,60 @@ static const int mohWeaponsToGeneral[] = {
 	WP_DETONATOR_GENERAL,
 	WP_KAR98_MORTAR_GENERAL,
 	WP_PIAT_GENERAL
+};
+
+static const char* mohWeaponsCSNames[] = {
+	"",//WP_NONE_GENERAL,
+	"Papers",//WP_PAPERS_GENERAL,
+	"Colt 45",//WP_COLT45_GENERAL,
+	"Walther P38",//WP_P38_GENERAL,
+	"Hi-Standard Silenced",//WP_HISTANDARD_GENERAL,
+	"M1 Garand",//WP_GARAND_GENERAL,
+	"Mauser KAR 98K",//WP_KAR98_GENERAL,
+	"KAR98 - Sniper",//WP_KAR98SNIPER_GENERAL,
+	"Springfield '03 Sniper",//WP_SPRINGFIELD_GENERAL,
+	"Thompson",//WP_THOMPSON_GENERAL,
+	"MP40",//WP_MP40_GENERAL,
+	"BAR",//WP_BAR_GENERAL,
+	"StG 44",//WP_MP44_GENERAL,
+	"Frag Grenade",//WP_FRAGGRENADE_GENERAL,
+	"Stielhandgranate",//WP_STIELHANDGRANATE_GENERAL,
+	"Bazooka",//WP_BAZOOKA_GENERAL,
+	"Panzerschreck",//WP_PANZERSCHRECK_GENERAL,
+	"Shotgun",//WP_SHOTGUN_GENERAL,
+	"",//WP_UNARMED_GENERAL,
+	//
+	// Team Assault and Team Tactics weapons
+	"Packed MG42 Turret",//WP_MG42_PORTABLE_GENERAL,
+	"Webley Revolver",//WP_WEBLEY_GENERAL,
+	"Nagant Revolver",//WP_NAGANTREV_GENERAL,
+	"Beretta",//WP_BERETTA_GENERAL,
+	"Lee-Enfield",//WP_ENFIELD_GENERAL,
+	"SVT 40",//WP_SVT_GENERAL,
+	"Mosin Nagant Rifle",//WP_MOSIN_GENERAL,
+	"G 43",//WP_G43_GENERAL,
+	"Enfield L42A1",//WP_ENFIELDL42A_GENERAL,
+	"Carcano",//WP_CARCANO_GENERAL,
+	"DeLisle",//WP_DELISLE_GENERAL,
+	"Sten Mark II",//WP_STEN_GENERAL,
+	"PPSH SMG",//WP_PPSH_GENERAL,
+	"Moschetto",//WP_MOSCHETTO_GENERAL,
+	"FG 42",//WP_FG42_GENERAL,
+	"Vickers-Berthier",//WP_VICKERS_GENERAL,
+	"Breda",//WP_BREDA_GENERAL,
+	"F1 Grenade",//WP_F1_GRENADE_GENERAL,
+	"Mills Grenade",//WP_MILLS_GRENADE_GENERAL,
+	"Nebelhandgranate",//WP_NEBELHANDGRANATE_GENERAL,
+	"M18 Smoke Grenade",//WP_M18_SMOKE_GRENADE_GENERAL,
+	"RDG-1 Smoke Grenade",//WP_RDG1_SMOKE_GRENADE_GENERAL,
+	"Bomba A Mano",//WP_BOMBA_GENERAL,
+	"Bomba A Mano Breda",//WP_BOMBA_BREDA_GENERAL,
+	"LandmineAllies",//WP_MINE_GENERAL, - "LandmineAxis" has the same WPrefix ... damn
+	"Minedetector",//WP_MINE_DETECTOR_GENERAL,
+	"Minensuchgerat",//WP_MINE_DETECTOR_AXIS_GENERAL,
+	"",//WP_DETONATOR_GENERAL, (dunno what their configstrings are)
+	"",//WP_KAR98_MORTAR_GENERAL, (dunno what their configstrings are)
+	"PIAT",//WP_PIAT_GENERAL
 };
 
 typedef enum {

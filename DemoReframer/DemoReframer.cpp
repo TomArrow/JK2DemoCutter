@@ -242,8 +242,10 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				// Copy all entities
 				// Entities from other demos will automatically overwrite entities from this demo.
 				for (auto it = snapInfoHere->entities.begin(); it != snapInfoHere->entities.end(); it++) {
-					if (it->first != mainPlayerPS.clientNum) {
+					//if (it->first != mainPlayerPS.clientNum) {
+					if (it->first != reframeClientNum) {
 						//if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
+
 #if MOHAAANGLEDEBUG
 						if (it->second.number < 64) {
 							if (it->second.bone_angles[0][0]/0.37f < tmpSmall) {
@@ -257,7 +259,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 							
 						}
 #endif
-							if (it->second.parent == reframeClientNum) {
+							if (isMOHAADemo && it->second.parent == reframeClientNum) {
 								continue;
 							}
 							playerEntities[it->first] = it->second;

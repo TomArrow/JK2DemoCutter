@@ -282,6 +282,17 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	memset(lastGottenEventsTime, 0, sizeof(lastGottenEventsTime));
 	memset(lastGottenEventsServerTime, 0, sizeof(lastGottenEventsServerTime));
 
+	// MOHAA
+	if(isMOHAADemo){
+		Com_Memset(mohaaPlayerWeapon, 0, sizeof(mohaaPlayerWeapon));
+		Com_Memset(mohaaPlayerWeaponModelIndex, 0, sizeof(mohaaPlayerWeaponModelIndex));
+		for (int i = 0; i < maxClientsThisDemo; i++) {
+			mohaaPlayerWeaponModelIndex[i] = -1;
+		}
+		Com_Memset(mohaaPlayerWeaponModelIndexThisFrame, 0, sizeof(mohaaPlayerWeaponModelIndexThisFrame));
+	}
+
+
 	for (int i = 0; i < MAX_CLIENTS_MAX; i++) {
 		firstPacketWithPlayer[i] = -1;
 		lastKnownPacketWithPlayer[i] = -1;
@@ -613,6 +624,25 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		// Need to convert the entity.
 		if (baseSnapIt != nullSnapIt && playerStateSourceSnap) *playerStateSourceSnap = baseSnapIt;
 		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second.playerState : &basePlayerStates[clientNum]);
+
+		if (isMOHAADemo) {
+			if (snap->mohaaPlayerWeapon[clientNum] != -1) {
+				int mohaaWeaponNum = specializeGameValue<GMAP_WEAPONS, UNSAFE>(snap->mohaaPlayerWeapon[clientNum], demoType);
+				const char* csWeaponName = mohWeaponsCSNames[mohaaWeaponNum];
+				if (*csWeaponName) { // Check for empty string
+
+					for (int i = CS_WEAPONS_MOH; i < CS_SOUNDTRACK_MOH; i++) { // from 1748 to 1881 but I think 1881 is too high of a limit actually but whatever, won't hurt.
+						const char* compareWeaponName = this->GetConfigString(i, NULL);
+						if (!_stricmp(csWeaponName, compareWeaponName)) {
+							retVal.activeItems[1] = i- CS_WEAPONS_MOH;
+							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_IDLE_MOH-1 : VM_ANIM_IDLE_MOH;
+							break;
+						}
+					}
+				}
+			}
+		}
+
 		//CG_EntityStateToPlayerState(thisEntity, &retVal,demoType,qtrue,baseSnap != -1 ? &snapshotInfos[baseSnap].playerState : &basePlayerStates[clientNum]);
 
 		if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
@@ -1526,6 +1556,10 @@ readNext:
 				return qfalse;
 			}
 
+			for (int i = 0; i < maxClientsThisDemo; i++) {
+				mohaaPlayerWeaponModelIndexThisFrame[i] = -1;
+			}
+
 			if (thisDemo.cut.Cl.lastSnapshotFinishedParsing) { // it can return true if the last snapshot was invalid too. but then we dont do this.
 				SnapshotInfo snapshotInfo;
 				snapshotInfo.serverTime = thisDemo.cut.Cl.snap.serverTime;
@@ -1547,8 +1581,48 @@ readNext:
 						}
 						snapshotInfo.hasPlayer[thisEntity->number] = qtrue;
 					}
+					else if (isMOHAADemo && thisEntity->parent > 0 && thisEntity->parent < maxClientsThisDemo && generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEntity->eType, demoType) == ET_ITEM_GENERAL && (thisEntity->eFlags & EF_SENTIENT_MOH)/* && && (thisEs->eFlags & EF_WEAPON_MOH)*/) { // Don't ask me why weapons have EF_SENTIENT and not EF_WEAPON...
+
+					 //static int tagNumUsage[1000]{};
+					 //tagNumUsage[thisEs->tag_num]++;
+					 // Magic tag numbers. Seem to be the ones for main held weapon. 22 and 55. Used by far the most.
+					 // There is others that happen to be used sometimes like 14 for snipers. I'm guessing that means they're strapped onto someone's back or sth because the snipers can also have 22/55
+					 // General observed usage (with sample count as example): 
+					 // 
+					 // 3 (47), 5(400), 6(191), 14 (11555), 22 (347807), 23 (11), 29 (6024), 40 (1243), 52 (90908)
+						if (thisEntity->tag_num == 52 || thisEntity->tag_num == 22) {
+
+							int configStringBaseIndex = getCS_MODELS(demoType); //(demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
+							if (mohaaPlayerWeaponModelIndexThisFrame[thisEntity->parent] != -1) {
+								int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + mohaaPlayerWeaponModelIndexThisFrame[thisEntity->parent]];
+								char* modelName2 = thisDemo.cut.Cl.gameState.stringData + offset;
+								offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + thisEntity->modelindex];
+								char* modelName = thisDemo.cut.Cl.gameState.stringData + offset;
+								std::cerr << "Weird. MOHAA weapon for player found twice. Duplicate? " << modelName << " vs. " << modelName2 << "\n";
+							}
+							if (thisEntity->modelindex != mohaaPlayerWeaponModelIndex[thisEntity->parent]) {
+								// Model changed. Update weapons array.
+
+								// Detecting weapons players are carrying
+								int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + thisEntity->modelindex];
+								//if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+								std::string weaponModel = thisDemo.cut.Cl.gameState.stringData + offset;
+								auto foundModel = mohaaWeaponModelMap.find(weaponModel);
+								if (foundModel != mohaaWeaponModelMap.end()) {
+									mohaaPlayerWeapon[thisEntity->parent] = generalizeGameValue<GMAP_WEAPONS, UNSAFE>(foundModel->second, demoType);
+								}
+								else {
+									mohaaPlayerWeapon[thisEntity->parent] = WP_NONE_GENERAL;
+								}
+
+							}
+							mohaaPlayerWeaponModelIndexThisFrame[thisEntity->parent] = thisEntity->modelindex;
+							mohaaPlayerWeaponModelIndex[thisEntity->parent] = thisEntity->modelindex;
+						}
+					}
 				}
 				Com_Memcpy(snapshotInfo.areamask, thisDemo.cut.Cl.snap.areamask, sizeof(thisDemo.cut.Cl.snap.areamask));
+				Com_Memcpy(snapshotInfo.mohaaPlayerWeapon, mohaaPlayerWeapon, sizeof(mohaaPlayerWeapon));
 				snapshotInfo.snapNum = thisDemo.cut.Cl.snap.messageNum;
 				snapshotInfo.playerState = thisDemo.cut.Cl.snap.ps;
 				snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&thisDemo.cut.Cl.oldSnap, &thisDemo.cut.Cl.snap);

@@ -83,6 +83,10 @@ class DemoReader {
 	int firstPacketWithPlayerState[MAX_CLIENTS_MAX];
 	int lastKnownPacketWithPlayerState[MAX_CLIENTS_MAX];
 
+	int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
+	int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
+	int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
+
 
 	SnapshotInfoMap snapshotInfos;
 	std::vector<Command> readCommands;

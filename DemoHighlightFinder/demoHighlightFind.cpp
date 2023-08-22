@@ -1434,9 +1434,11 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 }
 
 template<unsigned int max_clients>
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts,bool& wasDoingSQLiteExecution) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution) {
 	
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
+	if ((searchMode == SEARCH_MY_CTF_RETURNS || searchMode == SEARCH_ALL_MY_KILLS) && spreeInfo->countThirdPersons == spreeInfo->countKills) return;
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS || spreeInfo->countRets >= 2) { // gotta be at least 3 kills or 2 rets to count as killstreak
 		int countSaberKills = 0;
@@ -5850,7 +5852,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// This kill is not part of a killspree. Reset.
 								// But first, check if this concludes an existing killspree that we can now save.
 								if (countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, sharedVars.oldBasename, sharedVars.oldPath, sharedVars.oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
+									CheckSaveKillstreak<max_clients>(maxTimeHere,&spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, sharedVars.oldBasename, sharedVars.oldPath, sharedVars.oldDemoDateModified, demoType,opts,searchMode,wasDoingSQLiteExecution);
 								}
 
 								// Reset.
@@ -5863,7 +5865,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 						}
 						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
-							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, sharedVars.oldBasename, sharedVars.oldPath, sharedVars.oldDemoDateModified, demoType,opts,wasDoingSQLiteExecution);
+							CheckSaveKillstreak<max_clients>(maxTimeHere, &spreeInfo, clientNumAttacker, &killsOfThisSpree, &victims, &hashes, allKillsHashSS.str(), demoCurrentTime, io, bufferTime, lastGameStateChangeInDemoTime, sourceDemoFile, sharedVars.oldBasename, sharedVars.oldPath, sharedVars.oldDemoDateModified, demoType,opts,searchMode,wasDoingSQLiteExecution);
 						}
 
 					}

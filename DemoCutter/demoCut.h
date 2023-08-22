@@ -4612,6 +4612,7 @@ public:
 	std::map<int, entityState_t> entities;
 	std::map<int, int> playerCommandOrServerTimes;
 	qboolean hasPlayer[MAX_CLIENTS_MAX]{};
+	int mohaaPlayerWeapon[MAX_CLIENTS_MAX]{};
 	playerState_t playerState;
 	int serverTime;
 	byte areamask[MAX_MAP_AREA_BYTES];
@@ -4965,6 +4966,10 @@ inline int specializeGameValue(int value, demoType_t targetDemoType) {
 inline bool demoTypeIsMOHAA(demoType_t demoType) {
 	return demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
 }
+
+
+void IntegerToBoundingBox(int num, vec3_t mins, vec3_t maxs);
+
 
 /*
 template<gameMappingType_t T>

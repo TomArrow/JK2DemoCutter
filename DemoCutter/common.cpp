@@ -1630,6 +1630,42 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	}
 
 	if (isMOHAADemo) {
+		if (s->solid) {
+			vec3_t mins, maxs;
+			IntegerToBoundingBox(s->solid, mins, maxs);
+			switch ((int)maxs[2]) { // Very bad way of doing this tbh. idk. different places of the code say different values. sigh
+			case 94:
+			case MAXS_Z_MOH:
+				if (maxs[2] == 94.0f && mins[2] == 54.0f) { // Don't ask it's probably wrong anyway
+					ps->viewheight = CROUCH_RUN_VIEWHEIGHT_MOH;
+				}
+				else {
+					ps->viewheight = DEFAULT_VIEWHEIGHT_MOH;
+				}
+				break;
+			case 54:// But supposedly prone AND ducked in one place of the code? idk
+			case CROUCH_MAXS_Z_MOH:
+				ps->viewheight = CROUCH_VIEWHEIGHT_MOH;
+				break;
+			case 60:
+			case 53:
+				ps->viewheight = CROUCH_RUN_VIEWHEIGHT_MOH;
+				break;
+			case 52:
+				ps->viewheight = JUMP_START_VIEWHEIGHT_MOH;
+				break;
+			case 20:
+				ps->viewheight = PRONE_VIEWHEIGHT_MOH;
+				break;
+			default:
+				ps->viewheight = DEFAULT_VIEWHEIGHT_MOH;
+				break;
+			}
+		}
+		else {
+			ps->viewheight = DEFAULT_VIEWHEIGHT_MOH; // Idk, sometimes solid isn't set for whatever reason.
+		}
+		
 		ps->viewangles[0] = s->bone_angles[0][0] / 0.37f;
 		ps->viewangles[2] = s->bone_angles[0][2] / -0.4f;
 		ps->fLeanAngle = ps->viewangles[2];
@@ -1787,21 +1823,23 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 				ps->fd.saberDrawAnimLevel = ps->fd.saberAnimLevel = s->fireflag;
 			}
 
-			int generalizedLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(s->legsAnim,demoType);
+			if(!isMOHAADemo){
+				int generalizedLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(s->legsAnim,demoType);
 
-			// This is my own stuff: (restoring viewheight)
-			if (s->eFlags & EF_DEAD) {
-				ps->viewheight = DEAD_VIEWHEIGHT;
-			}
-			else if (
-				(generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_GENERAL //|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
-				|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK_GENERAL || (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK_GENERAL
+				// This is my own stuff: (restoring viewheight)
+				if (s->eFlags & EF_DEAD) {
+					ps->viewheight = DEAD_VIEWHEIGHT;
+				}
+				else if (
+					(generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_GENERAL //|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
+					|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK_GENERAL || (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK_GENERAL
 			
-				) {
-				ps->viewheight = CROUCH_VIEWHEIGHT;
-			}
-			else {
-				ps->viewheight = isMOHAADemo ? 82 : DEFAULT_VIEWHEIGHT;
+					) {
+					ps->viewheight = CROUCH_VIEWHEIGHT;
+				}
+				else {
+					ps->viewheight = DEFAULT_VIEWHEIGHT;
+				}
 			}
 		}
 
@@ -5351,6 +5389,40 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 
 
 
+
+
+/*
+=================
+IntegerToBoundingBox (MOHAA)
+=================
+*/
+#define BBOX_XBITS 9
+#define BBOX_YBITS 8
+#define BBOX_ZBOTTOMBITS 5
+#define BBOX_ZTOPBITS 9
+#define BBOX_MAX_X ( 1 << BBOX_XBITS )
+#define BBOX_MAX_Y ( 1 << BBOX_YBITS )
+#define BBOX_MAX_BOTTOM_Z ( 1 << ( BBOX_ZBOTTOMBITS - 1 ) )
+#define BBOX_REALMAX_BOTTOM_Z ( 1 << BBOX_ZBOTTOMBITS )
+#define BBOX_MAX_TOP_Z ( 1 << BBOX_ZTOPBITS )
+void IntegerToBoundingBox(int num, vec3_t mins, vec3_t maxs)
+{
+	int x, y, zd, zu;
+
+	x = num & (BBOX_MAX_X - 1);
+	y = (num >> (BBOX_XBITS)) & (BBOX_MAX_Y - 1);
+	zd = (num >> (BBOX_XBITS + BBOX_YBITS)) & (BBOX_REALMAX_BOTTOM_Z - 1);
+	zd -= BBOX_MAX_BOTTOM_Z;
+	zu = (num >> (BBOX_XBITS + BBOX_YBITS + BBOX_ZBOTTOMBITS)) & (BBOX_MAX_TOP_Z - 1);
+
+	mins[0] = -x;
+	mins[1] = -y;
+	mins[2] = zd;
+
+	maxs[0] = x;
+	maxs[1] = y;
+	maxs[2] = zu;
+}
 
 #ifdef DEBUG
 #define DEBUG_MOHAA_STRINGMATCH
