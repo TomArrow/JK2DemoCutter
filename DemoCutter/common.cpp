@@ -1871,7 +1871,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 			ps->fd.forcePower = baseState->fd.forcePower;
 			ps->stats[STAT_HEALTH] = baseState->stats[STAT_HEALTH];
 			ps->stats[STAT_ARMOR] = baseState->stats[STAT_ARMOR];
-			ps->stats[STAT_MAX_HEALTH] = baseState->stats[STAT_MAX_HEALTH];
+			ps->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = baseState->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH];
 		}
 	}
 
@@ -1879,16 +1879,17 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 
 }
 
-void EnhancePlayerStateWithBaseState(playerState_t* ps, playerState_t* baseState) {
+void EnhancePlayerStateWithBaseState(playerState_t* ps, playerState_t* baseState, demoType_t demoType) {
 	int		i;
 
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 	Com_Memcpy(ps->persistant, baseState->persistant, sizeof(ps->persistant));
 	if (ps->stats[STAT_HEALTH] > 0 && baseState->stats[STAT_HEALTH] > 0) { // don't copy positive health into a dead entity
 		//Com_Memcpy(ps->stats,baseState->stats,sizeof(ps->stats));
 		ps->fd.forcePower = baseState->fd.forcePower;
 		ps->stats[STAT_HEALTH] = baseState->stats[STAT_HEALTH];
 		ps->stats[STAT_ARMOR] = baseState->stats[STAT_ARMOR];
-		ps->stats[STAT_MAX_HEALTH] = baseState->stats[STAT_MAX_HEALTH];
+		ps->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = baseState->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH];
 	}
 
 }

@@ -1416,7 +1416,7 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 		int team = atoi(Info_ValueForKey(playerCS, maxLength, "t"));
 		basePlayerStates[i].persistant[PERS_TEAM] = team;
 		basePlayerStates[i].stats[STAT_HEALTH] = 100;
-		basePlayerStates[i].stats[STAT_MAX_HEALTH] = 100;
+		basePlayerStates[i].stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = 100;
 	}
 }
 

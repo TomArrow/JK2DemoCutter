@@ -361,7 +361,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 							else {
 								if (IsBetterTime(time, mainPlayerRealPSPartsServerTime, snapInfoHere->serverTime)) {
 									// Upgrade playerstate data only if it's actually better
-									EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS); // Just update health/armor and stuff like that. Not a godlike solution but eh.
+									EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS, demoType); // Just update health/armor and stuff like that. Not a godlike solution but eh.
 									mainPlayerRealPSPartsServerTime = snapInfoHere->serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
 								}
 								//if (IsBetterTime(time, mainPlayerServerTime, snapInfoHere->serverTime)) {
@@ -428,7 +428,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 							}
 							else if (isBetterPlayerStateData) {
 								// Upgrade playerstate data only if it's actually better
-								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS2); // Just update health/armor and stuff like that. Not a godlike solution but eh.
+								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS2, demoType); // Just update health/armor and stuff like that. Not a godlike solution but eh.
 								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
 							}
 							else if (isBetterEntityStateData) {
