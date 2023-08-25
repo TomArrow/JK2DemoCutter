@@ -638,8 +638,8 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 						const char* compareWeaponName = this->GetConfigString(i, NULL);
 						if (!_stricmp(csWeaponName, compareWeaponName)) {
 							retVal.activeItems[1] = i- CS_WEAPONS_MOH;
-							//retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_IDLE_MOH-1 : VM_ANIM_IDLE_MOH;
-							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_FIRE_MOH-1 : VM_ANIM_FIRE_MOH;
+							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_IDLE_MOH-1 : VM_ANIM_IDLE_MOH;
+							//retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_FIRE_MOH-1 : VM_ANIM_FIRE_MOH;
 							break;
 						}
 					}
