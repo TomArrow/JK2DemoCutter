@@ -196,6 +196,11 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	std::string playerSearchStdString = playerSearchString;
 	int reframeClientNum = demoReader->reader.getClientNumForDemo(&playerSearchStdString);
 
+	if (reframeClientNum == -1) {
+		Com_DPrintf("Failed to find matching player.\n");
+		return qfalse;
+	}
+
 	// Write demo header
 	if (isMOHAADemo) {
 		demo.cut.Clc.clientNum = reframeClientNum;

@@ -226,7 +226,7 @@ demoTime_t timeParse(std::string timeText) {
 
 
 //qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
-qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const std::vector<std::string>* metaDataStrings, bool noForcedMeta) {
+qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const std::vector<std::string>* metaDataStrings, bool noForcedMeta, const char* reframeString) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -758,6 +758,52 @@ cuterror:
 		CloseHandle(hFile);
 	}
 #endif
+
+	//
+	if (reframeString) {
+
+		std::cout << "Reframing after cutting... \n";
+
+		char			reframedFilename[MAX_OSPATH];
+
+		int baseFilenameLength = strlen(newName) - strlen(ext);
+		strncpy_s(reframedFilename,newName, baseFilenameLength); // Get filename without extension.
+		reframedFilename[baseFilenameLength] = 0; // Null-terminate it.
+		strncat_s(reframedFilename, "_reframe", sizeof("_reframe")-1); // TODO uh am i using this correctly?
+		strncat_s(reframedFilename, ext, strlen(ext)); // TODO uh am i using this correctly?
+
+		for (int i = 0; i < 2; i++) {
+
+
+			std::stringstream cmdLine;
+			//cmdLine << "\"";
+#ifndef WIN32
+			if (i == 0) cmdLine << "./"; // First try calling reframer .exe in same directory.
+#endif
+			cmdLine << "DemoReframer \"" << newName << "\" \"" << reframedFilename << "\" \"" << reframeString << "\"";
+			std::cout << "trying: " << cmdLine.str() << "\n";
+			int returnValue = system(cmdLine.str().c_str());
+			if (!returnValue) {
+				// Success
+				std::cout << "Reframe seems successful.\n";
+				break;
+			}
+			else {
+				if (i == 0) {
+
+					std::cout << "Reframe apparently unsuccessful. Trying global executable path next.\n";
+				}
+				else {
+					std::cout << "Reframe apparently failed, sorry.\n";
+				}
+			}
+#ifdef WIN32
+			break; // On linux, we try ./DemoReframer and then just DemoReframer to always prefer same folder. On Windows that's default behavior anyway so no need to try twice
+#endif
+		}
+	}
+
+
 	return ret;
 }
 
@@ -797,6 +843,7 @@ int main(int argcO, char** argvO) {
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto m = op.add<popl::Value<std::string>>("m", "meta", "Optionally, add {}-enclosed JSON data that will be attached past the end of an empty first message in the demo.");
 	auto n = op.add<popl::Switch>("n", "no-forced-meta", "Don't write any metadata at all if neither --meta is supplied nor metadata found in original demofile. By default a 'of' key is added containing the original demo filename. This is overridden by an 'of' value existing already in the demo to be cut.");
+	auto r = op.add<popl::Value<std::string>>("r", "reframe", "Optionally, reframe by calling reframer using system() call on the output file. Value same as would be with DemoReframer: Search string or clientnum");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -856,9 +903,12 @@ int main(int argcO, char** argvO) {
 	}
 	//std::string metaData = m->is_set() ? m->value() : "";
 
+	std::string reframeString = r->is_set() ? r->value() : "";
+	const char* reframeStringC = r->is_set() ? reframeString.c_str() : NULL;
+
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	//if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL, n->is_set())) {
-	if (demoCut(demoName, startTime, endTime, outputName, &metaDataStrings, n->is_set())) {
+	if (demoCut(demoName, startTime, endTime, outputName, &metaDataStrings, n->is_set(), reframeStringC)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
