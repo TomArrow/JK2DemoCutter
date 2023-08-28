@@ -3908,8 +3908,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 				}
 
+
 #ifdef DEBUGSTATSDB
-				if(generalizeGameValue<GMAP_WEAPONS, UNSAFE>( demo.cut.Cl.snap.ps.weapon,demoType)==WP_SABER_GENERAL){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
+				if(!isMOHAADemo && generalizeGameValue<GMAP_WEAPONS, UNSAFE>( demo.cut.Cl.snap.ps.weapon,demoType)==WP_SABER_GENERAL){ // TODO Maybe add saber on/off here too? Because saber off might have same anim always?
 					
 					animStanceKey keyHere = { demoType,demo.cut.Cl.snap.ps.saberHolstered,demo.cut.Cl.snap.ps.torsoAnim & ~getANIM_TOGGLEBIT(demoType),demo.cut.Cl.snap.ps.legsAnim & ~getANIM_TOGGLEBIT(demoType),demo.cut.Cl.snap.ps.saberMove,demo.cut.Cl.snap.ps.fd.saberAnimLevel };  // torsoAnim,legsAnim,saberMove,stance
 					animStanceCounts[keyHere]++;
@@ -3964,8 +3965,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						headJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
 					}
 				}
-				
-				{ // Playerstate events... uhm experimental?
+
+
+
+				if(!isMOHAADemo){ // Playerstate events... uhm experimental?
 					psEventData_t psEventData = demoCutGetEvent(&demo.cut.Cl.snap.ps, &demo.cut.Cl.oldSnap.ps,demoCurrentTime);
 
 					// Ok this confirms he took damage.
@@ -3985,6 +3988,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						jumpDetected[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 					}
 				}
+
 
 				// Fire events
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities + 1; pe++) { // +1 is so we can process the fake event entities created from parsing prints in MOHAA
