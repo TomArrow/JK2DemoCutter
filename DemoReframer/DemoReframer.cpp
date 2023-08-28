@@ -8,6 +8,8 @@
 #include <otherGameStuff.h>
 #include <otherGameStuff2.h>
 
+#include "tsl/htrie_map.h"
+
 // TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -24,8 +26,49 @@ public:
 
 
 
+tsl::htrie_map<char, int> playerNamesToClientNums;
+qboolean clientNameIsDuplicate[MAX_CLIENTS_MAX];
 
 
+
+void updatePlayerDemoStats(DemoReader* reader) {
+
+	bool isMOHAADemo = reader->isThisMOHAADemo();
+
+	if (!isMOHAADemo) return;
+
+	int max_clients = reader->getMaxClients();
+
+	if (isMOHAADemo) {
+		playerNamesToClientNums.clear();
+		Com_Memset(clientNameIsDuplicate, 0, sizeof(clientNameIsDuplicate));
+	}
+
+	int maxLength = 0;
+	int CS_PLAYERS_here = getCS_PLAYERS(reader->getDemoType());
+	for (int i = 0; i < max_clients; i++) {
+		const char* playerInfo = reader->GetConfigString(CS_PLAYERS_here + i, &maxLength);
+		std::string playerName = Info_ValueForKey(playerInfo, maxLength, isMOHAADemo ? "name" : "n");
+
+		if (isMOHAADemo && *playerInfo) { // Don't insert non existing players.
+			auto existingName = playerNamesToClientNums.find(playerName.c_str());
+			if (existingName != playerNamesToClientNums.end()) {
+				int otherClientNum = existingName.value();
+				clientNameIsDuplicate[otherClientNum] = qtrue;
+				clientNameIsDuplicate[i] = qtrue;
+				// Can't do this in reframer atm TODO
+				//if (playerLastSeen[i] > playerLastSeen[otherClientNum]) {
+				//	// Prioritize this player because he was seen more recently (duplicates could be lagged out connections). SHITTY solution, especially since it's only triggered during CS change.
+				//	// TODO FIX THIS omg
+				//	playerNamesToClientNums[playerName.c_str()] = i;
+				//}
+			}
+			else {
+				playerNamesToClientNums[playerName.c_str()] = i; // The lowest client number with that name will be accepted... kinda dumb but idk.
+			}
+		}
+	}
+}
 
 
 #ifdef RELDEBUG
@@ -156,10 +199,17 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	// Write demo header
 	if (isMOHAADemo) {
 		demo.cut.Clc.clientNum = reframeClientNum;
+
 	}
+
+	int CS_PLAYERS_here = getCS_PLAYERS(demoReader->reader.getDemoType());
+
+
 	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType,createCompressedOutput);
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;
+
+	updatePlayerDemoStats(&demoReader->reader);
 
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	std::map<int, entityState_t> playerEntities;
@@ -287,11 +337,65 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 
 				// Get new commands
+				bool anyConfigStringcommands = false;
 				std::vector<std::string> newCommandsHere = demoReader->reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
+					bool skipMessage = false;
+					if (isMOHAADemo) { // For MOHAA we have to add "You killed XXX" messages and also remove them in case they were part of the original demo (so we only get them in the right angle).
+
+						const char* command = newCommandsHere[c].c_str();
+						Cmd_TokenizeString(command);
+
+						char* cmd = Cmd_Argv(0);
+
+						if (!strcmp(cmd, "print")) {
+							
+							static const char youKilledPrefix[] = "\x03You killed";
+							static const int youKilledPrefixLength = sizeof(youKilledPrefix)-1;
+							static char youKilledPrefixCompare[youKilledPrefixLength+1];
+
+							strncpy_s(youKilledPrefixCompare, Cmd_Argv(1), youKilledPrefixLength);
+							youKilledPrefixCompare[youKilledPrefixLength] = 0;
+
+							if (!_stricmp(youKilledPrefix, youKilledPrefixCompare)) {
+								skipMessage = true; // It's a "You killed XXX" message. Dump it. We're recreating these from scratch.
+							}
+							else {
+
+								// If it's not, check if it's a death message.
+								entityState_t* deathEvent = parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
+								if (deathEvent) {
+									int				target = deathEvent->otherEntityNum;
+									int				attacker = deathEvent->otherEntityNum2;
+									if (attacker == reframeClientNum) {
+										if (target != reframeClientNum) {
+
+											int maxLength = 0;
+											const char* playerInfo = demoReader->reader.GetConfigString(CS_PLAYERS_here + target, &maxLength);
+											const char* playerName = Info_ValueForKey(playerInfo, maxLength, isMOHAADemo ? "name" : "n");
+											std::string newMsg = va("print \"\x03You killed %s\n\"", playerName);
+											commandsToAdd.push_back(newMsg);
+										}
+										else {
+
+											std::string newMsg = va("print \"\x03You killed yourself\n\""); 
+											commandsToAdd.push_back(newMsg);
+										}
+									}
+
+									delete deathEvent;
+								}
+							}
+
+						}
+						else if (!strcmp(cmd, "cs")) {
+							anyConfigStringcommands = true;
+						}
+					}
+
 					//if (i == 0) { // This is the main reference demo. Just add this stuff.
-						commandsToAdd.push_back(newCommandsHere[c]);
+						if(!skipMessage) commandsToAdd.push_back(newCommandsHere[c]);
 					/* }
 					else {
 						// Check if it's a dupe. Not a perfect solution as it won't properly deal with duplicated chat messages that only exist in a latter demo,
@@ -307,6 +411,10 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 							commandsToAdd.push_back(newCommandsHere[c]);
 						}
 					}*/
+				}
+
+				if (anyConfigStringcommands) {
+					updatePlayerDemoStats(&demoReader->reader); // TODO Also do this if gamestate. Somehow.
 				}
 
 			}

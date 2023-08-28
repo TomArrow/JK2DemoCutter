@@ -1667,8 +1667,9 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		}
 		
 		ps->viewangles[0] = s->bone_angles[0][0] / 0.37f;
-		ps->viewangles[2] = s->bone_angles[0][2] / -0.4f;
-		ps->fLeanAngle = ps->viewangles[2];
+		//ps->viewangles[2] = s->bone_angles[0][2] / -0.4f;
+		//ps->fLeanAngle = ps->viewangles[2];
+		ps->fLeanAngle = s->bone_angles[0][2] / -0.4f;
 		ps->fovMOHAA = 80;
 		ps->stats[STAT_CROSSHAIR_MOH] = qtrue;
 		VectorCopy(ps->origin, ps->camera_origin);
