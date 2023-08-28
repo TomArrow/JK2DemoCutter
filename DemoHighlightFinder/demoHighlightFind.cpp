@@ -117,6 +117,7 @@ public:
 	bool findSuperSlowKillStreaks = false;
 	bool noFindOutput = false;
 	bool testOnly = false;
+	bool reframeIfNeeded = false;
 	int jumpMetaEventsLimit = 0;
 };
 
@@ -455,7 +456,8 @@ class MetaEventTracker { // kill for meta events
 	int64_t demoTime;
 	int64_t demoTimeStart;
 	int bufferTimeReal;
-	bool trackResultingCaptures = false;
+	bool trackResultingCaptures = false; 
+	
 	
 	inline void addEvent(MetaEvent* metaEventAbs) {
 		int delta = (int)(metaEventAbs->demoTime - demoTime);
@@ -463,6 +465,9 @@ class MetaEventTracker { // kill for meta events
 		metaEvents.push_back(metaEvent);
 	}
 public:
+	bool needsReframe = false;
+	int reframeClientNum = -1; // If reframing is active, the target client number is here. When evaluating later it is checked whether this player has been followed throughout. If not, reframe.
+
 	MetaEventTracker(int64_t demoTimeA,SQLDelayedQueryWrapper_t* queryWrapperA,MetaEventTracker* previousA, int bufferTime, int duration,bool trackResultingCapturesA) {
 		demoTime = demoTimeA;
 		queryWrapper = queryWrapperA;
@@ -473,7 +478,7 @@ public:
 	}
 	~MetaEventTracker() {
 		// Dump metaEvents into query
-		if (queryWrapper && metaEvents.size()) { // Let's be sure
+		if (queryWrapper) { // Let's be sure
 
 			std::sort(metaEvents.begin(),metaEvents.end(), [](MetaEvent_Kill a, MetaEvent_Kill b)
 				{
@@ -486,26 +491,33 @@ public:
 			int ledToTeamCaptures = 0;
 			int ledToTeamCapturesAfter = 0;
 
-			// string for SQL
 			std::stringstream ss;
-			ss << "{\"me\":\"";
-			for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
-				ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type]<< it->relativeTime;
-				if (trackResultingCaptures && it->type == METAEVENT_CAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track self (by killer) captures resulting from thing.
-					ledToCaptures++;
-					if (it->relativeTime >= 0) {
-						ledToCapturesAfter++;
+
+			if (metaEvents.size()) {
+				// string for SQL
+				ss << "{\"me\":\"";
+				for (auto it = metaEvents.begin(); it != metaEvents.end(); it++) {
+					ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type] << it->relativeTime;
+					if (trackResultingCaptures && it->type == METAEVENT_CAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track self (by killer) captures resulting from thing.
+						ledToCaptures++;
+						if (it->relativeTime >= 0) {
+							ledToCapturesAfter++;
+						}
+					}
+					if (trackResultingCaptures && it->type == METAEVENT_TEAMCAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track team captures resulting from thing.
+						ledToTeamCaptures++;
+						if (it->relativeTime >= 0) {
+							ledToTeamCapturesAfter++;
+						}
 					}
 				}
-				if (trackResultingCaptures && it->type == METAEVENT_TEAMCAPTURE && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track team captures resulting from thing.
-					ledToTeamCaptures++;
-					if (it->relativeTime >= 0) {
-						ledToTeamCapturesAfter++;
-					}
-				}
+				ss << "\"}";
+				queryWrapper->query.add("@metaEvents", ss.str());
 			}
-			ss << "\"}";
-			queryWrapper->query.add("@metaEvents", ss.str());
+			else {
+
+				queryWrapper->query.add("@metaEvents", SQLDelayedValue_NULL);
+			}
 
 			// String for .bat
 			if (queryWrapper->batchString1.size() || queryWrapper->batchString2.size()) {
@@ -516,6 +528,11 @@ public:
 					ss << (it == metaEvents.begin() ? "" : ",") << metaEventKeyNames[it->type] << (bufferTimeReal+it->relativeTime); // TODO Compensate for demo not starting at exact correct millisecond.
 				}
 				ss << "\\\"}\"";
+
+				if (reframeClientNum != -1 && needsReframe) {
+					ss << " --reframe " << reframeClientNum;
+				}
+
 				queryWrapper->batchSuffix = ss.str();
 			}
 
@@ -572,9 +589,6 @@ public:
 				queryWrapper->query.add("@resultingCapturesAfter", SQLDelayedValue_NULL);
 			}
 		}
-		else {
-			queryWrapper->query.add("@metaEvents", SQLDelayedValue_NULL);
-		}
 
 		if (destroyPrevious) { // Avoid recursion. This loop is only called on the latest kill that's being deleted.
 
@@ -618,6 +632,20 @@ public:
 			old->previous = NULL;
 		}
 	}
+	// Mark all the democuts into the past maxTimeDelta (democut buffer time typically) as requiring a reframe (because player not followed or not visible)
+	inline void setReframeRequired(int64_t demoTime, int maxTimeDelta, bool purgeOlder = true) {
+		MetaEventTracker* current = this;
+		MetaEventTracker* old = NULL;
+		while (current && current->demoTime >= demoTime - maxTimeDelta) { // Using demoTime here because we're adding new events to a past tracker. They can be up to "timeDelta" after the end of a tracker timespan.
+			current->needsReframe = true;
+			old = current;
+			current = current->previous;
+		}
+		if (purgeOlder && old && current) { // this is only true if we arrive at one that's too old. Otherwise current will be NULL. It will also never be true if current == this (don't want to delete ourselves) because then old would be NULL.
+			delete current; // No need to delete the ones before it as the destructor handles that automatically
+			old->previous = NULL;
+		}
+	}
 };
 
 typedef enum MetaEventTrackerType { // We're not gonna do it for defrag becaue we can't tell when a defrag run is starting in all cases.
@@ -648,6 +676,16 @@ inline void addMetaEvent(metaEventType_t type, int64_t demoTime, int clientNum, 
 	for (int i = 0; i < METRACKER_TOTAL_COUNT; i++) {
 		if (metaEventTrackers[i][clientNum]) {
 			metaEventTrackers[i][clientNum]->addEventRecursive(theEvent, bufferTime, true);
+		}
+	}
+}
+
+inline void setReframeRequired(int64_t demoTime, int clientNum, const ExtraSearchOptions& opts, int bufferTime) {
+	
+	if (!opts.reframeIfNeeded) return;
+	for (int i = 0; i < METRACKER_TOTAL_COUNT; i++) {
+		if (metaEventTrackers[i][clientNum]) {
+			metaEventTrackers[i][clientNum]->setReframeRequired(demoTime, bufferTime, true);
 		}
 	}
 }
@@ -1580,6 +1618,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 		if (clientNumAttacker >= 0 && clientNumAttacker < max_clients) {
 			MetaEventTracker* killSpreeME = new MetaEventTracker(spreeInfo->lastKillTime, queryWrapper, metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker], bufferTime, spreeInfo->totalTime,true);
+			bool wasFollowedThroughBufferTime = playerFirstFollowed[clientNumAttacker] != -1 && playerFirstFollowed[clientNumAttacker] < (demo.cut.Cl.snap.serverTime - spreeInfo->totalTime - bufferTime);
+			killSpreeME->reframeClientNum = clientNumAttacker;
+			killSpreeME->needsReframe = !wasFollowedThroughBufferTime;
 			killSpreeME->addPastEvents(playerPastMetaEvents[clientNumAttacker], getMinimumMetaEventBufferTime(clientNumAttacker, bufferTime, demoCurrentTime));
 			metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker] = killSpreeME;
 		}
@@ -5347,6 +5388,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							addMetaEvent(METAEVENT_DEATH, demoCurrentTime, target, bufferTime, opts,bufferTime);
 							if(attacker >= 0 && attacker < max_clients && target != attacker){
 								MetaEventTracker* killME = new MetaEventTracker(demoCurrentTime, angleQueryWrapper, metaEventTrackers[METRACKER_KILLS][attacker],bufferTime,0,true);
+								bool wasFollowedThroughBufferTime = playerFirstFollowed[attacker] != -1 && playerFirstFollowed[attacker] < (demo.cut.Cl.snap.serverTime - bufferTime);
+								killME->reframeClientNum = attacker;
+								killME->needsReframe = !wasFollowedThroughBufferTime;
 								killME->addPastEvents(playerPastMetaEvents[attacker], getMinimumMetaEventBufferTime(attacker,bufferTime,demoCurrentTime));
 								addMetaEvent(victimIsFlagCarrier ? METAEVENT_RETURN : METAEVENT_KILL, demoCurrentTime, attacker, bufferTime, opts, bufferTime);
 								metaEventTrackers[METRACKER_KILLS][attacker] = killME;
@@ -5702,6 +5746,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 							// Meta event tracker for capture
 							MetaEventTracker* capME = new MetaEventTracker(demoCurrentTime, queryWrapper, metaEventTrackers[METRACKER_CAPTURES][playerNum], bufferTime, flagHoldTime, false);
+							bool wasFollowedThroughBufferTime = playerFirstFollowed[playerNum] != -1 && playerFirstFollowed[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime - bufferTime);
+							capME->needsReframe = !wasFollowedThroughBufferTime;
+							capME->reframeClientNum = playerNum;
 							capME->addPastEvents(playerPastMetaEvents[playerNum], getMinimumMetaEventBufferTime(playerNum, bufferTime, demoCurrentTime));
 							addMetaEvent(METAEVENT_CAPTURE, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
 							metaEventTrackers[METRACKER_CAPTURES][playerNum] = capME;
@@ -5982,6 +6029,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 					}
 					else {
+						// Set reframe required.
+						if (playerFirstFollowed[p] != -1) {
+							// Little optimization. Went from followed to not followed. 
+							// Don't wanna set this every single frame we're not followed.
+							setReframeRequired(demoCurrentTime, p, opts, bufferTime);
+						}
+
+						// Set not followed
 						playerFirstFollowed[p] = -1;
 					}
 					if (clientVisibleOrFollowed) {
@@ -6642,6 +6697,7 @@ int main(int argcO, char** argvO) {
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
+	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -6680,6 +6736,7 @@ int main(int argcO, char** argvO) {
 	opts.findSuperSlowKillStreaks = l->value();
 	opts.noFindOutput = n->value();
 	opts.testOnly = t->value();
+	opts.reframeIfNeeded = r->value();
 
 
 
