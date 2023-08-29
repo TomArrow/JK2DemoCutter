@@ -295,6 +295,7 @@ typedef struct _iobuf
 
 
 #define	MAX_STRING_CHARS	1024	// max length of a string passed to Cmd_TokenizeString
+#define	MAX_STRING_CHARS_MAX 2048	// MOHAA...
 #define	MAX_STRING_TOKENS	1024	// max tokens resulting from Cmd_TokenizeString
 #define	MAX_TOKEN_CHARS		1024	// max length of an individual token
 #define	MAX_INFO_STRING		1024
@@ -1573,7 +1574,7 @@ typedef struct {
 	// these are our reliable messages that go to the server
 	int			reliableSequence;
 	int			reliableAcknowledge;		// the last one the server has executed
-	char		reliableCommands[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS];
+	char		reliableCommands[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS_MAX];
 
 	// server message (unreliable) and command (reliable) sequence
 	// numbers are NOT cleared at level changes, but continue to
@@ -1587,7 +1588,7 @@ typedef struct {
 	int			serverCommandSequence;
 	int			lastPreExecutedServerCommand;		// last server command grabbed or executed with CL_GetServerCommand
 	int			lastExecutedServerCommand;		// last server command grabbed or executed with CL_GetServerCommand
-	char		serverCommands[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS];
+	char		serverCommands[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS_MAX];
 
 	// file transfer from server
 	fileHandle_t download;

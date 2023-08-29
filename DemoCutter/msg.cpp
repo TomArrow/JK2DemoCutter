@@ -647,10 +647,10 @@ void MSG_WriteString( msg_t *sb, const char *s, demoType_t demoType ) {
 		}
 	} else {
 		int		l,i;
-		char	string[MAX_STRING_CHARS];
+		char	string[MAX_STRING_CHARS_MAX];
 
 		l = strlen( s );
-		if ( l >= MAX_STRING_CHARS ) {
+		if ( l >= (isMOHAADemo ? MAX_STRING_CHARS_MAX : MAX_STRING_CHARS) ) {
 			Com_DPrintf( "MSG_WriteString: MAX_STRING_CHARS" );
 			if (isMOHAADemoWithScrambledString) {
 				MSG_WriteByte(sb, StrCharToNetByte[0]);
@@ -823,7 +823,7 @@ float MSG_ReadFloat( msg_t *msg ) {
 }
 
 char *MSG_ReadString( msg_t *msg, demoType_t demoType ) {
-	static char	string[MAX_STRING_CHARS];
+	static char	string[MAX_STRING_CHARS_MAX];
 	int		l,c;
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
@@ -905,7 +905,7 @@ char *MSG_ReadBigString( msg_t *msg, demoType_t demoType) {
 }
 
 char *MSG_ReadStringLine( msg_t *msg/*, demoType_t demoType*/) {
-	static char	string[MAX_STRING_CHARS];
+	static char	string[MAX_STRING_CHARS_MAX];
 	int		l,c;
 
 	l = 0;

@@ -4475,7 +4475,7 @@ static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t*
 	}
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
-	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS, s, sizeof(clcCut->serverCommands[index]));
+	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS_MAX, s, sizeof(clcCut->serverCommands[index]));
 }
 qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught) {
 	__TRY{
