@@ -378,7 +378,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 						if (!strcmp(cmd, "print")) {
 							
-							static const char youKilledPrefix[] = "\x03You killed";
+							static const char youKilledPrefix[] = "\x03You killed"; // "Has matado a ti mismo" / "Has matado a &&&"
 							static const int youKilledPrefixLength = sizeof(youKilledPrefix)-1;
 							static char youKilledPrefixCompare[youKilledPrefixLength+1];
 

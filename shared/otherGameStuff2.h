@@ -1581,30 +1581,98 @@ static const tsl::htrie_map<char, mohMeansOfDeath_t> mohMeansOfDeathArray = {
 	{"shot himself",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	{"shot himself in the",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	//{"died",{qtrue,qtrue,"",MOD_NONE_MOH}},  // Could also be MOD_FAST_BULLET  // Can't tell this apart from no client attacker
+	
+	
+	// Spanish versions: (yeah I know, cancer)
+	// Client attacker
+	{"fue aplastado por",{qtrue,qfalse,{},MOD_CRUSH_MOH}},
+	{"fue hecho trizas por",{qtrue,qfalse,{},MOD_TELEFRAG_MOH}},
+	{"fue empotrado en la pared por",{qtrue,qfalse,{},MOD_FALLING_MOH}},
+	{"fue sorprendido por",{qtrue,qfalse,{},MOD_EXPLOSION_MOH}},
+	{"Tropezó sobre",{qtrue,qfalse,{" con una granada"},MOD_GRENADE_MOH}}, // OpenMOHAA misspells as "'s' grenade"
+	{"es cogido",{qtrue,qfalse,{" quitándole los dientes"},MOD_GRENADE_MOH}}, // OpenMOHAA misspells as "'s' shrapnel out of his teeth"
+	{"ha sido alcanzado por",{qtrue,qfalse,{" con un misilazo en la boca"," con un bazookazo en la cara"},MOD_ROCKET_MOH}},
+	{"fue puesto fuera de combate por",{qtrue,qfalse,{},MOD_IMPACT_MOH}},
+	//{"fue disparado por",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH}}, // sadly same as the rifle specific one in spanish.
+	{"fue fusilado por",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_PISTOL}},
+	{"fue abatido con un rifle de francotirador por",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE,qtrue}},
+	{"fue disparado por",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_RIFLE}},
+	{"fue acribillado por",{qtrue,qfalse,{" con un SMG"},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_SMG}}, // OpenMOHAA misspells as "'s' SMG"
+	{"fue cosido a balazos por",{qtrue,qfalse,{},MOD_FAST_BULLET_MOH,MOH_WEAPON_CLASS_MG}},
+	{"fue atropellado por",{qtrue,qfalse,{},MOD_VEHICLE_MOH}},
+	{"fue abrasado por",{qtrue,qfalse,{},MOD_FIRE_MOH}}, // Can also be MOD_LAVA, MOD_SLIME, MOD_ON_FIRE
+	{"fue empalado por",{qtrue,qfalse,{},MOD_IMPALE_MOH}},
+	{"fue fuertemente golpeado por",{qtrue,qfalse,{},MOD_BASH_MOH}},
+	{"fue aporreado por",{qtrue,qfalse,{},MOD_BASH_MOH}},
+	{"fue perseguido y cazado por",{qtrue,qfalse,{},MOD_SHOTGUN_MOH}},
+	{"fue perdigoneado por",{qtrue,qfalse,{},MOD_SHOTGUN_MOH}},
+	{"fue asesinado por",{qtrue,qfalse,{},MOD_NONE_MOH}},
+
+	// No client attacker
+	{"fue achicharrado por",{qfalse,qfalse,{},MOD_LAVA_MOH}}, // Could also be MOD_SLIME
+	{"cráterizo",{qfalse,qfalse,{},MOD_FALLING_MOH}},
+	{"explotó",{qfalse,qfalse,{},MOD_EXPLOSION_MOH}}, // Could also be MOD_GRENADE
+	{"coges cohetes",{qfalse,qfalse,{},MOD_ROCKET_MOH}},
+	{"fue disparado en el/la",{qfalse,qfalse,{},MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
+	{"fue disparado",{qfalse,qfalse,{},MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
+	{"murio",{qfalse,qfalse,{},MOD_NONE_MOH}},
+
+	// Self kill
+	{"se mató",{qtrue,qtrue,{},MOD_SUICIDE_MOH}},
+	//{"was burned to a crisp",{qtrue,qtrue,"",MOD_LAVA_MOH}}, // Could also be MOD_SLIME // Can't tell this apart from no client attacker
+	//{"cratered",{qtrue,qtrue,"",MOD_FALLING_MOH}},  // Can't tell this apart from no client attacker
+	{"te explotaste tu mismo",{qtrue,qtrue,{},MOD_EXPLOSION_MOH}},
+	{"Te eliminaste tu mismo",{qtrue,qtrue,{},MOD_GRENADE_MOH}},
+	{"Tropezó encima de su propia granada",{qtrue,qtrue,{},MOD_GRENADE_MOH}},
+	{"Te lanzaste un bazookazo",{qtrue,qtrue,{},MOD_ROCKET_MOH}},
+	{"Se disparó el mismo",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
+	{"Se disparó él mismo",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
+	//{"died",{qtrue,qtrue,"",MOD_NONE_MOH}},  // Could also be MOD_FAST_BULLET  // Can't tell this apart from no client attacker
 
 
 };
 
 static const tsl::htrie_map<char, int> mohKillLocationArray = {
-	{"head",0},
-	{"helmet",1},
-	{"neck",2},
-	{"upper torso",3},
-	{"middle torso",4},
-	{"lower torso",5},
-	{"pelvis",6},
-	{"upper right arm",7},
-	{"upper left arm",8},
-	{"upper right leg",9},
-	{"upper left leg",10},
-	{"lower right arm",11},
-	{"lower left arm",12},
-	{"lower right leg",13},
-	{"lower left leg",14},
-	{"right hand",15},
-	{"left hand",16},
-	{"right foot",17},
-	{"left foot",18},
+	{"in the head",0},
+	{"in the helmet",1},
+	{"in the neck",2},
+	{"in the upper torso",3},
+	{"in the middle torso",4},
+	{"in the lower torso",5},
+	{"in the pelvis",6},
+	{"in the upper right arm",7},
+	{"in the upper left arm",8},
+	{"in the upper right leg",9},
+	{"in the upper left leg",10},
+	{"in the lower right arm",11},
+	{"in the lower left arm",12},
+	{"in the lower right leg",13},
+	{"in the lower left leg",14},
+	{"in the right hand",15},
+	{"in the left hand",16},
+	{"in the right foot",17},
+	{"in the left foot",18},
+
+	// Spanish
+	{"en la cabeza",0},
+	{"en el casco",1},
+	{"en el cuello",2},
+	{"en el pecho",3},
+	{"en el estómago",4},
+	{"en la tripa",5},
+	{"en la cadera",6},
+	{"en el brazo derecho",7},
+	{"en el brazo izquierdo",8},
+	{"en el muslo derecho",9},
+	{"en el muslo izquierdo",10},
+	{"en el antebrazo derecho",11},
+	{"en el antebrazo izquierdo",12},
+	{"en la pierna derecha",13},
+	{"en la pierna izquierda",14},
+	{"en la mano derecha",15},
+	{"en la mano izquierda",16},
+	{"en el pie derecho",17},
+	{"en el pie izquierdo",18},
 };
 
 

@@ -5443,8 +5443,10 @@ T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, char** message) {
 		return NULL; // Not a death message
 	}
 	else {
-		char partialString[MAX_NAME_LENGTH_MOHAA];
-		char possibleStringCompare[MAX_NAME_LENGTH_MOHAA];
+		//char partialString[MAX_NAME_LENGTH_MOHAA];
+		//char possibleStringCompare[MAX_NAME_LENGTH_MOHAA];
+		char partialString[50];
+		char possibleStringCompare[50]; // Those spanish strings are hella long
 		
 		int matchCount = 99999;
 
@@ -5584,7 +5586,7 @@ entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientN
 			return NULL;
 		}
 
-
+		/* I changed this. the "in the" is now part of the message. Needed due to translations.
 		int killLocIntroLength = sizeof(" in the ") - 1;
 		if (killLocIntroLength > msgLen) {
 			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
@@ -5601,6 +5603,19 @@ entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientN
 		int* matchedKillLocation = mohaaMatchString(&mohKillLocationArray, &message);
 		if (matchedKillLocation == NULL) {
 			return NULL; // No match for the location but there SHOULD have been a match.
+		}*/
+
+		if (!*message) {
+			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
+		}
+		message++; // Empty space
+		if (!*message) {
+			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
+		}
+
+		int* matchedKillLocation = mohaaMatchString(&mohKillLocationArray, &message);
+		if (matchedKillLocation == NULL) {
+			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
 		}
 
 		tmpEs.time = *matchedKillLocation; // Ugly but whatever.
