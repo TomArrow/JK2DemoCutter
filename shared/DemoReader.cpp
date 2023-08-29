@@ -626,6 +626,24 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second.playerState : &basePlayerStates[clientNum]);
 
 		if (isMOHAADemo) {
+
+			int normalizedPSFlags = MOH_CPT_NormalizePlayerStateFlags(snap->playerState.net_pm_flags,demoType);
+			//if ((normalizedPSFlags & PMF_CAMERA_VIEW_MOH) && (normalizedPSFlags & PMF_SPECTATING_MOH) && VectorDistance(thisEntity->pos.trBase, snap->playerState.origin) < 0.01f) {
+			if ((normalizedPSFlags & PMF_CAMERA_VIEW_MOH) && (normalizedPSFlags & PMF_SPECTATING_MOH) && VectorSame(thisEntity->pos.trBase, snap->playerState.origin)) {
+				
+				// We are likely following/spectating this player, and can thus infer some extra info. 
+				// For example we can copy over the fov which helps with sniper zoom stuff and such
+				retVal.fovMOHAA = snap->playerState.fovMOHAA;
+				if (retVal.fovMOHAA <= 60) { // Sniper zoom
+					retVal.stats[STAT_INZOOM_MOH] = retVal.fovMOHAA;
+					retVal.stats[STAT_CROSSHAIR_MOH] = qfalse;
+				}
+
+				/*if (VectorSame(thisEntity->apos.trBase, snap->playerState.viewangles)) { // Can't compare angles. For some reason they don't stay same for spectating.
+					std::cout << "Cool";
+				}*/
+			}
+
 			if (snap->mohaaPlayerWeapon[clientNum] != -1) {
 				int mohaaWeaponNum = specializeGameValue<GMAP_WEAPONS, UNSAFE>(snap->mohaaPlayerWeapon[clientNum], demoType);
 				const mohWeaponInfo_t* weaponInfo = &mohWeaponsInfo[mohaaWeaponNum];

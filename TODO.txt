@@ -6,7 +6,7 @@ save horizontal speeds separately!!!!!
 
 
 
-nice regexp for killsprees mohaa: 000_\d+[^T]*_U[45678]
+nice regexp for killsprees mohaa: 000_\d+[^T]*_U[45678] or 000_[56789][^T]*_U[3456789]
 
 
 q3 ideas:

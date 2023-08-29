@@ -475,6 +475,7 @@ typedef enum {
   (r)[1]=(s)[1]+(f)*((e)[1]-(s)[1]),\
   (r)[2]=(s)[2]+(f)*((e)[2]-(s)[2])) 
 
+#define VectorSame(a,b)			((b)[0]==(a)[0] && (b)[1]==(a)[1] && (b)[2]==(a)[2])
 
 
 #define VectorClear(a)			((a)[0]=(a)[1]=(a)[2]=0)

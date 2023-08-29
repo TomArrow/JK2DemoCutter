@@ -651,6 +651,82 @@ typedef enum {
 #define DEAD_VIEWHEIGHT_MOH			8
 
 
+// moh pm_flags
+#define	PMF_DUCKED_MOH				(1<<0)
+#define	PMF_VIEW_PRONE_MOH			(1<<1)
+//
+// 2 Flags removed in team tactics
+//
+#define PMF_SPECTATING_MOH			(1<<2)
+#define	PMF_RESPAWNED_MOH			(1<<3)
+#define	PMF_NO_PREDICTION_MOH		(1<<4)
+#define	PMF_FROZEN_MOH				(1<<5)
+#define	PMF_INTERMISSION_MOH		(1<<6)
+#define PMF_SPECTATE_FOLLOW_MOH		(1<<7)
+#define	PMF_CAMERA_VIEW_MOH			(1<<7)		// use camera view instead of ps view
+#define	PMF_NO_MOVE_MOH				(1<<8)
+#define PMF_VIEW_DUCK_RUN_MOH		(1<<9)
+#define	PMF_VIEW_JUMP_START_MOH		(1<<10)
+#define	PMF_LEVELEXIT_MOH			(1<<11)
+#define	PMF_NO_GRAVITY_MOH			(1<<12)
+#define	PMF_NO_HUD_MOH				(1<<13)
+#define	PMF_UNKNOWN_MOH				(1<<14)
+#define	PMF_NO_LEAN_MOH				(1<<15)
+
+
+static inline uint32_t CPT_NormalizePlayerStateFlags_ver_6(uint32_t flags) {
+	uint32_t normalizedFlags = 0;
+
+	// Convert AA PlayerMove flags to SH/BT flags
+	normalizedFlags |= flags & (1 << 0);
+	for (size_t i = 2; i < 32; ++i)
+	{
+		if (flags & (1 << (i + 2))) {
+			normalizedFlags |= (1 << i);
+		}
+	}
+
+	// So that flags are normalized across modules
+	return normalizedFlags;
+}
+
+static inline uint32_t CPT_DenormalizePlayerStateFlags_ver_6(uint32_t flags) {
+	uint32_t normalizedFlags = 0;
+
+	// Convert AA PlayerMove flags to SH/BT flags
+	normalizedFlags |= flags & (1 << 0);
+	for (size_t i = 2; i < 32; ++i)
+	{
+		if (flags & (1 << i)) {
+			normalizedFlags |= (1 << (i + 2));
+		}
+	}
+
+	// So that flags are normalized across modules
+	return normalizedFlags;
+}
+
+
+static inline uint32_t CPT_NormalizePlayerStateFlags_ver_15(uint32_t flags) {
+	return flags;
+}
+
+static inline uint32_t CPT_DenormalizePlayerStateFlags_ver_15(uint32_t flags) {
+	return flags;
+}
+
+static inline  uint32_t MOH_CPT_NormalizePlayerStateFlags(uint32_t flags, demoType_t demoType)
+{
+	if (demoType == DM3_MOHAA_PROT_6)
+	{
+		return CPT_NormalizePlayerStateFlags_ver_6(flags);
+	}
+	else
+	{
+		return CPT_NormalizePlayerStateFlags_ver_15(flags);
+	}
+}
+
 
 #define MOH_WEAPON_CLASS_PISTOL			(1<<0)
 #define MOH_WEAPON_CLASS_RIFLE			(1<<1)

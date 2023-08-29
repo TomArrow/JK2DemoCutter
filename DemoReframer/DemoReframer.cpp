@@ -231,6 +231,15 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	int framesWritten = 0;
 	SnapshotInfoMapIterator nullIt = demoReader->reader.SnapNullIt();
 	SnapshotInfoMapIterator nextSnapInfoHereIt = nullIt;
+
+	int maxClientsHere = demoReader->reader.getMaxClients();
+
+	struct {
+		int lastViewModelAnim = -1;
+		int lastEquippedWeapon = -1;
+		int viewModelAnimChanged = 0;
+	} mohaaState;
+
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -287,6 +296,14 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 				mainPlayerPS.clientNum = reframeClientNum;
 
+				if (isMOHAADemo) {
+
+					if (mainPlayerPS.iNetViewModelAnim != mohaaState.lastViewModelAnim || mainPlayerPS.stats[STAT_EQUIPPED_WEAPON_MOH] != mohaaState.lastEquippedWeapon) {
+						mohaaState.viewModelAnimChanged = (mohaaState.viewModelAnimChanged+1)&3;
+					}
+					mainPlayerPS.iViewModelAnimChanged = mohaaState.viewModelAnimChanged;
+				}
+
 				//
 				// Note:
 				// MOHAA doesn't seem to send proper view angles for entities
@@ -302,6 +319,11 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 					//if (it->first != mainPlayerPS.clientNum) {
 					if (it->first != reframeClientNum || isMOHAADemo) {
 						//if (playerEntities.find(it->first) == playerEntities.end() || entityIsInterpolated[it->first]) { // Prioritize entities that are not interpolated
+
+						//if (isMOHAADemo && it->first >= 0 && it->first < maxClientsHere) {
+						//	
+						//	if(VectorDistance(snapInfoHere->playerState.origin,it->second.))
+						//}
 
 #if MOHAAANGLEDEBUG
 						if (it->second.number < 64) {
