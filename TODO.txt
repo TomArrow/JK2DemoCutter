@@ -4,6 +4,11 @@ save horizontal speeds separately!!!!!
 // TODO Parse com_protocol for quake games in case they decide to override protocol despite demo name...
 
 
+
+
+nice regexp for killsprees mohaa: 000_\d+[^T]*_U[45678]
+
+
 q3 ideas:
 duel: detect duel kills where u came back from a huge health/armor disadvantage to ur opponent
 rockets: detect distance and jump height (ALSO FIX THE JUMP HEIGHT BTW, USE EV_JUMP)
@@ -196,6 +201,8 @@ check for @@@PLRENAME to track who is who and build a chain that allows to more 
 
 DONE: 
 
+TODO: Killsprees: dont count teamkills (or mark them specially). And mark somehow the number of unique clientnums in the killsprees
+TODO: Kills: mark Teamkills as such. Maybe comment them out by default.
 detect & remember last boost & speed gain
 detect mine boosts/backflip before kills? ( done as well as i can i think , tho no specific mine boost detect )
 check: leads to capture? can do that now

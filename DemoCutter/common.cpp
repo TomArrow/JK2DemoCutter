@@ -1605,6 +1605,10 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	s->m_iVehicleNum = ps->m_iVehicleNum;
 }
 
+int getMOHTeam(entityState_t* s) {
+	return (s->eFlags & EF_ANY_TEAM_MOH) ? ((s->eFlags & EF_AXIS_MOH) ? TEAM_AXIS_MOH : TEAM_ALLIES_MOH) : TEAM_FREEFORALL_MOH;
+}
+
 // baseState is my modification. It will use values from the base Snap that an entity just doesn't have. PERS_SPAWN_COUNT and precise health/armor
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues, playerState_t* baseState, qboolean enhanceOnly) {
 	int		i;
@@ -1672,6 +1676,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		ps->fLeanAngle = s->bone_angles[0][2] / -0.4f;
 		ps->fovMOHAA = 80;
 		ps->stats[STAT_CROSSHAIR_MOH] = qtrue;
+		ps->stats[STAT_TEAM_MOH] = getMOHTeam(s);
 		VectorCopy(ps->origin, ps->camera_origin);
 		VectorCopy(ps->viewangles, ps->camera_angles);
 	}

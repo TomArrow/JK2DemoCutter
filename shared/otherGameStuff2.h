@@ -479,6 +479,33 @@ const static int etEventToGeneralMap[] = {
 
 // OpenMOHAA
 
+typedef enum {
+	TEAM_NONE_MOH,
+	TEAM_SPECTATOR_MOH,
+	TEAM_FREEFORALL_MOH,
+	TEAM_ALLIES_MOH,
+	TEAM_AXIS_MOH
+} teamtypeMOH_t;
+
+typedef enum {
+	GT_SINGLE_PLAYER_MOH,	// single player
+	GT_FFA_MOH,				// free for all
+	GT_TEAM_MOH,			// team deathmatch
+	GT_TEAM_ROUNDS_MOH,
+	GT_OBJECTIVE_MOH,
+	// Team Assault game mode
+	GT_TOW_MOH,
+	// Team Tactics game mode
+	GT_LIBERATION_MOH,
+	GT_MAX_GAME_TYPE_MOH
+} gametypeMOH_t;
+
+
+
+#define EF_ALLIES_MOH			0x00000080		// su44: this player is in allies team
+#define EF_AXIS_MOH				0x00000100		// su44: this player is in axis team
+#define EF_ANY_TEAM_MOH			(EF_ALLIES_MOH | EF_AXIS_MOH)
+
 // entity subclass
 #define EF_ENTITY_MOH				(1<<0)
 #define EF_ANIMATE_MOH				(1<<1)
@@ -832,6 +859,8 @@ static const mohWeaponInfo_t mohWeaponsInfo[] = {
 	{"","kar98mortar",0},//WP_KAR98_MORTAR_GENERAL, (dunno what their configstrings are)
 	{"PIAT","PIAT",MOH_WEAPON_CLASS_HEAVY },//WP_PIAT_GENERAL
 };
+
+
 
 typedef enum {
 	STAT_HEALTH_MOH,

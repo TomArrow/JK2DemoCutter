@@ -325,6 +325,7 @@ public:
 	meansOfDeath_t mod;
 	bool isSuicide;
 	bool isRet;
+	bool isTeamKill;
 	bool isDoom;
 	bool isExplosion;
 	bool isVisible;
@@ -347,6 +348,7 @@ struct SpreeInfo {
 	int lastKillTime;
 	int countKills = 0;
 	int countRets = 0;
+	int countTeamKills = 0;
 	int countDooms = 0;
 	int countExplosions = 0;
 	int countThirdPersons = 0; // Not followed ones.
@@ -1116,11 +1118,14 @@ void updateForcePowersInfo(clientActive_t* clCut) { // TODO: make this adapt to 
 	forcePowersInfo.maxForceJumpVelocityDelta = (forceJumpHeight[forcePowersInfo.maxForceJumpLevel] - curHeight) / forceJumpHeight[forcePowersInfo.maxForceJumpLevel] * forceJumpStrength[forcePowersInfo.maxForceJumpLevel];
 }
 
+int g_gametype = 0;
+
 void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make this adapt to JKA
 	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
-	const char* playerInfo = clCut->gameState.stringData + stringOffset;
+	const char* serverInfo = clCut->gameState.stringData + stringOffset;
 
-	int g_weaponDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
+	int g_weaponDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
+	g_gametype = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_gametype"));
 
 	// JKA:
 	// Online forum says 65523 is saber only
@@ -1180,7 +1185,7 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 	// just be someone force pulling someone or such
 	// Force powers luckily are same for JK2 and JKA so no specialization needed atm (but might change if we ever support some mods?)
 
-	int g_forcePowerDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
+	int g_forcePowerDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
 
 	gameAllowsDoomingForcePowers = false;
 	// These are the powers that I think POTENTIALLY can result in dooms?
@@ -1479,6 +1484,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 	if ((searchMode == SEARCH_MY_CTF_RETURNS || searchMode == SEARCH_ALL_MY_KILLS) && spreeInfo->countThirdPersons == spreeInfo->countKills) return;
 
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS || spreeInfo->countRets >= 2) { // gotta be at least 3 kills or 2 rets to count as killstreak
+
+		int uniqueTargetCount = 0;
+
 		int countSaberKills = 0;
 		int maxDelayActual = 0;
 		int CS_PLAYERS_here = getCS_PLAYERS(demoType);
@@ -1508,6 +1516,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		int lastKillTime = 0;
 		std::set<std::string> killTypes;
 		std::set<int> nearbyPlayers;
+		std::set<int> uniqueTargets;
 		for (int i = 0; i < killsOfThisSpree->size(); i++) {
 			if ((*killsOfThisSpree)[i].isSaberKill) {
 				countSaberKills++;
@@ -1517,6 +1526,8 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			int timeSinceLastKill = (*killsOfThisSpree)[i].time - lastKillTime;
 			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
 			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
+
+			uniqueTargets.insert((*killsOfThisSpree)[i].targetClientNum);
 
 			killTypes.insert((*killsOfThisSpree)[i].modInfoString);
 			//killTypesSS << (*killsOfThisSpree)[i].modInfoString << "\n";
@@ -1529,6 +1540,8 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 				nearbyPlayers.insert((*killsOfThisSpree)[i].nearbyPlayers[n].clientNum);
 			}
 		}
+
+		uniqueTargetCount = uniqueTargets.size();
 
 		if (countSaberKills < opts.onlyLogKillSpreesWithSaberKills) {
 			return;
@@ -1597,6 +1610,8 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED_TEXT(query, "@victimClientNums", victimsNumsString.c_str());
 		SQLBIND_DELAYED(query, int, "@countKills", spreeInfo->countKills);
 		SQLBIND_DELAYED(query, int, "@countRets", spreeInfo->countRets);
+		SQLBIND_DELAYED(query, int, "@countTeamKills", spreeInfo->countTeamKills);
+		SQLBIND_DELAYED(query, int, "@countUniqueTargets", uniqueTargetCount);
 		SQLBIND_DELAYED(query, int, "@countDooms", spreeInfo->countDooms);
 		SQLBIND_DELAYED(query, int, "@countExplosions", spreeInfo->countExplosions);
 		SQLBIND_DELAYED(query, int, "@countThirdPersons", spreeInfo->countThirdPersons);
@@ -1641,7 +1656,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 		std::stringstream ss; // First half of target filename
 		std::stringstream ss2; // Second half of target filename (so we can insert more modifiers that we don't know about yet)
-		ss << mapname << std::setfill('0') << "___KILLSPREE" << maxDelay << "_" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "");
+		ss << mapname << std::setfill('0') << "___KILLSPREE" << maxDelay << "_" << spreeInfo->countKills << (spreeInfo->countRets ? va("R%d", spreeInfo->countRets) : "") << (spreeInfo->countDooms ? va("D%d", spreeInfo->countDooms) : "") << (spreeInfo->countExplosions ? va("E%d", spreeInfo->countExplosions) : "") << (spreeInfo->countTeamKills ? va("T%d", spreeInfo->countTeamKills) : "") << "_U" << uniqueTargetCount;
 		ss2 << "___" << playername << "__";
 		for (int i = 0; i < victims->size(); i++) {
 			ss2 << "_" << (*victims)[i];
@@ -1659,7 +1674,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		std::stringstream batSS2;
 		batSS << "\nrem hash: " << hash_hex_string;
 		batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
-		batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
+		batSS << "\n" << (((spreeInfo->countKills-spreeInfo->countTeamKills) >= KILLSTREAK_MIN_KILLS) ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
 		batSS2 << targetFilename2Filtered << "\" " << startTime << " " << endTime;
 		batSS2 << (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
@@ -1833,6 +1848,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"map	TEXT NOT NULL,"
 		"killerIsFlagCarrier	BOOLEAN NOT NULL,"
 		"isReturn	BOOLEAN NOT NULL,"
+		"isTeamKill	BOOLEAN NOT NULL,"
 		"victimCapperKills INTEGER,"
 		"victimCapperRets INTEGER,"
 		"victimCapperWasFollowedOrVisible	BOOLEAN,"
@@ -2015,6 +2031,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"victimClientNums	TEXT NOT NULL,"
 		"countKills	INTEGER NOT NULL,"
 		"countRets	INTEGER NOT NULL,"
+		"countTeamKills	INTEGER NOT NULL,"
+		"countUniqueTargets	INTEGER NOT NULL,"
 		"countDooms	INTEGER NOT NULL,"
 		"countExplosions	INTEGER NOT NULL,"
 		"countThirdPersons	INTEGER NOT NULL,"
@@ -2082,9 +2100,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	;
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,resultingCaptures,resultingSelfCaptures,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,resultingCaptures,resultingSelfCaptures,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@resultingCaptures,@resultingSelfCaptures,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@resultingCaptures,@resultingSelfCaptures,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -2106,10 +2124,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
 	preparedStatementText = "INSERT INTO killSprees "
-		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countDooms, countExplosions,"
+		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
 		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,metaEvents,demoName,demoPath,demoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
-		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets, @countDooms, @countExplosions,"
+		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
 		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@metaEvents,@demoName,@demoPath,@demoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
@@ -3146,6 +3164,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					mohaaPlayerWeaponModelIndexThisFrame[i] = -1;
 				}
 
+				if (isMOHAADemo) {
+					playerTeams[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.stats[STAT_TEAM_MOH];
+				}
+
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
@@ -3159,6 +3181,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
+
+						if (isMOHAADemo) {
+							playerTeams[thisEs->number] = getMOHTeam(thisEs);
+						}
+
 						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(thisEs->saberMove,demoType);
 						animNumberGeneral_t thisEsGeneralLegsAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->legsAnim,demoType);
 						animNumberGeneral_t thisEsGeneralTorsoAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->torsoAnim,demoType);
@@ -4142,12 +4169,21 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 
 
+							bool isTeamKill = false;
+							if (isMOHAADemo) {
+								isTeamKill = g_gametype > GT_FFA_MOH && attacker != target && attacker >= 0 && attacker < max_clients&& playerTeams[attacker] == playerTeams[target] && playerTeams[target] != TEAM_FREEFORALL_MOH && playerTeams[target] != TEAM_NONE_MOH;
+							}
+							else {
+								isTeamKill = attacker != target && attacker >= 0 && attacker < max_clients&& playerTeams[attacker] == playerTeams[target] && playerTeams[target] != TEAM_FREE;
+							}
+
 							//targetIsVisible = targetIsVisible && attackerIsVisibleOrFollowed; // Make sure both attacker and victim are visible. Some servers send info
 
 							float maxSpeedTargetFloat = getMaxSpeedForClientinTimeFrame(target, demoCurrentTime - 1000, demoCurrentTime);
 							int maxSpeedTarget = maxSpeedTargetFloat;
 							Kill thisKill;
 							thisKill.isRet = victimIsFlagCarrier;
+							thisKill.isTeamKill = isTeamKill;
 							thisKill.isSuicide = isSuicide;
 							thisKill.isDoom = isDoomKill;
 							thisKill.isExplosion = (mod == MOD_FLECHETTE_GENERAL ||
@@ -5253,6 +5289,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT(angleQuery, "@shorthash", shorthash.c_str());
 							SQLBIND_DELAYED_TEXT(angleQuery, "@map", mapname.c_str());
 							SQLBIND_DELAYED(angleQuery, int, "@isReturn", victimIsFlagCarrier);
+							SQLBIND_DELAYED(angleQuery, int, "@isTeamKill", isTeamKill);
 							SQLBIND_DELAYED(angleQuery, int, "@killerIsFlagCarrier", attackerIsFlagCarrier);
 							if (victimIsFlagCarrier) {
 								SQLBIND_DELAYED(angleQuery, int, "@victimFlagHoldTime", recentFlagHoldTimes[target]);
@@ -5890,6 +5927,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								killsOfThisSpree.push_back(*thisKill);
 								if (thisKill->isDoom) spreeInfo.countDooms++;
 								if (thisKill->isRet) spreeInfo.countRets++;
+								if (thisKill->isTeamKill) spreeInfo.countTeamKills++;
 								if (thisKill->isExplosion) spreeInfo.countExplosions++;
 								if (!thisKill->isFollowed) spreeInfo.countThirdPersons++;
 								spreeInfo.totalTime += spreeInfo.countKills == 0? 0: (thisKill->time - spreeInfo.lastKillTime);
