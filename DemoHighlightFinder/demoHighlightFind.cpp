@@ -223,11 +223,16 @@ int playerTeams[MAX_CLIENTS_MAX];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 int lastEventTime[MAX_GENTITIES];
-float lastGroundHeight[MAX_CLIENTS]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
+float lastGroundHeight[MAX_CLIENTS_MAX]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
 std::map<int,std::string> lastPlayerModel;
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
+
+#define GROUND_CROUCH_SNEAK_THRESHOLD 2000 // If you are crouching and walking on ground for this long, we're gonna assume you're SNEAKING
+int groundCrouchDurations[MAX_CLIENTS_MAX];
+int64_t lastSneak[MAX_CLIENTS_MAX];
+int lastSneakDuration[MAX_CLIENTS_MAX];
 
 // From including, to excluding
 #define STRAFE_ANALYSIS_BUCKET_COUNT 18
@@ -1885,6 +1890,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"specialJumps	INTEGER,"
 		"timeSinceLastSelfSentryJump	INTEGER,"
 
+		"lastSneak	INTEGER,"
+		"lastSneakDuration	INTEGER,"
+
 		"resultingCaptures INTEGER,"
 		"resultingSelfCaptures INTEGER,"
 		"metaEvents	TEXT,"
@@ -2100,9 +2108,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	;
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,resultingCaptures,resultingSelfCaptures,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@resultingCaptures,@resultingSelfCaptures,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -2811,6 +2819,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&requiredMetaEventAges, 0, sizeof(requiredMetaEventAges));
 	Com_Memset(&metaEventTrackers, 0, sizeof(metaEventTrackers));
 	Com_Memset(&playerPastMetaEvents, 0, sizeof(playerPastMetaEvents));
+	Com_Memset(&groundCrouchDurations, 0, sizeof(groundCrouchDurations));
+	Com_Memset(&lastSneak, 0, sizeof(lastSneak));
+	Com_Memset(&lastSneakDuration, 0, sizeof(lastSneakDuration));
 	resetCurrentPacketPeriodStats();
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
@@ -3190,6 +3201,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						animNumberGeneral_t thisEsGeneralLegsAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->legsAnim,demoType);
 						animNumberGeneral_t thisEsGeneralTorsoAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->torsoAnim,demoType);
 
+						// Crouch/Sneak detection
+						if (isGeneralizedCrouchAnim(thisEsGeneralLegsAnim, demoType) && thisEs->groundEntityNum == ENTITYNUM_WORLD) {
+							groundCrouchDurations[thisEs->number] += deltaTimeFromLastSnapshot;
+							if (groundCrouchDurations[thisEs->number] > GROUND_CROUCH_SNEAK_THRESHOLD) {
+								lastSneak[thisEs->number] = demoCurrentTime;
+								lastSneakDuration[thisEs->number] = groundCrouchDurations[thisEs->number];
+							}
+						}
+						else {
+							groundCrouchDurations[thisEs->number] = 0;
+						}
+
 						thisFrameInfo.canBlockSimplified[thisEs->number] = WP_SaberCanBlock_Simple(thisEs,demoType);
 
 						float speed = VectorLength(thisEs->pos.trDelta); // Used for strafe analysis buckets and saving recent speeds
@@ -3450,6 +3473,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// 
 				// Playerstate tracking
 				{
+					// Crouch/Sneak detection
+					if (isGeneralizedCrouchAnim((animNumberGeneral_t)psGeneralLegsAnim, demoType) && demo.cut.Cl.snap.ps.groundEntityNum == ENTITYNUM_WORLD) {
+						groundCrouchDurations[demo.cut.Cl.snap.ps.clientNum] += deltaTimeFromLastSnapshot;
+						if (groundCrouchDurations[demo.cut.Cl.snap.ps.clientNum] > GROUND_CROUCH_SNEAK_THRESHOLD) {
+							lastSneak[demo.cut.Cl.snap.ps.clientNum] = demoCurrentTime;
+							lastSneakDuration[demo.cut.Cl.snap.ps.clientNum] = groundCrouchDurations[demo.cut.Cl.snap.ps.clientNum];
+						}
+					}
+					else {
+						groundCrouchDurations[demo.cut.Cl.snap.ps.clientNum] = 0;
+					}
+
 					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
 
 					playerStateStrafeDeviationThisFrame = calculateStrafeDeviation(&demo.cut.Cl.snap.ps, &strafeApplicablePlayerStateThisFrame);
@@ -4039,7 +4074,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 					else {
 						thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-						int eventNumber = demoCutGetEvent(thisEs, demoCurrentTime, demoType);
+						eventNumber = demoCutGetEvent(thisEs, demoCurrentTime, demoType);
 						eventNumber = generalizeGameValue<GMAP_EVENTS, UNSAFE>(eventNumber, demoType);
 					}
 
@@ -4233,6 +4268,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							thisKill.speedatSaberMoveChange = isWorldKill ? -1 : (playerLastSaberMove[attacker].lastSaberMove[0].speed);
 
 							int64_t timeSinceLastSelfSentryJump = isWorldKill ? -1 : (lastSelfSentryJump[attacker] >= 0 ? (demoCurrentTime - lastSelfSentryJump[attacker]) : -1);
+							
+							int64_t timeSinceLastSneak = isWorldKill ? -1 : (demoCurrentTime - lastSneak[attacker]);
 
 							// This is the place that had all the continues originally.
 							
@@ -5013,6 +5050,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								modInfo << "_SELFSENTRYJUMP"<< (int)timeSinceLastSelfSentryJump; // this is so rare that i'd rather just find all and decide if its worth keeping later
 							}
 
+							if (timeSinceLastSneak < 2000 && timeSinceLastSneak != -1) {
+								modInfo << "_SNEAK";
+							}
+
 							
 							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 							const char* info = demo.cut.Cl.gameState.stringData + offset;
@@ -5358,6 +5399,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL(angleQuery, "@headJumps");
 								SQLBIND_DELAYED_NULL(angleQuery, "@specialJumps");
 								SQLBIND_DELAYED_NULL(angleQuery, "@timeSinceLastSelfSentryJump");
+							}
+
+							if (!isWorldKill && timeSinceLastSneak < 10000 && timeSinceLastSneak != -1) {
+								SQLBIND_DELAYED(angleQuery, int, "@lastSneak", timeSinceLastSneak);
+								SQLBIND_DELAYED(angleQuery, int, "@lastSneakDuration", lastSneakDuration[attacker]);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(angleQuery, "@lastSneak");
+								SQLBIND_DELAYED_NULL(angleQuery, "@lastSneakDuration");
 							}
 
 							if (baseFlagDistanceKnownAndApplicable) {

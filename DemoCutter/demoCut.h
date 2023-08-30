@@ -4515,6 +4515,8 @@ qboolean inline BG_SaberInAttack(int move, demoType_t demoType)
 
 
 
+
+
 template<class T>
 qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke support JKA properly? Or too much work...
 {
@@ -4964,6 +4966,24 @@ inline int specializeGameValue(int value, demoType_t targetDemoType) {
 		return gameInfosMapped[targetDemoType]->mappings[T].reversedMapping.get<A>(value);
 	}
 }
+
+inline bool isCrouchAnim(int legsAnim, demoType_t demoType) {
+	int generalizedLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(legsAnim, demoType);
+
+	return (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_GENERAL //|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
+		|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK_GENERAL || (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK_GENERAL;
+}
+inline bool isGeneralizedCrouchAnim(animNumberGeneral_t generalizedLegsAnim, demoType_t demoType) {
+
+	return (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_GENERAL //|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1IDLE_15
+		|| (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALKBACK_GENERAL || (generalizedLegsAnim & ~ANIM_TOGGLEBIT) == BOTH_CROUCH1WALK_GENERAL;
+}
+
+
+
+
+
+
 
 inline bool demoTypeIsMOHAA(demoType_t demoType) {
 	return demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
