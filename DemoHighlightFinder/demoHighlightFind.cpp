@@ -6409,9 +6409,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
 				
-				if (isMOHAADemo) {
-					parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
-				}
+				//if (isMOHAADemo) { // We do this in another place now.
+				//	parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
+				//}
 
 				//jp::VecNum vec_num;
 				//jp::RegexMatch rm;
