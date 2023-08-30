@@ -1640,7 +1640,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			MetaEventTracker* killSpreeME = new MetaEventTracker(spreeInfo->lastKillTime, queryWrapper, metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker], bufferTime, spreeInfo->totalTime,true);
 			bool wasFollowedThroughBufferTime = playerFirstFollowed[clientNumAttacker] != -1 && playerFirstFollowed[clientNumAttacker] < (demo.cut.Cl.snap.serverTime - spreeInfo->totalTime - bufferTime);
 			killSpreeME->reframeClientNum = clientNumAttacker;
-			killSpreeME->needsReframe = !wasFollowedThroughBufferTime;
+			killSpreeME->needsReframe = opts.reframeIfNeeded && !wasFollowedThroughBufferTime;
 			killSpreeME->addPastEvents(playerPastMetaEvents[clientNumAttacker], getMinimumMetaEventBufferTime(clientNumAttacker, bufferTime, demoCurrentTime));
 			metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker] = killSpreeME;
 		}
@@ -5481,7 +5481,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								MetaEventTracker* killME = new MetaEventTracker(demoCurrentTime, angleQueryWrapper, metaEventTrackers[METRACKER_KILLS][attacker],bufferTime,0,true);
 								bool wasFollowedThroughBufferTime = playerFirstFollowed[attacker] != -1 && playerFirstFollowed[attacker] < (demo.cut.Cl.snap.serverTime - bufferTime);
 								killME->reframeClientNum = attacker;
-								killME->needsReframe = !wasFollowedThroughBufferTime;
+								killME->needsReframe = opts.reframeIfNeeded && !wasFollowedThroughBufferTime;
 								killME->addPastEvents(playerPastMetaEvents[attacker], getMinimumMetaEventBufferTime(attacker,bufferTime,demoCurrentTime));
 								addMetaEvent(victimIsFlagCarrier ? METAEVENT_RETURN : METAEVENT_KILL, demoCurrentTime, attacker, bufferTime, opts, bufferTime);
 								metaEventTrackers[METRACKER_KILLS][attacker] = killME;
@@ -5838,7 +5838,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// Meta event tracker for capture
 							MetaEventTracker* capME = new MetaEventTracker(demoCurrentTime, queryWrapper, metaEventTrackers[METRACKER_CAPTURES][playerNum], bufferTime, flagHoldTime, false);
 							bool wasFollowedThroughBufferTime = playerFirstFollowed[playerNum] != -1 && playerFirstFollowed[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime - bufferTime);
-							capME->needsReframe = !wasFollowedThroughBufferTime;
+							capME->needsReframe = opts.reframeIfNeeded && !wasFollowedThroughBufferTime;
 							capME->reframeClientNum = playerNum;
 							capME->addPastEvents(playerPastMetaEvents[playerNum], getMinimumMetaEventBufferTime(playerNum, bufferTime, demoCurrentTime));
 							addMetaEvent(METAEVENT_CAPTURE, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
