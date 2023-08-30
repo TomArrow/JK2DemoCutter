@@ -639,9 +639,15 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 					retVal.stats[STAT_CROSSHAIR_MOH] = qfalse;
 				}
 
+
 				/*if (VectorSame(thisEntity->apos.trBase, snap->playerState.viewangles)) { // Can't compare angles. For some reason they don't stay same for spectating.
 					std::cout << "Cool";
 				}*/
+			}
+
+			if (thisEntity->number == snap->playerState.stats[STAT_INFOCLIENT_MOH]) { // We are getting the health info for this player from a playerstate.
+
+				retVal.stats[STAT_HEALTH_MOH] = snap->playerState.stats[STAT_INFOCLIENT_HEALTH_MOH];
 			}
 
 			if (snap->mohaaPlayerWeapon[clientNum] != -1) {
