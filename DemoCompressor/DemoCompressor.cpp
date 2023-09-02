@@ -92,6 +92,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(sourceDemoFile,ext, oldName,&demoType,&isCompressedFile, &demo.cut.Clc);
 
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
 	strcpy_s(originalExt, sizeof(originalExt), ext);
 
 	/*char specialTypeChar = ext[3];

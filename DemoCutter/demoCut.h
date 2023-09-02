@@ -299,6 +299,7 @@ typedef struct _iobuf
 #define	MAX_STRING_TOKENS	1024	// max tokens resulting from Cmd_TokenizeString
 #define	MAX_TOKEN_CHARS		1024	// max length of an individual token
 #define	MAX_INFO_STRING		1024
+#define	MAX_INFO_STRING_MAX		1350 // MOHAA...
 #define	MAX_INFO_KEY		1024
 #define	MAX_INFO_VALUE		1024
 
@@ -1862,9 +1863,9 @@ enum svc_ops_e_general {
 };
 
 char* Info_ValueForKey(const char* s,int maxLength, const char* key);
-void Info_RemoveKey(char* s, const char* key);
+void Info_RemoveKey(char* s, const char* key, bool isMOHAADemo);
 void Info_RemoveKey_Big(char* s, const char* key);
-qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value);
+qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value, bool isMOHAADemo);
 void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char* value);
 
 

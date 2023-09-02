@@ -44,6 +44,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(outputName, ext, outputNameNoExt, &demoType, &createCompressedOutput);
+
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 	/*ext = (char*)outputName + strlen(outputName) - 6;
 	if (!*ext) {
 		demoType = DM_15;
@@ -109,9 +112,9 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, getCS_LEVEL_START_TIME(demoType), "10000", demoType);
 
 	// Add "fake demo" server name.
-	char infoCopy[MAX_INFO_STRING];
+	char infoCopy[MAX_INFO_STRING_MAX];
 	infoCopy[0] = 0;
-	strcpy_s(infoCopy, MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
+	strcpy_s(infoCopy, isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy, demoType);
 

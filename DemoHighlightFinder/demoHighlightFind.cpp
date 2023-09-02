@@ -3072,6 +3072,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 			default:
 				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message %d (%d) \n",cmd,ocmd);
+				if (isMOHAADemo && readGamestate == 0) {
+					goto cutcontinue; // Uh I made some silly oopsie
+				}
 				goto cuterror;
 			case svc_nop_general:
 				break;

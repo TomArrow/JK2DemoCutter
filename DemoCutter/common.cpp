@@ -373,13 +373,13 @@ void sanitizeFilename(const char* input, char* output,qboolean allowExtension) {
 Info_RemoveKey
 ===================
 */
-void Info_RemoveKey(char* s, const char* key) {
+void Info_RemoveKey(char* s, const char* key, bool isMOHAADemo) {
 	char* start;
 	char	pkey[MAX_INFO_KEY];
 	char	value[MAX_INFO_VALUE];
 	char* o;
 
-	if (strlen(s) >= MAX_INFO_STRING) {
+	if (strlen(s) >= (isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING)) {
 		Com_Error(ERR_DROP, "Info_RemoveKey: oversize infostring");
 	}
 
@@ -535,10 +535,10 @@ Info_SetValueForKey
 Changes or adds a key/value pair
 ==================
 */
-qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* value) {
-	char	newi[MAX_INFO_STRING];
+qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* value, bool isMOHAADemo) {
+	char	newi[MAX_INFO_STRING_MAX];
 
-	if (strlen(s) >= MAX_INFO_STRING) {
+	if (strlen(s) >= (isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING)) {
 		Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring");
 	}
 
@@ -557,7 +557,7 @@ qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* 
 		return qfalse;
 	}
 
-	Info_RemoveKey(s, key);
+	Info_RemoveKey(s, key, isMOHAADemo);
 
 	if (!strlen(value))
 		return qfalse;
@@ -565,7 +565,7 @@ qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* 
 	Com_sprintf(newi, sizeof(newi),  "\\%s\\%s", key, value);
 
 	// q3infoboom exploit
-	if (strlen(newi) + strlen(s) >= MAX_INFO_STRING) {
+	if (strlen(newi) + strlen(s) >= (isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING)) {
 		Com_DPrintf("Info string length exceeded\n");
 		return qfalse;
 	}
