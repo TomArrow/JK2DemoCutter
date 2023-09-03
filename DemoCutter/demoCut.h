@@ -1494,7 +1494,7 @@ typedef struct {
 
 typedef int		fileHandle_t;
 
-#define	MAX_RELIABLE_COMMANDS	128			// max string commands buffered for restransmit
+#define	MAX_RELIABLE_COMMANDS	512//128			// max string commands buffered for restransmit. heightened for MOH which likes to dump a lot of configstrings and stuff.
 
 typedef enum {
 	NA_BOT,
