@@ -118,6 +118,7 @@ public:
 	bool noFindOutput = false;
 	bool testOnly = false;
 	bool reframeIfNeeded = false;
+	bool dumpStufftext = false;
 	int jumpMetaEventsLimit = 0;
 };
 
@@ -2471,6 +2472,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.playerModelQueries = new queryCollection();
 	io.playerDemoStatsQueries = new queryCollection();
 	io.animStanceQueries = new queryCollection();
+	io.packetStatsQueries = new queryCollection();
 
 
 
@@ -6406,7 +6408,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				hadConfigStringCommands = true;
 			}
-			if (!strcmp(cmd, "print")) {
+			else if (!strcmp(cmd, "stufftext")) {
+				
+				std::cerr << "STUFFTEXT DUMP: " << Cmd_Argv(1) << "\n";
+
+			}
+			else if (!strcmp(cmd, "print")) {
 				//Looking for 
 				//"^2[^7OC-System^2]: bizzle^7 has finished in [^200:24.860^7] which is his personal best time. ^2Top10 time!^7 Difference to best: [^200:00.000^7]."
 
@@ -6793,6 +6800,7 @@ int main(int argcO, char** argvO) {
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
+	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -6832,6 +6840,7 @@ int main(int argcO, char** argvO) {
 	opts.noFindOutput = n->value();
 	opts.testOnly = t->value();
 	opts.reframeIfNeeded = r->value();
+	opts.dumpStufftext = D->value();
 
 
 
