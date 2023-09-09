@@ -300,6 +300,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 					if (mainPlayerPS.iNetViewModelAnim != mohaaState.lastViewModelAnim || mainPlayerPS.stats[STAT_EQUIPPED_WEAPON_MOH] != mohaaState.lastEquippedWeapon) {
 						mohaaState.viewModelAnimChanged = (mohaaState.viewModelAnimChanged+1)&3;
+						mohaaState.lastViewModelAnim = mainPlayerPS.iNetViewModelAnim;
+						mohaaState.lastEquippedWeapon = mainPlayerPS.stats[STAT_EQUIPPED_WEAPON_MOH];
 					}
 					mainPlayerPS.iViewModelAnimChanged = mohaaState.viewModelAnimChanged;
 				}

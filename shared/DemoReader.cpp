@@ -662,7 +662,50 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 						const char* compareWeaponName = this->GetConfigString(i, NULL);
 						if (!_stricmp(csWeaponName, compareWeaponName)) {
 							retVal.activeItems[1] = i- CS_WEAPONS_MOH;
-							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_IDLE_MOH-1 : VM_ANIM_IDLE_MOH;
+							vmAnimMoh_e viewModelAnim = VM_ANIM_IDLE_MOH;
+							if (demoType == DM3_MOHAA_PROT_6) {
+								/*// Don't have it done for spearhead etc stuff
+								float reloadWeight = 0;
+								float fireWeight = 0;
+								for (int f = 0; f < 16; f++) {
+									if (thisEntity->frameInfo[f].index == 150) {
+										reloadWeight = std::max(0.001f, thisEntity->frameInfo[f].weight);
+									} else if (thisEntity->frameInfo[f].index == 157) {
+										fireWeight = std::max(0.001f, thisEntity->frameInfo[f].weight);
+									}
+								}
+								if (fireWeight > reloadWeight) {
+									viewModelAnim = VM_ANIM_FIRE_MOH;
+								}
+								else if (reloadWeight > fireWeight) {
+									viewModelAnim = VM_ANIM_RELOAD_MOH;
+								}*/
+								float minWeight = -9999.9f;
+								bool nonIdleTypeFound = false;
+								for (int f = 0; f < 16; f++) {
+									vmAnimMoh_e animThisFrame = playerAnimToVMAnimMap[thisEntity->frameInfo[f].index];
+									if (animThisFrame != VM_ANIM_IDLE_MOH) {
+										bool useThis = false;
+										if (animThisFrame == VM_ANIM_IDLE_0_MOH || animThisFrame == VM_ANIM_IDLE_1_MOH || animThisFrame == VM_ANIM_IDLE_2_MOH) {
+											if (!nonIdleTypeFound && thisEntity->frameInfo[f].weight > minWeight) {
+												useThis = true;
+											}
+										}
+										else {
+											if (!nonIdleTypeFound || thisEntity->frameInfo[f].weight > minWeight) {
+												useThis = true;
+											}
+											nonIdleTypeFound = true;
+										}
+										if (useThis) {
+											minWeight = thisEntity->frameInfo[f].weight;
+											viewModelAnim = playerAnimToVMAnimMap[thisEntity->frameInfo[f].index];
+										}
+									}
+								}
+								
+							}
+							retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? viewModelAnim -1 : viewModelAnim;
 							//retVal.iNetViewModelAnim = demoType == DM3_MOHAA_PROT_6 ? VM_ANIM_FIRE_MOH-1 : VM_ANIM_FIRE_MOH;
 							break;
 						}

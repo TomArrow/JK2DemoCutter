@@ -17,6 +17,13 @@ obj[^\n"]+[13579]000_(?:[56789]|\d\d)[^T]*(?:T[12])?_U(?:[3456789]|\d\d)[^\r\n]*
 
 
 
+moh ideas:
+detect 360 trick shots? stuff like that with quick reaction time/aim? but we dont see map so tough.
+
+
+competitive obj: detect 1 vs all kind of situation with victory.
+
+
 
 
 q3 ideas:

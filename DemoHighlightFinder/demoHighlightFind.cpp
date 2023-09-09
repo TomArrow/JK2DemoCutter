@@ -63,6 +63,10 @@ struct ioHandles_t {
 	sqlite3* debugStatsDb;
 	sqlite3_stmt* insertAnimStanceStatement;
 	sqlite3_stmt* updateAnimStanceCountStatement;
+	sqlite3_stmt* insertFrameInfoViewModelAnimStatement;
+	sqlite3_stmt* updateFrameInfoViewModelAnimCountStatement;
+	sqlite3_stmt* insertFrameInfoViewModelAnimStatementSimple;
+	sqlite3_stmt* updateFrameInfoViewModelAnimCountStatementSimple;
 
 	// Demostats (optionaal)
 	sqlite3* demoStatsDb;
@@ -85,6 +89,8 @@ struct ioHandles_t {
 	queryCollection* playerModelQueries;
 	queryCollection* playerDemoStatsQueries;
 	queryCollection* animStanceQueries;
+	queryCollection* frameInfoVieWModelQueries;
+	queryCollection* frameInfoVieWModelSimpleQueries;
 	queryCollection* packetStatsQueries;
 
 	// Output bat files
@@ -306,6 +312,22 @@ struct cgs{
 #ifdef DEBUGSTATSDB
 typedef std::tuple<int, int, int, int, int,int> animStanceKey; // demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance
 std::map< animStanceKey, int> animStanceCounts;
+typedef enum frameInfoType_t {
+	PLAYER,
+	PLAYER_HIGHWEIGHT,
+	WEAPON,
+	WEAPON_HIGHWEIGHT
+};
+char* frameInfoTypeNames[] = {
+	"player",
+	"player_highweight",
+	"weapon",
+	"weapon_highweight",
+};
+typedef std::tuple<int, frameInfoType_t, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int> frameInfoViewModelAnimKey; // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+std::map< frameInfoViewModelAnimKey, int> frameInfoViewModelAnimCounts;
+typedef std::tuple<int, frameInfoType_t, int, int> frameInfoViewModelAnimSimpleKey; // demoVersion,type,viewModelAnim,frameInfoIndex
+std::map< frameInfoViewModelAnimSimpleKey, int> frameInfoViewModelAnimSimpleCounts;
 #endif
 
 
@@ -2243,12 +2265,57 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"PRIMARY KEY(demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance)"
 		"); ",
 		NULL, NULL, NULL);
+	sqlite3_exec(io.debugStatsDb, "CREATE TABLE frameInfoViewModelAnims ("
+		"demoVersion INTEGER NOT NULL,"
+		"type TEXT NOT NULL," // player or weapon
+		"viewModelAnim INTEGER NOT NULL,"
+		"frameInfo0Index INTEGER NOT NULL,"
+		"frameInfo1Index INTEGER NOT NULL,"
+		"frameInfo2Index INTEGER NOT NULL,"
+		"frameInfo3Index INTEGER NOT NULL,"
+		"frameInfo4Index INTEGER NOT NULL,"
+		"frameInfo5Index INTEGER NOT NULL,"
+		"frameInfo6Index INTEGER NOT NULL,"
+		"frameInfo7Index INTEGER NOT NULL,"
+		"frameInfo8Index INTEGER NOT NULL,"
+		"frameInfo9Index INTEGER NOT NULL,"
+		"frameInfo10Index INTEGER NOT NULL,"
+		"frameInfo11Index INTEGER NOT NULL,"
+		"frameInfo12Index INTEGER NOT NULL,"
+		"frameInfo13Index INTEGER NOT NULL,"
+		"frameInfo14Index INTEGER NOT NULL,"
+		"frameInfo15Index INTEGER NOT NULL,"
+		"countFound INTEGER NOT NULL,"
+		"PRIMARY KEY(demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index)"
+		"); ",
+		NULL, NULL, NULL);
+	sqlite3_exec(io.debugStatsDb, "CREATE TABLE frameInfoViewModelAnimsSimple ("
+		"demoVersion INTEGER NOT NULL,"
+		"type TEXT NOT NULL," // player or weapon
+		"viewModelAnim INTEGER NOT NULL,"
+		"frameInfoIndex INTEGER NOT NULL,"
+		"countFound INTEGER NOT NULL,"
+		"PRIMARY KEY(demoVersion,type,viewModelAnim,frameInfoIndex)"
+		"); ",
+		NULL, NULL, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO animStances (demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance,countFound) VALUES (@demoVersion,@saberHolstered,@torsoAnim,@legsAnim,@saberMove,@stance, 0);";
-
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAnimStanceStatement, NULL);
-	preparedStatementText = "UPDATE animStances SET countFound = countFound + @countFound WHERE demoVersion=@demoVersion AND saberHolstered=@saberHolstered AND torsoAnim=@torsoAnim AND @legsAnim=@legsAnim AND saberMove=@saberMove AND stance=@stance;";
 
+	preparedStatementText = "UPDATE animStances SET countFound = countFound + @countFound WHERE demoVersion=@demoVersion AND saberHolstered=@saberHolstered AND torsoAnim=@torsoAnim AND @legsAnim=@legsAnim AND saberMove=@saberMove AND stance=@stance;";
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateAnimStanceCountStatement, NULL);
+
+	preparedStatementText = "INSERT OR IGNORE INTO frameInfoViewModelAnims (demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index,countFound) VALUES (@demoVersion,@type,@viewModelAnim,@frameInfo0Index,@frameInfo1Index,@frameInfo2Index,@frameInfo3Index,@frameInfo4Index,@frameInfo5Index,@frameInfo6Index,@frameInfo7Index,@frameInfo8Index,@frameInfo9Index,@frameInfo10Index,@frameInfo11Index,@frameInfo12Index,@frameInfo13Index,@frameInfo14Index,@frameInfo15Index,0);";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertFrameInfoViewModelAnimStatement, NULL);
+	
+	preparedStatementText = "UPDATE frameInfoViewModelAnims SET countFound = countFound + @countFound WHERE demoVersion=@demoVersion AND type=@type AND viewModelAnim=@viewModelAnim AND frameInfo0Index=@frameInfo0Index AND frameInfo1Index=@frameInfo1Index AND frameInfo2Index=@frameInfo2Index AND frameInfo3Index=@frameInfo3Index AND frameInfo4Index=@frameInfo4Index AND frameInfo5Index=@frameInfo5Index AND frameInfo6Index=@frameInfo6Index AND frameInfo7Index=@frameInfo7Index AND frameInfo8Index=@frameInfo8Index AND frameInfo9Index=@frameInfo9Index AND frameInfo10Index=@frameInfo10Index AND frameInfo11Index=@frameInfo11Index AND frameInfo12Index=@frameInfo12Index AND frameInfo13Index=@frameInfo13Index AND frameInfo14Index=@frameInfo14Index AND frameInfo15Index=@frameInfo15Index;";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateFrameInfoViewModelAnimCountStatement, NULL);
+
+	preparedStatementText = "INSERT OR IGNORE INTO frameInfoViewModelAnimsSimple (demoVersion,type,viewModelAnim,frameInfoIndex,countFound) VALUES (@demoVersion,@type,@viewModelAnim,@frameInfoIndex,0);";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertFrameInfoViewModelAnimStatementSimple, NULL);
+	
+	preparedStatementText = "UPDATE frameInfoViewModelAnimsSimple SET countFound = countFound + @countFound WHERE demoVersion=@demoVersion AND type=@type AND viewModelAnim=@viewModelAnim AND frameInfoIndex=@frameInfoIndex;";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateFrameInfoViewModelAnimCountStatementSimple, NULL);
+
 	sqlite3_exec(io.debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 #endif
 }
@@ -2273,6 +2340,42 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			std::cerr << "Error updating anim stance count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.updateAnimStanceCountStatement);
+		//wasDoingSQLiteExecution = false;
+	}
+	// frame info viewmodelindex info
+	for (auto it = io.frameInfoVieWModelQueries->begin(); it != io.frameInfoVieWModelQueries->end(); it++) {
+		//wasDoingSQLiteExecution = true;
+		(*it)->query.bind(io.insertFrameInfoViewModelAnimStatement);
+		int queryResult = sqlite3_step(io.insertFrameInfoViewModelAnimStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting frameInfo-viewmodelanim info into database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(io.insertFrameInfoViewModelAnimStatement);
+
+		(*it)->query.bind(io.updateFrameInfoViewModelAnimCountStatement);
+		queryResult = sqlite3_step(io.updateFrameInfoViewModelAnimCountStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error updating frameInfo-viewmodelanim info count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(io.updateFrameInfoViewModelAnimCountStatement);
+		//wasDoingSQLiteExecution = false;
+	}
+	// frame info viewmodelindex info
+	for (auto it = io.frameInfoVieWModelSimpleQueries->begin(); it != io.frameInfoVieWModelSimpleQueries->end(); it++) {
+		//wasDoingSQLiteExecution = true;
+		(*it)->query.bind(io.insertFrameInfoViewModelAnimStatementSimple);
+		int queryResult = sqlite3_step(io.insertFrameInfoViewModelAnimStatementSimple);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting frameInfo-viewmodelanim (simple) info into database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(io.insertFrameInfoViewModelAnimStatementSimple);
+
+		(*it)->query.bind(io.updateFrameInfoViewModelAnimCountStatementSimple);
+		queryResult = sqlite3_step(io.updateFrameInfoViewModelAnimCountStatementSimple);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error updating frameInfo-viewmodelanim info (simple) count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(io.updateFrameInfoViewModelAnimCountStatementSimple);
 		//wasDoingSQLiteExecution = false;
 	}
 #endif
@@ -2472,6 +2575,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.playerModelQueries = new queryCollection();
 	io.playerDemoStatsQueries = new queryCollection();
 	io.animStanceQueries = new queryCollection();
+	io.frameInfoVieWModelQueries = new queryCollection();
+	io.frameInfoVieWModelSimpleQueries = new queryCollection();
 	io.packetStatsQueries = new queryCollection();
 
 
@@ -2555,6 +2660,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 		sqlite3_finalize(io.insertAnimStanceStatement);
 		sqlite3_finalize(io.updateAnimStanceCountStatement);
+		sqlite3_finalize(io.insertFrameInfoViewModelAnimStatement);
+		sqlite3_finalize(io.updateFrameInfoViewModelAnimCountStatement);
+		sqlite3_finalize(io.insertFrameInfoViewModelAnimStatementSimple);
+		sqlite3_finalize(io.updateFrameInfoViewModelAnimCountStatementSimple);
 		sqlite3_close(io.debugStatsDb);
 #endif
 
@@ -2728,6 +2837,48 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 		//SQLBIND_DELAYED(io.updateAnimStanceCountStatement, int, "@stance", std::get<5>(it->first));
 
 		io.animStanceQueries->push_back(queryWrapper);
+	}
+	
+	for (auto it = frameInfoViewModelAnimCounts.begin(); it != frameInfoViewModelAnimCounts.end(); it++) {
+
+		SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+		SQLDelayedQuery* query = &queryWrapper->query;
+
+		SQLBIND_DELAYED(query, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND_DELAYED_TEXT(query, "@type", frameInfoTypeNames[std::get<1>(it->first)]);
+		SQLBIND_DELAYED(query, int, "@viewModelAnim", std::get<2>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo0Index", std::get<3>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo1Index", std::get<4>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo2Index", std::get<5>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo3Index", std::get<6>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo4Index", std::get<7>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo5Index", std::get<8>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo6Index", std::get<9>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo7Index", std::get<10>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo8Index", std::get<11>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo9Index", std::get<12>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo10Index", std::get<13>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo11Index", std::get<14>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo12Index", std::get<15>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo13Index", std::get<16>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo14Index", std::get<17>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfo15Index", std::get<18>(it->first));
+		SQLBIND_DELAYED(query, int, "@countFound", it->second);
+
+		io.frameInfoVieWModelQueries->push_back(queryWrapper);
+	}
+	for (auto it = frameInfoViewModelAnimSimpleCounts.begin(); it != frameInfoViewModelAnimSimpleCounts.end(); it++) {
+
+		SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+		SQLDelayedQuery* query = &queryWrapper->query;
+
+		SQLBIND_DELAYED(query, int, "@demoVersion", std::get<0>(it->first));
+		SQLBIND_DELAYED_TEXT(query, "@type", frameInfoTypeNames[std::get<1>(it->first)]);
+		SQLBIND_DELAYED(query, int, "@viewModelAnim", std::get<2>(it->first));
+		SQLBIND_DELAYED(query, int, "@frameInfoIndex", std::get<3>(it->first));
+		SQLBIND_DELAYED(query, int, "@countFound", it->second);
+
+		io.frameInfoVieWModelSimpleQueries->push_back(queryWrapper);
 	}
 #endif
 }
@@ -3200,6 +3351,29 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						if (isMOHAADemo) {
 							playerTeams[thisEs->number] = getMOHTeam(thisEs);
+
+#ifdef DEBUGSTATSDB
+							if (thisEs->number == demo.cut.Cl.snap.ps.clientNum) {
+
+								frameInfoViewModelAnimKey keyHere = { demoType,PLAYER,demo.cut.Cl.snap.ps.iNetViewModelAnim,thisEs->frameInfo[0].index, thisEs->frameInfo[1].index, thisEs->frameInfo[2].index, thisEs->frameInfo[3].index, thisEs->frameInfo[4].index, thisEs->frameInfo[5].index, thisEs->frameInfo[6].index, thisEs->frameInfo[7].index, thisEs->frameInfo[8].index, thisEs->frameInfo[9].index, thisEs->frameInfo[10].index, thisEs->frameInfo[11].index, thisEs->frameInfo[12].index, thisEs->frameInfo[13].index, thisEs->frameInfo[14].index, thisEs->frameInfo[15].index };  // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+								frameInfoViewModelAnimCounts[keyHere]++;
+								float strongestWeight = -9999.9f;
+								int strongestIndex = -1;
+								for (int i = 0; i < 16; i++) {
+									frameInfoViewModelAnimSimpleKey keySimpleHere = { demoType,PLAYER,demo.cut.Cl.snap.ps.iNetViewModelAnim,thisEs->frameInfo[i].index };  // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+									frameInfoViewModelAnimSimpleCounts[keySimpleHere]++;
+									if (thisEs->frameInfo[i].weight > strongestWeight) {
+										strongestIndex = i;
+										strongestWeight = thisEs->frameInfo[i].weight;
+									}
+								}
+								if (strongestIndex != -1) {
+									frameInfoViewModelAnimSimpleKey keySimpleHere = { demoType,PLAYER_HIGHWEIGHT,demo.cut.Cl.snap.ps.iNetViewModelAnim,thisEs->frameInfo[strongestIndex].index };  // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+									frameInfoViewModelAnimSimpleCounts[keySimpleHere]++;
+								}
+
+							}
+#endif
 						}
 
 						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(thisEs->saberMove,demoType);
@@ -3443,6 +3617,27 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						// 
 						// 3 (47), 5(400), 6(191), 14 (11555), 22 (347807), 23 (11), 29 (6024), 40 (1243), 52 (90908)
 						if(thisEs->tag_num == 52 || thisEs->tag_num == 22){
+
+#ifdef DEBUGSTATSDB
+							if (thisEs->parent == demo.cut.Cl.snap.ps.clientNum) {
+								frameInfoViewModelAnimKey keyHere = { demoType,WEAPON,demo.cut.Cl.snap.ps.iNetViewModelAnim,thisEs->frameInfo[0].index, thisEs->frameInfo[1].index, thisEs->frameInfo[2].index, thisEs->frameInfo[3].index, thisEs->frameInfo[4].index, thisEs->frameInfo[5].index, thisEs->frameInfo[6].index, thisEs->frameInfo[7].index, thisEs->frameInfo[8].index, thisEs->frameInfo[9].index, thisEs->frameInfo[10].index, thisEs->frameInfo[11].index, thisEs->frameInfo[12].index, thisEs->frameInfo[13].index, thisEs->frameInfo[14].index, thisEs->frameInfo[15].index };  // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+								frameInfoViewModelAnimCounts[keyHere]++;
+								float strongestWeight = -9999.9f;
+								int strongestIndex = -1;
+								for (int i = 0; i < 16; i++) {
+									frameInfoViewModelAnimSimpleKey keySimpleHere = { demoType,WEAPON,demo.cut.Cl.snap.ps.iNetViewModelAnim,thisEs->frameInfo[i].index };  // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+									frameInfoViewModelAnimSimpleCounts[keySimpleHere]++;
+									if (thisEs->frameInfo[i].weight > strongestWeight) {
+										strongestIndex = i;
+										strongestWeight = thisEs->frameInfo[i].weight;
+									}
+								}
+								if (strongestIndex != -1) {
+									frameInfoViewModelAnimSimpleKey keySimpleHere = { demoType,WEAPON_HIGHWEIGHT,demo.cut.Cl.snap.ps.iNetViewModelAnim,thisEs->frameInfo[strongestIndex].index };  // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
+									frameInfoViewModelAnimSimpleCounts[keySimpleHere]++;
+								}
+							}
+#endif
 
 							int configStringBaseIndex = getCS_MODELS(demoType); //(demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
 							if (mohaaPlayerWeaponModelIndexThisFrame[thisEs->parent] != -1) {
@@ -6408,7 +6603,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				hadConfigStringCommands = true;
 			}
-			else if (!strcmp(cmd, "stufftext")) {
+			else if (opts.dumpStufftext && !strcmp(cmd, "stufftext")) {
 				
 				std::cerr << "STUFFTEXT DUMP: " << Cmd_Argv(1) << "\n";
 
