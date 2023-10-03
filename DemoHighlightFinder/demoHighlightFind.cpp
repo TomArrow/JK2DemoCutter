@@ -125,6 +125,7 @@ public:
 	bool testOnly = false;
 	bool reframeIfNeeded = false;
 	bool dumpStufftext = false;
+	bool printDebug = false;
 	int jumpMetaEventsLimit = 0;
 };
 
@@ -3245,9 +3246,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						char* cmd = Cmd_Argv(0);
 
-						if (!strcmp(cmd, "print")) {
-							if (isMOHAADemo) {
+						if (isMOHAADemo) {
+
+							if (!strcmp(cmd, "print")) {
 								entityState_t* deathEvent = parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
+								if (deathEvent) {
+									parsedEventEntities.push(deathEvent);
+								}
+							}
+							else if (!strcmp(cmd, "printdeathmsg")) {
+								entityState_t* deathEvent = parseMOHAAPrintDeathMsgFromTokenized(&playerNamesToClientNums);
 								if (deathEvent) {
 									parsedEventEntities.push(deathEvent);
 								}
@@ -4732,6 +4740,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										break;
 									case MOD_BASH_GENERAL:
 										modInfo << "_BASH";
+										break;
+									case MOD_LANDMINE_GENERAL:
+										modInfo << "_LANDMINE";
 										break;
 								}
 								if(needMoreInfo)
@@ -6501,9 +6512,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
 			char* cmd = Cmd_Argv(0);
-			if (cmd[0]) {
-				firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
-			}
+			//if (cmd[0] && !firstServerCommand) {
+			//	firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
+			//}
 
 			if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
 				std::string chatCommand = command;
@@ -6996,6 +7007,7 @@ int main(int argcO, char** argvO) {
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
+	auto p = op.add<popl::Switch>("p", "print-debug", "Prints out various debug things, like all configstrings.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -7036,8 +7048,9 @@ int main(int argcO, char** argvO) {
 	opts.testOnly = t->value();
 	opts.reframeIfNeeded = r->value();
 	opts.dumpStufftext = D->value();
+	opts.printDebug = p->value();
 
-
+	if (opts.printDebug) GlobalDebugOutputFlags = ~0; // TODO Make this more flexible? Able to specify types of debug output? Merge the stufftext stuff into it too.
 
 	highlightSearchMode_t searchMode = SEARCH_INTERESTING;
 	//if (argc > 3) {

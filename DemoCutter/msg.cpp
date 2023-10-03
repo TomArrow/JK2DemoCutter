@@ -677,6 +677,9 @@ void MSG_WriteString( msg_t *sb, const char *s, demoType_t demoType ) {
 				MSG_WriteByte(sb, StrCharToNetByte[string[i]]);
 			}
 		}
+		if (isMOHAADemoWithScrambledString) {
+			MSG_WriteByte(sb, StrCharToNetByte[0]);
+		}
 
 		if (!isMOHAADemoWithScrambledString) {
 			MSG_WriteData(sb, string, l + 1);
@@ -729,6 +732,9 @@ void MSG_WriteBigString( msg_t *sb, const char *s, demoType_t demoType) {
 			if (isMOHAADemoWithScrambledString) {
 				MSG_WriteByte(sb, StrCharToNetByte[string[i]]);
 			}
+		}
+		if (isMOHAADemoWithScrambledString) {
+			MSG_WriteByte(sb, StrCharToNetByte[0]);
 		}
 
 		if (!isMOHAADemoWithScrambledString) {
@@ -822,7 +828,7 @@ float MSG_ReadFloat( msg_t *msg ) {
 	return dat.f;	
 }
 
-char *MSG_ReadString( msg_t *msg, demoType_t demoType ) {
+char *MSG_ReadString( msg_t *msg, demoType_t demoType, qboolean forceNonScrambled ) {
 	static char	string[MAX_STRING_CHARS_MAX];
 	int		l,c;
 
@@ -836,7 +842,7 @@ char *MSG_ReadString( msg_t *msg, demoType_t demoType ) {
 			break;
 		}
 
-		if (isMOHAADemoWithScrambledString) {
+		if (isMOHAADemoWithScrambledString && !forceNonScrambled) {
 			c = NetByteToStrChar[c];
 		}
 
@@ -2651,7 +2657,7 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 		if ( from == NULL ) {
 			return;
 		}
-		MSG_WriteBits( msg, from->number, GENTITYNUM_BITS );
+		MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((from->number + 1) % MAX_GENTITIES) : from->number, GENTITYNUM_BITS );
 		MSG_WriteBits( msg, 1, 1 );
 		return;
 	}
@@ -2684,13 +2690,13 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 			return;		// nothing at all
 		}
 		// write two bits for no change
-		MSG_WriteBits( msg, to->number, GENTITYNUM_BITS );
+		MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((to->number + 1) % MAX_GENTITIES) : to->number, GENTITYNUM_BITS );
 		MSG_WriteBits( msg, 0, 1 );		// not removed
 		MSG_WriteBits( msg, 0, 1 );		// no delta
 		return;
 	}
 
-	MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((to->number + 1) % GENTITYNUM_BITS) : to->number, GENTITYNUM_BITS ); // mohaa extensions apparently add 1 to the value and then subtract it when reading. idfk why.
+	MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((to->number + 1) % MAX_GENTITIES) : to->number, GENTITYNUM_BITS ); // mohaa extensions apparently add 1 to the value and then subtract it when reading. idfk why.
 	MSG_WriteBits( msg, 0, 1 );			// not removed
 	MSG_WriteBits( msg, 1, 1 );			// we have a delta
 

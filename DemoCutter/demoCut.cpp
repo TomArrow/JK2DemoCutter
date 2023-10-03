@@ -240,6 +240,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	//demoPlay_t* play = demo.play.handle;
 	qboolean		ret = qfalse;
 	int				framesSaved = 0;
+	qboolean		newGameStateAfterDemoCutBegun = qfalse;
 	char			ext[7]{};
 	//char			originalExt[7]{};
 	demoType_t		demoType;
@@ -524,10 +525,11 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				break;
 			case svc_gamestate_general:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
-				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime,demo.cut.Cl.snap.serverTime,atoi(demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]),(qboolean)(demo.cut.Cl.snap.ps.pm_type==PM_SPINTERMISSION), demoCurrentTime-demo.lastPMTChange,mapRestartCounter,NULL)) {
-					Com_DPrintf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
-					goto cutcomplete;
-				}
+				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange, mapRestartCounter, NULL)) {
+					//Com_DPrintf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
+					//goto cutcomplete;// Actually, who cares. Let's keep the map changes in the cut demo too. Shrug.
+					newGameStateAfterDemoCutBegun = qtrue;
+				} 
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
 					goto cuterror;
 				}
@@ -622,8 +624,11 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
 			char* cmd = Cmd_Argv(0);
-			if (cmd[0]) {
-				firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
+			//if (cmd[0] && !firstServerCommand) {
+			//	firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
+			//}
+			if (!cmd[0]) {
+				continue;
 			}
 			if (!strcmp(cmd, "cs")) {
 				if (!demoCutConfigstringModified(&demo.cut.Cl,demoType)) {
@@ -643,7 +648,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		}
 		else if (framesSaved > 0) {
 			/* this msg is in range, write it */
-			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum)) { // Hmm did I do this? I don't recall...
+			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum) || newGameStateAfterDemoCutBegun) { // Hmm did I do this? I don't recall... NEW: newGameStateAfterDemoCutBegun: If there is a new gamestate, may as well just start just dumping the messages now.
 				demoCutWriteDemoMessage(&oldMsg, newHandle, &demo.cut.Clc);
 			}
 			else {

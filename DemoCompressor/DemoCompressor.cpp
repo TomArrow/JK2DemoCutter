@@ -343,8 +343,11 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
 			char* cmd = Cmd_Argv(0);
-			if (cmd[0]) {
-				firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
+			//if (cmd[0] && !firstServerCommand) {
+			//	firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
+			//}
+			if (!cmd[0]) {
+				continue;
 			}
 			if (!strcmp(cmd, "cs")) {
 				if (!demoCutConfigstringModified(&demo.cut.Cl,demoType)) {

@@ -629,7 +629,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 
 			int normalizedPSFlags = MOH_CPT_NormalizePlayerStateFlags(snap->playerState.net_pm_flags,demoType);
 			//if ((normalizedPSFlags & PMF_CAMERA_VIEW_MOH) && (normalizedPSFlags & PMF_SPECTATING_MOH) && VectorDistance(thisEntity->pos.trBase, snap->playerState.origin) < 0.01f) {
-			if ((normalizedPSFlags & PMF_CAMERA_VIEW_MOH) && (normalizedPSFlags & PMF_SPECTATING_MOH) && VectorSame(thisEntity->pos.trBase, snap->playerState.origin)) {
+			if ((normalizedPSFlags & PMF_CAMERA_VIEW_MOH) && (normalizedPSFlags & PMF_SPECTATING_MOH) && (demoType == DM3_MOHAA_PROT_15 ? VectorDistance(thisEntity->pos.trBase, snap->playerState.origin) < 0.5f : VectorSame(thisEntity->pos.trBase, snap->playerState.origin))) { // In expansions, probably due to netcode changes, we cannot check for equality of the vectors. We must compare for them being very close instead.
 				
 				// We are likely following/spectating this player, and can thus infer some extra info. 
 				// For example we can copy over the fov which helps with sniper zoom stuff and such
@@ -1564,7 +1564,7 @@ readNext:
 		bool malformedMessageCaught = false;
 		byte cmd;
 		if (oldMsg.readcount > oldMsg.cursize) {
-			Com_DPrintf("Demo cutter, read past end of server message.\n");
+			Com_DPrintf("Demo reader, read past end of server message.\n");
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
@@ -1940,10 +1940,11 @@ readNext:
 		
 		Cmd_TokenizeString(command);
 		char* cmd = Cmd_Argv(0);
-		if (cmd[0]) {
-			firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
-		}
-		else {
+		//if (cmd[0] && !firstServerCommand) {
+		//	firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
+		//}
+		//else {
+		if(!cmd){
 			continue;
 		}
 

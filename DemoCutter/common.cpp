@@ -18,6 +18,14 @@ constexpr char* postEOFMetadataMarker = "HIDDENMETA";
 //
 
 
+typedef enum globalDebugOutputType_t {
+	DEBUG_CONFIGSTRING,
+	DEBUG_COMMANDS,
+};
+
+int GlobalDebugOutputFlags = 0;
+
+
 
 std::string errorInfo = "";
 
@@ -3415,6 +3423,7 @@ void CG_ParseCGMessage_ver_15(msg_t* msg, demoType_t demoType)
 	int    iInfo;
 	int    iCount;
 	char* szTmp;
+	char* s;
 	vec3_t vStart, vEnd, vTmp;
 	vec3_t vEndArray[MAX_IMPACTS];
 	float  alpha;
@@ -3696,7 +3705,7 @@ void CG_ParseCGMessage_ver_15(msg_t* msg, demoType_t demoType)
 
 		case 30:
 			iInfo = MSG_ReadByte(msg);
-			MSG_ReadString(msg, demoType);//strcpy(cgi.HudDrawElements[iInfo].shaderName, MSG_ReadString(msg));
+			MSG_ReadString(msg, demoType,qtrue);//strcpy(cgi.HudDrawElements[iInfo].shaderName, MSG_ReadString(msg));
 			//cgi.HudDrawElements[iInfo].string[0] = 0;
 			//cgi.HudDrawElements[iInfo].pFont = NULL;
 			//cgi.HudDrawElements[iInfo].fontName[0] = 0;
@@ -3738,12 +3747,12 @@ void CG_ParseCGMessage_ver_15(msg_t* msg, demoType_t demoType)
 		case 36:
 			iInfo = MSG_ReadByte(msg);
 			//cgi.HudDrawElements[iInfo].hShader = 0;
-			MSG_ReadString(msg,demoType);//strcpy(cgi.HudDrawElements[iInfo].string, MSG_ReadString(msg));
+			s = MSG_ReadString(msg,demoType, qtrue);//strcpy(cgi.HudDrawElements[iInfo].string, MSG_ReadString(msg));
 			break;
 
 		case 37:
 			iInfo = MSG_ReadByte(msg);
-			MSG_ReadString(msg, demoType);//strcpy(cgi.HudDrawElements[iInfo].fontName, MSG_ReadString(msg));
+			MSG_ReadString(msg, demoType, qtrue);//strcpy(cgi.HudDrawElements[iInfo].fontName, MSG_ReadString(msg));
 			//cgi.HudDrawElements[iInfo].hShader = 0;
 			//cgi.HudDrawElements[iInfo].shaderName[0] = 0;
 			// load the font
@@ -3777,7 +3786,7 @@ void CG_ParseCGMessage_ver_15(msg_t* msg, demoType_t demoType)
 			vStart[2] = MSG_ReadCoord(msg);
 			iLarge = MSG_ReadBits(msg,1);
 			iInfo = MSG_ReadBits(msg,6);
-			szTmp = MSG_ReadString(msg,demoType);
+			szTmp = MSG_ReadString(msg,demoType, qtrue);
 
 			//iOldEnt = current_entity_number;
 
@@ -4305,12 +4314,20 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 		}
 		if (cmd == svc_configstring_general) {
 			int len, start;
+			qboolean oobOld;
+			int bitOld, readCountOld;
 			start = msg->readcount;
 			i = MSG_ReadShort(msg);
 			if (i < 0 || i >= maxAllowedConfigString) {
 				Com_DPrintf("configstring > MAX_CONFIGSTRINGS");
 				return qfalse;
 			}
+			if (i == 0 && *demoType == DM3_MOHAA_PROT_6) {
+				oobOld = msg->oob;
+				bitOld = msg->bit;
+				readCountOld = msg->readcount;
+			}
+configStringReadRetry:
 			s = MSG_ReadBigString(msg, *demoType);
 			len = strlen(s);
 			if (len + 1 + clCut->gameState.dataCount > MAX_GAMESTATE_CHARS) {
@@ -4333,8 +4350,17 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 				// Medal of Honor .dm3 file format. Check protocol version because the demo file ending is same for all.
 				// This is produced by stock MOH with unlocked demo functionality. OpenMOHAA has different naming.
 				char* protocolString = Info_ValueForKey(s, BIG_INFO_STRING, "protocol");
+				if (*protocolString == 0) {
+					// This might be spearhead/breakthrough demo, in which case all we get here is garbled nonsense and obviously no value for protocol, since string reading/writing uses a funny lookup table.
+					// All we can try is set directly to protocol15/16/17 and retry string reading and hope it works.
+					msg->oob = oobOld;
+					msg->bit = bitOld;
+					msg->readcount = readCountOld;
+					*demoType = DM3_MOHAA_PROT_15;
+					goto configStringReadRetry;
+				}
 				int protocol = atoi(protocolString);
-				switch (protocol) {
+				switch (protocol) { // I guess this ends up being pointless because protocol 15-17 uses a different string reading thingie and we get a garbled string here.
 					case 0:
 						throw std::logic_error("MOH demo without protocol in CS_SERVERINFO");
 					case 6:
@@ -4353,6 +4379,10 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 				}
 
 				clcCut->demoCheckProtocol = qfalse; //No need to check this again while playing the demo.
+			}
+
+			if (GlobalDebugOutputFlags & (1 << DEBUG_CONFIGSTRING)) {
+				std::cerr << "CONFIGSTRING DEBUG (GAMESTATE): serverTime "<< clCut->snap.serverTime << ", index " << i << ": " << s << "\n";
 			}
 
 			// append it to the gameState string buffer
@@ -4398,7 +4428,20 @@ static inline qboolean demoCutParseGamestateReal(msg_t* msg, clientConnection_t*
 		// really stable or functional. 
 		// Hence we pass the fourth argument "forceConfigStringMethod" if this is a demo header,
 		// but read normally if it's not (then it's a normal gamestate with that value intact).
-		clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut, isDemoHeader);
+		//clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut, isDemoHeader);
+
+		// Actually, I changed my mind. We just force a read here even if it may not be valid, and catch the possible "read past end of message" style event.
+		qboolean oldOOB = msg->oob;
+		int oldBit = msg->bit;
+		int oldReadCount = msg->readcount;
+		clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut, qfalse);
+		if (isDemoHeader && msg->readcount > msg->cursize) {
+			// Ok this is confirmed one of the old school "missing server frame time" demo headers as the stock game writes them.
+			msg->oob = oldOOB;
+			msg->bit = oldBit;
+			msg->readcount = oldReadCount;
+			clCut->serverFrameTime = MSG_ReadServerFrameTime(msg, *demoType, clCut, qtrue); // Get the correct value from sv_fps instead
+		}
 	}
 
 	// RMG stuff (JKA specific)
@@ -4429,7 +4472,7 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	newSnap->numEntities = 0;
 	newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
 	if (demoType == DM3_MOHAA_PROT_15) {
-		newnum = (newnum - 1) % MAX_GENTITIES; // Idk why tf but that's how it is apparently.
+		newnum = (unsigned short)(newnum - 1) % MAX_GENTITIES; // Idk why tf but that's how it is apparently.
 	}
 	while (1) {
 		// read the entity index number
@@ -4453,10 +4496,16 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 			oldindex++;
 			MSG_ReadDeltaEntity(msg, oldstate, newstate, newnum, demoType, clCut->serverFrameTime); // serverFrameTime stuff is MOHAA
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
+			if (demoType == DM3_MOHAA_PROT_15) {
+				newnum = (unsigned short)(newnum - 1) % MAX_GENTITIES; // Idk why tf but that's how it is apparently.
+			}
 		}
 		else if (oldnum > newnum) {
 			MSG_ReadDeltaEntity(msg, &clCut->entityBaselines[newnum], newstate, newnum, demoType, clCut->serverFrameTime); // serverFrameTime stuff is MOHAA
 			newnum = MSG_ReadBits(msg, GENTITYNUM_BITS);
+			if (demoType == DM3_MOHAA_PROT_15) {
+				newnum = (unsigned short)(newnum - 1) % MAX_GENTITIES; // Idk why tf but that's how it is apparently.
+			}
 		}
 		if (newstate->number == MAX_GENTITIES - 1)
 			continue;
@@ -4507,6 +4556,11 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 	if (!strcmp(old, s)) {
 		return qtrue; // unchanged
 	}
+
+	if (GlobalDebugOutputFlags & (1 << DEBUG_CONFIGSTRING)) {
+		std::cerr << "CONFIGSTRING DEBUG (CONFIGSTRINGMODIFIED): serverTime " << clCut->snap.serverTime << ", index " << index << ": " << s << "\n";
+	}
+
 	// build the new gameState_t
 	oldGs = clCut->gameState;
 	Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
@@ -4730,7 +4784,7 @@ void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg,
 			continue;
 		}
 	}
-	MSG_WriteBits(msg, (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
+	MSG_WriteBits(msg, demoType == DM3_MOHAA_PROT_15 ? (MAX_GENTITIES % MAX_GENTITIES) : (MAX_GENTITIES - 1), GENTITYNUM_BITS);	// end of packetentities
 }
 
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut) {
@@ -4799,7 +4853,7 @@ void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* cl
 	for (int i = 0; i < metaMarkerLength; i++) {
 		MSG_WriteByte(&buf,postEOFMetadataMarker[i]);
 	}
-	MSG_WriteBigString(&buf, metaData, demoType);
+	MSG_WriteBigString(&buf, metaData, demoType == DM3_MOHAA_PROT_15 ? DM3_MOHAA_PROT_6 : demoType); // For Spearheard/Breakthrough we might need scrambling, but at loading time we don't even know if it's one of those yet, so it would make it impossible to decide.
 
 
 	// finished writing the client packet
@@ -4913,6 +4967,17 @@ void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientAc
 	// write the checksum feed
 	MSG_WriteLong(&buf, clcCut->checksumFeed);
 
+	if (demoType == DM3_MOHAA_PROT_15) {
+		// This is a break with the stock game,
+		// but the stock game's behavior is actually faulty,
+		// it writes invalid gamestate missing this part,
+		// causing either read past end of message when trying to read it,
+		// or leading to "invalid command byte" style errors if we DON'T read it
+		// despite it being there.
+		// Just do the right thing.
+		MSG_WriteFloat(&buf,clCut->serverFrameTime);
+	}
+
 	// This is supposed to be part of gamestate
 	// but it doesn't seem like the normal game writes this for the demo header either
 	// I guess just stay compatible here and do it the "wrong" way to not lead to a
@@ -4986,9 +5051,11 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	// copy over any commands
 	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
 		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
-		MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general,demoType));
-		MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
-		MSG_WriteString(msg, command, demoType);
+		if (command) { // firstServerCommand can be 0 at the start, so we have to loop through a lot of empty entries first. No use writing them.
+			MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general, demoType));
+			MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
+			MSG_WriteString(msg, command, demoType);
+		}
 	}
 	// this is the snapshot we are creating
 	frame = &clCut->snap;
@@ -5096,6 +5163,11 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 	if (!strcmp(old, s)) {
 		return qtrue; // unchanged
 	}
+
+	if (GlobalDebugOutputFlags & (1 << DEBUG_CONFIGSTRING)) {
+		std::cerr << "CONFIGSTRING DEBUG (CONFIGSTRINGMODIFIEDMANUAL): serverTime " << clCut->snap.serverTime << ", index " << configStringNum << ": " << value << "\n";
+	}
+
 	// build the new gameState_t
 	oldGs = clCut->gameState;
 	Com_Memset(&clCut->gameState, 0, sizeof(clCut->gameState));
@@ -5627,6 +5699,96 @@ mohParseDeathMsgReturnEntityState:
 	}
 }
 
+entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char,int>* playerMapClientNumMap) {
+	if (Cmd_Argc() < 6) {
+		return NULL; // Not a proper printdeathmsg
+	}
+	else {
+		static entityState_t tmpEs;
+
+		Com_Memset(&tmpEs,0,sizeof(tmpEs));
+
+		tmpEs.event = EV_OBITUARY_GENERAL;
+		tmpEs.time = -1;
+
+		auto player1Match = playerMapClientNumMap->find(Cmd_Argv(4));
+		if (player1Match == playerMapClientNumMap->end()) {
+			std::cout << "STRING MATCH FAIL, NO MATCH: " << Cmd_Argv(4) << "\n";
+			return NULL;
+		}
+		int matchedPlayer1 = player1Match.value();
+
+		tmpEs.otherEntityNum = matchedPlayer1; // target
+
+		auto s1Match = mohMeansOfDeathArray.find(Cmd_Argv(1));
+		if (s1Match == mohMeansOfDeathArray.end()) {
+			std::cout << "STRING MATCH FAIL, NO MATCH: " << Cmd_Argv(1) << "\n";
+			return NULL;
+		}
+		mohMeansOfDeath_t mohMod = s1Match.value();
+
+		tmpEs.eventParm = mohMod.meansOfDeath;
+		tmpEs.weapon = mohMod.weaponClass; // Little special thing.
+		tmpEs.time2 = mohMod.wasZoomed;
+
+		if (mohMod.isSelfKill) { 
+			tmpEs.otherEntityNum2 = matchedPlayer1; // attacker
+		}
+		else if (!mohMod.attackerExistsAndIsClient) {
+			tmpEs.otherEntityNum2 = ENTITYNUM_WORLD; // attacker
+		}
+
+		if (!mohMod.attackerExistsAndIsClient || mohMod.isSelfKill) {
+			goto mohParsePrintDeathMsgReturnEntityState;
+		}
+
+		{
+			auto player2Match = playerMapClientNumMap->find(Cmd_Argv(3));
+			if (player2Match == playerMapClientNumMap->end()) {
+				std::cout << "STRING MATCH FAIL, NO MATCH: " << Cmd_Argv(3) << "\n";
+				return NULL;
+			}
+			int matchedPlayer2 = player2Match.value();
+
+			tmpEs.otherEntityNum2 = matchedPlayer2; // attacker
+		}
+
+		const char* s2 = Cmd_Argv(2);
+		bool s2Match = false;
+		int s2Count = 0;
+		for (int i = 0; i < MOH_MAX_KILLMSG_S2_VARIATIONS; i++) {
+
+			if (mohMod.s2[i]) {
+				s2Count++;
+				if (!_stricmp(s2, mohMod.s2[i])) {
+
+					s2Match = true;
+					break;
+				}
+			}
+		}
+
+		if (s2Count && !s2Match) {
+			std::cout << "STRING MATCH FAIL, NO MATCH: " << Cmd_Argv(2) << "\n";
+			return NULL;
+		}
+
+		// Kill location doesn't exist in expansions. :(
+		/*
+		int* matchedKillLocation = mohaaMatchString(&mohKillLocationArray, &message);
+		if (matchedKillLocation == NULL) {
+			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
+		}*/
+
+		tmpEs.time = -1; // Ugly but whatever.
+
+mohParsePrintDeathMsgReturnEntityState:
+		entityState_t* retVal = new entityState_t{};
+		*retVal = tmpEs;
+		return retVal;
+	}
+}
+
 
 
 
@@ -5877,6 +6039,49 @@ static gameInfo_t gameInfos[] = {
 		},
 		MAX_CONFIGSTRINGS_MOH,
 		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH_OLD},
+		MAX_CLIENTS_MOH
+	},
+	{ // MOHAA expansions
+		DM3_MOHAA_PROT_15, 
+		{
+			svc_bad_general,
+			svc_nop_general,
+			svc_gamestate_general,
+			svc_configstring_general,			// [short] [string] only in gamestate messages
+			svc_baseline_general,				// only in gamestate messages
+			svc_serverCommand_general,			// [string] to be executed by client game module
+			svc_download_general,				// [short] size [size bytes]
+			svc_snapshot_general,
+			svc_centerprint_general,
+			svc_locprint_general,
+			svc_cgameMessage_general,
+			svc_EOF_general
+		},
+		{
+			{ // MOHAA is very different from classic Q3 engine. A lot of these don't make sense for MOHAA so they're not really fixed up.
+				{},
+				{qlEventToGeneralMap,sizeof(qlEventToGeneralMap) / sizeof(qlEventToGeneralMap[0])},
+			},{
+				{},
+				{mohWeaponsToGeneral,sizeof(mohWeaponsToGeneral) / sizeof(mohWeaponsToGeneral[0])}, // MOH doesn't REALLY have a weapons enum and doesn't network weapon index either. Just basing it on the WPREFIX_ enum.
+			},{
+				{},
+				{mohaaModToGeneralMap,sizeof(mohaaModToGeneralMap) / sizeof(mohaaModToGeneralMap[0])},
+			},
+			{{},{lsMoveNOSABERToGeneral,sizeof(lsMoveNOSABERToGeneral) / sizeof(lsMoveNOSABERToGeneral[0])}},
+			{{},{qldm91ItemListToGeneral,sizeof(qldm91ItemListToGeneral) / sizeof(qldm91ItemListToGeneral[0])}},
+			{
+				{{{DM_15_1_03,DM_16},qlAnimToDM16,sizeof(qlAnimToDM16) / sizeof(qlAnimToDM16[0])}},
+				{qlAnimsToGeneral,sizeof(qlAnimsToGeneral) / sizeof(qlAnimsToGeneral[0])},
+			},
+			{{},{mohaaEntityTypeToGeneral,sizeof(mohaaEntityTypeToGeneral) / sizeof(mohaaEntityTypeToGeneral[0])}},
+		},
+		{
+			{entityStateFieldsMOHAA_ver_15,sizeof(entityStateFieldsMOHAA_ver_15) / sizeof(entityStateFieldsMOHAA_ver_15[0]),},
+			{playerStateFieldsMOHAA_ver_15,sizeof(playerStateFieldsMOHAA_ver_15) / sizeof(playerStateFieldsMOHAA_ver_15[0]),}
+		},
+		MAX_CONFIGSTRINGS_MOH,
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH},
 		MAX_CLIENTS_MOH
 	},
 	{

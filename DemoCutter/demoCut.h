@@ -28,6 +28,7 @@
 
 #include "tsl/htrie_map.h"
 
+extern int GlobalDebugOutputFlags;
 extern const char* DPrintFLocation;
 
 #ifdef _WIN32
@@ -1691,7 +1692,7 @@ int		MSG_ReadShort(msg_t* sb);
 int		MSG_ReadSShort(msg_t* sb);
 int		MSG_ReadLong(msg_t* sb);
 float	MSG_ReadFloat(msg_t* sb);
-char* MSG_ReadString(msg_t* sb, demoType_t demoType);
+char* MSG_ReadString(msg_t* sb, demoType_t demoType, qboolean forceNonScrambled=qfalse);
 char* MSG_ReadBigString(msg_t* sb, demoType_t demoType);
 char* MSG_ReadStringLine(msg_t* sb);
 float	MSG_ReadAngle16(msg_t* sb);
@@ -2857,6 +2858,7 @@ typedef enum {
 	MOD_GIB_GENERAL,
 	MOD_IMPALE_GENERAL,
 	MOD_BASH_GENERAL,
+	MOD_LANDMINE_GENERAL, // Breakthrough/SH? Not sure if actually used.
 
 	MOD_MAX_GENERAL,
 } meansOfDeath_t;
@@ -5027,6 +5029,7 @@ inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, dem
 
 
 entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
+entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char, int>* playerMapClientNumMap);
 
 
 #endif

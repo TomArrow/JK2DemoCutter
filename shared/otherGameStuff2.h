@@ -1452,6 +1452,8 @@ typedef enum {
 	MOD_IMPALE_MOH,
 	MOD_BASH_MOH,
 	MOD_SHOTGUN_MOH,
+	MOD_SOMETHING_MOH,
+	MOD_LANDMINE_MOH,
 	MOD_TOTAL_NUMBER_MOH,
 
 } meansOfDeathMOH_t;
@@ -1494,6 +1496,8 @@ static int mohaaModToGeneralMap[]{ // based on wolfcamql
 	MOD_IMPALE_GENERAL,
 	MOD_BASH_GENERAL,
 	MOD_SHOTGUN_GENERAL,
+	MOD_UNKNOWN_GENERAL,// Not sure.
+	MOD_LANDMINE_GENERAL,
 	MOD_MAX_GENERAL,//MOD_TOTAL_NUMBER_GENERAL,
 };
 
@@ -1563,15 +1567,18 @@ static const tsl::htrie_map<char, mohMeansOfDeath_t> mohMeansOfDeathArray = {
 	{"was hunted down by",{qtrue,qfalse,{},MOD_SHOTGUN_MOH}},
 	{"was pumped full of buckshot by",{qtrue,qfalse,{},MOD_SHOTGUN_MOH}},
 	{"was killed by",{qtrue,qfalse,{},MOD_NONE_MOH}},
+	{"stepped on",{qtrue,qfalse,{"'s landmine"},MOD_LANDMINE_MOH}}, // Breakthrough/maybe SH
 
 	// No client attacker
 	{"was burned to a crisp",{qfalse,qfalse,{},MOD_LAVA_MOH}}, // Could also be MOD_SLIME
+	{"was melted to nothing",{qfalse,qfalse,{},MOD_SLIME_MOH}}, // Breakthrough
 	{"cratered",{qfalse,qfalse,{},MOD_FALLING_MOH}},
 	{"blew up",{qfalse,qfalse,{},MOD_EXPLOSION_MOH}}, // Could also be MOD_GRENADE
 	{"caught a rocket",{qfalse,qfalse,{},MOD_ROCKET_MOH}},
 	{"was shot in the",{qfalse,qfalse,{},MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
 	{"was shot",{qfalse,qfalse,{},MOD_BULLET_MOH}}, // Could also be MOD_FAST_BULLET
 	{"died",{qfalse,qfalse,{},MOD_NONE_MOH}},
+	{"stepped on a land mine",{qfalse,qfalse,{},MOD_LANDMINE_MOH}}, // Breakthrough/maybe SH
 
 	// Self kill
 	{"took himself out of commision",{qtrue,qtrue,{},MOD_SUICIDE_MOH}},
@@ -1584,7 +1591,7 @@ static const tsl::htrie_map<char, mohMeansOfDeath_t> mohMeansOfDeathArray = {
 	{"shot himself",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	{"shot himself in the",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	//{"died",{qtrue,qtrue,"",MOD_NONE_MOH}},  // Could also be MOD_FAST_BULLET  // Can't tell this apart from no client attacker
-	
+	{"was hoist on his own pitard",{qtrue,qtrue,{},MOD_LANDMINE_MOH}}, // Breakthrough/maybe SH
 	
 	// Spanish versions: (yeah I know, cancer)
 	// Client attacker

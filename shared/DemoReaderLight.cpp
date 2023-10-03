@@ -605,8 +605,11 @@ readNext:
 		
 		Cmd_TokenizeString(command);
 		char* cmd = Cmd_Argv(0);
-		if (cmd[0]) {
-			firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
+		//if (cmd[0] && !firstServerCommand) {
+		//	firstServerCommand = thisDemo.cut.Clc.lastExecutedServerCommand;
+		//}
+		if (!cmd[0]) {
+			continue;
 		}
 		if (!strcmp(cmd, "cs")) {
 			if (!demoCutConfigstringModified(&thisDemo.cut.Cl,demoType)) {
