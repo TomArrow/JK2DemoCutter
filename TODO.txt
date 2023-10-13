@@ -4,6 +4,7 @@ save horizontal speeds separately!!!!!
 // TODO Parse com_protocol for quake games in case they decide to override protocol despite demo name...
 
 
+count laughs following kills/caps/rets
 
 
 nice regexp for killsprees mohaa: 

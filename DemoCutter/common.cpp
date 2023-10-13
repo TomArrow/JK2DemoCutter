@@ -5050,8 +5050,18 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteLong(msg, clcCut->reliableSequence);
 	// copy over any commands
 	for (int serverCommand = firstServerCommand; serverCommand <= clcCut->serverCommandSequence; serverCommand++) {
+		if (serverCommand < clcCut->serverCommandSequence - (MAX_RELIABLE_COMMANDS - 1)) {
+			int lowestPossible = clcCut->serverCommandSequence - (MAX_RELIABLE_COMMANDS - 1);
+			if (serverCommand != 0) {
+				std::cout << "WARNING: demoCutWriteDeltaSnapshot: serverCommand number " << serverCommand << " is lower than the buffer remembers. Skipping to " << lowestPossible << "\n";
+			}
+			else {
+				std::cout << "NOTE: demoCutWriteDeltaSnapshot: serverCommand number " << serverCommand << " is lower than the buffer remembers. Probably due to being start of demo. Skipping to " << lowestPossible << "\n";
+			}
+			serverCommand = lowestPossible;
+		}
 		char* command = clcCut->serverCommands[serverCommand & (MAX_RELIABLE_COMMANDS - 1)];
-		if (command) { // firstServerCommand can be 0 at the start, so we have to loop through a lot of empty entries first. No use writing them.
+		if (*command) { // firstServerCommand can be 0 at the start, so we have to loop through a lot of empty entries first. No use writing them.
 			MSG_WriteByte(msg, specializeGeneralSVCOp(svc_serverCommand_general, demoType));
 			MSG_WriteLong(msg, serverCommand/* + serverCommandOffset*/);
 			MSG_WriteString(msg, command, demoType);
