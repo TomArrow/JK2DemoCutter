@@ -2141,6 +2141,14 @@ float VectorDistance(vec3_t v1, vec3_t v2)
 	return VectorLength(dir);
 } 
 
+float Vector2Distance(vec2_t v1, vec2_t v2)
+{
+	vec2_t dir;
+
+	Vector2Subtract(v2, v1, dir);
+	return VectorLength2(dir);
+} 
+
 
 
 #define Q_COLOR_ESCAPE	'^'

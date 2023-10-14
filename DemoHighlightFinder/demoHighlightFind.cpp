@@ -127,10 +127,32 @@ public:
 	bool dumpStufftext = false;
 	bool printDebug = false;
 	int jumpMetaEventsLimit = 0;
+	int strafeCSVSyncPoint = 0; // Where do we sync different strafes in the csv? I think speed 300 makes sense? This also serves as a general trigger for the strafe CSV functionality. If 0 -> disabled
+	int strafeCSVResetPoint = 0; // Where do we reset to a new strafe in the csv? When falls below this. I think 200 makes sense.
+	int strafeCSVMinRunDuration = 0; // Discard runs for strafe csv that are shorter than N milliseconds.
+	bool strafeCSVInterpolate = false;
 };
 
 
+typedef struct strafeCSVPoint_t {
+	int64_t timeOffset;
+	float distanceTraveledFromLast;
+	float velocityXY;
+};
 
+typedef std::vector<strafeCSVPoint_t> strafeCSVRun_t;
+strafeCSVRun_t strafeCSVCurrentRun[MAX_CLIENTS_MAX];
+std::vector< strafeCSVRun_t> strafeCSVRuns[MAX_CLIENTS_MAX];
+
+inline static void strafeCSVResetPlayer(int clientNum, const ExtraSearchOptions& opts) {
+	if (strafeCSVCurrentRun[clientNum].size() > 0) {
+		int64_t timeDuration = strafeCSVCurrentRun[clientNum].back().timeOffset;
+		if (!opts.strafeCSVMinRunDuration || timeDuration >= opts.strafeCSVMinRunDuration) {
+			strafeCSVRuns[clientNum].push_back(strafeCSVCurrentRun[clientNum]);
+		}
+		strafeCSVCurrentRun[clientNum].clear();
+	}
+}
 
 
 #define PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -2558,6 +2580,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// (yeah I realize it's probably not a huge performance impact but there is literally zero benefit outside of elegance/cleanliness)
 }
 
+static void inline writeStrafeCSV(int i, const ExtraSearchOptions& opts);
+
 template<unsigned int max_clients>
 qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 
@@ -2603,6 +2627,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			}
 		}
 	}
+
 
 	if (opts.testOnly) return qtrue;
 
@@ -2701,6 +2726,15 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		}
 	}
 
+	// Dump strafeCSV if desired
+	if (opts.strafeCSVSyncPoint) {
+		for (int i = 0; i < max_clients; i++) {
+			strafeCSVResetPlayer(i, opts);
+
+			writeStrafeCSV(i, opts);
+		}
+	}
+
 	io.outputBatHandle->close();
 	io.outputBatHandleKillSprees->close();
 	io.outputBatHandleDefrag->close();
@@ -2712,6 +2746,169 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	return success;
 }
 
+static void inline writeStrafeCSV(int clientNum, const ExtraSearchOptions& opts) {
+	if (strafeCSVRuns[clientNum].size() > 0) {
+
+		std::ofstream strafeCSVPlayerOutputHandle;
+		strafeCSVPlayerOutputHandle.open(va("strafeCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
+
+
+		// Find sync points for each run
+		int64_t* syncPoints = new int64_t[strafeCSVRuns[clientNum].size()]{};
+		float* syncPointsDistance = new float[strafeCSVRuns[clientNum].size()]{};
+
+		int64_t earliestTime = 0;
+		for (int runId = 0; runId < strafeCSVRuns[clientNum].size(); runId++) {
+			syncPoints[runId] = 0;
+			syncPointsDistance[runId] = 0;
+			bool syncPointFound = false;
+			for (int frame = 0; frame < strafeCSVRuns[clientNum][runId].size(); frame++) {
+				syncPoints[runId] = strafeCSVRuns[clientNum][runId][frame].timeOffset;
+				syncPointsDistance[runId] += strafeCSVRuns[clientNum][runId][frame].distanceTraveledFromLast;
+				if (strafeCSVRuns[clientNum][runId][frame].timeOffset >= opts.strafeCSVSyncPoint) {
+					syncPointFound = true;
+					break;
+				}
+			}
+			if (!syncPointFound) {
+				syncPoints[runId] = -1;
+			}
+			else if (earliestTime > -syncPoints[runId]) {
+				earliestTime = -syncPoints[runId];
+			}
+		}
+
+		// Write header
+		strafeCSVPlayerOutputHandle << "time";
+		for (int r = 0; r < strafeCSVRuns[clientNum].size(); r++) {
+			if (syncPoints[r] == -1) continue;
+			strafeCSVPlayerOutputHandle << ",run" << r << "Dist";
+		}
+		for (int r = 0; r < strafeCSVRuns[clientNum].size(); r++) {
+			if (syncPoints[r] == -1) continue;
+			strafeCSVPlayerOutputHandle << ",run" << r << "Speed";
+		}
+		strafeCSVPlayerOutputHandle << "\n";
+
+
+		// Write data
+		int64_t currentTime = earliestTime;
+		int* runFrameIndizi = new int[strafeCSVRuns[clientNum].size()]{};
+		float* distancesTraveled = new float[strafeCSVRuns[clientNum].size()]{};
+		while (true) {
+
+			strafeCSVPlayerOutputHandle << currentTime;
+
+
+			// Write distance travelled
+			for (int runId = 0; runId < strafeCSVRuns[clientNum].size(); runId++) {
+				if (syncPoints[runId] == -1) continue;
+
+				bool entryWritten = false;
+				while (runFrameIndizi[runId] < strafeCSVRuns[clientNum][runId].size()) {
+					strafeCSVPoint_t* pointHere = &strafeCSVRuns[clientNum][runId][runFrameIndizi[runId]];
+					int64_t realTimehere = pointHere->timeOffset - syncPoints[runId];
+					if (realTimehere < currentTime) {
+						runFrameIndizi[runId]++;
+						if (runFrameIndizi[runId] < strafeCSVRuns[clientNum][runId].size()) {
+							distancesTraveled[runId] += strafeCSVRuns[clientNum][runId][runFrameIndizi[runId]].distanceTraveledFromLast;
+						}
+					}
+					else if (realTimehere == currentTime) {
+						strafeCSVPlayerOutputHandle << "," << (distancesTraveled[runId] - syncPointsDistance[runId]);
+						entryWritten = true;
+						break;
+					}
+					else { // Point lies in the future
+						if (opts.strafeCSVInterpolate && runFrameIndizi[runId] > 0) {
+							strafeCSVPoint_t* lastPoint = &strafeCSVRuns[clientNum][runId][runFrameIndizi[runId]-1];
+							int64_t timeDiff = pointHere->timeOffset - lastPoint->timeOffset;
+							int64_t timeInterpol = realTimehere - currentTime;
+							float distanceToSubtract = pointHere->distanceTraveledFromLast * ((float)timeInterpol / (float)timeDiff); // TODO Worry about division by zero? Or is it safe? Prolly safe in this specific case.
+							strafeCSVPlayerOutputHandle << "," << (distancesTraveled[runId] - syncPointsDistance[runId] - distanceToSubtract);
+							entryWritten = true;
+						}
+						break;
+					}
+				}
+				if (!entryWritten) {
+					strafeCSVPlayerOutputHandle << ",";
+				}
+			}
+
+			// Write current speed. 
+			for (int runId = 0; runId < strafeCSVRuns[clientNum].size(); runId++) {
+				if (syncPoints[runId] == -1) continue;
+
+				bool entryWritten = false;
+				if (runFrameIndizi[runId] < strafeCSVRuns[clientNum][runId].size()) {
+					strafeCSVPoint_t* pointHere = &strafeCSVRuns[clientNum][runId][runFrameIndizi[runId]];
+					int64_t realTimehere = pointHere->timeOffset - syncPoints[runId];
+					if (realTimehere == currentTime) {
+						strafeCSVPlayerOutputHandle << "," << pointHere->velocityXY;
+						entryWritten = true;
+					}
+					else if(realTimehere > currentTime) { // A simple else should do really, but let's be safe I guess
+						if (opts.strafeCSVInterpolate && runFrameIndizi[runId] > 0) {
+							strafeCSVPoint_t* lastPoint = &strafeCSVRuns[clientNum][runId][runFrameIndizi[runId] - 1];
+							float speedDiff = pointHere->velocityXY - lastPoint->velocityXY;
+							int64_t timeDiff = pointHere->timeOffset - lastPoint->timeOffset;
+							int64_t timeInterpol = realTimehere - currentTime;
+							float speedHere = pointHere->velocityXY - speedDiff * ((float)timeInterpol / (float)timeDiff); // TODO Worry about division by zero? Or is it safe? Prolly safe in this specific case.
+							strafeCSVPlayerOutputHandle << "," << speedHere;
+							entryWritten = true;
+						}
+					}
+				}
+				if (!entryWritten) {
+					strafeCSVPlayerOutputHandle << ",";
+				}
+			}
+			strafeCSVPlayerOutputHandle << "\n";
+
+			bool nextBiggerTimeSet = false;
+			int64_t nextBiggerTime = 0;
+			// Find next time point.
+			for (int runId = 0; runId < strafeCSVRuns[clientNum].size(); runId++) {
+				if (syncPoints[runId] == -1) continue;
+
+				while (runFrameIndizi[runId] < strafeCSVRuns[clientNum][runId].size()) {
+					strafeCSVPoint_t* pointHere = &strafeCSVRuns[clientNum][runId][runFrameIndizi[runId]];
+					int64_t realTimehere = pointHere->timeOffset - syncPoints[runId];
+					if (realTimehere <= currentTime) {
+						runFrameIndizi[runId]++;
+						if (runFrameIndizi[runId] < strafeCSVRuns[clientNum][runId].size()) {
+							distancesTraveled[runId] += strafeCSVRuns[clientNum][runId][runFrameIndizi[runId]].distanceTraveledFromLast;
+						}
+					}
+					else { // Point lies in the future
+						if (realTimehere < nextBiggerTime || !nextBiggerTimeSet) {
+							nextBiggerTime = realTimehere;
+						}
+						nextBiggerTimeSet = true;
+						break;
+					}
+				}
+			}
+
+			if (nextBiggerTimeSet) {
+				currentTime = nextBiggerTime;
+			}
+			else {
+				break; // No data left to write
+			}
+			
+		}
+
+
+		delete[] syncPoints;
+		delete[] syncPointsDistance;
+		delete[] runFrameIndizi;
+		delete[] distancesTraveled;
+
+		strafeCSVPlayerOutputHandle.close();
+	}
+}
 
 static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQLiteExecution, const sharedVariables_t& sharedVars) {
 	// Save player stats
@@ -3384,6 +3581,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #endif
 						}
 
+						if (opts.strafeCSVSyncPoint && (thisEs->eFlags & EF_TELEPORT_BIT)) {
+							strafeCSVResetPlayer(thisEs->number, opts);
+						}
+
 						saberMoveName_t thisEsGeneralSaberMove = (saberMoveName_t)generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(thisEs->saberMove,demoType);
 						animNumberGeneral_t thisEsGeneralLegsAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->legsAnim,demoType);
 						animNumberGeneral_t thisEsGeneralTorsoAnim = (animNumberGeneral_t)generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(thisEs->torsoAnim,demoType);
@@ -3691,6 +3892,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 					else {
 						groundCrouchDurations[demo.cut.Cl.snap.ps.clientNum] = 0;
+					}
+
+					if (opts.strafeCSVSyncPoint && (demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT)) {
+						strafeCSVResetPlayer(demo.cut.Cl.snap.ps.clientNum, opts);
 					}
 
 					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
@@ -4195,6 +4400,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// While we're at it, register z coordinates of players touching the ground.
 				//
 				// Also while we're at it, manage special jumps (over player heads for now)
+				// 
+				// While at it, if requested, log stuff for strafe CSV output.
 				for (int i = 0; i < max_clients;i++) {
 					if (thisFrameInfo.entityExists[i]) {
 						playerVisibleFrames[i]++;
@@ -4220,12 +4427,30 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 						}
-						if (lastFrameInfo.entityExists[i] && thisFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
-							// Sadly this doesn't always work. It often does, but also often doesn't.
-							// My guess: It's only 1 frame with quick jumps and the server didn't send that particular frame due to snap limit.
-							// Or: It's not even a single frame? idk.
-							jumpDetected[i] = qtrue;
+						if (lastFrameInfo.entityExists[i]) {
+							if (opts.strafeCSVSyncPoint) { // Strafe CSV logging is enabled. Player visible this and last frame. Let's do some magic. Why did I write that. What's magiclal about it?
+								float currentSpeed = VectorLength2(thisFrameInfo.playerVelocities[i]);
+								float lastSpeed = VectorLength2(lastFrameInfo.playerVelocities[i]);
+								if ((lastSpeed >= opts.strafeCSVResetPoint && currentSpeed < opts.strafeCSVResetPoint) || fabsf(currentSpeed) < 1.0f) {
+									strafeCSVResetPlayer(i, opts);
+								}
+								int64_t timeOffset = strafeCSVCurrentRun[i].size() > 0 ? strafeCSVCurrentRun[i].back().timeOffset + deltaTimeFromLastSnapshot: 0;
+								float distanceTraveled = Vector2Distance(thisFrameInfo.playerPositions[i], lastFrameInfo.playerPositions[i]);
+								strafeCSVPoint_t newPoint{};
+								newPoint.distanceTraveledFromLast = distanceTraveled;
+								newPoint.timeOffset = timeOffset;
+								newPoint.velocityXY = currentSpeed;
+								strafeCSVCurrentRun[i].push_back(newPoint);
+							}
+
+							if (thisFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
+								// Sadly this doesn't always work. It often does, but also often doesn't.
+								// My guess: It's only 1 frame with quick jumps and the server didn't send that particular frame due to snap limit.
+								// Or: It's not even a single frame? idk.
+								jumpDetected[i] = qtrue;
+							}
 						}
+
 					}
 					else {
 						playerVisibleFrames[i] = 0;
@@ -4233,6 +4458,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						lastGroundHeight[i] = 99999999; // What's the point of remembering the ground height if the player may suddenly appear already in air and we have an old value and wrongly detect Air 2 Air kills?
 						specialJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
 						headJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
+
+						if (opts.strafeCSVSyncPoint) { // Strafe CSV logging is enabled. Player not visible. Reset this run.
+							strafeCSVResetPlayer(i,opts);
+						}
 					}
 				}
 
@@ -6917,7 +7146,6 @@ cuterror:
 	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution,opts);
 
 
-
 	
 
 
@@ -7008,6 +7236,8 @@ int main(int argcO, char** argvO) {
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
 	auto p = op.add<popl::Switch>("p", "print-debug", "Prints out various debug things, like all configstrings.");
+	auto z = op.add<popl::Value<std::string>>("z", "strafe-csv", "Writes CSV files containing different strafes. Pass 2 numbers separated by comma. Sync point (ups speed) and reset point ups (speed). Optionally, a third number for a minimum run length in milliseconds.");
+	auto Z = op.add<popl::Switch>("Z", "strafe-csv-interpolate", "Does the strafe CSV with interpolated values instead of leaving them empty when not available at a certain time interval.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -7049,6 +7279,37 @@ int main(int argcO, char** argvO) {
 	opts.reframeIfNeeded = r->value();
 	opts.dumpStufftext = D->value();
 	opts.printDebug = p->value();
+	opts.strafeCSVInterpolate = Z->value();
+
+	if (z->is_set()) {
+		std::string values = z->value();
+		size_t firstCommaPos = values.find(",");
+		if (firstCommaPos != std::string::npos) {
+			std::string number1String = values.substr(0,firstCommaPos);
+			// "12,32" -> firstCommaPos is 2. so desired offset is 3. size() is 5, 5-2 is 3. -1 is 2.
+			std::string number2String = values.substr(firstCommaPos+1,values.size()-firstCommaPos-1);
+			size_t secondCommaPos = number2String.find(",");
+			std::string number3String = "";
+			if (secondCommaPos != std::string::npos) {
+				number3String = number2String.substr(secondCommaPos + 1, number2String.size() - secondCommaPos - 1);
+				number2String = number2String.substr(0,secondCommaPos);
+			}
+			int num1 = atoi(number1String.c_str());
+			int num2 = atoi(number2String.c_str());
+			int num3 = atoi(number3String.c_str());
+			opts.strafeCSVSyncPoint = num1;
+			opts.strafeCSVResetPoint = num2;
+			opts.strafeCSVMinRunDuration = num3;
+			std::cout << "Doing strafe CSV output with sync point " << num1 << ", reset point " << num2 << " and min run duration " << num3 << "\n";
+		}
+		else {
+			std::cerr << "ERROR: Value supplied for -z/--strafe-csv option must be at least 2 ups speed numbers delimited by a comma. One for sync point, other for reset point. Optionally, a third number for a minimum run length in milliseconds.\n";
+#ifdef DEBUG
+			std::cin.get();
+#endif
+			return 1;
+		}
+	}
 
 	if (opts.printDebug) GlobalDebugOutputFlags = ~0; // TODO Make this more flexible? Able to specify types of debug output? Merge the stufftext stuff into it too.
 

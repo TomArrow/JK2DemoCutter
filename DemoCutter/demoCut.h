@@ -489,6 +489,9 @@ typedef enum {
 #define	SnapVector(v) {v[0]=((int)(v[0]));v[1]=((int)(v[1]));v[2]=((int)(v[2]));}
 
 
+#define Vector2Subtract(a,b,c)	((c)[0]=(a)[0]-(b)[0],(c)[1]=(a)[1]-(b)[1])
+
+
 // angle indexes
 #define	PITCH				0		// up / down
 #define	YAW					1		// left / right
@@ -3773,6 +3776,7 @@ int getLikelyStanceFromTorsoAnim(int torsoAnim, demoType_t demoType, byte* proba
 
 
 float VectorDistance(vec3_t v1, vec3_t v2);
+float Vector2Distance(vec2_t v1, vec2_t v2);
 
 
 
