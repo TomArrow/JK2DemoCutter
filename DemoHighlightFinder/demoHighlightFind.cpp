@@ -131,6 +131,8 @@ public:
 	int strafeCSVResetPoint = 0; // Where do we reset to a new strafe in the csv? When falls below this. I think 200 makes sense.
 	int strafeCSVMinRunDuration = 0; // Discard runs for strafe csv that are shorter than N milliseconds.
 	bool strafeCSVInterpolate = false;
+	bool playerCSVDump = false;
+	bool playerCSVDumpCommandTimeDupeSkip = false;
 };
 
 
@@ -153,6 +155,16 @@ inline static void strafeCSVResetPlayer(int clientNum, const ExtraSearchOptions&
 		strafeCSVCurrentRun[clientNum].clear();
 	}
 }
+
+
+typedef struct playerDumpCSVPoint_t {
+	int64_t demoTime;
+	int commandTime;
+	vec3_t position;
+	vec3_t velocity;
+	vec3_t viewangles;
+};
+std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
 
 
 #define PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -2581,6 +2593,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 }
 
 static void inline writeStrafeCSV(int i, const ExtraSearchOptions& opts);
+static void inline writePlayerDumpCSV(int i, const ExtraSearchOptions& opts);
 
 template<unsigned int max_clients>
 qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
@@ -2734,6 +2747,13 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			writeStrafeCSV(i, opts);
 		}
 	}
+	
+	// Dump player CSV if desired
+	if (opts.playerCSVDump) {
+		for (int i = 0; i < max_clients; i++) {
+			writePlayerDumpCSV(i, opts);
+		}
+	}
 
 	io.outputBatHandle->close();
 	io.outputBatHandleKillSprees->close();
@@ -2744,6 +2764,32 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	lock.unlock();
 	
 	return success;
+}
+
+static void inline writePlayerDumpCSV(int clientNum, const ExtraSearchOptions& opts) {
+	if (playerDumpCSVDataPoints[clientNum].size() > 0) {
+
+		std::ofstream strafeCSVPlayerOutputHandle;
+		strafeCSVPlayerOutputHandle.open(va("playerDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
+
+		strafeCSVPlayerOutputHandle << "demoTime,commandTime,posX,posY,posZ,velX,velY,velZ,pitch,yaw,roll\n";
+
+		int lastCommandTime = -9999999;
+		int64_t countSkipped = 0;
+		for (auto it = playerDumpCSVDataPoints[clientNum].begin(); it != playerDumpCSVDataPoints[clientNum].end(); it++) {
+			if (opts.playerCSVDumpCommandTimeDupeSkip && lastCommandTime == it->commandTime) {
+				countSkipped++;
+				continue;
+			}
+			strafeCSVPlayerOutputHandle << it->demoTime << ","<< it->commandTime << ","<< it->position[0] << ","<< it->position[1] << ","<< it->position[2] << ","<< it->velocity[0] << ","<< it->velocity[1] << ","<< it->velocity[2] << ","<< it->viewangles[PITCH] << ","<< it->viewangles[YAW] << ","<< it->viewangles[ROLL] << "\n";
+			lastCommandTime = it->commandTime;
+		}
+		if (countSkipped) {
+			std::cout << "writePlayerDumpCSV: Skipped " << countSkipped << " frames with duplicate commandTime for player " << clientNum << ".\n";
+		}
+
+		strafeCSVPlayerOutputHandle.close();
+	}
 }
 
 static void inline writeStrafeCSV(int clientNum, const ExtraSearchOptions& opts) {
@@ -4427,7 +4473,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 						}
+
+						if (opts.playerCSVDump) {
+							playerDumpCSVPoint_t newPoint;
+							newPoint.demoTime = demoCurrentTime;
+							newPoint.commandTime = thisFrameInfo.commandTime[i];
+							VectorCopy(thisFrameInfo.playerPositions[i], newPoint.position);
+							VectorCopy(thisFrameInfo.playerVelocities[i], newPoint.velocity);
+							VectorCopy(thisFrameInfo.playerAngles[i], newPoint.viewangles);
+							playerDumpCSVDataPoints[i].push_back(newPoint);
+						}
+
 						if (lastFrameInfo.entityExists[i]) {
+
 							if (opts.strafeCSVSyncPoint) { // Strafe CSV logging is enabled. Player visible this and last frame. Let's do some magic. Why did I write that. What's magiclal about it?
 								float currentSpeed = VectorLength2(thisFrameInfo.playerVelocities[i]);
 								float lastSpeed = VectorLength2(lastFrameInfo.playerVelocities[i]);
@@ -7236,6 +7294,7 @@ int main(int argcO, char** argvO) {
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
 	auto p = op.add<popl::Switch>("p", "print-debug", "Prints out various debug things, like all configstrings.");
+	auto y = op.add<popl::Implicit<int>>("y", "player-frames-csv", "Writes CSV files containing position, velocity and viewangle of players. Pass 1 as a value to skip duplicate commandTime values",0);
 	auto z = op.add<popl::Value<std::string>>("z", "strafe-csv", "Writes CSV files containing different strafes. Pass 2 numbers separated by comma. Sync point (ups speed) and reset point ups (speed). Optionally, a third number for a minimum run length in milliseconds.");
 	auto Z = op.add<popl::Switch>("Z", "strafe-csv-interpolate", "Does the strafe CSV with interpolated values instead of leaving them empty when not available at a certain time interval.");
 	op.parse(argcO, argvO);
@@ -7280,6 +7339,8 @@ int main(int argcO, char** argvO) {
 	opts.dumpStufftext = D->value();
 	opts.printDebug = p->value();
 	opts.strafeCSVInterpolate = Z->value();
+	opts.playerCSVDump = y->is_set();
+	opts.playerCSVDumpCommandTimeDupeSkip = y->is_set() ? y->value() == 1 : false;
 
 	if (z->is_set()) {
 		std::string values = z->value();
