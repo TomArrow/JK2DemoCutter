@@ -23,6 +23,7 @@ class ExtraMergeOptions {
 public:
 	int persistEntitiesMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
 	int interpolateEntitiesMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
+	int interpolatePlayerStateMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
 	bool skipMainPlayerDeadFrames = false; // For reframes: Skip frames that don't contain main player.
 };
 
@@ -458,6 +459,16 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 							}
 						}
 					}
+
+					if (reframeClientNum != tmpPS.clientNum) {
+						Com_Memset(&tmpES, 0, sizeof(tmpES));
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue);
+						if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || (entityIsInterpolated[tmpPS.clientNum] && (!snapIsInterpolated || entityServerTime[tmpPS.clientNum] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
+							playerEntities[tmpPS.clientNum] = tmpES;
+							entityIsInterpolated[tmpPS.clientNum] = snapIsInterpolated;
+							entityServerTime[tmpPS.clientNum] = snapInfoHere->serverTime;
+						}
+					}
 				}
 				else {
 					// self explanatory.
@@ -470,6 +481,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 						mainPlayerServerTime = snapInfoHere->serverTime;
 					}
 					else if (tmpPS.clientNum != mainPlayerPS.clientNum) {
+						Com_Memset(&tmpES, 0, sizeof(tmpES));
 						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue);
 						if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || (entityIsInterpolated[tmpPS.clientNum] && (!snapIsInterpolated || entityServerTime[tmpPS.clientNum] < snapInfoHere->serverTime))) { // Prioritize entities that are not interpolated
 							playerEntities[tmpPS.clientNum] = tmpES;
@@ -611,7 +623,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 				}
 
 				if (opts.persistEntitiesMaxDelay) {
-					demoReaders[i].reader.GetFutureEntityStates(time, opts.persistEntitiesMaxDelay, &futureEntityStates, &snapInfoHereIterator);
+					demoReaders[i].reader.GetFutureEntityStates(time, opts.persistEntitiesMaxDelay, true, &futureEntityStates, &snapInfoHereIterator);
 				}
 
 			}
@@ -768,9 +780,46 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		}
 
 		if (opts.persistEntitiesMaxDelay) {
+
+			// Interpolate playerstate if desired
+			if (opts.interpolatePlayerStateMaxDelay && mainPlayerServerTime < time) {
+				auto futurePS = futureEntityStates.find(mainPlayerPS.clientNum);
+				if (futurePS != futureEntityStates.end()
+					&& (futurePS->second.demoToolsData.serverTime- mainPlayerServerTime) < opts.interpolatePlayerStateMaxDelay
+					&& mainPlayerServerTime < futurePS->second.demoToolsData.serverTime
+					&& time < futurePS->second.demoToolsData.serverTime
+					) {
+					entityState_t* futurePsState = &futurePS->second; // You think it's lame we take it from an entityState but we only need pos, angles and velocity and those entitystates are from getfutureentitystates and not snapped. Just makes things easier.
+					int oldTime = mainPlayerServerTime;
+					int futureTime = futurePS->second.demoToolsData.serverTime;
+					int nowTime = time;
+					float ratio = ((float)nowTime - (float)oldTime) / ((float)futureTime - (float)oldTime);
+					if (futurePsState->pos.trType == TR_LINEAR_STOP) { // Hmm I'm not too confident about this one... feel this will all fall apart on a server without g_smoothclients with a fast switching spectator
+						oldTime = mainPlayerPS.commandTime;
+						futureTime = futurePS->second.pos.trTime;
+						nowTime = oldTime + ratio * (float)(futureTime - oldTime);
+						mainPlayerPS.commandTime = nowTime;
+					}
+					else {
+						mainPlayerPS.commandTime = nowTime-oldTime + mainPlayerPS.commandTime; // Ew
+					}
+					if (oldTime < futureTime) {
+						for (int i = 0; i < 3; i++) {
+							mainPlayerPS.origin[i] = mainPlayerPS.origin[i] + ratio * (futurePsState->pos.trBase[i] - mainPlayerPS.origin[i]);
+							mainPlayerPS.viewangles[i] = LerpAngle(
+								mainPlayerPS.viewangles[i], futurePsState->apos.trBase[i], ratio);
+							mainPlayerPS.velocity[i] = mainPlayerPS.velocity[i] +
+								ratio * (futurePsState->pos.trDelta[i] - mainPlayerPS.velocity[i]);
+						}
+					}
+				}
+			}
+
+			// Repeat/interpolate past entities
 			for (auto it = pastEntityStates.begin(); it != pastEntityStates.end(); it++) {
 				auto futureIt = futureEntityStates.find(it->first);
-				if (it->first != mainPlayerPS.clientNum
+				if (it->second.demoToolsData.serverTime < time
+					&& it->first != mainPlayerPS.clientNum
 					&& playerEntities.find(it->first) == playerEntities.end() 
 					&& futureIt != futureEntityStates.end()
 					&& (futureIt->second.demoToolsData.serverTime- it->second.demoToolsData.serverTime) <= opts.persistEntitiesMaxDelay
@@ -779,44 +828,48 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 					&& !((futureIt->second.eFlags ^ it->second.eFlags) & getEF_TELEPORTBIT(demoType)) // Hasn't teleported in between
 					) {
 					int deltaTime = futureIt->second.demoToolsData.serverTime - it->second.demoToolsData.serverTime;
+
+					entityState_t entState = it->second;
+
+					if (entState.demoToolsData.isInterpolated) {
+						// Restore non-interpolated trajectories so we are starting from real data.
+						entState.pos = entState.demoToolsData.uninterpolatedPos;
+						entState.apos = entState.demoToolsData.uninterpolatedAPos;
+						entState.demoToolsData.isInterpolated = false;
+					}
+					else {
+						// Save real data for restoring later.
+						entState.demoToolsData.uninterpolatedPos = entState.pos;
+						entState.demoToolsData.uninterpolatedAPos = entState.apos;
+					}
+
 					float distanceFromOld = VectorDistance(futureIt->second.pos.trBase,it->second.pos.trBase);
 					float travelSpeedUPS = 1000.0f*distanceFromOld / (float)deltaTime;
 					if (travelSpeedUPS < 3000) { // Travel speed 3000 is very implausible. Just a sanity check.
 
-						if (opts.interpolateEntitiesMaxDelay && deltaTime <= opts.interpolateEntitiesMaxDelay && futureIt->second.demoToolsData.serverTime > it->second.demoToolsData.serverTime) {
-							entityState_t entState = it->second;
-
-							if (entState.demoToolsData.isInterpolated) {
-								// Restore non-interpolated trajectories so we are starting from real data.
-								entState.pos = entState.demoToolsData.uninterpolatedPos;
-								entState.apos = entState.demoToolsData.uninterpolatedAPos;
-								entState.demoToolsData.isInterpolated = false;
-							}
-							else {
-								// Save real data for restoring later.
-								entState.demoToolsData.uninterpolatedPos = entState.pos;
-								entState.demoToolsData.uninterpolatedAPos = entState.apos;
-								entState.demoToolsData.isInterpolated = true;
-							}
+						if (opts.interpolateEntitiesMaxDelay && deltaTime <= opts.interpolateEntitiesMaxDelay && futureIt->second.demoToolsData.serverTime > it->second.demoToolsData.serverTime && futureIt->second.demoToolsData.serverTime > time) {
+							
 							if (it->second.eType == specializeGameValue<GMAP_ENTITYTYPE, UNSAFE>(ET_PLAYER_GENERAL, demoType)) {
 								int oldTime = it->second.demoToolsData.serverTime;
 								int futureTime = futureIt->second.demoToolsData.serverTime;
 								int nowTime = time;
 								float ratio = ((float)nowTime - (float)oldTime) / ((float)futureTime - (float)oldTime);
-								if (it->second.pos.trType == TR_LINEAR_STOP) {
+								if (it->second.pos.trType == TR_LINEAR_STOP) { // Hmm I'm not too confident about this one... feel this will all fall apart on a server without g_smoothclients with a fast switching spectator
 									oldTime = it->second.pos.trTime;
 									futureTime = futureIt->second.pos.trTime;
-									nowTime = ratio * (float)(futureTime - oldTime);
+									nowTime = oldTime + ratio * (float)(futureTime - oldTime);
 									entState.pos.trTime = nowTime;
 								}
-								for (int i = 0; i < 3; i++) {
-									entState.pos.trBase[i] = it->second.pos.trBase[i] + ratio * (futureIt->second.pos.trBase[i] - it->second.pos.trBase[i]);
-									//if (!grabAngles) {
-									entState.apos.trBase[i] = LerpAngle(
-										it->second.apos.trBase[i], futureIt->second.apos.trBase[i], ratio);
-									//}
-									entState.pos.trDelta[i] = it->second.pos.trDelta[i] +
-										ratio * (futureIt->second.pos.trDelta[i] - it->second.pos.trDelta[i]);
+								if (futureTime > oldTime) {
+
+									entState.demoToolsData.isInterpolated = true;
+									for (int i = 0; i < 3; i++) {
+										entState.pos.trBase[i] = it->second.pos.trBase[i] + ratio * (futureIt->second.pos.trBase[i] - it->second.pos.trBase[i]);
+										entState.apos.trBase[i] = LerpAngle(
+											it->second.apos.trBase[i], futureIt->second.apos.trBase[i], ratio);
+										entState.pos.trDelta[i] = it->second.pos.trDelta[i] +
+											ratio * (futureIt->second.pos.trDelta[i] - it->second.pos.trDelta[i]);
+									}
 								}
 
 								playerEntities[it->first] = entState;
@@ -829,8 +882,8 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 							}
 						}
 						else {
-							playerEntities[it->first] = it->second;
-							entityServerTime[it->first] = it->second.demoToolsData.serverTime;
+							playerEntities[it->first] = entState;
+							entityServerTime[it->first] = entState.demoToolsData.serverTime;
 						}
 					}
 				}
@@ -846,7 +899,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));
 		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
-		bool doWriteSnap = !(opts.skipMainPlayerDeadFrames && reframeClientNum != -1 && mainPlayerServerTime != time);
+		bool doWriteSnap = !(opts.skipMainPlayerDeadFrames /* && reframeClientNum != -1*/ && mainPlayerServerTime != time);
 
 		if (doWriteSnap) {
 
@@ -978,6 +1031,7 @@ int main(int argcO, char** argvO) {
 	auto r = op.add<popl::Value<std::string>>("r", "reframe", "Optionally, reframe. Value same as would be with DemoReframer: Search string or clientnum");
 	auto p = op.add<popl::Implicit<int>>("p", "persist-entities", "Detect gaps in entity visibility and try to fill them. Millisecond value of maximum gap to fill.", -1);
 	auto i = op.add<popl::Implicit<int>>("i", "interpolate-entities", "Interpolate entity positions. Automatically implies -p/--persist-entities.  Millisecond value of maximum gap to fill.", -1);
+	auto I = op.add<popl::Implicit<int>>("I", "interpolate-playerstate", "Interpolate playerstate positions. Automatically implies -p/--persist-entities.  Millisecond value of maximum gap to fill.", -1);
 	auto s = op.add<popl::Switch>("s", "skip-main-player-deadframes", "For reframing: Skip frames that don't contain the main player, to reduce stutter.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
@@ -1005,7 +1059,8 @@ int main(int argcO, char** argvO) {
 	
 	opts.persistEntitiesMaxDelay = p->is_set() ? (p->value() < 0 ? EVENT_VALID_MSEC : p->value()) : 0; // If no millisecond value provided, use default of 300. Shrug.
 	opts.interpolateEntitiesMaxDelay = i->is_set() ? (i->value() < 0 ? EVENT_VALID_MSEC : i->value()) : 0; // If no millisecond value provided, use default of 300. Shrug.
-	if (opts.interpolateEntitiesMaxDelay && !opts.persistEntitiesMaxDelay) {
+	opts.interpolatePlayerStateMaxDelay = I->is_set() ? (I->value() < 0 ? EVENT_VALID_MSEC : I->value()) : 0; // If no millisecond value provided, use default of 300. Shrug.
+	if ((opts.interpolateEntitiesMaxDelay || opts.interpolatePlayerStateMaxDelay) && !opts.persistEntitiesMaxDelay) {
 		opts.persistEntitiesMaxDelay = opts.interpolateEntitiesMaxDelay;
 	}
 	opts.skipMainPlayerDeadFrames = s->is_set();

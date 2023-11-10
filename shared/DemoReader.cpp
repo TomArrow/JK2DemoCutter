@@ -936,7 +936,7 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 	
 }
 
-std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, const SnapshotInfoMapIterator* referenceSnapIt) {
+std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnapIt) {
 	std::map<int, entityState_t> retVal;
 
 	int searchEndTime = serverTime + maxTimeIntoFuture;
@@ -959,6 +959,12 @@ std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, i
 					retVal[itEnt->first] = entState;
 				}
 			}
+			if (includePlayerStates && retVal.find(it->second.playerState.clientNum) == retVal.end()) {
+				entityState_t entState{};
+				BG_PlayerStateToEntityState(&it->second.playerState, &entState,qfalse,demoType,qtrue,qfalse);
+				entState.demoToolsData.serverTime = it->second.serverTime;
+				retVal[it->second.playerState.clientNum] = entState;
+			}
 		}
 		it++;
 	}
@@ -967,7 +973,7 @@ std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, i
 	
 }
 
-void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnapIt) {
+void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnapIt) {
 
 	int searchEndTime = serverTime + maxTimeIntoFuture;
 
@@ -987,6 +993,13 @@ void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, st
 					entState.demoToolsData.serverTime = it->second.serverTime;
 					(*mapToEnhance)[itEnt->first] = entState;
 				}
+			}
+
+			if (includePlayerStates && mapToEnhance->find(it->second.playerState.clientNum) == mapToEnhance->end()) {
+				entityState_t entState{};
+				BG_PlayerStateToEntityState(&it->second.playerState, &entState, qfalse, demoType, qtrue, qfalse);
+				entState.demoToolsData.serverTime = it->second.serverTime;
+				(*mapToEnhance)[it->second.playerState.clientNum] = entState;
 			}
 		}
 		it++;
