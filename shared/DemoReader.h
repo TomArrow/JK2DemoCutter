@@ -6,7 +6,6 @@
 #include "jpcre2.hpp"
 #include <demoCut.h>
 
-
 #define PLAYERSTATE_FUTURE_SEEK 60000
 
 typedef jpcre2::select<char> jp;
@@ -58,6 +57,10 @@ public:
 typedef std::map<int, SnapshotInfo> SnapshotInfoMap;
 typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 
+typedef enum dimensionDataType_t {
+	DIM_OWNAGE
+};
+
 class DemoReader {
 
 	bool	isMOHAADemo = false;
@@ -87,6 +90,11 @@ class DemoReader {
 	int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
 	int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
 
+	struct {
+		qboolean ownageExtraInfoMetaMarker = qfalse;
+		qboolean dimensionInfoConfirmed = qfalse;
+		dimensionDataType_t dimensionInfoType = (dimensionDataType_t )(-1);
+	} extraFieldInfo;
 
 	SnapshotInfoMap snapshotInfos;
 	std::vector<Command> readCommands;
@@ -111,6 +119,9 @@ class DemoReader {
 	int				lastKnownTime = 0;
 	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
+	qboolean wasFirstCommandByte = qfalse;
+	qboolean firstCommandByteRead = qfalse;
+	rapidjson::Document* jsonSourceFileMetaDocument = NULL;
 
 	playerState_t	oldPS;
 
@@ -169,6 +180,7 @@ public:
 
 	int getMaxClients();
 
+	qboolean containsDimensionData();
 	demoType_t getDemoType();
 	bool isThisMOHAADemo();
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
@@ -191,6 +203,8 @@ public:
 	playerState_t GetCurrentPlayerState();
 	playerState_t GetInterpolatedPlayerState(double time);
 	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL);
+	std::map<int, entityState_t> GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, const SnapshotInfoMapIterator* referenceSnap = NULL);
+	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
 	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);

@@ -649,7 +649,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						ss.str(std::string());
 						ss << "cs " << (CS_PLAYERS + i) << " " << tmpConfigString;
 						commandsToAdd.push_back(ss.str());
-						tmpPS.eFlags |= EF_TELEPORT_BIT;
+						tmpPS.eFlags |= getEF_TELEPORTBIT(demoType);
 					}
 					lastSpectatedClientNums[i]= originalPlayerstateClientNum;*/
 

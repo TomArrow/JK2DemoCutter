@@ -19,6 +19,13 @@
 demo_t			demo;
 
 
+class ExtraMergeOptions {
+public:
+	int persistEntitiesMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
+	bool skipMainPlayerDeadFrames = false; // For reframes: Skip frames that don't contain main player.
+};
+
+
 // When we combine demos from multiple angles, inevitably we will encounter combining events from playerstates and entitystates.
 // Sadly the two operate rather differently. To not cause myself a major headache, we'll just accumulate and rewrite all player events.
 // This means it won't be a perfect merge but honestly I think it's the best I can do.
@@ -99,7 +106,7 @@ inline bool IsBetterTime(T& curTime, T& oldTime, T& newTime) {
 }
 
 
-qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles, std::string* reframeSearchString) {
+qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles, std::string* reframeSearchString, const ExtraMergeOptions& opts) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -239,6 +246,8 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	std::map<int, entityState_t> playerEntities;
 	std::map<int, entityState_t> playerEntitiesOld;
+	std::map<int, entityState_t> futureEntityStates;
+	std::map<int, entityState_t> pastEntityStates;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS,tmpPS2, mainPlayerPS, mainPlayerPSOld;
@@ -248,9 +257,11 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	qboolean isFirstSnapshot = qtrue;
 	std::stringstream ss;
 	int framesWritten = 0;
+	int framesSkippedDeadFrames = 0;
 	byte	areamasHere[MAX_MAP_AREA_BYTES];
 
 	while(1){
+		futureEntityStates.clear();
 		commandsToAdd.clear();
 		eventsToAdd.clear();
 		qboolean allSourceDemosFinished = qtrue;
@@ -598,6 +609,10 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 					}
 				}
 
+				if (opts.persistEntitiesMaxDelay) {
+					demoReaders[i].reader.GetFutureEntityStates(time, opts.persistEntitiesMaxDelay, &futureEntityStates, &snapInfoHereIterator);
+				}
+
 			}
 			if (!demoReaders[i].reader.EndReachedAtServerTime(time)) {
 				allSourceDemosFinished = qfalse;
@@ -750,7 +765,28 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 			}
 			extraPlayerEventEntities[i].clear();
 		}
-		
+
+		if (opts.persistEntitiesMaxDelay) {
+			for (auto it = pastEntityStates.begin(); it != pastEntityStates.end(); it++) {
+				auto futureIt = futureEntityStates.find(it->first);
+				if (it->first != mainPlayerPS.clientNum
+					&& playerEntities.find(it->first) == playerEntities.end() 
+					&& futureIt != futureEntityStates.end()
+					&& (futureIt->second.demoToolsData.serverTime- it->second.demoToolsData.serverTime) <= opts.persistEntitiesMaxDelay
+					&& futureIt->second.eType == it->second.eType
+					//&& (futureIt->second.eType != specializeGameValue<GMAP_ENTITYTYPE,UNSAFE>(ET_PLAYER_GENERAL,demoType) || )
+					&& !((futureIt->second.eFlags ^ it->second.eFlags) & getEF_TELEPORTBIT(demoType)) // Hasn't teleported in between
+					) {
+					int deltaTime = futureIt->second.demoToolsData.serverTime - it->second.demoToolsData.serverTime;
+					float distanceFromOld = VectorDistance(futureIt->second.pos.trBase,it->second.pos.trBase);
+					float travelSpeedUPS = 1000.0f*distanceFromOld / (float)deltaTime;
+					if (travelSpeedUPS < 3000) { // Travel speed 3000 is very implausible. Just a sanity check.
+						playerEntities[it->first] = it->second;
+						entityServerTime[it->first] = it->second.demoToolsData.serverTime;
+					}
+				}
+			}
+		}
 
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
@@ -761,15 +797,33 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));
 		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
-		if (isFirstSnapshot) {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL,createCompressedOutput);
-			isFirstSnapshot = qfalse;
+		bool doWriteSnap = !(opts.skipMainPlayerDeadFrames && reframeClientNum != -1 && mainPlayerServerTime != time);
+
+		if (doWriteSnap) {
+
+			if (isFirstSnapshot) {
+				demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL, NULL, createCompressedOutput);
+				isFirstSnapshot = qfalse;
+			}
+			else {
+				demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld, createCompressedOutput);
+			}
+
+			framesWritten++;
+
+			demo.cut.Clc.reliableSequence++;
+			demo.cut.Clc.serverMessageSequence++;
+
+			mainPlayerPSOld = mainPlayerPS;
+			//playerEntitiesOld.clear();
+			//for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
+			//	playerEntitiesOld[it->first] = it->second;
+			//}
+			playerEntitiesOld = playerEntities; // Faster?
 		}
 		else {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld,createCompressedOutput);
+			framesSkippedDeadFrames++;
 		}
-
-		framesWritten++;
 
 		int oldTime = time;
 		time = INT_MAX;
@@ -788,15 +842,31 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 				time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 			}
 		}
-		demo.cut.Clc.reliableSequence++;
-		demo.cut.Clc.serverMessageSequence++;
 
-		mainPlayerPSOld = mainPlayerPS;
-		//playerEntitiesOld.clear();
-		//for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
-		//	playerEntitiesOld[it->first] = it->second;
-		//}
-		playerEntitiesOld = playerEntities; // Faster?
+		/*if (doWriteSnap) {
+
+			demo.cut.Clc.reliableSequence++;
+			demo.cut.Clc.serverMessageSequence++;
+
+			mainPlayerPSOld = mainPlayerPS;
+			//playerEntitiesOld.clear();
+			//for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
+			//	playerEntitiesOld[it->first] = it->second;
+			//}
+			playerEntitiesOld = playerEntities; // Faster?
+		}*/
+
+
+		// Remember any past versions of entities so we can persist them
+		if (opts.persistEntitiesMaxDelay) {
+			for (auto it = playerEntities.begin(); it != playerEntities.end(); it++) {
+				if (pastEntityStates.find(it->first) == pastEntityStates.end() || pastEntityStates[it->first].demoToolsData.serverTime < entityServerTime[it->first]){
+					entityState_t entState = it->second;
+					entState.demoToolsData.serverTime = entityServerTime[it->first];
+					pastEntityStates[it->first] = entState;
+				}
+			}
+		}
 
 		if (allSourceDemosFinished || time == INT_MAX) break;
 	}
@@ -812,6 +882,9 @@ cuterror:
 	FS_FCloseFile(newHandle);
 
 	std::cout << "Total frames written: " << framesWritten << "\n";
+	if (opts.skipMainPlayerDeadFrames) {
+		std::cout << "Total main player dead frames skipped: " << framesSkippedDeadFrames << "\n";
+	}
 	for (int i = 0; i < demoReaders.size(); i++) {
 		std::cout << "Frames from demo " << i << ": " << demoReaders[i].packetsUsed << " (" << (demoReaders[i].packetsUsed*100/framesWritten) << "%)\n";
 	}
@@ -854,6 +927,8 @@ int main(int argcO, char** argvO) {
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto r = op.add<popl::Value<std::string>>("r", "reframe", "Optionally, reframe. Value same as would be with DemoReframer: Search string or clientnum");
+	auto p = op.add<popl::Implicit<int>>("p", "persist-entities", "Detect gaps in entity visibility and try to fill them. Millisecond value of maximum gap to fill.", -1);
+	auto s = op.add<popl::Switch>("s", "skip-main-player-deadframes", "For reframing: Skip frames that don't contain the main player, to reduce stutter.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -876,6 +951,11 @@ int main(int argcO, char** argvO) {
 	char* demoName = NULL;
 	const char* outputName = NULL;
 
+	ExtraMergeOptions opts;
+	
+	opts.persistEntitiesMaxDelay = p->is_set() ? (p->value() < 0 ? EVENT_VALID_MSEC : p->value()) : 0; // If no millisecond value provided, use default of 300. Shrug.
+	opts.skipMainPlayerDeadFrames = s->is_set();
+
 	//outputName = argv[1];
 	outputName = args[0].c_str();
 	char* filteredOutputName = new char[strlen(outputName) + 1];
@@ -893,7 +973,7 @@ int main(int argcO, char** argvO) {
 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 
-	if (demoMerge(filteredOutputName,&inputFiles, (r->is_set() && searchString.size())? &searchString : NULL)) {
+	if (demoMerge(filteredOutputName,&inputFiles, (r->is_set() && searchString.size())? &searchString : NULL, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);

@@ -25,7 +25,7 @@
 qboolean DemoReaderLight::PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap) {
 	// if the next frame is a teleport for the playerstate, we
 	// can't interpolate during demos
-	if (lastSnap && ((snap->ps.eFlags ^ lastSnap->ps.eFlags) & EF_TELEPORT_BIT)) {
+	if (lastSnap && ((snap->ps.eFlags ^ lastSnap->ps.eFlags) & getEF_TELEPORTBIT(demoType))) {
 		return qtrue;
 	}
 

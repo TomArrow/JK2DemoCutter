@@ -3627,7 +3627,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #endif
 						}
 
-						if (opts.strafeCSVSyncPoint && (thisEs->eFlags & EF_TELEPORT_BIT)) {
+						if (opts.strafeCSVSyncPoint && (thisEs->eFlags & getEF_TELEPORTBIT(demoType))) {
 							strafeCSVResetPlayer(thisEs->number, opts);
 						}
 
@@ -3940,7 +3940,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						groundCrouchDurations[demo.cut.Cl.snap.ps.clientNum] = 0;
 					}
 
-					if (opts.strafeCSVSyncPoint && (demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT)) {
+					if (opts.strafeCSVSyncPoint && (demo.cut.Cl.snap.ps.eFlags & getEF_TELEPORTBIT(demoType))) {
 						strafeCSVResetPlayer(demo.cut.Cl.snap.ps.clientNum, opts);
 					}
 
@@ -4106,7 +4106,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					qboolean playerStateBoostDetected = qfalse;
 					thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
 					thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_time;
-					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & EF_TELEPORT_BIT);
+					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & getEF_TELEPORTBIT(demoType));
 
 #ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
 					if (thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] != lastFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum]

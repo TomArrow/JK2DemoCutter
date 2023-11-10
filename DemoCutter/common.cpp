@@ -1611,6 +1611,8 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	s->customRGBA[3] = ps->customRGBA[3];
 
 	s->m_iVehicleNum = ps->m_iVehicleNum;
+
+	s->demoToolsData = ps->demoToolsData;
 }
 
 int getMOHTeam(entityState_t* s) {
@@ -1889,7 +1891,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		}
 	}
 
-
+	ps->demoToolsData = s->demoToolsData;
 
 }
 
@@ -4915,6 +4917,33 @@ const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 	return MSG_ReadBigString(msg, demoType);
 }
 
+// In cut demos, metadata gets added ___ at the start, but we may still need the value.
+const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* searchName) {
+	if (doc->HasMember(searchName)) {
+		return searchName;
+	}
+	else {
+		for (rapidjson::Value::MemberIterator it = doc->MemberBegin(); it != doc->MemberEnd(); it++) {
+
+			const char* nameHere = it->name.GetString();
+
+			if (nameHere) {
+				while (*nameHere == '_') {
+					nameHere++; 
+				}
+				if (*nameHere && !stricmp(searchName,nameHere)) {
+					std::cout << "Found metadata member " << searchName << " as " << it->name.GetString() << "\n";
+					return it->name.GetString();
+				}
+			}
+
+		}
+	}
+	return NULL;
+}
+
+
+
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
 	byte			bufData[MAX_MSGLEN];
 	std::vector<byte>			bufDataRaw;
@@ -6056,7 +6085,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsMOHAA_ver_6,sizeof(playerStateFieldsMOHAA_ver_6) / sizeof(playerStateFieldsMOHAA_ver_6[0]),}
 		},
 		MAX_CONFIGSTRINGS_MOH,
-		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH_OLD},
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH_OLD, EF_TELEPORT_BIT},
 		MAX_CLIENTS_MOH
 	},
 	{ // MOHAA expansions
@@ -6099,7 +6128,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsMOHAA_ver_15,sizeof(playerStateFieldsMOHAA_ver_15) / sizeof(playerStateFieldsMOHAA_ver_15[0]),}
 		},
 		MAX_CONFIGSTRINGS_MOH,
-		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH},
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH, EF_TELEPORT_BIT},
 		MAX_CLIENTS_MOH
 	},
 	{
@@ -6139,7 +6168,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFields_jk2sp,sizeof(playerStateFields_jk2sp) / sizeof(playerStateFields_jk2sp[0]),}
 		},
 		MAX_CONFIGSTRINGS_JK2SP,//MAX_CONFIGSTRINGS,
-		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP},
+		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME, EF_TELEPORT_BIT},
 		1 // Just the main player
 	},
 	{ // First is treated as default.
@@ -6274,7 +6303,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA},
 	},{
 		DM_26,
 		{
@@ -6317,7 +6346,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA},
 	},{
 		DM_26_XBOX,
 		{
@@ -6637,6 +6666,7 @@ void initializeGameInfos() {
 			if (gameInfos[i].constants.ef_missile_stick == -1) gameInfos[i].constants.ef_missile_stick = NULL; // Q3 for example doesn't have mixxile stick at all.
 			if (!gameInfos[i].constants.anim_togglebit) gameInfos[i].constants.anim_togglebit = ANIM_TOGGLEBIT;
 			if (!gameInfos[i].constants.cs_level_start_time) gameInfos[i].constants.cs_level_start_time = CS_LEVEL_START_TIME;
+			if (!gameInfos[i].constants.ef_teleportbit) gameInfos[i].constants.ef_teleportbit = EF_TELEPORT_BIT;
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 
 			// BTw for dynamically created arrays here: We don't care about destroying them. They are created one time at startup and that's it. When program closes they disappear too.

@@ -856,6 +856,8 @@ int main(int argcO, char** argvO) {
 	//if (argc < 4) {
 	if (args.size() < 3) {
 		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
 		return 1;
 	}
 	else if (h->is_set()) {

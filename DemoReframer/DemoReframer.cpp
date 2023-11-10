@@ -10,6 +10,9 @@
 
 #include "tsl/htrie_map.h"
 
+
+#include <include/popl.hpp>
+
 // TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -24,6 +27,12 @@ public:
 	int packetsUsed = 0;
 };
 
+
+class ExtraReframeOptions {
+public:
+	bool visAll = false; // Override demo vis data (areamask) to make everything visible. Needed sometimes to not end up with a broken reframed demo.
+	bool skipDimensionData = false; // Ignore dimension data in demos. Might be needed for special mods that cause misdetects of dimensions, or for fun.
+};
 
 
 tsl::htrie_map<char, int> playerNamesToClientNums;
@@ -76,7 +85,7 @@ void updatePlayerDemoStats(DemoReader* reader) {
 #endif
 
 
-qboolean demoReframe( const char* demoName,const char* outputName, const char* playerSearchString, qboolean visAll) {
+qboolean demoReframe( const char* demoName,const char* outputName, const char* playerSearchString, const ExtraReframeOptions& opts) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -128,12 +137,12 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	memset(&demo, 0, sizeof(demo));
 
 	//std::vector<DemoReaderTrackingWrapper> demoReaders;
-	std::cout << "loading up demo...";
+	std::cout << "loading up demo...\n";
 	DemoReaderTrackingWrapper* demoReader = new DemoReaderTrackingWrapper();
 	int startTime = INT_MAX;
 	demoReader->reader.LoadDemo(demoName);
 	startTime = std::min(startTime, demoReader->reader.GetFirstSnapServerTime()); // Find start time.
-	std::cout << "done.";
+	std::cout << "done.\n";
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
 
@@ -194,7 +203,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	}
 
 	std::string playerSearchStdString = playerSearchString;
-	int reframeClientNum = demoReader->reader.getClientNumForDemo(&playerSearchStdString);
+	int reframeClientNum = demoReader->reader.getClientNumForDemo(&playerSearchStdString,qtrue);
 
 	if (reframeClientNum == -1) {
 		Com_DPrintf("Failed to find matching player.\n");
@@ -240,12 +249,17 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		int viewModelAnimChanged = 0;
 	} mohaaState;
 
+	int oldMainPlayerDimension = -99999;
+	int64_t entityFramesSkippedDueToDimension = 0;
+	qboolean dimensionDataDetected = demoReader->reader.containsDimensionData();
+
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		int nonSkippedDemoIndex = 0;
+
 		//static qboolean entityIsInterpolated[MAX_GENTITIES];
 		//Com_Memset(entityIsInterpolated, 0, sizeof(entityIsInterpolated));
 		//qboolean mainPlayerPSIsInterpolated = qfalse;
@@ -253,7 +267,9 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		SnapshotInfoMapIterator sourceSnap = nullIt; // snap that actually contains the player so we can use its areamask.
 		SnapshotInfoMapIterator snapInfoHereIt = nullIt;
 			if (demoReader->reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
-				
+
+				dimensionDataDetected = demoReader->reader.containsDimensionData();
+
 				sourceSnap = snapInfoHereIt = nextSnapInfoHereIt != nullIt ? nextSnapInfoHereIt : demoReader->reader.GetSnapshotInfoAtServerTimeIterator(time);
 				SnapshotInfo* snapInfoHere = &snapInfoHereIt->second;
 				//qboolean snapIsInterpolated = qfalse;
@@ -326,6 +342,12 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 						//	
 						//	if(VectorDistance(snapInfoHere->playerState.origin,it->second.))
 						//}
+						if (dimensionDataDetected && it->second.demoToolsData.detectedDimension != mainPlayerPS.demoToolsData.detectedDimension) {
+							entityFramesSkippedDueToDimension++;
+							if (!opts.skipDimensionData) {
+								continue;
+							}
+						}
 
 #if MOHAAANGLEDEBUG
 						if (it->second.number < 64) {
@@ -359,9 +381,18 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 #endif
 
 				if (tmpPS.clientNum != reframeClientNum) {
-					Com_Memset(&tmpES, 0, sizeof(tmpES));
-					BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse,demoType, qtrue);
-					playerEntities[tmpPS.clientNum] = tmpES;
+					bool skipBecauseDimension = false;
+					if (dimensionDataDetected && tmpPS.demoToolsData.detectedDimension != mainPlayerPS.demoToolsData.detectedDimension) {
+						entityFramesSkippedDueToDimension++;
+						if (!opts.skipDimensionData) {
+							skipBecauseDimension = true;
+						}
+					}
+					if (!skipBecauseDimension) {
+						Com_Memset(&tmpES, 0, sizeof(tmpES));
+						BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse, demoType, qtrue);
+						playerEntities[tmpPS.clientNum] = tmpES;
+					}
 				}
 
 
@@ -446,6 +477,13 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 					updatePlayerDemoStats(&demoReader->reader); // TODO Also do this if gamestate. Somehow.
 				}
 
+				if (dimensionDataDetected) {
+					if (mainPlayerPS.demoToolsData.detectedDimension != oldMainPlayerDimension) {
+						std::cout << "Reframe-client is in dimension " << mainPlayerPS.demoToolsData.detectedDimension << "\n";
+					}
+					oldMainPlayerDimension = mainPlayerPS.demoToolsData.detectedDimension;
+				}
+
 			}
 			if (!demoReader->reader.EndReachedAtServerTime(time)) {
 				allSourceDemosFinished = qfalse;
@@ -456,7 +494,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		if (visAll || sourceSnap == nullIt) {
+		if (opts.visAll || sourceSnap == nullIt) {
 			Com_Memset(demo.cut.Cl.snap.areamask, 0, sizeof(demo.cut.Cl.snap.areamask));
 		}
 		else {
@@ -514,6 +552,14 @@ cuterror:
 	FS_FCloseFile(newHandle);
 
 	std::cout << "Total frames written: " << framesWritten << "\n";
+	if (dimensionDataDetected) {
+		if (opts.skipDimensionData) {
+			std::cout << "Total entities that would have been skipped due to being in a different dimension: " << entityFramesSkippedDueToDimension << " (" << ((float)entityFramesSkippedDueToDimension / (float)framesWritten) << " per frame), but dimension data was ignored with -n/--no-dimensions." << "\n";
+		}
+		else {
+			std::cout << "Total entities skipped due to being in a different dimension: " << entityFramesSkippedDueToDimension << " (" << ((float)entityFramesSkippedDueToDimension / (float)framesWritten) << " per frame)" << "\n";
+		}
+	}
 	std::cout << "Frames from demo " << ": " << demoReader->packetsUsed << " (" << (demoReader->packetsUsed*100/framesWritten) << "%)\n";
 
 	return ret;
@@ -549,32 +595,58 @@ cuterror:
 }*/
 
 
-int main(int argc, char** argv) {
-	if (argc <4) {
+int main(int argcO, char** argvO) {
+
+	popl::OptionParser op("Allowed options");
+	auto n = op.add<popl::Switch>("n", "no-dimensions", "Do not parse dimension data");
+	auto v = op.add<popl::Switch>("v", "vis-all", "Sometimes demos can contain vis data that ends up breaking the reframed demo. Force everything to be visible with this option.");
+	auto h = op.add<popl::Switch>("h", "help", "Show help");
+	op.parse(argcO, argvO);
+	auto args = op.non_option_args();
+
+
+	//if (argc <4) {
+	if (args.size() <3) {
 		std::cout << "need 3 arguments at least: demoname, outputname, player to follow (search string or clientnum), [optional: visall for demos that result in graphical artifacts]";
 		return 1;
 	}
-	initializeGameInfos();
-	char* demoName = NULL;
-	char* outputName = NULL;
-	char* playerNameSearchString = NULL;
+	else if (h->is_set()) {
+		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
+		return 0;
+	}
 
-	demoName = argv[1];
-	outputName = argv[2];
-	playerNameSearchString = argv[3];
+	initializeGameInfos();
+	const char* demoName = NULL;
+	const char* outputName = NULL;
+	const char* playerNameSearchString = NULL;
+
+	demoName = args[0].c_str();//argv[1];
+	outputName = args[1].c_str();//argv[2];
+	playerNameSearchString = args[2].c_str();//argv[3];
 	char* filteredOutputName = new char[strlen(outputName) + 1];
 	sanitizeFilename(outputName, filteredOutputName,qtrue);
 	
-	qboolean visAll = qfalse;
-	if (argc == 5 && !stricmp(argv[4],"visall")) {
-		visAll = qtrue;
+	ExtraReframeOptions opts;
+
+	opts.visAll = false;
+	//if (argc == 5 && !stricmp(argv[4],"visall")) {
+	if (args.size() > 3 && !stricmp(args[4].c_str(),"visall")) {
+		opts.visAll = true;
+	}
+	if (v->is_set()) {
+		opts.visAll = true;
+	}
+	if (n->is_set()) {
+		opts.skipDimensionData = true;
 	}
 
-	std::cout << sizeof(DemoReaderTrackingWrapper);
+	std::cout << sizeof(DemoReaderTrackingWrapper) << "\n";
 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 
-	if (demoReframe(demoName, filteredOutputName, playerNameSearchString, visAll)) {
+	if (demoReframe(demoName, filteredOutputName, playerNameSearchString, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully reframed in %.5f seconds\n", demoName,seconds);

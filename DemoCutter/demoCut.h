@@ -26,6 +26,8 @@
 #include "anims.h"
 #include "animsStanceMappings.h"
 
+#include "include/rapidjson/document.h"
+
 #include "tsl/htrie_map.h"
 
 extern int GlobalDebugOutputFlags;
@@ -687,6 +689,12 @@ typedef enum
 	MAX_AISTATES
 } aistateEnum_t;
 
+
+typedef struct demoToolsEntityData_t{
+	int detectedDimension;
+	int serverTime; // Server time of this entity state. To be used where necessary/useful.
+};
+
 typedef struct playerState_s {
 	// Shared between games:
 
@@ -1080,12 +1088,10 @@ typedef struct playerState_s {
 
 	
 
-	
-
-
-
-
-	
+	// Demo Tools specific values, only used internally
+	// Not exactly a super elegant way of doing it but eh,
+	// we don't have the problem of needing these structs to be in sync between game,cgame,engine etc.
+	demoToolsEntityData_t demoToolsData;
 
 } playerState_t;
 
@@ -1409,6 +1415,12 @@ typedef struct entityState_s {
 			float	scaleMOHAA;
 		};
 	};
+
+
+	// Demo Tools specific values, only used internally
+	// Not exactly a super elegant way of doing it but eh,
+	// we don't have the problem of needing these structs to be in sync between game,cgame,engine etc.
+	demoToolsEntityData_t demoToolsData;
 } entityState_t;
 
 typedef struct {
@@ -4662,6 +4674,8 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);
 void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
 
+const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* searchName);
+
 std::string makeConfigStringCommand(int index, std::string value);
 int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
@@ -4731,6 +4745,7 @@ struct gameConstantsInfo_t {
 	int ef_missile_stick;
 	int anim_togglebit;
 	int cs_level_start_time;
+	int ef_teleportbit;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -4858,6 +4873,9 @@ inline int getEF_MISSILE_STICK(demoType_t demoType) {
 }
 inline int getANIM_TOGGLEBIT(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.anim_togglebit;
+}
+inline int getEF_TELEPORTBIT(demoType_t demoType) {
+	return gameInfosMapped[demoType]->constants.ef_teleportbit;
 }
 inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;

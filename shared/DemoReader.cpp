@@ -13,12 +13,14 @@
 
 
 
-
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
 //
 
 demoType_t DemoReader::getDemoType() {
 	return demoType;
+}
+qboolean DemoReader::containsDimensionData() {
+	return extraFieldInfo.dimensionInfoConfirmed;
 }
 bool DemoReader::isThisMOHAADemo() {
 	return demoTypeIsMOHAA(demoType);
@@ -147,7 +149,7 @@ int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean pr
 qboolean DemoReader::PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap) {
 	// if the next frame is a teleport for the playerstate, we
 	// can't interpolate during demos
-	if (lastSnap && ((snap->ps.eFlags ^ lastSnap->ps.eFlags) & EF_TELEPORT_BIT)) {
+	if (lastSnap && ((snap->ps.eFlags ^ lastSnap->ps.eFlags) & getEF_TELEPORTBIT(demoType))) {
 		return qtrue;
 	}
 
@@ -251,6 +253,10 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	isMOHAADemo = isThisMOHAADemo();
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
+
+	wasFirstCommandByte = qfalse;
+	firstCommandByteRead = qfalse;
+
 	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
 	if (!*ext) {
 		demoType = DM_16;
@@ -300,6 +306,9 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 		lastKnownPacketWithPlayerState[i] = -1;
 	}
 
+	Com_Memset(&extraFieldInfo, 0, sizeof(extraFieldInfo));
+	extraFieldInfo.dimensionInfoType = (dimensionDataType_t)(-1);
+
 	readGamestate = 0;
 
 	demoStartTime = 0;
@@ -315,6 +324,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	lastGottenCommandsTime = 0;
 	lastGottenCommandsServerTime = 0;
 	endReached = qfalse;
+	jsonSourceFileMetaDocument = NULL;
 
 	snapshotInfos.clear();
 
@@ -395,7 +405,7 @@ SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(Snapsh
 	while (lastKnownTime <= pastServerTime && !endReached) {
 		ReadMessage();
 	}
-	while (oldSnapInfoIt->second.serverTime <= pastServerTime && oldSnapInfoIt != snapshotInfos.end()) {
+	while (oldSnapInfoIt != snapshotInfos.end() && oldSnapInfoIt->second.serverTime <= pastServerTime) {
 
 		oldSnapInfoIt++;
 	}
@@ -925,6 +935,64 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 
 	
 }
+
+std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, const SnapshotInfoMapIterator* referenceSnapIt) {
+	std::map<int, entityState_t> retVal;
+
+	int searchEndTime = serverTime + maxTimeIntoFuture;
+
+	SeekToAnySnapshotIfNotYet();
+	SeekToServerTime(serverTime+ searchEndTime);
+
+	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
+
+
+	SnapshotInfoMapIterator lastPastSnap = snapshotInfos.end();
+
+	auto it = *referenceSnapIt;
+	while (it != snapshotInfos.end() && it->second.serverTime <= searchEndTime) {
+		if (it->second.serverTime >= serverTime) {
+			for (auto itEnt = it->second.entities.begin(); itEnt != it->second.entities.end(); itEnt++) {
+				if (retVal.find(itEnt->first) == retVal.end()) {
+					entityState_t entState = itEnt->second;
+					entState.demoToolsData.serverTime = it->second.serverTime;
+					retVal[itEnt->first] = entState;
+				}
+			}
+		}
+		it++;
+	}
+
+	return retVal;
+	
+}
+
+void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnapIt) {
+
+	int searchEndTime = serverTime + maxTimeIntoFuture;
+
+	SeekToAnySnapshotIfNotYet();
+	SeekToServerTime(serverTime+ searchEndTime);
+
+	if (endReached && !anySnapshotParsed) return; // Nothing to do really lol.
+
+	SnapshotInfoMapIterator lastPastSnap = snapshotInfos.end();
+
+	auto it = *referenceSnapIt;
+	while (it != snapshotInfos.end() && it->second.serverTime <= searchEndTime) {
+		if (it->second.serverTime >= serverTime) {
+			for (auto itEnt = it->second.entities.begin(); itEnt != it->second.entities.end(); itEnt++) {
+				if (mapToEnhance->find(itEnt->first) == mapToEnhance->end() || (*mapToEnhance)[itEnt->first].demoToolsData.serverTime > it->second.serverTime) { // Put it in if we either don't have it yet, or if our version of the entity is less into the future.
+					entityState_t entState = itEnt->second;
+					entState.demoToolsData.serverTime = it->second.serverTime;
+					(*mapToEnhance)[itEnt->first] = entState;
+				}
+			}
+		}
+		it++;
+	}
+	
+}
 void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) {
 
 	if (targetDemoType == demoType)
@@ -1205,7 +1273,7 @@ void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from,
 		return;
 	}
 	
-	nextPsTeleport = (qboolean)( to->snapFlagServerCount || ((curps->eFlags ^ nextps->eFlags) & EF_TELEPORT_BIT));
+	nextPsTeleport = (qboolean)( to->snapFlagServerCount || ((curps->eFlags ^ nextps->eFlags) & getEF_TELEPORTBIT(demoType)));
 	
 	/*
 #ifdef _DEBUG
@@ -1568,8 +1636,37 @@ readNext:
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
+		wasFirstCommandByte = (qboolean)!firstCommandByteRead;
+		firstCommandByteRead = qtrue;
 		cmd = generalizeGameSVCOp(cmd,demoType);
 		if (cmd == svc_EOF_general) {
+			// TODO Check for svc_extension/svc_voip (ioq3/wolfcamql)
+			if (wasFirstCommandByte) {
+				// check for hidden meta content
+				const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
+				if (maybeMeta) {
+
+					jsonSourceFileMetaDocument = new rapidjson::Document();
+					if (jsonSourceFileMetaDocument->Parse(maybeMeta).HasParseError() || !jsonSourceFileMetaDocument->IsObject()) {
+						// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
+						// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
+						// will quit the process. Because the user can after all just adjust and fix the commandline.
+						std::cout << "Old demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+						break;
+					}
+
+					const char* realExtraFieldsMetaname = jsonGetRealMetadataKeyName(jsonSourceFileMetaDocument, "extraFields");
+					if (realExtraFieldsMetaname) {
+						const char* extraFields = (*jsonSourceFileMetaDocument)[realExtraFieldsMetaname].GetString();
+						if (extraFields) {
+							if (!stricmp(extraFields,"ownage")) {
+								extraFieldInfo.ownageExtraInfoMetaMarker = qtrue;
+							}
+						}
+					}
+
+				}
+			}
 			break;
 		}
 		//I'm not sure what this does or why it does it...
@@ -1627,6 +1724,20 @@ readNext:
 				return qfalse;
 			}
 
+			{
+				int possibleDimensionNum = (thisDemo.cut.Cl.snap.ps.fd.forcePowersActive >> 20) & 31;
+				if (possibleDimensionNum) {
+					if (!extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.ownageExtraInfoMetaMarker) {
+						extraFieldInfo.dimensionInfoConfirmed = qtrue;
+						extraFieldInfo.dimensionInfoType = DIM_OWNAGE;
+						std::cout << "Demo appears to contain Ownage-City style dimension data (first seen in playerstate)! Report a bug if this is a mistake.\n";
+					}
+					if (extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.dimensionInfoType == DIM_OWNAGE) {
+						thisDemo.cut.Cl.snap.ps.demoToolsData.detectedDimension = possibleDimensionNum;
+					}
+				}
+			}
+
 			for (int i = 0; i < maxClientsThisDemo; i++) {
 				mohaaPlayerWeaponModelIndexThisFrame[i] = -1;
 			}
@@ -1636,6 +1747,19 @@ readNext:
 				snapshotInfo.serverTime = thisDemo.cut.Cl.snap.serverTime;
 				for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+
+					int possibleDimensionNum = (thisEntity->forcePowersActive >> 20) & 31;
+					if (possibleDimensionNum) {
+						if (!extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.ownageExtraInfoMetaMarker) {
+							extraFieldInfo.dimensionInfoConfirmed = qtrue;
+							extraFieldInfo.dimensionInfoType = DIM_OWNAGE;
+							std::cout << "Demo appears to contain Ownage-City style dimension data (first seen in entity)! Report a bug if this is a mistake.\n";
+						}
+						if (extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.dimensionInfoType == DIM_OWNAGE) {
+							thisEntity->demoToolsData.detectedDimension = possibleDimensionNum;
+						}
+					}
+
 					snapshotInfo.entities[thisEntity->number] = *thisEntity;
 
 					lastMessageWithEntity[thisEntity->number] = thisDemo.cut.Cl.snap.messageNum;
