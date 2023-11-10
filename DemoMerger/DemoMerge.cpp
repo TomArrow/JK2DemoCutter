@@ -22,6 +22,7 @@ demo_t			demo;
 class ExtraMergeOptions {
 public:
 	int persistEntitiesMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
+	int interpolateEntitiesMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
 	bool skipMainPlayerDeadFrames = false; // For reframes: Skip frames that don't contain main player.
 };
 
@@ -781,8 +782,56 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 					float distanceFromOld = VectorDistance(futureIt->second.pos.trBase,it->second.pos.trBase);
 					float travelSpeedUPS = 1000.0f*distanceFromOld / (float)deltaTime;
 					if (travelSpeedUPS < 3000) { // Travel speed 3000 is very implausible. Just a sanity check.
-						playerEntities[it->first] = it->second;
-						entityServerTime[it->first] = it->second.demoToolsData.serverTime;
+
+						if (opts.interpolateEntitiesMaxDelay && deltaTime <= opts.interpolateEntitiesMaxDelay && futureIt->second.demoToolsData.serverTime > it->second.demoToolsData.serverTime) {
+							entityState_t entState = it->second;
+
+							if (entState.demoToolsData.isInterpolated) {
+								// Restore non-interpolated trajectories so we are starting from real data.
+								entState.pos = entState.demoToolsData.uninterpolatedPos;
+								entState.apos = entState.demoToolsData.uninterpolatedAPos;
+								entState.demoToolsData.isInterpolated = false;
+							}
+							else {
+								// Save real data for restoring later.
+								entState.demoToolsData.uninterpolatedPos = entState.pos;
+								entState.demoToolsData.uninterpolatedAPos = entState.apos;
+								entState.demoToolsData.isInterpolated = true;
+							}
+							if (it->second.eType == specializeGameValue<GMAP_ENTITYTYPE, UNSAFE>(ET_PLAYER_GENERAL, demoType)) {
+								int oldTime = it->second.demoToolsData.serverTime;
+								int futureTime = futureIt->second.demoToolsData.serverTime;
+								int nowTime = time;
+								float ratio = ((float)nowTime - (float)oldTime) / ((float)futureTime - (float)oldTime);
+								if (it->second.pos.trType == TR_LINEAR_STOP) {
+									oldTime = it->second.pos.trTime;
+									futureTime = futureIt->second.pos.trTime;
+									nowTime = ratio * (float)(futureTime - oldTime);
+									entState.pos.trTime = nowTime;
+								}
+								for (int i = 0; i < 3; i++) {
+									entState.pos.trBase[i] = it->second.pos.trBase[i] + ratio * (futureIt->second.pos.trBase[i] - it->second.pos.trBase[i]);
+									//if (!grabAngles) {
+									entState.apos.trBase[i] = LerpAngle(
+										it->second.apos.trBase[i], futureIt->second.apos.trBase[i], ratio);
+									//}
+									entState.pos.trDelta[i] = it->second.pos.trDelta[i] +
+										ratio * (futureIt->second.pos.trDelta[i] - it->second.pos.trDelta[i]);
+								}
+
+								playerEntities[it->first] = entState;
+								entityServerTime[it->first] = it->second.demoToolsData.serverTime;
+							}
+							else {
+								retimeEntity(&entState, time, time);
+								playerEntities[it->first] = entState;
+								entityServerTime[it->first] = it->second.demoToolsData.serverTime;
+							}
+						}
+						else {
+							playerEntities[it->first] = it->second;
+							entityServerTime[it->first] = it->second.demoToolsData.serverTime;
+						}
 					}
 				}
 			}
@@ -928,6 +977,7 @@ int main(int argcO, char** argvO) {
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto r = op.add<popl::Value<std::string>>("r", "reframe", "Optionally, reframe. Value same as would be with DemoReframer: Search string or clientnum");
 	auto p = op.add<popl::Implicit<int>>("p", "persist-entities", "Detect gaps in entity visibility and try to fill them. Millisecond value of maximum gap to fill.", -1);
+	auto i = op.add<popl::Implicit<int>>("i", "interpolate-entities", "Interpolate entity positions. Automatically implies -p/--persist-entities.  Millisecond value of maximum gap to fill.", -1);
 	auto s = op.add<popl::Switch>("s", "skip-main-player-deadframes", "For reframing: Skip frames that don't contain the main player, to reduce stutter.");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
@@ -954,6 +1004,10 @@ int main(int argcO, char** argvO) {
 	ExtraMergeOptions opts;
 	
 	opts.persistEntitiesMaxDelay = p->is_set() ? (p->value() < 0 ? EVENT_VALID_MSEC : p->value()) : 0; // If no millisecond value provided, use default of 300. Shrug.
+	opts.interpolateEntitiesMaxDelay = i->is_set() ? (i->value() < 0 ? EVENT_VALID_MSEC : i->value()) : 0; // If no millisecond value provided, use default of 300. Shrug.
+	if (opts.interpolateEntitiesMaxDelay && !opts.persistEntitiesMaxDelay) {
+		opts.persistEntitiesMaxDelay = opts.interpolateEntitiesMaxDelay;
+	}
 	opts.skipMainPlayerDeadFrames = s->is_set();
 
 	//outputName = argv[1];

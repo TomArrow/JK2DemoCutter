@@ -690,9 +690,30 @@ typedef enum
 } aistateEnum_t;
 
 
+typedef enum {
+	TR_STATIONARY,
+	TR_INTERPOLATE,				// non-parametric, but interpolate between snapshots
+	TR_LINEAR,
+	TR_LINEAR_STOP,
+	TR_SINE,					// value = base + sin( time / duration ) * delta
+	TR_GRAVITY
+} trType_t;
+
+typedef struct {
+	trType_t	trType;
+	int		trTime;
+	int		trDuration;			// if non 0, trTime + trDuration = stop time
+	vec3_t	trBase;
+	vec3_t	trDelta;			// velocity, etc
+} trajectory_t;
+
+
 typedef struct demoToolsEntityData_t{
 	int detectedDimension;
 	int serverTime; // Server time of this entity state. To be used where necessary/useful.
+	bool isInterpolated;
+	trajectory_t uninterpolatedPos;
+	trajectory_t uninterpolatedAPos;
 };
 
 typedef struct playerState_s {
@@ -1145,22 +1166,6 @@ typedef struct usercmd_s {
 	signed char	forwardmove, rightmove, upmove;
 } usercmd_t;
 
-typedef enum {
-	TR_STATIONARY,
-	TR_INTERPOLATE,				// non-parametric, but interpolate between snapshots
-	TR_LINEAR,
-	TR_LINEAR_STOP,
-	TR_SINE,					// value = base + sin( time / duration ) * delta
-	TR_GRAVITY
-} trType_t;
-
-typedef struct {
-	trType_t	trType;
-	int		trTime;
-	int		trDuration;			// if non 0, trTime + trDuration = stop time
-	vec3_t	trBase;
-	vec3_t	trDelta;			// velocity, etc
-} trajectory_t;
 
 
 // Be extra(!!) careful here because of the unions.
