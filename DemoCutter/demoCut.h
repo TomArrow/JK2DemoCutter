@@ -173,6 +173,9 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 	}
 }*/
 
+#ifdef WINDOWS
+#define atoll(S) _atoi64(S)
+#endif
 
 
 

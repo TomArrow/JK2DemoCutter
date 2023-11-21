@@ -17,6 +17,9 @@ obj[^\n"]+[13579]000_(?:[56789]|\d\d)[^T]*(?:T[12])?_U(?:[3456789]|\d\d)[^\r\n]*
 [135]000_(?:[56789]|\d\d)[^T]*(?:T[12])?_U(?:[3456789]|\d\d)
 
 
+
+detect special kind of kills like dfa with a swing animation or otherwise weird glitched/inconsistent animations?
+
 FIX: I'm using teleport_bit wrong in a bunch of places.
 
 

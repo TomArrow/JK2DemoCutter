@@ -168,18 +168,18 @@ demoTime_t timeParse(std::string timeText) {
 		else parsedTime.type = DEMOTIME;
 
 		if (parsedTime.type == GAMETIME && skipNumber.size() != 0 ) { // Skip a number of games for gametime.
-			parsedTime.skips = atoi(skipNumber.c_str());
+			parsedTime.skips = atoll(skipNumber.c_str());
 		}
 
 		if (number1.size() != 0 && number2.size() == 0 && number3.size() == 0) { // Just a simple number
-			parsedTime.time = atoi(number1.c_str());
+			parsedTime.time = atoll(number1.c_str());
 			parsedTime.success = qtrue;
 		}
 		else if (number2.size() != 0) { // MM:SS.xxx format
-			parsedTime.time = atoi(number2.c_str())*1000;
-			if (number1.size() != 0) parsedTime.time += atoi(number1.c_str())*60*1000;
+			parsedTime.time = atoll(number2.c_str())*1000;
+			if (number1.size() != 0) parsedTime.time += atoll(number1.c_str())*60*1000;
 			if (number3.size() != 0) {
-				int64_t rawValue = atoi(number3.c_str());
+				int64_t rawValue = atoll(number3.c_str());
 				int64_t decimalCompensate = 3-number3.size();
 				if (decimalCompensate > 0) {
 					for (int i = 0; i < decimalCompensate; i++) {
@@ -245,8 +245,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	//char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
-	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int				demoCurrentTime = 0;
+	int64_t			demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
+	int64_t			demoCurrentTime = 0;
 
 	int				lastKnownTime = 0;
 	int				lastValidSnap = -1;

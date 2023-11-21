@@ -180,14 +180,24 @@ jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has fin
 jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat the WORLD RECORD and )?(is now ranked) \^\d#(\d) \^7with)\s\^3(\d+):(\d+))raw", "mSi");
 jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on this map!\s*\^\d\]:)raw", "mSi");
 
+jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+
 class defragRunInfo_t {
 public:
 	int milliseconds = 0;
 	std::string playerName;
 	qboolean isNumber1 = qfalse;
-	qboolean isTop10 = qfalse;
+	//qboolean isTop10 = qfalse;
 	qboolean isLogged = qfalse;
 	qboolean isPersonalBest = qfalse;
+
+	// JAPRO
+	int knownClientNum = -1;
+	std::string courseName;
+	int exactRank;
+	std::string style;
+	qboolean isValid = qtrue;
+
 };
 
 
@@ -321,8 +331,8 @@ qboolean jumpDetected[MAX_CLIENTS_MAX];
 jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
 #define MAX_LAUGH_DELAY 7000 // From first laugh to last laugh, max delay.
 #define LAUGHS_CUT_PRE_TIME 10000 // Upon first laugh, cut last 10 seconds so we see context.
-int firstLaugh = -1;
-int lastLaugh = -1;
+int64_t firstLaugh = -1;
+int64_t lastLaugh = -1;
 int laughCount = 0;
 std::stringstream laughs;
 std::stringstream laughsChatlog;
@@ -408,7 +418,7 @@ public:
 
 struct SpreeInfo {
 	int totalTime;
-	int lastKillTime;
+	int64_t lastKillTime;
 	int countKills = 0;
 	int countRets = 0;
 	int countTeamKills = 0;
@@ -811,6 +821,7 @@ struct frameInfo_t {
 	qboolean pmFlagKnockback[MAX_CLIENTS_MAX];
 	qboolean psTeleportBit[MAX_CLIENTS_MAX];
 	int pmFlagTime[MAX_CLIENTS_MAX];
+	int duelTime[MAX_CLIENTS_MAX];
 	int commandTime[MAX_CLIENTS_MAX];
 	int legsAnimGeneral[MAX_CLIENTS_MAX];
 	int torsoAnimGeneral[MAX_CLIENTS_MAX];
@@ -1093,7 +1104,7 @@ qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
 		info->playerName = vec_num[matchNum][1];
 		int minutes = atoi(vec_num[matchNum][2].c_str());
-		std::string secondString = vec_num[matchNum][3];
+		//std::string secondString = vec_num[matchNum][3];
 		float seconds = atof(vec_num[matchNum][3].c_str());
 		int milliSeconds = (1000.0f * seconds) + 0.5f;
 		int pureMilliseconds = milliSeconds % 1000;
@@ -1103,6 +1114,125 @@ qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 		info->isLogged = (qboolean)(vec_num[matchNum][5].length() > 0);
 		info->isNumber1 = (qboolean)(vec_num[matchNum][7].length() > 0);
 		info->isPersonalBest = (qboolean)(vec_num[matchNum][4].length() > 0);
+
+		return qtrue;
+	}
+	return qfalse;
+}
+
+
+static constexpr auto jaPRONameColorClientNumMap{ []() constexpr {
+	std::array<int64_t, 8> finalMap{};
+	for (int clientNum = 0; clientNum < 64; clientNum++) {
+		// JAPRO time report name coloring code
+		int nameColor = 7 - (clientNum % 8);//sad hack
+		if (nameColor < 2)
+			nameColor = 2;
+		else if (nameColor > 7 || nameColor == 5)
+			nameColor = 7;
+		finalMap[nameColor] |= (1L << clientNum);
+	}
+	
+	return finalMap;
+}() };
+
+template<int max_clients>
+qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoType_t demoType) {
+	jp::VecNum vec_num;
+	jp::VecNas vec_nas;
+	jp::RegexMatch rm;
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
+	size_t count = rm.setRegexObject(&defragJaProFinishRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.setNamedSubstringVector(&vec_nas)         //pass pointer to VecNum vector
+		.match();
+
+	auto test = jaPRONameColorClientNumMap.begin();
+	
+	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+
+		static int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+
+		info->playerName = vec_nas[matchNum]["name"];
+
+		int hours = atoi(vec_nas[matchNum]["hours"].c_str());
+		int minutes = atoi(vec_nas[matchNum]["minutes"].c_str());
+		int seconds = atoi(vec_nas[matchNum]["seconds"].c_str());
+		int milliSeconds = atoi(vec_nas[matchNum]["msec"].c_str());
+
+		int color = atoi(vec_nas[matchNum]["color"].c_str());
+		int nameColor = atoi(vec_nas[matchNum]["nameColor"].c_str());
+
+		const char* recordType = vec_nas[matchNum]["recordType"].c_str();
+
+		info->milliseconds = milliSeconds + seconds*1000 + minutes * 60 * 1000 + hours * 60 * 60 * 1000;
+		info->isLogged = (qboolean)(color == 5);
+		info->isValid = (qboolean)(color == 5 || color == 2);
+		info->isNumber1 = (qboolean)(!_stricmp(recordType, "WR"));
+		info->isPersonalBest = (qboolean)(!_stricmp(recordType,"WR") || !_stricmp(recordType,"SR+PB") || !_stricmp(recordType,"PB"));
+		info->exactRank = info->isPersonalBest ? atoi(vec_nas[matchNum]["newRank"].c_str()) : -1;
+		info->style = vec_nas[matchNum]["style"];
+		info->courseName = vec_nas[matchNum]["c"][0] == 'C' ? "" : vec_nas[matchNum]["mapname"];
+		int64_t clientNumBitmask = jaPRONameColorClientNumMap[nameColor];
+
+
+		bool isPossiblyRealName = color != 5;
+
+		int playerNumber = -1;
+		std::vector<int> possibleClientNums;
+		for (int clientNum = 0; clientNum < max_clients; clientNum++) {
+
+			if (!(clientNumBitmask & (1L << clientNum))) { // Color coding indicates this definitely wasn't the right player.
+				continue;
+			}
+
+			int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+			const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+
+			if (!*playerInfo) continue;
+
+			char* team = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "team" : "t");
+
+			if (!*team || atoi(team)==3) continue;
+
+			possibleClientNums.push_back(clientNum);
+			if (isPossiblyRealName) {
+				std::string playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
+				std::string playerNameCompareStripped = Q_StripColorAll(playerNameCompare);
+				if (playerNameCompare == info->playerName) {
+					playerNumber = clientNum;
+				}
+			}
+		}
+		if (playerNumber == -1 && possibleClientNums.size() > 0) {
+			// For logged in users, we can only reliably determine whose run it was if only one active player matched the color coding
+			// or if we are following the player and can verify that his run ended on this frame (although that's kind of dirty as theoretically it could be different players still but oh well)
+			if (possibleClientNums.size() == 1) {
+				// Only one player matches the color coding. Good. Ez.
+				playerNumber = possibleClientNums[0];
+			}
+			else {
+
+				if (lastFrameInfo.duelTime[demo.cut.Cl.snap.ps.clientNum] && !demo.cut.Cl.snap.ps.duelTime && demo.cut.Cl.snap.ps.stats[11]) { // Was running last frame but not anymore. stats[11] means racemode in japro
+
+					for (int i = 0; i < possibleClientNums.size(); i++) {
+
+						if (possibleClientNums[i] == demo.cut.Cl.snap.ps.clientNum) {
+
+							playerNumber = demo.cut.Cl.snap.ps.clientNum;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		if (playerNumber != -1) {
+			info->knownClientNum = playerNumber;
+		}
 
 		return qtrue;
 	}
@@ -1704,9 +1834,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		}
 
 
-		int startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
-		int endTime = spreeInfo->lastKillTime + bufferTime;
-		int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+		int64_t startTime = spreeInfo->lastKillTime-spreeInfo->totalTime - bufferTime;
+		int64_t endTime = spreeInfo->lastKillTime + bufferTime;
+		int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 		bool isTruncated = false;
 		int truncationOffset = 0;
 		if (earliestPossibleStart > startTime) {
@@ -1791,9 +1921,9 @@ void checkSaveLaughs(int demoCurrentTime, int bufferTime, int lastGameStateChang
 
 			io.laughQueries->push_back(queryWrapper);
 
-			int startTime = firstLaugh - LAUGHS_CUT_PRE_TIME - bufferTime;
-			int endTime = lastLaugh + bufferTime;
-			int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+			int64_t startTime = firstLaugh - LAUGHS_CUT_PRE_TIME - bufferTime;
+			int64_t endTime = lastLaugh + bufferTime;
+			int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 			bool isTruncated = false;
 			int truncationOffset = 0;
 			if (earliestPossibleStart > startTime) {
@@ -3170,8 +3300,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	//char			originalExt[7]{};
 	demoType_t		demoType;
 	int				demoStartTime = 0;
-	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int				demoOldTime = 0;
+	int64_t			demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
+	int64_t			demoOldTime = 0;
 	int				deltaTimeFromLastSnapshot = 0;
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
@@ -3561,6 +3691,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					demoStartTime = demo.cut.Cl.snap.serverTime;
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
+				if (demoCurrentTime < 0) {
+					std::cout << "demoCurrentTime negative wtf?! demoOldTime "<< demoOldTime << ", demoCurrentTime " << demoCurrentTime  << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << "\n";
+				}
 				deltaTimeFromLastSnapshot = demoCurrentTime - demoOldTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				currentPacketPeriodStats.periodTotalTime += demoCurrentTime - demoOldTime;
@@ -3977,6 +4110,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 					}
 
+					thisFrameInfo.duelTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.duelTime;
 					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
 					thisFrameInfo.legsAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralLegsAnim;
 					thisFrameInfo.torsoAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralTorsoAnim;
@@ -5570,9 +5704,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 
-							int startTime = demoCurrentTime - bufferTime;
-							int endTime = demoCurrentTime + bufferTime;
-							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+							int64_t startTime = demoCurrentTime - bufferTime;
+							int64_t endTime = demoCurrentTime + bufferTime;
+							int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 							bool isTruncated = false;
 							int truncationOffset = 0;
 							if (earliestPossibleStart > startTime) {
@@ -6346,10 +6480,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							if (!playerIsVisibleOrFollowed && !wasVisibleOrFollowed) continue; // No need to cut out those who were not visible at all in any way.
 							if (searchMode == SEARCH_MY_CTF_RETURNS && playerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
 
-							int runStart = demoCurrentTime - flagHoldTime;
-							int startTime = runStart - bufferTime;
-							int endTime = demoCurrentTime + bufferTime;
-							int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+							int64_t runStart = demoCurrentTime - flagHoldTime;
+							int64_t startTime = runStart - bufferTime;
+							int64_t endTime = demoCurrentTime + bufferTime;
+							int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 							bool isTruncated = false;
 							int truncationOffset = 0;
 							if (earliestPossibleStart > startTime) {
@@ -6421,11 +6555,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					int clientNumAttacker = clientIt->first;
 
 					// Update required meta event tracking times
-					if (clientIt->second.size() == 0) {
-						requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; // No kills in backlog. We only have to keep [bufferTime] milliseconds into past.
-					}
-					else {
-						requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = clientIt->second[0].time - bufferTime; // Kills in backlog that might become part of killsprees. Take oldest one and go [bufferTime] milliseconds back in time and there's our answer.
+					if(clientNumAttacker < max_clients && clientNumAttacker >=0 ){
+						if (clientIt->second.size() == 0) {
+							requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; // No kills in backlog. We only have to keep [bufferTime] milliseconds into past.
+						}
+						else {
+							requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = clientIt->second[0].time - bufferTime; // Kills in backlog that might become part of killsprees. Take oldest one and go [bufferTime] milliseconds back in time and there's our answer.
+						}
 					}
 
 					if (clientIt->second.size() == 0 || (clientIt->second.back().time + killStreakSpeedTypes[spCount-1-speedTypesSkip]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
@@ -6513,7 +6649,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					clientIt->second.clear();
 
 					// Can reset this now as no pending killsprees are here anymore.
-					requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; 
+					if (clientNumAttacker < max_clients && clientNumAttacker >= 0) {
+						requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime;
+					}
 				
 					// Clean up old speeds
 					// We do need to keep speeds of at least OLDER_SPEEDS_STORE_LIMIT because we might have to check past speeds for future kills that aren't logged yet.
@@ -6947,6 +7085,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					runFound = qtrue;
 				} else if (findRazorDefragRun(printText, &runInfo)) {
 					runFound = qtrue;
+				} else if (findJAProDefragRun<max_clients>(printText, &runInfo, demoType)) {
+					runFound = qtrue;
 				}
 
 
@@ -6955,6 +7095,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char * info = demo.cut.Cl.gameState.stringData + stringOffset;
 					std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
+
+					if (runInfo.courseName != "") {
+						std::stringstream ssMapName;
+						ssMapName << mapname << "(" << runInfo.courseName << ")";
+						mapname = ssMapName.str();
+					}
+
 					std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
 					//std::string playername = vec_num[matchNum][1];
 					std::string playername = runInfo.playerName;
@@ -6982,13 +7129,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					
 					// Find player
 					int playerNumber = -1;
-					for (int clientNum = 0; clientNum < max_clients; clientNum++) {
+					if (runInfo.knownClientNum != -1) {
+						playerNumber = runInfo.knownClientNum;
+					} else {
+						for (int clientNum = 0; clientNum < max_clients; clientNum++) {
 
-						int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
-						const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-						std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset,isMOHAADemo?"name": "n");
-						if (playerNameCompare == playername) {
-							playerNumber = clientNum;
+							int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+							const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+							std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset,isMOHAADemo?"name": "n");
+							if (playerNameCompare == playername) {
+								playerNumber = clientNum;
+							}
 						}
 					}
 					
@@ -7006,7 +7157,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							wasVisibleOrFollowed = true;
 						}
 					}
-					int runStart = demoCurrentTime - totalMilliSeconds;
+					int64_t runStart = demoCurrentTime - totalMilliSeconds;
 
 					std::stringstream formattedTime;
 					formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
@@ -7055,9 +7206,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged) && searchMode != SEARCH_ALL_DEFRAG) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
 					
 
-					int startTime = runStart - bufferTime;
-					int endTime = demoCurrentTime + bufferTime;
-					int earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+					int64_t startTime = runStart - bufferTime;
+					int64_t endTime = demoCurrentTime + bufferTime;
+					int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
 					bool isTruncated = false;
 					int truncationOffset = 0;
 					if (earliestPossibleStart > startTime) {
