@@ -573,6 +573,11 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 				// incredibly complicated, hard to read and possibly even more unelegant in places
 				std::vector<Event> newEvents = demoReaders[i].reader.GetNewEventsAtServerTime(time,EK_ALL);
 				for (int e = 0; e < newEvents.size(); e++) {
+
+					//if (!newEvents[e].eventNumber) {
+					//	std::cout << "Event number 0 from Demo Reader, weird!\n";
+					//}
+
 					// We check whether this event is already registered.
 					// Since we are combining multiple demos, each event will (or can) come from multiple places.
 

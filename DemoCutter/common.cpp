@@ -1764,6 +1764,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		if (s->eFlags & EF_DEAD)
 		{
 			ps->stats[STAT_HEALTH] = 0;
+			ps->pm_type = PM_DEAD;
 		}
 		else
 		{
@@ -1882,12 +1883,24 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	if (baseState) {
 		//ps->persistant[PERS_SPAWN_COUNT] = baseState->persistant[PERS_SPAWN_COUNT];
 		Com_Memcpy(ps->persistant, baseState->persistant, sizeof(ps->persistant));
+		Com_Memcpy(ps->ammo, baseState->ammo, sizeof(ps->ammo));
+		ps->damageEvent = baseState->damageEvent;
+		ps->damageCount = baseState->damageCount;
+		ps->damageYaw = baseState->damageYaw;
+		ps->damagePitch = baseState->damagePitch;
+		if (s->eFlags & EF_DEAD) {
+			// Something to fix view angles? idk
+		}
+		ps->stats[STAT_HOLDABLE_ITEMS] = baseState->stats[STAT_HOLDABLE_ITEMS];
+		ps->stats[STAT_HOLDABLE_ITEM] = baseState->stats[STAT_HOLDABLE_ITEM];
+		ps->stats[STAT_WEAPONS] = baseState->stats[STAT_WEAPONS];
+		ps->stats[STAT_DEAD_YAW] = baseState->stats[STAT_DEAD_YAW];
+		ps->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = baseState->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH];
 		if (ps->stats[STAT_HEALTH] > 0 && baseState->stats[STAT_HEALTH] > 0) { // don't copy positive health into a dead entity
 			//Com_Memcpy(ps->stats,baseState->stats,sizeof(ps->stats));
 			ps->fd.forcePower = baseState->fd.forcePower;
 			ps->stats[STAT_HEALTH] = baseState->stats[STAT_HEALTH];
 			ps->stats[STAT_ARMOR] = baseState->stats[STAT_ARMOR];
-			ps->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = baseState->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH];
 		}
 	}
 

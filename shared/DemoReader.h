@@ -123,7 +123,7 @@ class DemoReader {
 	qboolean firstCommandByteRead = qfalse;
 	rapidjson::Document* jsonSourceFileMetaDocument = NULL;
 
-	playerState_t	oldPS;
+	playerState_t	oldPS[MAX_CLIENTS_MAX];
 
 	double			lastGottenCommandsTime = 0;
 	int				lastGottenCommandsServerTime = 0;

@@ -1860,7 +1860,7 @@ readNext:
 
 
 			// Fire playerstate events
-			if (thisDemo.cut.Cl.snap.ps.externalEvent && thisDemo.cut.Cl.snap.ps.externalEvent != oldPS.externalEvent) {
+			if (thisDemo.cut.Cl.snap.ps.externalEvent && thisDemo.cut.Cl.snap.ps.externalEvent != oldPS[thisDemo.cut.Cl.snap.ps.clientNum].externalEvent) {
 				
 				Event thisEvent;
 #ifdef DEBUG
@@ -1895,10 +1895,10 @@ readNext:
 			// Fire eventSequence events
 			for (int i = thisDemo.cut.Cl.snap.ps.eventSequence - MAX_PS_EVENTS; i < thisDemo.cut.Cl.snap.ps.eventSequence; i++) {
 				// if we have a new predictable event
-				if (i >= oldPS.eventSequence
+				if (i >= oldPS[thisDemo.cut.Cl.snap.ps.clientNum].eventSequence
 					// or the server told us to play another event instead of a predicted event we already issued
 					// or something the server told us changed our prediction causing a different event
-					|| (i > oldPS.eventSequence - MAX_PS_EVENTS && thisDemo.cut.Cl.snap.ps.events[i & (MAX_PS_EVENTS - 1)] != oldPS.events[i & (MAX_PS_EVENTS - 1)])) {
+					|| (i > oldPS[thisDemo.cut.Cl.snap.ps.clientNum].eventSequence - MAX_PS_EVENTS && thisDemo.cut.Cl.snap.ps.events[i & (MAX_PS_EVENTS - 1)] != oldPS[thisDemo.cut.Cl.snap.ps.clientNum].events[i & (MAX_PS_EVENTS - 1)])) {
 
 
 					Event thisEvent;
@@ -1984,7 +1984,7 @@ readNext:
 			}
 
 
-			oldPS = thisDemo.cut.Cl.snap.ps;
+			oldPS[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.ps;
 
 			// Find out which players are visible / followed
 			// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
