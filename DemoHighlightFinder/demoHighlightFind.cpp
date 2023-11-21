@@ -2174,6 +2174,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"serverNameStripped	TEXT NOT NULL,"
 		"readableTime TEXT NOT NULL,"
 		"totalMilliseconds	INTEGER,"
+		"style	TEXT,"
 		"playerName	TEXT NOT NULL,"
 		"playerNameStripped	TEXT NOT NULL,"
 		"isTop10	BOOLEAN NOT NULL,"
@@ -2308,9 +2309,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertCaptureStatement, NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,demoName,demoPath,demoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,demoName,demoPath,demoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@style,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@demoName,@demoPath,@demoTime,@serverTime,@demoDateTime);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDefragRunStatement, NULL);
 	preparedStatementText = "INSERT INTO laughs"
@@ -7173,6 +7174,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
 					SQLBIND_DELAYED(query, int, "@totalMilliseconds", totalMilliSeconds);
 					SQLBIND_DELAYED_TEXT(query, "@playerName", playername.c_str());
+					if (runInfo.style != "") {
+						SQLBIND_DELAYED_TEXT(query, "@style", runInfo.style.c_str());
+					}
+					else {
+						SQLBIND_DELAYED_NULL(query, "@style");
+					}
 					std::string playernameStripped = Q_StripColorAll(playername);
 					SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
 					SQLBIND_DELAYED(query, int, "@isTop10", isLogged);
@@ -7220,7 +7227,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					
 
 					std::stringstream ss;
-					ss << mapname << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+					ss << mapname << (runInfo.style != "" ? va("___%s",runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
