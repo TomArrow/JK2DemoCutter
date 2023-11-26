@@ -1913,6 +1913,19 @@ void EnhancePlayerStateWithBaseState(playerState_t* ps, playerState_t* baseState
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 	Com_Memcpy(ps->persistant, baseState->persistant, sizeof(ps->persistant));
+	Com_Memcpy(ps->ammo, baseState->ammo, sizeof(ps->ammo));
+	ps->damageEvent = baseState->damageEvent;
+	ps->damageCount = baseState->damageCount;
+	ps->damageYaw = baseState->damageYaw;
+	ps->damagePitch = baseState->damagePitch;
+	if (ps->stats[STAT_HEALTH] <= 0) {
+		// Something to fix view angles? idk
+	}
+	ps->stats[STAT_HOLDABLE_ITEMS] = baseState->stats[STAT_HOLDABLE_ITEMS];
+	ps->stats[STAT_HOLDABLE_ITEM] = baseState->stats[STAT_HOLDABLE_ITEM];
+	ps->stats[STAT_WEAPONS] = baseState->stats[STAT_WEAPONS];
+	ps->stats[STAT_DEAD_YAW] = baseState->stats[STAT_DEAD_YAW];
+	ps->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = baseState->stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH];
 	if (ps->stats[STAT_HEALTH] > 0 && baseState->stats[STAT_HEALTH] > 0) { // don't copy positive health into a dead entity
 		//Com_Memcpy(ps->stats,baseState->stats,sizeof(ps->stats));
 		ps->fd.forcePower = baseState->fd.forcePower;

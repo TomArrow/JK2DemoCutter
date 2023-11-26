@@ -17,6 +17,12 @@ obj[^\n"]+[13579]000_(?:[56789]|\d\d)[^T]*(?:T[12])?_U(?:[3456789]|\d\d)[^\r\n]*
 [135]000_(?:[56789]|\d\d)[^T]*(?:T[12])?_U(?:[3456789]|\d\d)
 
 
+if merging PS and ES, allow either snapping PS always, or do a special interpolation and only use the ES value to sanity check (we know it must be within +- 0.5 of the ES value, so use interpolated if it falls in that range, otherwise ES value)
+
+remove spectator chat in reframes?
+
+get info from tinfo, EV_PAIN
+
 
 detect special kind of kills like dfa with a swing animation or otherwise weird glitched/inconsistent animations?
 
