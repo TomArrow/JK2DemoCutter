@@ -252,7 +252,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	std::map<int, entityState_t> pastEntityStates;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
-	playerState_t tmpPS,tmpPS2, mainPlayerPS, mainPlayerPSOld;
+	playerState_t tmpPS,tmpPS2,tmpPS3, mainPlayerPS, mainPlayerPSOld;
 	entityState_t tmpES;// , mainPlayerPSSourceES;
 	int currentCommand = 1;
 	// Start writing snapshots.
@@ -454,7 +454,15 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 								// Sanity check.
 								assert(usedSnapIt->second.entities.find(reframeClientNum) != usedSnapIt->second.entities.end()); 
 
-								CG_EntityStateToPlayerState(&usedSnapIt->second.entities[reframeClientNum], &mainPlayerPS, demoType, qtrue, NULL, mainPlayerRealPSPartsServerTime != -1 ?  qtrue : qfalse); // Accessing the entities map like that.. not very efficient? We do the same inside GetLastOrNextPlayer, now we have done it twice. Meh.
+								// TODO: Make this actually work somehow?
+								// Problem: Depending on the order in which we get playerstate/entitystate data, we either do the "enhanceonly" thing or we do the EnhancePlayerStateWithBaseState thing, and both lead to inconsistent results, so in cases where we quickly alternate between both methods (like with strobe), we end up with weird inconsistent behavior. Sad but true.
+								//CG_EntityStateToPlayerState(&usedSnapIt->second.entities[reframeClientNum], &mainPlayerPS, demoType, qtrue, NULL, mainPlayerRealPSPartsServerTime != -1 ?  qtrue : qfalse); // Accessing the entities map like that.. not very efficient? We do the same inside GetLastOrNextPlayer, now we have done it twice. Meh.
+								
+								// Sad way of doing it but best we got for now for consistency :(
+								tmpPS3 = mainPlayerPS;
+								CG_EntityStateToPlayerState(&usedSnapIt->second.entities[reframeClientNum], &mainPlayerPS, demoType, qtrue, NULL, qfalse);
+								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS3, demoType); // Just update health/armor and stuff like that. Not a godlike solution but eh.
+
 								mainPlayerServerTime = usedSnapIt->second.serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
 							}
 						}
@@ -514,8 +522,16 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 					else if(reframeClientNum == -1 && // Reframe handling is completely separate already, see further above.
 						mainPlayerPSIsInterpolated && (!snapIsInterpolated || snapInfoHere->serverTime > mainPlayerServerTime)){
 						// Move some entity stuff over to playerState to improve its precision? Kind of experimental.
-						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
+						// TODO: Make this actually work somehow?
+						// Problem: Depending on the order in which we get playerstate/entitystate data, we either do the "enhanceonly" thing or we do the EnhancePlayerStateWithBaseState thing, and both lead to inconsistent results, so in cases where we quickly alternate between both methods (like with strobe), we end up with weird inconsistent behavior. Sad but true.
+						//CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qtrue);
+						tmpPS3 = mainPlayerPS;
+						
+						// Sad way of doing it but best we got for now for consistency :(
+						CG_EntityStateToPlayerState(&it->second, &mainPlayerPS, demoType, qtrue, NULL, qfalse);
+						EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS3, demoType);
 						mainPlayerServerTime = snapInfoHere->serverTime;
+
 						// This does not reset the isInterpolated status, since it's kind of a "meh" value from an entity. It's just a patchwork kinda.
 					}
 				}

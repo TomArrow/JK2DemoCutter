@@ -4,7 +4,10 @@ save horizontal speeds separately!!!!!
 // TODO Parse com_protocol for quake games in case they decide to override protocol despite demo name...
 
 
-count laughs following kills/caps/rets
+KINDA important: Unify EnhancePlayerStateWithBaseState and "enhanceOnly" to be consistent with each other.
+Problem: Depending on the order in which we get playerstate/entitystate data, we either do the "enhanceonly" thing or we do the EnhancePlayerStateWithBaseState thing, and both lead to inconsistent results, so in cases where we quickly alternate between both methods (like with strobe), we end up with weird inconsistent behavior. Sad but true.
+Basically, the order of the demos determines the outcome, which shouldn't be the case.
+For example, enhanceonly didnt properly handle death/alive state and still doesnt handle crouch viewheight and such. Also it was intended to be used when only gaps are being filled but right now it could end up being used even with minute old playerstates. How to reconcile?
 
 
 nice regexp for killsprees mohaa: 
@@ -271,6 +274,7 @@ check for @@@PLRENAME to track who is who and build a chain that allows to more 
 
 DONE: 
 
+count laughs following kills/caps/rets
 sneaky detection: detect long periods of crouch and rets that follow within 2 seconds after them
 TODO: Killsprees: dont count teamkills (or mark them specially). And mark somehow the number of unique clientnums in the killsprees
 TODO: Kills: mark Teamkills as such. Maybe comment them out by default.

@@ -1757,9 +1757,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		s->eFlags |= EF_SEEKERDRONE;
 	}
 	*/
-	if(!enhanceOnly){
-		ps->genericEnemyIndex = -1; //no real option for this
-
+	if (!enhanceOnly || (s->eFlags & EF_DEAD) > 0 != (ps->stats[STAT_HEALTH] <= 0)) {
 		//The client has no knowledge of health levels (except for the client entity)
 		if (s->eFlags & EF_DEAD)
 		{
@@ -1769,7 +1767,15 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		else
 		{
 			ps->stats[STAT_HEALTH] = 100;
+			if (ps->pm_type == PM_DEAD) { // Correct this if needed.
+				ps->pm_type = PM_NORMAL;
+			}
 		}
+	}
+
+	if(!enhanceOnly){
+		ps->genericEnemyIndex = -1; //no real option for this
+
 
 		// TODO fix this. For example we want the EV_SABER_ATTACK event to work.
 		// Dirty quick try: Just set it as "externalEvent"
