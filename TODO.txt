@@ -21,6 +21,36 @@ if merging PS and ES, allow either snapping PS always, or do a special interpola
 
 remove spectator chat in reframes?
 
+
+Important: Write lastGamestateChangeinDemoTime to database. So we can properly cut from GUI.
+
+Todo: Laughs: Determine WHO laughed? Aka properly parse chat message. So we can tell if laugh came from someone nearby.
+
+TODO: Track meta events for defrag runs but only around the finish?
+
+
+when our lightsaberstyle guess is uncertain, fallback to ps if its reasonably recent?
+
+fix mines not being properly persistent with -i -I (beams glitching, flickering)
+
+combiner: copy over bmodel model entities (solid = SOLID_BMODEL or sth like that)
+
+when merging: not only get most current position but also most current alive state!!!
+
+DemoCutter: Put the last received "scores" command in at the start of the demo?
+
+
+
+Bsp to minimap:make the strength of lines not moderated by zRange
+Also try to detect sky via the surf_sky thing
+make it recognize patches!
+
+
+
+detect rets through mines? where mines were narrowly avoided?
+
+
+
 get info from tinfo, EV_PAIN
 
 
