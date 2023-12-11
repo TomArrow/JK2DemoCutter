@@ -7300,7 +7300,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					
 
 					std::stringstream ss;
-					ss << mapname << (runInfo.style != "" ? va("___%s",runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (isNumberOne ? "" : "___top10") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+					ss << mapname << (runInfo.style != "" ? va("___%s",runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
