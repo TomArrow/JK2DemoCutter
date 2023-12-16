@@ -1507,7 +1507,8 @@ psEventData_t demoCutGetEvent(playerState_t* ps, playerState_t* ops, int demoCur
 	return psEventData;
 }
 
-int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType) {
+// readOnly parameter: Do not write anythng or change any state. We are pre-parsing events.
+int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType,qboolean readOnly) {
 	//if (lastEvent.find(es->number) == lastEvent.end()) {
 	//	lastEvent[es->number] = 0;
 	//} // Not really necessary is it? That's what it will be by default?
@@ -1538,19 +1539,23 @@ int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType) 
 	}*/
 
 	// if ( cent->snapShotTime < cg.time - EVENT_VALID_MSEC ) {
-	if (lastEventTime[es->number] < demoCurrentTime - EVENT_VALID_MSEC) {
+	if (lastEventTime[es->number] < demoCurrentTime - EVENT_VALID_MSEC && !readOnly) {
 		lastEvent[es->number] = 0;
 	}
 
 	int eventNumberRaw = es->eType > getET_EVENTS(demoType) ? es->eType - getET_EVENTS(demoType) : es->event;
 	int eventNumber = eventNumberRaw & ~EV_EVENT_BITS;
 
-	lastEventTime[es->number] = demoCurrentTime;
+	if (!readOnly) {
+		lastEventTime[es->number] = demoCurrentTime;
+	}
 	if (eventNumberRaw == lastEvent[es->number]) {
 		return 0;
 	}
 
-	lastEvent[es->number] = eventNumberRaw;
+	if (!readOnly) {
+		lastEvent[es->number] = eventNumberRaw;
+	}
 	return eventNumber;
 	
 }
@@ -2123,6 +2128,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		"projectileWasAirborne	BOOLEAN,"
 
+		"sameFrameRet	BOOLEAN,"
+
 		"baseFlagDistance	REAL,"
 		"headJumps	INTEGER,"
 		"specialJumps	INTEGER,"
@@ -2359,9 +2366,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	;
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
 	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+		"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,sameFrameRet,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
@@ -3541,10 +3548,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
 		float playerStateStrafeDeviationThisFrame = 0;
 
-		bool redFlagStatusResetByConfigstring = false;
-		bool blueFlagStatusResetByConfigstring = false;
-		int	redFlagNewCarrierByEvent = -1;
-		int	blueFlagNewCarrierByEvent = -1;
+		int redFlagStatusResetByConfigstring = 0;
+		int blueFlagStatusResetByConfigstring = 0;
+		int64_t	redFlagNewCarrierByEventBitMask = 0;
+		int64_t	blueFlagNewCarrierByEventBitMask = 0;
+		int64_t	redFlagCapturedPlayerBitMask = 0;
+		int64_t	blueFlagCapturedPlayerBitMask = 0;
+		int64_t	playersKilledThisFrameBitMask = 0;
 
 	cutcontinue:
 
@@ -3702,15 +3712,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
 									if (strlen(str) >= 2) {
 										if (str[0] != '1') {
-											redFlagStatusResetByConfigstring = true;
+											redFlagStatusResetByConfigstring++;
 										}
 										if (str[1] != '1') {
-											blueFlagStatusResetByConfigstring = true;
+											blueFlagStatusResetByConfigstring++;
 										}
 									}
 									else { // This is some weird bug/imperfection in the code. Sometimes it just sends cs 23 0 for whatever reason. Seems to happen at end of games.
-										redFlagStatusResetByConfigstring = true;
-										blueFlagStatusResetByConfigstring = true;
+										redFlagStatusResetByConfigstring++;
+										blueFlagStatusResetByConfigstring++;
 									}
 									/*if (strlen(str) >= 3) { // Too lazy to do other way lol.
 										yellowflagTmp = str[2] - '0';
@@ -4784,6 +4794,48 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 				}
 
+				// Preparse flag pickup events (lame but it CAN happen that people pick up the flag and die on the same frame, and we won't be able to register it as a ret if the kill event comes before the flag pickup event otherwise)
+				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) { // +1 is so we can process the fake event entities created from parsing prints in MOHAA
+
+					entityState_t* thisEs = NULL;
+					int eventNumber = 0;
+					thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+					eventNumber = demoCutGetEvent(thisEs, demoCurrentTime, demoType,qtrue);
+					eventNumber = generalizeGameValue<GMAP_EVENTS, UNSAFE>(eventNumber, demoType);
+
+					if (eventNumber) {
+						if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
+							int playerNum = thisEs->trickedentindex;
+							int flagTeam = thisEs->trickedentindex2;
+
+							// So, since many things can in theory happen during a single server frame (like someone both getting the flag and dying)
+							// we track all the players that got the flag on this frame.
+							// And if they are killed, we clear this flag again. (Or not?)
+							// This will be checked against in the EV_OBITUARY handling to detect returns that might otherwise have been lost.
+							if (flagTeam == TEAM_RED) {
+								redFlagNewCarrierByEventBitMask |= (1L << playerNum);
+							}
+							else if (flagTeam == TEAM_BLUE) {
+								blueFlagNewCarrierByEventBitMask |= (1L << playerNum);
+							}
+						}
+						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
+							int playerNum = thisEs->trickedentindex;
+							int flagTeam = thisEs->trickedentindex2; 
+
+							// Similarly, here, we track whoever captured the flag on this frame.
+							// Because let's say we remember the flag carrier from last frame and he actually successfully captured,
+							// but he died on the same frame after capturing, we don't wanna count that as a return.
+							// So this will be checked against in the EV_OBITUARY handling.
+							if (flagTeam == TEAM_RED) {
+								redFlagCapturedPlayerBitMask |= (1L << playerNum);
+							}
+							else if (flagTeam == TEAM_BLUE) {
+								blueFlagCapturedPlayerBitMask |= (1L << playerNum);
+							}
+						}
+					}
+				}
 
 				// Fire events
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities + 1; pe++) { // +1 is so we can process the fake event entities created from parsing prints in MOHAA
@@ -4807,7 +4859,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 					else {
 						thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-						eventNumber = demoCutGetEvent(thisEs, demoCurrentTime, demoType);
+						eventNumber = demoCutGetEvent(thisEs, demoCurrentTime, demoType,qfalse);
 						eventNumber = generalizeGameValue<GMAP_EVENTS, UNSAFE>(eventNumber, demoType);
 					}
 
@@ -4830,9 +4882,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							bool			targetIsVisibleOrFollowed = false;
 							bool			attackerIsVisible = false;
 							bool			isSaberKill = false; // In case we want to avoid non-saber kills to save space with huge demo collections
+							qboolean		sameFrameRet = qfalse;
 							if (target < 0 || target >= max_clients) {
 								std::cout << "CG_Obituary: target out of range. This should never happen really.";
 							}
+
+							playersKilledThisFrameBitMask |= (1L << target);
 
 							if (attacker < 0 || attacker >= max_clients) {
 								attacker = ENTITYNUM_WORLD;
@@ -4857,10 +4912,79 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
 							attackerIsFlagCarrier = attacker == lastKnownBlueFlagCarrier || attacker == lastKnownRedFlagCarrier;
 
-							int victimFlagTeam = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? TEAM_BLUE:TEAM_RED) : -1;
-							int attackerFlagTeam = attackerIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? TEAM_BLUE:TEAM_RED) : -1;
+							int victimFlagTeam = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? TEAM_BLUE : TEAM_RED) : -1;
+							int attackerFlagTeam = attackerIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? TEAM_BLUE : TEAM_RED) : -1;
 
 							int victimCarrierLastPickupOrigin = victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+
+							if (!victimIsFlagCarrier) {
+								// Victim acquired the flag on this frame/snap
+								// We technically don't know the order - did he get the flag first? Or did he die first?
+								// But logically it should be the former. How would you die and get the flag after you died?
+
+								// TODO what about victimCarrierLastPickupOrigin?
+								if (redFlagNewCarrierByEventBitMask & (1L << target)) {
+									victimIsFlagCarrier = true;
+									victimFlagTeam = TEAM_BLUE;
+									victimCarrierLastPickupOrigin = -1;
+									sameFrameRet = qtrue;
+								}
+								else if (blueFlagNewCarrierByEventBitMask & (1L << target)) {
+									victimIsFlagCarrier = true;
+									victimFlagTeam = TEAM_RED;
+									victimCarrierLastPickupOrigin = -1;
+									sameFrameRet = qtrue;
+								}
+							}
+							if (!attackerIsFlagCarrier && attacker >= 0 && attacker < max_clients) {
+								// Attacker acquired the flag on this frame/snap
+								// Same as above for victim
+
+								// TODO what about victimCarrierLastPickupOrigin?
+								if (redFlagNewCarrierByEventBitMask & (1L << attacker)) {
+									attackerIsFlagCarrier = true;
+									attackerFlagTeam = TEAM_BLUE;
+								}
+								else if (blueFlagNewCarrierByEventBitMask & (1L << attacker)) {
+									attackerIsFlagCarrier = true;
+									attackerFlagTeam = TEAM_RED;
+								}
+							}
+							if (victimIsFlagCarrier) {
+								// Victim with flag captured the flag on the same frame.
+								// So what this tells us is that we may be wrong about the victim being a flag carrier
+								// We get both the EV_OBITUARY of the victim as well as the event telling us that the victim captured a flag.
+								// We can't know the order for sure but logically it makes sense that someone captured the flag and died on the next frame
+								// versus someone dying and THEN capturing the flag. lol.
+								// TLDR: We assume that if that player captured a flag on this frame, this isn't a return.
+								if (redFlagCapturedPlayerBitMask & (1L << target)) {
+									victimIsFlagCarrier = false;
+									victimFlagTeam = -1;
+									victimCarrierLastPickupOrigin = -1;
+								}
+								else if (blueFlagCapturedPlayerBitMask & (1L << target)) {
+									victimIsFlagCarrier = false;
+									victimFlagTeam = -1;
+									victimCarrierLastPickupOrigin = -1;
+								}
+							}
+
+							// Attacker with flag captured the flag on the same frame.
+							// There is really no way to tell whether he captured the flag first or whether
+							// he killed the other person first. It's the same frame, either is possible.
+							// Let's give benefit of doubt and assume he did the kill with the flag on his back.
+							/*if (attackerIsFlagCarrier) {
+								if (redFlagCapturedPlayerBitMask & (1L << attacker)) {
+									attackerIsFlagCarrier = false;
+									attackerFlagTeam = -1;
+								}
+								else if (blueFlagCapturedPlayerBitMask & (1L << attacker)) {
+									attackerIsFlagCarrier = false;
+									attackerFlagTeam = -1;
+								}
+							}*/
+
+
 
 							// Track how many people a flag carrier kills during his hold.
 							if (!isWorldKill && attackerIsFlagCarrier) {
@@ -5743,6 +5867,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								modInfo << "_TW"; // Through wall. Meh, not very universal. But decent?
 							}
 
+							if (sameFrameRet) {
+								modInfo << "_SFR"; 
+							}
+
 
 							int killerProjectile = -1;
 							qboolean isProjectileBased = qfalse;
@@ -6114,6 +6242,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@boostCountAttacker", boostCountAttacker);
 							SQLBIND_DELAYED(angleQuery, int, "@boostCountVictim", boostCountVictim);
 
+							SQLBIND_DELAYED(angleQuery, int, "@sameFrameRet", sameFrameRet);
+
 							if (canBeAirborne) {
 								if (killerProjectile == -1) {
 									SQLBIND_DELAYED_NULL(angleQuery, "@projectileWasAirborne");
@@ -6310,7 +6440,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// There is no weapon (at least in JK2) with higher splash radius I believe.
 							addMetaEventNearby<max_clients>(thisEs->pos.trBase, 256.0f + 50.0f, METAEVENT_EFFECT, demoCurrentTime, bufferTime, opts, bufferTime); 
 						}
-						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
+						/*else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
 							int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
 							// A bit pointless tbh because we reset it to -1 anyway before checking entities. 
@@ -6322,7 +6452,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								blueFlagNewCarrierByEvent = playerNum;
 								//lastKnownBlueFlagCarrier = playerNum;
 							}
-						}
+						}*/
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
 							//Capture.
 							int playerNum = thisEs->trickedentindex;
@@ -6805,11 +6935,33 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (blueFlagStatusResetByConfigstring) {
 					lastKnownBlueFlagCarrier = -1;
 				}
-				if (redFlagNewCarrierByEvent != -1) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
-					lastKnownRedFlagCarrier = redFlagNewCarrierByEvent;
+				if (redFlagNewCarrierByEventBitMask) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
+					int64_t possiblePlayers = redFlagNewCarrierByEventBitMask; // These are all players who picked up a red flag this frame (silly I know!)
+					possiblePlayers &= ~playersKilledThisFrameBitMask; // These are players who were killed this frame, so they can no longer have the flag.
+					possiblePlayers &= ~redFlagCapturedPlayerBitMask; // These are players who captured the flag this frame, so they too can no longer have it.
+					
+					// Check if possiblePlayers is a power of 2
+					if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
+						// It's one possible player.
+						lastKnownRedFlagCarrier = (int)(log2(possiblePlayers)+0.5); // + 0.5 to avoid double to int conversion issues issues.
+					}
+					else {
+						// Either no player left or multiple ones. In short, we don't know.
+						lastKnownRedFlagCarrier = -1;
+					}
 				}
-				if (blueFlagNewCarrierByEvent != -1) {
-					lastKnownBlueFlagCarrier = blueFlagNewCarrierByEvent;
+				if (blueFlagNewCarrierByEventBitMask) {
+					// Same logic as with red flag above.
+					int64_t possiblePlayers = blueFlagNewCarrierByEventBitMask; 
+					possiblePlayers &= ~playersKilledThisFrameBitMask; 
+					possiblePlayers &= ~blueFlagCapturedPlayerBitMask; 
+
+					if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
+						lastKnownBlueFlagCarrier = (int)(log2(possiblePlayers) + 0.5);
+					}
+					else {
+						lastKnownBlueFlagCarrier = -1;
+					}
 				}
 				vec3_t lastKnownBlueFlagCarrierPosition, lastKnownRedFlagCarrierPosition;
 				vec3_t lastKnownBlueFlagCarrierVelocity, lastKnownRedFlagCarrierVelocity;
@@ -6841,12 +6993,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 								// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
 								if (lastKnownRedFlagCarrier == p) {
+									std::cerr << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
 									lastKnownRedFlagCarrier = -1;
-									std::cerr << "Player entity ("<< p << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting\n";
 								}
 								if (lastKnownBlueFlagCarrier == p) {
+									std::cerr << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
 									lastKnownBlueFlagCarrier = -1;
-									std::cerr << "Player entity (" << p << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting.\n";
 								}
 
 								// Reset the required meta event age for capture cuts if the player is seen without a flag.
@@ -6881,12 +7033,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 						// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
 						if (lastKnownRedFlagCarrier == demo.cut.Cl.snap.ps.clientNum) {
+							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <=0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
 							lastKnownRedFlagCarrier = -1;
-							std::cerr << "Playerstate ("<< demo.cut.Cl.snap.ps.clientNum << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting\n";
 						}
 						if (lastKnownBlueFlagCarrier == demo.cut.Cl.snap.ps.clientNum) {
+							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
 							lastKnownBlueFlagCarrier = -1;
-							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting.\n";
 						}
 
 						// Same logic as with entities above, see comment above. But ofc playerstate is always visible but view angle can change
