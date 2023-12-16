@@ -3414,6 +3414,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&lastSneakDuration, 0, sizeof(lastSneakDuration));
 	resetCurrentPacketPeriodStats();
 
+	lastKnownRedFlagCarrier = lastKnownBlueFlagCarrier = -1;
+
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < max_clients; i++) {
 		lastBackflip[i] = -1;
@@ -3538,6 +3540,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
 		float playerStateStrafeDeviationThisFrame = 0;
+
+		bool redFlagStatusResetByConfigstring = false;
+		bool blueFlagStatusResetByConfigstring = false;
+		int	redFlagNewCarrierByEvent = -1;
+		int	blueFlagNewCarrierByEvent = -1;
 
 	cutcontinue:
 
@@ -3675,28 +3682,60 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				currentPacketPeriodStats.totalServerCommandSize += oldMsg.readcount - oldMsgOffset;
 
 				// Pre-execution of commands for mohaa (since events are sent as prints)
-				if(isMOHAADemo){
+				// Change: Also do it in any demo for flag status
+				if(true || isMOHAADemo){
 					for (; demo.cut.Clc.lastPreExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastPreExecutedServerCommand++) {
 						char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastPreExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 						Cmd_TokenizeString(command);
 
 						char* cmd = Cmd_Argv(0);
 
-						if (isMOHAADemo) {
+						//if (isMOHAADemo) {
 
-							if (!strcmp(cmd, "print")) {
-								entityState_t* deathEvent = parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
-								if (deathEvent) {
-									parsedEventEntities.push(deathEvent);
+							if (!strcmp(cmd, "cs")) {
+
+								int index = atoi(Cmd_Argv(1));
+								if (index == CS_FLAGSTATUS) {
+									char* str = Cmd_Argv(2);
+
+									int redflagTmp, blueflagTmp, yellowflagTmp;
+									// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
+									if (strlen(str) >= 2) {
+										if (str[0] != '1') {
+											redFlagStatusResetByConfigstring = true;
+										}
+										if (str[1] != '1') {
+											blueFlagStatusResetByConfigstring = true;
+										}
+									}
+									else { // This is some weird bug/imperfection in the code. Sometimes it just sends cs 23 0 for whatever reason. Seems to happen at end of games.
+										redFlagStatusResetByConfigstring = true;
+										blueFlagStatusResetByConfigstring = true;
+									}
+									/*if (strlen(str) >= 3) { // Too lazy to do other way lol.
+										yellowflagTmp = str[2] - '0';
+									}
+									else {
+										yellowflagTmp = 0;
+									}*/
+
 								}
 							}
-							else if (!strcmp(cmd, "printdeathmsg")) {
-								entityState_t* deathEvent = parseMOHAAPrintDeathMsgFromTokenized(&playerNamesToClientNums);
-								if (deathEvent) {
-									parsedEventEntities.push(deathEvent);
+							else if (isMOHAADemo) {
+								if (!strcmp(cmd, "print")) {
+									entityState_t* deathEvent = parseMOHAADeathMessage(&playerNamesToClientNums, Cmd_Argv(1));
+									if (deathEvent) {
+										parsedEventEntities.push(deathEvent);
+									}
+								}
+								else if (!strcmp(cmd, "printdeathmsg")) {
+									entityState_t* deathEvent = parseMOHAAPrintDeathMsgFromTokenized(&playerNamesToClientNums);
+									if (deathEvent) {
+										parsedEventEntities.push(deathEvent);
+									}
 								}
 							}
-						}
+						//}
 					}
 				}
 				break;
@@ -3710,6 +3749,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0),SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
 					goto cuterror;
 				}
+
+				lastKnownRedFlagCarrier = lastKnownBlueFlagCarrier = -1; // New gamestate. Fair to assume that nobody has the flag now.
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
@@ -6275,9 +6316,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// A bit pointless tbh because we reset it to -1 anyway before checking entities. 
 							// Let me rethink this some day TODO
 							if (flagTeam == TEAM_RED) {
-								lastKnownRedFlagCarrier = playerNum;
+								redFlagNewCarrierByEvent = playerNum;
+								//lastKnownRedFlagCarrier = playerNum; // Don't set it here so it doesn't interfere with potential kill events timing-wise, in case the flag return and pickup of new flag happens on same frame (unlikely but possible, especially with snaps?)
 							}else if (flagTeam == TEAM_BLUE) {
-								lastKnownBlueFlagCarrier = playerNum;
+								blueFlagNewCarrierByEvent = playerNum;
+								//lastKnownBlueFlagCarrier = playerNum;
 							}
 						}
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
@@ -6755,7 +6798,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				// Find out which players are visible / followed
 				// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
-				lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
+				//lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
+				if (redFlagStatusResetByConfigstring) { // First reset flag carrier if the flag status has been reset via configstring.
+					lastKnownRedFlagCarrier = -1;
+				}
+				if (blueFlagStatusResetByConfigstring) {
+					lastKnownBlueFlagCarrier = -1;
+				}
+				if (redFlagNewCarrierByEvent != -1) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
+					lastKnownRedFlagCarrier = redFlagNewCarrierByEvent;
+				}
+				if (blueFlagNewCarrierByEvent != -1) {
+					lastKnownBlueFlagCarrier = blueFlagNewCarrierByEvent;
+				}
 				vec3_t lastKnownBlueFlagCarrierPosition, lastKnownRedFlagCarrierPosition;
 				vec3_t lastKnownBlueFlagCarrierVelocity, lastKnownRedFlagCarrierVelocity;
 				for (int p = 0; p < max_clients; p++) {
@@ -6768,7 +6823,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						if (thisEntity->number == p) {
 							clientIsInSnapshot = true;
 
-							// TODO check playerteam bc ghost powerups?
+							// TODO check playerteam bc ghost powerups? - I think that's not needed as we are checking entities and not scoreboard data.
 							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
 								lastKnownRedFlagCarrier = thisEntity->number;
 								VectorCopy(thisEntity->pos.trBase,lastKnownRedFlagCarrierPosition);
@@ -6782,6 +6837,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 							}
 							else { 
+								
+								// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
+								// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
+								if (lastKnownRedFlagCarrier == p) {
+									lastKnownRedFlagCarrier = -1;
+									std::cerr << "Player entity ("<< p << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting\n";
+								}
+								if (lastKnownBlueFlagCarrier == p) {
+									lastKnownBlueFlagCarrier = -1;
+									std::cerr << "Player entity (" << p << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting.\n";
+								}
+
 								// Reset the required meta event age for capture cuts if the player is seen without a flag.
 								// This means the player is not currently holding a flag, therefore he can't be in the process of capturing a flag,
 								// hence we can stop tracking meta events for him into the past in case we want to do a cut of him with meta events.
@@ -6811,10 +6878,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
 					}
 					else {
+						// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
+						// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
+						if (lastKnownRedFlagCarrier == demo.cut.Cl.snap.ps.clientNum) {
+							lastKnownRedFlagCarrier = -1;
+							std::cerr << "Playerstate ("<< demo.cut.Cl.snap.ps.clientNum << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting\n";
+						}
+						if (lastKnownBlueFlagCarrier == demo.cut.Cl.snap.ps.clientNum) {
+							lastKnownBlueFlagCarrier = -1;
+							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting.\n";
+						}
+
 						// Same logic as with entities above, see comment above. But ofc playerstate is always visible but view angle can change
 						// So I think overall similar logic applies here too and besides, let's keep it consistent.
 						requiredMetaEventAges[METRACKER_CAPTURES][demo.cut.Cl.snap.ps.clientNum] = demoCurrentTime - bufferTime;
 					}
+
 					if (clientIsInSnapshot) {
 						clientVisibleOrFollowed = true;
 						if (playerFirstVisible[p] == -1) {
