@@ -10,6 +10,7 @@ Basically, the order of the demos determines the outcome, which shouldn't be the
 For example, enhanceonly didnt properly handle death/alive state and still doesnt handle crouch viewheight and such. Also it was intended to be used when only gaps are being filled but right now it could end up being used even with minute old playerstates. How to reconcile?
 
 
+
 nice regexp for killsprees mohaa: 
 000_\d+[^T]*_U[45678]
 000_[56789][^T]*_U[3456789]

@@ -122,6 +122,7 @@ public:
 	bool onlyLogCapturesWithSaberKills = false;
 	bool findSuperSlowKillStreaks = false;
 	bool noFindOutput = false;
+	bool killSpreesOnlyVisible = false;
 	bool testOnly = false;
 	bool reframeIfNeeded = false;
 	bool dumpStufftext = false;
@@ -425,6 +426,7 @@ struct SpreeInfo {
 	int countDooms = 0;
 	int countExplosions = 0;
 	int countThirdPersons = 0; // Not followed ones.
+	int countInvisibles = 0; // Not visible ones.
 	float maxVictimSpeed;
 };
 
@@ -1853,6 +1855,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@countDooms", spreeInfo->countDooms);
 		SQLBIND_DELAYED(query, int, "@countExplosions", spreeInfo->countExplosions);
 		SQLBIND_DELAYED(query, int, "@countThirdPersons", spreeInfo->countThirdPersons);
+		SQLBIND_DELAYED(query, int, "@countInvisibles", spreeInfo->countInvisibles);
 
 		SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyPlayers.size() > 0 ? nearbyPlayersString.c_str() : NULL);
 		SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyPlayers.size());
@@ -1900,7 +1903,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		for (int i = 0; i < victims->size(); i++) {
 			ss2 << "_" << (*victims)[i];
 		}
-		ss2 << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
+		ss2 << "___" << maxSpeedAttacker <<"_"<< maxSpeedVictims << "ups" << (spreeInfo->countThirdPersons ? va("___thirdperson%d", spreeInfo->countThirdPersons) : "") << (spreeInfo->countInvisibles ? va("___invisibles%d", spreeInfo->countInvisibles) : "") << "___" << clientNumAttacker << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "") << "_" << shorthash;
 
 		std::string targetFilename = ss.str();
 		std::string targetFilename2 = ss2.str();
@@ -1913,7 +1916,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		std::stringstream batSS2;
 		batSS << "\nrem hash: " << hash_hex_string;
 		batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
-		batSS << "\n" << (((spreeInfo->countKills-spreeInfo->countTeamKills) >= KILLSTREAK_MIN_KILLS) ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
+		batSS << "\n" << (((spreeInfo->countKills-std::max(spreeInfo->countTeamKills,spreeInfo->countInvisibles)) >= KILLSTREAK_MIN_KILLS) ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
 		batSS2 << targetFilename2Filtered << "\" " << startTime << " " << endTime;
 		batSS2 << (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
@@ -2288,6 +2291,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"countDooms	INTEGER NOT NULL,"
 		"countExplosions	INTEGER NOT NULL,"
 		"countThirdPersons	INTEGER NOT NULL,"
+		"countInvisibles	INTEGER NOT NULL,"
 		"nearbyPlayers	TEXT,"
 		"nearbyPlayerCount	INTEGER NOT NULL,"
 		"demoRecorderClientnum	INTEGER NOT NULL,"
@@ -2380,10 +2384,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
 	preparedStatementText = "INSERT INTO killSprees "
 		"( hash, shorthash,maxDelay,maxDelayActual, map,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
-		" countThirdPersons, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,resultingLaughs,resultingLaughsAfter,metaEvents,demoName,demoPath,demoTime,lastGamestateDemoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
+		" countThirdPersons, countInvisibles, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,resultingLaughs,resultingLaughsAfter,metaEvents,demoName,demoPath,demoTime,lastGamestateDemoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
 		" VALUES "
 		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
-		" @countThirdPersons, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@resultingLaughs,@resultingLaughsAfter,@metaEvents,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
+		" @countThirdPersons, @countInvisibles, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@resultingLaughs,@resultingLaughsAfter,@metaEvents,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
 	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
@@ -6667,7 +6671,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							timeCheckedForKillStreaks[clientNumAttacker] = thisKill->time - 1;
 
 							if (thisKill->time <= timeCheckedForKillStreaks[clientNumAttacker]) continue; // This one's already been registered.
-							if (thisKill->isSuicide || !thisKill->isVisible) continue; // Uninteresting.
+							if (thisKill->isSuicide || (!thisKill->isVisible && opts.killSpreesOnlyVisible)) continue; // Uninteresting.
 
 
 							// Starting or continuing kill spree?
@@ -6683,6 +6687,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								if (thisKill->isTeamKill) spreeInfo.countTeamKills++;
 								if (thisKill->isExplosion) spreeInfo.countExplosions++;
 								if (!thisKill->isFollowed) spreeInfo.countThirdPersons++;
+								if (!thisKill->isVisible) spreeInfo.countInvisibles++;
 								spreeInfo.totalTime += spreeInfo.countKills == 0? 0: (thisKill->time - spreeInfo.lastKillTime);
 								spreeInfo.countKills++;
 								spreeInfo.lastKillTime = thisKill->time;
@@ -7522,6 +7527,7 @@ int main(int argcO, char** argvO) {
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
+	auto k = op.add<popl::Switch>("k", "kill-sprees-only-visible-kills", "Only find killsprees made up out of visible kills.");
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
 	auto p = op.add<popl::Switch>("p", "print-debug", "Prints out various debug things, like all configstrings.");
@@ -7566,6 +7572,7 @@ int main(int argcO, char** argvO) {
 	opts.findSuperSlowKillStreaks = l->value();
 	opts.noFindOutput = n->value();
 	opts.testOnly = t->value();
+	opts.killSpreesOnlyVisible = k->value();
 	opts.reframeIfNeeded = r->value();
 	opts.dumpStufftext = D->value();
 	opts.printDebug = p->value();
