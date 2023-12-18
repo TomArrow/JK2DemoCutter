@@ -2194,6 +2194,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"flagTeam	INTEGER NOT NULL,"
 		"capperKills INTEGER NOT NULL,"
 		"capperRets INTEGER NOT NULL,"
+		"sameFrameCap	BOOLEAN NOT NULL,"
 		"redScore INTEGER,"
 		"blueScore INTEGER,"
 		"redPlayerCount INTEGER,"
@@ -2372,9 +2373,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
 	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertCaptureStatement, NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
@@ -3717,17 +3718,46 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										if (str[1] != '1') {
 											blueFlagStatusResetByConfigstring++;
 										}
+										redflagTmp = str[0] - '0';
+										blueflagTmp = str[1] - '0';
 									}
 									else { // This is some weird bug/imperfection in the code. Sometimes it just sends cs 23 0 for whatever reason. Seems to happen at end of games.
 										redFlagStatusResetByConfigstring++;
 										blueFlagStatusResetByConfigstring++;
+										redflagTmp = 0;
+										blueflagTmp = 0;
 									}
-									/*if (strlen(str) >= 3) { // Too lazy to do other way lol.
+									if (strlen(str) >= 3) { // Too lazy to do other way lol.
 										yellowflagTmp = str[2] - '0';
 									}
 									else {
 										yellowflagTmp = 0;
-									}*/
+									}
+
+									// We already set cgs.redFlagLastChangeToTaken up here because farther down (after capture/kill event evaluation) it is used to update flag hold times.
+									// Without this, the flag hold time will be wrong on the first and following frame, potentially leading to wrong flag hold times for captures that happened in 1 frame or 2 frames.
+									// But we don't yet update other flag related status stuff, we do that at the bottom. (idk it's messy maybe it doesnt even make sense. TODO)
+									if (cgs.redflag != redflagTmp) {
+										//cgs.redFlagLastChange = demoCurrentTime;
+										if (redflagTmp == 1) {
+											cgs.redFlagLastChangeToTaken = demoCurrentTime;
+											//cgs.redFlagLastPickupOrigin = cgs.redflag;
+										}
+									}
+									if (cgs.blueflag != blueflagTmp) {
+										//cgs.blueFlagLastChange = demoCurrentTime;
+										if (blueflagTmp == 1) {
+											cgs.blueFlagLastChangeToTaken = demoCurrentTime;
+											//cgs.blueFlagLastPickupOrigin = cgs.blueflag;
+										}
+									}
+									if (cgs.yellowflag != yellowflagTmp) {
+										//cgs.yellowflagLastChange = demoCurrentTime;
+										if (yellowflagTmp == 1) {
+											cgs.yellowflagLastChangeToTaken = demoCurrentTime;
+											//cgs.yellowflagLastPickupOrigin = cgs.yellowflag; // Not sure if this is correct?
+										}
+									}
 
 								}
 							}
@@ -3806,7 +3836,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				if (demoCurrentTime < 0) {
-					std::cout << "demoCurrentTime negative wtf?! demoOldTime "<< demoOldTime << ", demoCurrentTime " << demoCurrentTime  << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << "\n";
+					std::cerr << "demoCurrentTime negative wtf?! demoOldTime "<< demoOldTime << ", demoCurrentTime " << demoCurrentTime  << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
 				}
 				deltaTimeFromLastSnapshot = demoCurrentTime - demoOldTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
@@ -4147,7 +4177,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								char* modelName2 = demo.cut.Cl.gameState.stringData + offset;
 								offset = demo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + thisEs->modelindex];
 								char* modelName = demo.cut.Cl.gameState.stringData + offset;
-								std::cerr << "Weird. MOHAA weapon for player found twice. Duplicate? " << modelName << " vs. " << modelName2 <<"\n";
+								std::cerr << "Weird. MOHAA weapon for player found twice. Duplicate? " << modelName << " vs. " << modelName2 << " (" << DPrintFLocation << ")\n";
 							}
 							if (thisEs->modelindex != mohaaPlayerWeaponModelIndex[thisEs->parent]) {
 								// Model changed. Update weapons array.
@@ -6211,6 +6241,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED(angleQuery, double, "@victimCapperAnyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
 								SQLBIND_DELAYED(angleQuery, double, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
 								SQLBIND_DELAYED(angleQuery, double, "@victimCapperAverageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
+
+								SQLBIND_DELAYED(angleQuery, int, "@sameFrameRet", sameFrameRet);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(angleQuery, "@victimFlagHoldTime");
@@ -6226,6 +6258,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperAnyVeryCloseEnemyTimePercent");
 								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperMoreThanOneVeryCloseEnemyTimePercent");
 								SQLBIND_DELAYED_NULL(angleQuery, "@victimCapperAverageVeryCloseEnemyCount");
+
+								SQLBIND_DELAYED_NULL(angleQuery, "@sameFrameRet");
 							}
 							SQLBIND_DELAYED(angleQuery, int, "@targetIsVisible", targetIsVisible);
 							SQLBIND_DELAYED(angleQuery, int, "@targetIsFollowed", targetIsFollowed);
@@ -6242,7 +6276,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@boostCountAttacker", boostCountAttacker);
 							SQLBIND_DELAYED(angleQuery, int, "@boostCountVictim", boostCountVictim);
 
-							SQLBIND_DELAYED(angleQuery, int, "@sameFrameRet", sameFrameRet);
 
 							if (canBeAirborne) {
 								if (killerProjectile == -1) {
@@ -6458,6 +6491,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
 
+							bool sameFrameCap = false;
+
 							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 							const char* info = demo.cut.Cl.gameState.stringData + offset;
 							std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "mapname");
@@ -6479,6 +6514,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							bool playerIsVisibleOrFollowed = playerIsFollowed || playerIsVisible;
 
 							int flagHoldTime = recentFlagHoldTimes[playerNum];
+
+							if (redFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+								// Player got the flag on this exact frame. Flag hold time is going to be wrong. Set to 0 manually.
+								flagHoldTime = 0;
+								sameFrameCap = true;
+							}
+							else if (blueFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+								flagHoldTime = 0;
+								sameFrameCap = true;
+							}
 
 							bool wasFollowed = false;
 							bool wasVisible = false;
@@ -6649,6 +6694,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@flagTeam", flagTeam);
 							SQLBIND_DELAYED(query, int, "@capperKills", flagCarrierKillCount);
 							SQLBIND_DELAYED(query, int, "@capperRets", flagCarrierRetCount);
+							SQLBIND_DELAYED(query, int, "@sameFrameCap", sameFrameCap);
 							SQLBIND_DELAYED(query, int, "@redScore", teamInfo[TEAM_RED].score);
 							SQLBIND_DELAYED(query, int, "@blueScore", teamInfo[TEAM_BLUE].score);
 							SQLBIND_DELAYED(query, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
@@ -6935,6 +6981,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (blueFlagStatusResetByConfigstring) {
 					lastKnownBlueFlagCarrier = -1;
 				}
+				if (lastKnownRedFlagCarrier != -1) {
+					recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken; 
+				}
+				if (lastKnownBlueFlagCarrier != -1) {
+					recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
+				}
 				if (redFlagNewCarrierByEventBitMask) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
 					int64_t possiblePlayers = redFlagNewCarrierByEventBitMask; // These are all players who picked up a red flag this frame (silly I know!)
 					possiblePlayers &= ~playersKilledThisFrameBitMask; // These are players who were killed this frame, so they can no longer have the flag.
@@ -6980,7 +7032,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								lastKnownRedFlagCarrier = thisEntity->number;
 								VectorCopy(thisEntity->pos.trBase,lastKnownRedFlagCarrierPosition);
 								VectorCopy(thisEntity->pos.trDelta,lastKnownRedFlagCarrierVelocity);
-								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken;
+								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken; // Hmm but this creates a wrong value on the first frame of holding the flag. If it's a one-frame capture we will end up with a wrong time duration held ...
 							}
 							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
 								lastKnownBlueFlagCarrier = thisEntity->number;
@@ -7833,7 +7885,7 @@ int main(int argcO, char** argvO) {
 			std::cout << "Doing strafe CSV output with sync point " << num1 << ", reset point " << num2 << " and min run duration " << num3 << "\n";
 		}
 		else {
-			std::cerr << "ERROR: Value supplied for -z/--strafe-csv option must be at least 2 ups speed numbers delimited by a comma. One for sync point, other for reset point. Optionally, a third number for a minimum run length in milliseconds.\n";
+			std::cerr << "ERROR: Value supplied for -z/--strafe-csv option must be at least 2 ups speed numbers delimited by a comma. One for sync point, other for reset point. Optionally, a third number for a minimum run length in milliseconds. (" << DPrintFLocation << ")\n";
 #ifdef DEBUG
 			std::cin.get();
 #endif

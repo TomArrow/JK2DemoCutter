@@ -11,6 +11,10 @@ For example, enhanceonly didnt properly handle death/alive state and still doesn
 
 
 
+count !markme and [DEMOMOMENT] as laughs? but also make an extra table for them. and maybe also parse the times in demo names?
+
+
+
 nice regexp for killsprees mohaa: 
 000_\d+[^T]*_U[45678]
 000_[56789][^T]*_U[3456789]
@@ -275,6 +279,7 @@ check for @@@PLRENAME to track who is who and build a chain that allows to more 
 
 DONE: 
 
+recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken; // Hmm but this creates a wrong value on the first frame of holding the flag. If it's a one-frame capture we will end up with a wrong time duration held ...
 count laughs following kills/caps/rets
 sneaky detection: detect long periods of crouch and rets that follow within 2 seconds after them
 TODO: Killsprees: dont count teamkills (or mark them specially). And mark somehow the number of unique clientnums in the killsprees
