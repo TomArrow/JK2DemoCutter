@@ -1,10 +1,27 @@
 #/bin/bash
+# This is the function that calls the analyzer. 
+analyzer () {
+	# You can change the analysis parameters here
+	# Note: Remove the ./ before DemoHighlightFinder.exe if the .exe file isn't in the same folder and if it is in PATH instead
+	./DemoHighlightFinder.exe "$1" 10000 ctfreturns 2>>errors.log
+	if [ $? -eq 139 ]; then
+		>&2 echo "Demo $1 led to segfault!"
+	fi
+}
 
-# Note: Remove the ./ before DemoHighlightFinder.exe if the .exe file isn't in the same folder and if it is in PATH instead
+# Replace the path with the path you want to analyze. If you need more than 1 demo path, duplicate the line that says `"/path/to/demo/folder" \` as many times as necessary and replace the paths with the new paths
+demoPaths=( \
+"/path/to/demo/folder" \
+)
 
-# This following line is for serial (non parallel) analysis of a folder
-#find "demos" -name '*' -type f -exec ./DemoHighlightFinder.exe {} 10000 ctfreturns \;
+for demoPath in "${demoPaths[@]}"; do
 
-# This following line is for parallel analysis of a folder with 5 threads (5 files being analyzed at same time)
-find "demos" -name '*' -type f -print0 | xargs -0 -P 5 -I %  ./DemoHighlightFinder.exe % 10000 ctfreturns \; 2>>errors.log
+	# This following line is for serial (non parallel) analysis of a folder. Leave it commented out unless you don't want parallel processing.
+	#find "$demoPath" -name '*' -type f -exec bash -c "$(declare -f analyzer); analyzer \"{}\"" \; 2>>errorsXargs.log
+
+	# This following line is for parallel analysis of a folder with 5 threads (5 files being analyzed at same time). Comment it out if you don't want parallel processing.
+	find "$demoPath" -name '*' -type f -print0 | xargs -0 -P 5 -I %  bash -c "$(declare -f analyzer); analyzer \"%\"" \; 2>>errorsXargs.log
+
+done
+
 read -n1 -r
