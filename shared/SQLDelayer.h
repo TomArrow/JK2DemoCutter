@@ -80,7 +80,7 @@ public:
 			return SQLBIND_INDEX_NULL(statement, index);
 			break;
 		case SQLVALUE_TYPE_INTEGER:
-			return SQLBIND_INDEX(statement, int, index, intValue);
+			return SQLBIND_INDEX(statement, int64, index, intValue);
 			break;
 		case SQLVALUE_TYPE_REAL:
 			return SQLBIND_INDEX(statement, double, index, doubleValue);
