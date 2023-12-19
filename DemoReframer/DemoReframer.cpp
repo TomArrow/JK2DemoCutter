@@ -251,6 +251,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 	int oldMainPlayerDimension = -99999;
 	int64_t entityFramesSkippedDueToDimension = 0;
+	int64_t entityFramesSkippedDueToDimensionGlobalEventExcept = 0;
+	int64_t entityFramesSkippedDueToDimensionGlobalDimExcept = 0;
 	qboolean dimensionDataDetected = demoReader->reader.containsDimensionData();
 
 	while(1){
@@ -343,9 +345,18 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 						//	if(VectorDistance(snapInfoHere->playerState.origin,it->second.))
 						//}
 						if (dimensionDataDetected && it->second.demoToolsData.detectedDimension != mainPlayerPS.demoToolsData.detectedDimension) {
-							entityFramesSkippedDueToDimension++;
-							if (!opts.skipDimensionData) {
-								continue;
+							if (it->second.demoToolsData.globalDimension) {
+								entityFramesSkippedDueToDimensionGlobalDimExcept++;
+							}
+							else if (it->second.demoToolsData.globalEvent) {
+								entityFramesSkippedDueToDimensionGlobalEventExcept++;
+							}
+							else {
+
+								entityFramesSkippedDueToDimension++;
+								if (!opts.skipDimensionData) {
+									continue;
+								}
 							}
 						}
 
@@ -383,9 +394,13 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				if (tmpPS.clientNum != reframeClientNum) {
 					bool skipBecauseDimension = false;
 					if (dimensionDataDetected && tmpPS.demoToolsData.detectedDimension != mainPlayerPS.demoToolsData.detectedDimension) {
-						entityFramesSkippedDueToDimension++;
-						if (!opts.skipDimensionData) {
-							skipBecauseDimension = true;
+						if (tmpPS.demoToolsData.globalDimension) {
+							entityFramesSkippedDueToDimensionGlobalDimExcept++;
+						} else {
+							entityFramesSkippedDueToDimension++;
+							if (!opts.skipDimensionData) {
+								skipBecauseDimension = true;
+							}
 						}
 					}
 					if (!skipBecauseDimension) {
@@ -554,10 +569,10 @@ cuterror:
 	std::cout << "Total frames written: " << framesWritten << "\n";
 	if (dimensionDataDetected) {
 		if (opts.skipDimensionData) {
-			std::cout << "Total entities that would have been skipped due to being in a different dimension: " << entityFramesSkippedDueToDimension << " (" << ((float)entityFramesSkippedDueToDimension / (float)framesWritten) << " per frame), but dimension data was ignored with -n/--no-dimensions." << "\n";
+			std::cout << "Total entities that would have been skipped due to being in a different dimension: " << entityFramesSkippedDueToDimension << " (" << ((float)entityFramesSkippedDueToDimension / (float)framesWritten) << " per frame), except global dim: " << entityFramesSkippedDueToDimensionGlobalDimExcept << " (" << ((float)entityFramesSkippedDueToDimensionGlobalDimExcept / (float)framesWritten) << " per frame), except global event:" << entityFramesSkippedDueToDimensionGlobalEventExcept << " (" << ((float)entityFramesSkippedDueToDimensionGlobalEventExcept / (float)framesWritten) << " per frame), but dimension data was ignored with -n/--no-dimensions." << "\n";
 		}
 		else {
-			std::cout << "Total entities skipped due to being in a different dimension: " << entityFramesSkippedDueToDimension << " (" << ((float)entityFramesSkippedDueToDimension / (float)framesWritten) << " per frame)" << "\n";
+			std::cout << "Total entities skipped due to being in a different dimension: " << entityFramesSkippedDueToDimension << " (" << ((float)entityFramesSkippedDueToDimension / (float)framesWritten) << " per frame), except global dim: " << entityFramesSkippedDueToDimensionGlobalDimExcept << " (" << ((float)entityFramesSkippedDueToDimensionGlobalDimExcept / (float)framesWritten) << " per frame), except global event:" << entityFramesSkippedDueToDimensionGlobalEventExcept << " (" << ((float)entityFramesSkippedDueToDimensionGlobalEventExcept / (float)framesWritten) << " per frame)" << "\n";
 		}
 	}
 	std::cout << "Frames from demo " << ": " << demoReader->packetsUsed << " (" << (demoReader->packetsUsed*100/framesWritten) << "%)\n";

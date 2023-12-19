@@ -713,6 +713,8 @@ typedef struct {
 
 typedef struct demoToolsEntityData_t{
 	int detectedDimension;
+	bool globalDimension;
+	bool globalEvent;
 	int serverTime; // Server time of this entity state. To be used where necessary/useful.
 	bool isInterpolated;
 	trajectory_t uninterpolatedPos;

@@ -1751,6 +1751,7 @@ readNext:
 					}
 					if (extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.dimensionInfoType == DIM_OWNAGE) {
 						thisDemo.cut.Cl.snap.ps.demoToolsData.detectedDimension = possibleDimensionNum;
+						thisDemo.cut.Cl.snap.ps.demoToolsData.globalDimension = possibleDimensionNum == (((int)-999) & 31);
 					}
 				}
 			}
@@ -1774,6 +1775,31 @@ readNext:
 						}
 						if (extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.dimensionInfoType == DIM_OWNAGE) {
 							thisEntity->demoToolsData.detectedDimension = possibleDimensionNum;
+							thisEntity->demoToolsData.globalDimension = possibleDimensionNum == (((int)-999) & 31);
+						}
+					}
+					thisEntity->demoToolsData.globalEvent = false;
+					if (extraFieldInfo.dimensionInfoConfirmed && extraFieldInfo.dimensionInfoType == DIM_OWNAGE) {
+						if (thisEntity->number >= maxClientsThisDemo && thisEntity->eType > getET_EVENTS(demoType)) {
+							int generalEvent = generalizeGameValue<GMAP_EVENTS, UNSAFE>(thisEntity->eType - getET_EVENTS(demoType), demoType);
+							thisEntity->demoToolsData.globalEvent =
+								generalEvent == EV_BODY_QUEUE_COPY_GENERAL
+								|| generalEvent == EV_CLIENTJOIN_GENERAL
+								|| generalEvent == EV_DESTROY_WEAPON_MODEL_GENERAL
+								//|| generalEvent == EV_GLOBAL_SOUND_GENERAL
+								//|| generalEvent == EV_GLOBAL_TEAM_SOUND_GENERAL
+								//|| generalEvent == EV_MUTE_SOUND_GENERAL
+								|| generalEvent == EV_CTFMESSAGE_GENERAL
+								|| generalEvent == EV_SAGA_OBJECTIVECOMPLETE_GENERAL
+								|| generalEvent == EV_SAGA_ROUNDOVER_GENERAL
+								|| generalEvent == EV_SCREENSHAKE_GENERAL
+								|| generalEvent == EV_DESTROY_GHOUL2_INSTANCE_GENERAL
+								|| generalEvent == EV_SET_FREE_SABER_GENERAL
+								|| generalEvent == EV_SET_FORCE_DISABLE_GENERAL
+								|| generalEvent == EV_GIVE_NEW_RANK_GENERAL
+								|| generalEvent == EV_TESTLINE_GENERAL
+								//|| generalEvent == EV_SCOREPLUM_GENERAL
+								|| generalEvent == EV_OBITUARY_GENERAL;
 						}
 					}
 
