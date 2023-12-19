@@ -3,7 +3,7 @@
 analyzer () {
 	# You can change the analysis parameters here
 	# Note: Remove the ./ before DemoHighlightFinder.exe if the .exe file isn't in the same folder and if it is in PATH instead
-	./DemoHighlightFinder.exe "$1" 10000 ctfreturns 2>>errors.log
+	./DemoHighlightFinder.exe "$1" 10000 ctfreturns
 	if [ $? -eq 139 ]; then
 		>&2 echo "Demo $1 led to segfault!"
 	fi
@@ -20,7 +20,7 @@ for demoPath in "${demoPaths[@]}"; do
 	#find "$demoPath" -name '*' -type f -exec bash -c "$(declare -f analyzer); analyzer \"{}\"" \; 2>>errorsXargs.log
 
 	# This following line is for parallel analysis of a folder with 5 threads (5 files being analyzed at same time). Comment it out if you don't want parallel processing.
-	find "$demoPath" -name '*' -type f -print0 | xargs -0 -P 5 -I %  bash -c "$(declare -f analyzer); analyzer \"%\"" \; 2>>errorsXargs.log
+	find "$demoPath" -name '*' -type f -print0 | xargs -0 -P 5 -I %  bash -c "$(declare -f analyzer); analyzer \"%\"" \; 2>>errors.log
 
 done
 

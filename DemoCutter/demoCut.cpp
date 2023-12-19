@@ -249,6 +249,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	int64_t			demoCurrentTime = 0;
 
 	int				lastKnownTime = 0;
+	int				lastKnownInOrderTime = 0;
 	int				lastValidSnap = -1;
 
 	int				mapRestartCounter = 0;
@@ -385,6 +386,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	qboolean originalCutOffsetRead = qfalse;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
+
+	int maxSequenceNum = -9999;
 	while (oldSize > 0) {
 	cutcontinue:
 		if (isCompressedFile) {
@@ -398,6 +401,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 			goto cuterror;
 		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
+		maxSequenceNum = std::max(maxSequenceNum, demo.cut.Clc.serverMessageSequence);
 		oldSize -= 4;
 		/* Read the message size */
 		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
@@ -573,9 +577,18 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					//startTime += demo.cut.Cl.snap.serverTime;
 					//endTime += demo.cut.Cl.snap.serverTime;
 				}
-				if (demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
-					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
-					demoStartTime = demo.cut.Cl.snap.serverTime;
+				if (demo.cut.Clc.serverMessageSequence == maxSequenceNum) { // See demoHighlightFind.cpp for detailed commentary
+					if (demo.cut.Cl.snap.serverTime < lastKnownInOrderTime) {
+
+						if (demo.cut.Cl.snap.serverTime > 10000) {
+							// This is a non-critical warning, mostly for debugging. It used to be more dangerous.
+							std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << sourceDemoFile << ")\n";
+						}
+
+						demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
+						demoStartTime = demo.cut.Cl.snap.serverTime;
+					}
+					lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;

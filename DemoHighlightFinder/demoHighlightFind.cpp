@@ -3435,6 +3435,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	int				lastGameStateChange = 0;
 	int64_t			lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
+	int				lastKnownInOrderTime = 0;
 	qboolean		isCompressedFile = qfalse;
 	int				psGeneralSaberMove = 0;
 	int				psGeneralTorsoAnim = 0;
@@ -3596,7 +3597,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
-	int oldSequenceNum=0;
+	bool firstSnapAfterGamestate = false;
+	bool sequenceNumOrderChanged = false;
+
+	int oldSequenceNum=-9999;
+	int maxSequenceNum=-9999;
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
 
@@ -3634,17 +3639,21 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
 
+		maxSequenceNum = std::max(maxSequenceNum, demo.cut.Clc.serverMessageSequence);
+
+		sequenceNumOrderChanged = false;
 		if (demo.cut.Clc.serverMessageSequence == oldSequenceNum) {
-			std::cout << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << "\n";
+			std::cerr << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
 		}
 		else if (demo.cut.Clc.serverMessageSequence < oldSequenceNum) {
+			sequenceNumOrderChanged = true;
 			if (demo.cut.Clc.serverMessageSequence == -1) {
 #ifdef DEBUG
 				std::cout << "Message number changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with "<< oldSize << " bytes left." << "\n";
 #endif
 			}
 			else {
-				std::cout << "WARNING: Message number order changed: " << oldSequenceNum << "->" << demo.cut.Clc.serverMessageSequence << " at demotime " << demoCurrentTime << "\n";
+				std::cerr << "WARNING: Message number order changed: " << oldSequenceNum << "->" << demo.cut.Clc.serverMessageSequence << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
 			}
 		}
 		else {
@@ -3848,6 +3857,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cuterror;
 				}
 
+				firstSnapAfterGamestate = true;
+
 				lastKnownRedFlagCarrier = lastKnownBlueFlagCarrier = -1; // New gamestate. Fair to assume that nobody has the flag now.
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
@@ -3888,9 +3899,27 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					// first message in demo. Get servertime offset from here to cut correctly.
 					demoStartTime = demo.cut.Cl.snap.serverTime;
 				}
-				if (demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
-					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
-					demoStartTime = demo.cut.Cl.snap.serverTime;
+
+				if (demo.cut.Clc.serverMessageSequence == maxSequenceNum) { // Only do any form of time base handling if packets are arriving in linear order.
+					if (demo.cut.Cl.snap.serverTime < lastKnownInOrderTime /* && demo.cut.Cl.snap.serverTime < 10000*/) { // Assume a servertime reset (new serverTime is under 10 secs). 
+						// Ok so: The old method was to assume that it's a proper serverTime reset if serverTime is under 10000 (we are freshly after a restart).
+						// But some demos can be so damn laggy that we go slightly past that.
+						// We can't entirely remove the check because some demos can have serverTime going slightly backwards due to packets arriving in the wrong order (blame on me I guess)
+						// However, whenever the serverTime goes backwards due to lag, the order of demo.cut.Clc.serverMessageSequence is jumbled up as well!
+						// So we can use that as a much more reliable check for whether it is a true serverTime reset or not.
+						//
+						//if (demo.cut.Cl.snap.serverTime < 120000 || (lastKnownTime - demo.cut.Cl.snap.serverTime) > 120000) {
+
+						if (demo.cut.Cl.snap.serverTime > 10000) {
+							// This is a non-critical warning, mostly for debugging. It used to be more dangerous.
+							std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", sequenceNumOrderChanged " << (sequenceNumOrderChanged ? "true" : "false") << ", firstSnapAfterGameState " << (firstSnapAfterGamestate ? "true" : "false") << ", demoOldTime " << demoOldTime << ", lastGameStateChangeInDemoTime " << lastGameStateChangeInDemoTime << ", lastGameStateChange " << lastGameStateChange << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
+							//std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000; delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", demoOldTime " << demoOldTime << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
+						}
+						
+						demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
+						demoStartTime = demo.cut.Cl.snap.serverTime;
+					}
+					lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
 				if (demoCurrentTime < 0) {
@@ -3900,6 +3929,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				currentPacketPeriodStats.periodTotalTime += demoCurrentTime - demoOldTime;
 				demoOldTime = demoCurrentTime;
+				firstSnapAfterGamestate = false;
 
 				for (int cl = 0; cl < max_clients; cl++) {
 					requiredMetaEventAges[METRACKER_KILLS][cl] = demoCurrentTime - bufferTime; // Kills are a point in time. Whenever a kill happens, we need to have the past [bufferTime] milliseconds available. So just always require the last [bufferTime] milliseconds minimum for kills.

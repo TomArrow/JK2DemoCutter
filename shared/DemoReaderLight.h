@@ -8,6 +8,8 @@
 
 class DemoReaderLight {
 
+	std::string originalDemoPath = "";
+
 	bool	isMOHAADemo = false;
 	int		maxClientsThisDemo;
 
@@ -33,6 +35,8 @@ class DemoReaderLight {
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
+	int				lastKnownInOrderTime = 0;
+	int				maxSequenceNum = -9999;
 
 	float			lastGottenCommandsTime = 0;
 	float			lastGottenEventsTime = 0;

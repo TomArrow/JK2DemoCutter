@@ -82,6 +82,8 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	//char originalExt[7];
 	oldHandle = 0; // TODO if already loaded, gracefully close
 
+	originalDemoPath = sourceDemoFile;
+
 	thisDemo.cut.Clc.demoCheckFor103 = qfalse;
 	//strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
 
@@ -129,6 +131,8 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	lastGameStateChange = 0;
 	lastGameStateChangeInDemoTime = 0;
 	lastKnownTime = 0;
+	lastKnownInOrderTime = 0;
+	maxSequenceNum = -9999;
 	thisDemo.cut.Clc.lastKnownCommandTime = 0;
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
@@ -354,6 +358,7 @@ readNext:
 	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 		return qfalse;
 	thisDemo.cut.Clc.serverMessageSequence = LittleLong(thisDemo.cut.Clc.serverMessageSequence);
+	maxSequenceNum = std::max(maxSequenceNum, demo.cut.Clc.serverMessageSequence);
 	oldSize -= 4;
 	/* Read the message size */
 	if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
@@ -468,10 +473,26 @@ readNext:
 				// first message in demo. Get servertime offset from here to cut correctly.
 				demoStartTime = thisDemo.cut.Cl.snap.serverTime;
 			}
-			if (thisDemo.cut.Cl.snap.serverTime < lastKnownTime && thisDemo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
+			if (thisDemo.cut.Clc.serverMessageSequence == maxSequenceNum) { // See demoHighlightFind.cpp for detailed commentary
+				if (thisDemo.cut.Cl.snap.serverTime < lastKnownInOrderTime) {
+
+					if (thisDemo.cut.Cl.snap.serverTime > 10000) {
+						// This is a non-critical warning, mostly for debugging. It used to be more dangerous.
+						std::cerr << "thisDemo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << originalDemoPath << ")\n";
+					}
+
+					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
+					demoStartTime = thisDemo.cut.Cl.snap.serverTime;
+				}
+				lastKnownInOrderTime = thisDemo.cut.Cl.snap.serverTime;
+			}
+			/*if (thisDemo.cut.Cl.snap.serverTime < lastKnownTime && thisDemo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
+				if (demo.cut.Cl.snap.serverTime > 10000) {
+					std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime but demo.cut.Cl.snap.serverTime > 10000; demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
+				}
 				demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
 				demoStartTime = thisDemo.cut.Cl.snap.serverTime;
-			}
+			}*/
 			demoCurrentTime = demoBaseTime + thisDemo.cut.Cl.snap.serverTime - demoStartTime;
 			lastKnownTime = thisDemo.cut.Cl.snap.serverTime;
 

@@ -63,6 +63,8 @@ typedef enum dimensionDataType_t {
 
 class DemoReader {
 
+	std::string originalDemoPath = "";
+
 	bool	isMOHAADemo = false;
 	int		maxClientsThisDemo = MAX_CLIENTS;
 
@@ -117,6 +119,8 @@ class DemoReader {
 	int				lastGameStateChange = 0;
 	int				lastGameStateChangeInDemoTime = 0;
 	int				lastKnownTime = 0;
+	int				lastKnownInOrderTime = 0;
+	int				maxSequenceNum = -9999;
 	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
 	qboolean wasFirstCommandByte = qfalse;
