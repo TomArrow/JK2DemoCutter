@@ -10,12 +10,7 @@ Basically, the order of the demos determines the outcome, which shouldn't be the
 For example, enhanceonly didnt properly handle death/alive state and still doesnt handle crouch viewheight and such. Also it was intended to be used when only gaps are being filled but right now it could end up being used even with minute old playerstates. How to reconcile?
 
 
-For killAngles: specifically note whether the kill is from a pre-processed demo, to make it easier for the GUI to immediately see that this info is usable? (since in the past it would be based on serverName and there are ugly workarounds for that there)
-Actually, just do a new table called demoDatabaseMeta which contains info about various stuff, for example whether the serverName is in fact in the killAngles table
 
-fix the negative demo time demos..
-
-Make a table with demo meta data. Like the filesize, datetime and total length. Use that then to avoid working with cuts of a demo as the main source in GUI
 
 
 
@@ -287,6 +282,10 @@ check for @@@PLRENAME to track who is who and build a chain that allows to more 
 
 DONE: 
 
+For killAngles: specifically note whether the kill is from a pre-processed demo, to make it easier for the GUI to immediately see that this info is usable? (since in the past it would be based on serverName and there are ugly workarounds for that there)
+Actually, just do a new table called demoDatabaseMeta which contains info about various stuff, for example whether the serverName is in fact in the killAngles table
+fix the negative demo time demos..
+Make a table with demo meta data. Like the filesize, datetime and total length. Use that then to avoid working with cuts of a demo as the main source in GUI
 recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken; // Hmm but this creates a wrong value on the first frame of holding the flag. If it's a one-frame capture we will end up with a wrong time duration held ...
 count laughs following kills/caps/rets
 sneaky detection: detect long periods of crouch and rets that follow within 2 seconds after them

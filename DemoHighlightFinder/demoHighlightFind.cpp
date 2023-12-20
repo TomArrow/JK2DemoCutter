@@ -7016,6 +7016,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								killsOfThisSpree.clear();
 								allKillsHashSS.str(std::string());
 								countFittingInLastBracket = 0;
+								i--; // New spree might be coming after and start with the kill we just skipped.
 							}
 						}
 						if ( countFittingInLastBracket < spreeInfo.countKills) { // If all of the kills would fit in a faster bracket (like for example delay 3000 instead of delay 5000) we don't count this one and only count the faster one. To avoid pointless dupes.
