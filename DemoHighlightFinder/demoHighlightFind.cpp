@@ -184,7 +184,7 @@ jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has fin
 jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat the WORLD RECORD and )?(is now ranked) \^\d#(\d) \^7with)\s\^3(\d+):(\d+))raw", "mSi");
 jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on this map!\s*\^\d\]:)raw", "mSi");
 
-jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
 
 class defragRunInfo_t {
 public:
@@ -201,7 +201,9 @@ public:
 	int exactRank;
 	std::string style;
 	qboolean isValid = qtrue;
-
+	qboolean isProRun = qfalse;
+	int teleports = 0;
+	int checkpoints = 0;
 };
 
 
@@ -1219,6 +1221,15 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 		int color = atoi(vec_nas[matchNum]["color"].c_str());
 		int nameColor = atoi(vec_nas[matchNum]["nameColor"].c_str());
+
+		// Runs with run teles
+		info->isProRun = (qboolean)( strlen(vec_nas[matchNum]["prorun"].c_str()) > 0);
+		info->teleports = atoi(vec_nas[matchNum]["tps"].c_str());
+		info->checkpoints = atoi(vec_nas[matchNum]["cps"].c_str());
+
+		//if (info->isProRun || info->teleports || info->checkpoints) {
+		//	std::cout << "Run with run teles found\n";
+		//}
 
 		const char* recordType = vec_nas[matchNum]["recordType"].c_str();
 
@@ -2254,6 +2265,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"isTop10	BOOLEAN NOT NULL,"
 		"isNumber1	BOOLEAN NOT NULL,"
 		"isPersonalBest	BOOLEAN NOT NULL,"
+		"runTeleProRun	BOOLEAN,"
+		"runTeleTeleports	INTEGER,"
+		"runTeleCheckpoints	INTEGER,"
 		"wasVisible	BOOLEAN NOT NULL,"
 		"wasFollowed	BOOLEAN NOT NULL,"
 		"wasFollowedOrVisible	BOOLEAN NOT NULL,"
@@ -2408,9 +2422,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertCaptureStatement, NULL);
 	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@style,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@style,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDefragRunStatement, NULL);
 	preparedStatementText = "INSERT INTO laughs"
@@ -7634,6 +7648,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					SQLBIND_DELAYED(query, int, "@isTop10", isLogged);
 					SQLBIND_DELAYED(query, int, "@isNumber1", isNumberOne);
 					SQLBIND_DELAYED(query, int, "@isPersonalBest", isPersonalBest);
+
+					if (runInfo.teleports || runInfo.checkpoints || runInfo.isProRun) {
+						SQLBIND_DELAYED(query, int, "@runTeleProRun", runInfo.isProRun);
+						SQLBIND_DELAYED(query, int, "@runTeleTeleports", runInfo.teleports);
+						SQLBIND_DELAYED(query, int, "@runTeleCheckpoints", runInfo.checkpoints);
+					}
+					else {
+						SQLBIND_DELAYED_NULL(query, "@runTeleProRun");
+						SQLBIND_DELAYED_NULL(query, "@runTeleTeleports");
+						SQLBIND_DELAYED_NULL(query, "@runTeleCheckpoints");
+					}
 					SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
 					SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
 					SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
@@ -7677,7 +7702,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					
 
 					std::stringstream ss;
-					ss << mapname << (runInfo.style != "" ? va("___%s",runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+					ss << mapname << (runInfo.style != "" ? va("___%s",runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo.isProRun ? "_RTPRO": "") << ((runInfo.teleports || runInfo.checkpoints) ? va("_RT%dT%dC", runInfo.teleports, runInfo.checkpoints): "") << "___" << playername << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 					std::string targetFilename = ss.str();
 					char* targetFilenameFiltered = new char[targetFilename.length()+1];
@@ -7691,7 +7716,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
-					if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+					if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << (runInfo.isProRun ? " RUNTELE PRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va(" RUNTELE %dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "\n";
 				}
 
 				
