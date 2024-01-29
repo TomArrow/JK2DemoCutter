@@ -15,7 +15,7 @@
 
 
 #define FASTHUFFMAN // Based on: https://github.com/mightycow/uberdemotools/commit/685b132abc4803f4c813fa07928cd9a4099e5d59
-
+#define MSG_ALLCHARS // Don't strip out stuff > 127 in strings. We might wanna do this on a demo type basis but really what's the point. If the input demo contained sth, it's fair to say we can use it, and the clients strip it out on their own anyway, why double the effort here. TODO: What about the % character thing? Keep it too for sake of preserving original data?
 
 // Fast Huffman decoder from:
 // from: https://github.com/mightycow/uberdemotools/commit/685b132abc4803f4c813fa07928cd9a4099e5d59
@@ -664,9 +664,11 @@ void MSG_WriteString( msg_t *sb, const char *s, demoType_t demoType ) {
 
 		// get rid of 0xff chars, because old clients don't like them
 		for ( i = 0 ; i < l ; i++ ) {
+#ifndef MSG_ALLCHARS
 			if (!isMOHAADemo && demoType < DM_91 && ((byte *)string)[i] > 127 ) {
 				string[i] = '.';
 			}
+#endif
 
 			// TODO: This is from wolfcamql for quake live ig. Idk.
 			// ok to check each byte when parsing UTF-8 since '%' (0x25) isn't a valid UTF-8 byte
@@ -719,9 +721,11 @@ void MSG_WriteBigString( msg_t *sb, const char *s, demoType_t demoType) {
 
 		// get rid of 0xff chars, because old clients don't like them
 		for ( i = 0 ; i < l ; i++ ) {
+#ifndef MSG_ALLCHARS
 			if (!isMOHAADemo && demoType < DM_91 && ((byte *)string)[i] > 127 ) {
 				string[i] = '.';
 			}
+#endif
 
 			// TODO: This is from wolfcamql for quake live ig. Idk.
 			// ok to check each byte when parsing UTF-8 since '%' (0x25) isn't a valid UTF-8 byte
@@ -853,10 +857,12 @@ char *MSG_ReadString( msg_t *msg, demoType_t demoType, qboolean forceNonScramble
 		if ( c == '%' ) {
 			c = '.';
 		}
+#ifndef MSG_ALLCHARS
 		// don't allow higher ascii values
 		if ( c > 127 && demoType < DM_91 && !isMOHAADemo) { // Quake live stuff. Quake live DM_91 supports UTF-8? Also MOHAA doesn't "dot" the rest
 			c = '.';
 		}
+#endif
 
 		string[l] = c;
 		l++;

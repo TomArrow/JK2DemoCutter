@@ -11,6 +11,12 @@ For example, enhanceonly didnt properly handle death/alive state and still doesn
 
 
 
+find stuff followed by markme within 5-10 seconds?
+
+
+
+
+what about the string extra stuff stripping hm. do i really need it? after all if the original demo had it ... why would i care?
 
 
 
