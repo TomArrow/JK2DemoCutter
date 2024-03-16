@@ -14,6 +14,11 @@ For example, enhanceonly didnt properly handle death/alive state and still doesn
 find stuff followed by markme within 5-10 seconds?
 
 
+MARK MAX HEIGHT DIFFERENCE traveled during current swing. to find dfas from very high above for example, but also boosts from below maybe?
+sth similar for overall distance traveled during special move?
+
+detect hits that resulted in self kills? idk or at least stuff that results in a doom that wwasnt attributed?
+
 
 
 what about the string extra stuff stripping hm. do i really need it? after all if the original demo had it ... why would i care?
