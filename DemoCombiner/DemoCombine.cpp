@@ -14,36 +14,7 @@
 
 
 
-class DemoSource {
-public:
-	std::string sourceName;
-	std::string demoPath;
-	std::vector<std::string> playersToCopy;
-	double delay=0.0f; // Absolute delay of the demo time against the target demo time
-	double showStart = 0.0f; // In demo time
-	double showEnd = std::numeric_limits<float>::infinity(); // In demo time
-	double playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
-	double playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
-	qboolean copyAllPlayers = qfalse;
-	qboolean copyRemainingPlayersAsG2AnimEnts = qfalse;
-	qboolean isFinished = qfalse;
-	qboolean copySubmodels = qfalse;
-	qboolean copyModels = qfalse;
-};
 
-struct SourcePlayerInfo {
-	int clientNum;
-	double pingCompensation; // in ms
-	qboolean asG2AnimEnt;
-};
-
-class DemoReaderWrapper {
-public:
-	DemoReader reader;
-	std::vector<SourcePlayerInfo> playersToCopy;
-	DemoSource* sourceInfo;
-	int targetFramesRead;
-};
 
 
 class SlotManager {

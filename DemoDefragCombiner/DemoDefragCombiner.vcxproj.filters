@@ -206,6 +206,9 @@
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c">
       <Filter>Common\lzmaSDK</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\DemoReaderLight.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">

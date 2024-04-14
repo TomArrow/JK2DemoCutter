@@ -198,6 +198,8 @@ public:
 	SnapshotInfoMapIterator GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt);
 	SnapshotInfoMapIterator GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt, int pastServerTime);
 	int GetLastServerTimeBeforeServerTime(int serverTime);
+	SnapshotInfo* GetSnapshotInfoAtOrBeforeDemoTime(float demoTime, qboolean includeAfterIfFirst = qtrue);
+	SnapshotInfoMapIterator GetSnapshotInfoAtOrBeforeDemoTimeIterator(float demoTime, qboolean includeAfterIfFirst = qtrue);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
 	SnapshotInfoMapIterator GetSnapshotInfoAtServerTimeIterator(int serverTime);
 	qboolean SeekToServerTime(int serverTime);
@@ -238,5 +240,39 @@ public:
 
 
 void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType);
+
+
+class DemoSource {
+public:
+	std::string sourceName;
+	std::string demoPath;
+	std::vector<std::string> playersToCopy;
+	double delay = 0.0f; // Absolute delay of the demo time against the target demo time
+	double showStart = 0.0f; // In demo time
+	double showEnd = std::numeric_limits<float>::infinity(); // In demo time
+	double playerStateStart = 0.0f; // When to start considering this demo for playerState. Players will still be copied as entities otherwise.
+	double playerStateEnd = std::numeric_limits<float>::infinity(); // When to stop considering this demo for playerState. Players will still be copied as entities otherwise.
+	qboolean copyAllPlayers = qfalse;
+	qboolean copyRemainingPlayersAsG2AnimEnts = qfalse;
+	qboolean isFinished = qfalse;
+	qboolean copySubmodels = qfalse;
+	qboolean copyModels = qfalse;
+};
+
+struct SourcePlayerInfo {
+	int clientNum;
+	double pingCompensation; // in ms
+	qboolean asG2AnimEnt;
+};
+
+class DemoReaderWrapper {
+public:
+	DemoReader reader;
+	std::vector<SourcePlayerInfo> playersToCopy;
+	DemoSource* sourceInfo;
+	int targetFramesRead;
+};
+
+
 
 #endif

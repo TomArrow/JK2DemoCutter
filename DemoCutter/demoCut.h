@@ -4648,6 +4648,7 @@ public:
 	int mohaaPlayerWeapon[MAX_CLIENTS_MAX]{};
 	playerState_t playerState;
 	int serverTime;
+	int64_t demoTime;
 	byte areamask[MAX_MAP_AREA_BYTES];
 	qboolean playerStateTeleport;
 	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
@@ -4655,6 +4656,9 @@ public:
 
 inline bool snapshotInfosServerTimeSmallerPredicate(const std::pair<int, SnapshotInfo> &it, const int &serverTime) {
 	return it.second.serverTime < serverTime;
+};
+inline bool snapshotInfosDemoTimeSmallerPredicate(const std::pair<int, SnapshotInfo> &it, const float &demoTime) {
+	return it.second.demoTime < demoTime;
 };
 inline bool snapshotInfosServerTimeGreaterPredicate(const int &serverTime, const std::pair<int, SnapshotInfo>& it) {
 	return serverTime < it.second.serverTime;

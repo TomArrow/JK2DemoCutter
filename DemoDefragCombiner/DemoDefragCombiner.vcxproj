@@ -25,6 +25,7 @@
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\animMappingTable.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
+    <ClCompile Include="..\shared\DemoReaderLight.cpp" />
     <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zArcIn.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zBuf.c" />

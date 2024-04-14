@@ -442,6 +442,29 @@ int DemoReader::GetLastServerTimeBeforeServerTime(int serverTime) {
 	}
 	return -1; // Shouldn't happen really but whatever
 }
+
+SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtOrBeforeDemoTimeIterator(float demoTime, qboolean includeAfterIfFirst) {
+	if (SeekToTime(demoTime) || (demoTime < 0.0f && SeekToAnySnapshotIfNotYet() && includeAfterIfFirst)) {
+		auto lower = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), demoTime, snapshotInfosDemoTimeSmallerPredicate);
+		if (lower != snapshotInfos.end()) {
+			if (lower->second.demoTime == demoTime) {
+				return lower;
+			}
+			else if (lower != snapshotInfos.begin()) {
+				lower--;
+				return lower;
+			}
+			else if(includeAfterIfFirst){
+				return lower;
+			}
+		}
+		return snapshotInfos.end(); // Can happen if that particular time's snapshot is missing from the demo.
+	}
+	else {
+		return snapshotInfos.end();
+	}
+
+}
 SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtServerTimeIterator(int serverTime) {
 	if (SeekToServerTime(serverTime)) {
 		if (demoBaseTime) { // demoBaseTime should be 0 for any regular demo BUT some demos might include a serverTime reset, in which case demoBaseTime is increased. At this point there is no more serverTime regularity guaranteed hence we cannot use binary search and have to do a slow linear search
@@ -462,6 +485,10 @@ SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtServerTimeIterator(int serv
 }
 SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
 	SnapshotInfoMapIterator it = GetSnapshotInfoAtServerTimeIterator(serverTime);
+	return it!= snapshotInfos.end() ? &it->second : NULL;
+}
+SnapshotInfo* DemoReader::GetSnapshotInfoAtOrBeforeDemoTime(float demoTime, qboolean includeAfterIfFirst) {
+	SnapshotInfoMapIterator it = GetSnapshotInfoAtOrBeforeDemoTimeIterator(demoTime, includeAfterIfFirst);
 	return it!= snapshotInfos.end() ? &it->second : NULL;
 }
 qboolean DemoReader::SeekToCommandTime(int serverTime) {
@@ -1707,6 +1734,9 @@ readNext:
 			goto readNext;
 		}
 
+
+		SnapshotInfo* thisSnapshotInfo = NULL;
+
 		// other commands
 		switch (cmd) {
 		case svc_centerprint_general:
@@ -1771,6 +1801,7 @@ readNext:
 				mohaaPlayerWeaponModelIndexThisFrame[i] = -1;
 			}
 
+			thisSnapshotInfo = NULL;
 			if (thisDemo.cut.Cl.lastSnapshotFinishedParsing) { // it can return true if the last snapshot was invalid too. but then we dont do this.
 				SnapshotInfo snapshotInfo;
 				snapshotInfo.serverTime = thisDemo.cut.Cl.snap.serverTime;
@@ -1882,7 +1913,7 @@ readNext:
 				if (firstPacketWithPlayerState[thisDemo.cut.Cl.snap.ps.clientNum] == -1) firstPacketWithPlayerState[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.messageNum;
 				lastKnownPacketWithPlayerState[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.messageNum;
 				snapshotInfo.hasPlayer[thisDemo.cut.Cl.snap.ps.clientNum] = qtrue;
-				snapshotInfos[thisDemo.cut.Cl.snap.messageNum] = snapshotInfo;
+				thisSnapshotInfo = &(snapshotInfos[thisDemo.cut.Cl.snap.messageNum] = snapshotInfo);
 				anySnapshotParsed = qtrue;// Fix? Well this makes more sense in any case.
 			}
 
@@ -1915,6 +1946,9 @@ readNext:
 			demoCurrentTime = demoBaseTime + thisDemo.cut.Cl.snap.serverTime - demoStartTime;
 			lastKnownTime = thisDemo.cut.Cl.snap.serverTime;
 
+			if (thisSnapshotInfo) {
+				thisSnapshotInfo->demoTime = demoCurrentTime;
+			}
 
 			// Fire playerstate events
 			if (thisDemo.cut.Cl.snap.ps.externalEvent && thisDemo.cut.Cl.snap.ps.externalEvent != oldPS[thisDemo.cut.Cl.snap.ps.clientNum].externalEvent) {
