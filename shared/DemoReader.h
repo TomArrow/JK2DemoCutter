@@ -96,6 +96,8 @@ class DemoReader {
 		qboolean ownageExtraInfoMetaMarker = qfalse;
 		qboolean dimensionInfoConfirmed = qfalse;
 		dimensionDataType_t dimensionInfoType = (dimensionDataType_t )(-1);
+		int64_t	cutStartOffset = 0;
+		int64_t	truncationOffset = 0;
 	} extraFieldInfo;
 
 	SnapshotInfoMap snapshotInfos;
@@ -184,6 +186,7 @@ public:
 
 	int getMaxClients();
 
+	int64_t getCutStartOffset(qboolean withTruncationOffset = qtrue);
 	qboolean containsDimensionData();
 	demoType_t getDemoType();
 	bool isThisMOHAADemo();

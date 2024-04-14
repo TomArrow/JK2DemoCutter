@@ -99,6 +99,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	// Copy over player config strings
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			int64_t cutStartOffset = demoReaders[i].getCutStartOffset(qtrue);
 			int spectatedClient = demoReaders[i].GetCurrentPlayerState().clientNum;
 			lastSpectatedClientNums[i] = spectatedClient;			
 			if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32

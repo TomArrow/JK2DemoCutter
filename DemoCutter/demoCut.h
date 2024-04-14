@@ -4694,7 +4694,7 @@ int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::strin
 void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut = NULL);
-
+int64_t demoCutGetDemoNameTruncationOffset(const char* demoName);
 
 
 

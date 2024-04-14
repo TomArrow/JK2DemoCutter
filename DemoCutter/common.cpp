@@ -5869,7 +5869,28 @@ mohParsePrintDeathMsgReturnEntityState:
 }
 
 
+int64_t demoCutGetDemoNameTruncationOffset(const char* demoName) {
+	static char numberBuffer[100];
+	int numberBufferIndex = 0;
 
+	while (*demoName) {
+		if (!_strnicmp(demoName,"_tr",3)) {
+			demoName += 3;
+			numberBufferIndex = 0;
+			while (*demoName >= '0' && *demoName <= '9' && numberBufferIndex < (sizeof(numberBuffer)-1)) {
+				numberBuffer[numberBufferIndex++] = *demoName;
+				demoName++;
+			}
+			if (numberBufferIndex > 0) {
+				numberBuffer[numberBufferIndex] = '\0';
+				return atoi(numberBuffer);
+			}
+			
+		}
+		demoName++;
+	}
+	return 0L;
+}
 
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut) {

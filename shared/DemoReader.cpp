@@ -22,6 +22,9 @@ demoType_t DemoReader::getDemoType() {
 qboolean DemoReader::containsDimensionData() {
 	return extraFieldInfo.dimensionInfoConfirmed;
 }
+int64_t DemoReader::getCutStartOffset(qboolean withTruncationOffset) {
+	return extraFieldInfo.cutStartOffset + (withTruncationOffset ? extraFieldInfo.truncationOffset : 0);
+}
 bool DemoReader::isThisMOHAADemo() {
 	return demoTypeIsMOHAA(demoType);
 }
@@ -251,6 +254,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	memset(&thisDemo, 0, sizeof(thisDemo));
 	demoCutGetDemoType(sourceDemoFile, ext, oldName ,&demoType,&isCompressedFile,&thisDemo.cut.Clc);
 
+
 	isMOHAADemo = isThisMOHAADemo();
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
@@ -309,6 +313,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 
 	Com_Memset(&extraFieldInfo, 0, sizeof(extraFieldInfo));
 	extraFieldInfo.dimensionInfoType = (dimensionDataType_t)(-1);
+	extraFieldInfo.truncationOffset = demoCutGetDemoNameTruncationOffset(sourceDemoFile);
 
 	readGamestate = 0;
 
@@ -1680,6 +1685,12 @@ readNext:
 								extraFieldInfo.ownageExtraInfoMetaMarker = qtrue;
 							}
 						}
+					}
+					if (jsonSourceFileMetaDocument->HasMember("cso")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+						extraFieldInfo.cutStartOffset = (*jsonSourceFileMetaDocument)["cso"].GetInt64();
+					}
+					if (jsonSourceFileMetaDocument->HasMember("trim")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+						extraFieldInfo.truncationOffset = (*jsonSourceFileMetaDocument)["trim"].GetInt64();
 					}
 
 				}
