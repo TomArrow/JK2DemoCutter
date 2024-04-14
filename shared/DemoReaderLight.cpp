@@ -145,7 +145,9 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 
 	//while (oldSize > 0) ReadMessage();
 
-	ReadMessage(); // Will only read pretty much the first message so we have gamestate and are somewhat "initialized" i guess
+	while (readGamestate == 0 && !endReached) {
+		ReadMessage(); // Will only read pretty much the first message so we have gamestate and are somewhat "initialized" i guess
+	}
 }
 
 qboolean DemoReaderLight::CloseDemo() {
