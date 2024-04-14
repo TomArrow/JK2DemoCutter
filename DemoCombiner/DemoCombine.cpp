@@ -858,6 +858,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS,SAFE>(tmpEntity.weapon,sourceDemoType, demoType);
 							tmpEntity.event = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType, demoType);
 							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.boltInfo,sourceDemoType, demoType);
+							tmpEntity.boltInfo = -1;
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}

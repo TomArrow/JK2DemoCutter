@@ -10,6 +10,16 @@ Basically, the order of the demos determines the outcome, which shouldn't be the
 For example, enhanceonly didnt properly handle death/alive state and still doesnt handle crouch viewheight and such. Also it was intended to be used when only gaps are being filled but right now it could end up being used even with minute old playerstates. How to reconcile?
 
 
+Make demo converter. Let it for example fix up names for jomme. Find closest color from the NT mod colors.
+
+
+- not sure if done yet? find amount of SD in a cap run
+
+
+
+do some stats. client number average score
+
+
 
 find stuff followed by markme within 5-10 seconds?
 
