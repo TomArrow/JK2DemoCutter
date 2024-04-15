@@ -1749,7 +1749,7 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 }
 
 template<unsigned int max_clients>
-void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int demoCurrentTime, const ioHandles_t& io, int bufferTime,int64_t lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution) {
+void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int64_t demoCurrentTime, const ioHandles_t& io, int bufferTime,int64_t lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution) {
 	
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
@@ -1967,6 +1967,177 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		//timeCheckedForKillStreaks[clientNumAttacker] = spreeInfo->lastKillTime;
 	}
 
+}
+
+template<unsigned int max_clients>
+qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& sharedVars,int64_t demoCurrentTime, const char* sourceDemoFile, const ioHandles_t& io, int bufferTime,int64_t lastGameStateChangeInDemoTime,  demoType_t demoType, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution, int CS_PLAYERS_here) {
+	
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
+	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
+	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+
+	if (runInfo.courseName != "") {
+		std::stringstream ssMapName;
+		ssMapName << mapname << "(" << runInfo.courseName << ")";
+		mapname = ssMapName.str();
+	}
+
+	std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
+	//std::string playername = vec_num[matchNum][1];
+	std::string playername = runInfo.playerName;
+	//int minutes = atoi(vec_num[matchNum][2].c_str());
+	//std::string secondString = vec_num[matchNum][3];
+	//float seconds = atof(vec_num[matchNum][3].c_str());
+	//int milliSeconds = (1000.0f* seconds)+0.5f;
+	//int pureMilliseconds = milliSeconds % 1000;
+	//int pureSeconds = milliSeconds / 1000;
+
+	//bool isLogged = vec_num[matchNum][4].length() > 0;
+	//bool isNumberOne = vec_num[matchNum][6].length() > 0;
+	bool isLogged = runInfo.isLogged;
+	bool isNumberOne = runInfo.isNumber1;
+	bool isPersonalBest = runInfo.isPersonalBest;
+
+	//int totalSeconds = minutes * 60 + seconds;
+	//int totalMilliSeconds = minutes * 60000 + milliSeconds;
+	int totalMilliSeconds = runInfo.milliseconds;
+
+	int pureMilliseconds = totalMilliSeconds % 1000;
+	int tmpSeconds = totalMilliSeconds / 1000;
+	int pureSeconds = tmpSeconds % 60;
+	int minutes = tmpSeconds / 60;
+
+	// Find player
+	int playerNumber = -1;
+	if (runInfo.knownClientNum != -1) {
+		playerNumber = runInfo.knownClientNum;
+	}
+	else {
+		for (int clientNum = 0; clientNum < max_clients; clientNum++) {
+
+			int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+			const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+			std::string playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
+			if (playerNameCompare == playername) {
+				playerNumber = clientNum;
+			}
+		}
+	}
+
+	bool wasFollowed = false;
+	bool wasVisible = false;
+	bool wasVisibleOrFollowed = false;
+	if (playerNumber != -1) {
+		if (playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
+			wasFollowed = true;
+		}
+		if (playerFirstVisible[playerNumber] != -1 && playerFirstVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
+			wasVisible = true;
+		}
+		if (playerFirstFollowedOrVisible[playerNumber] != -1 && playerFirstFollowedOrVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
+			wasVisibleOrFollowed = true;
+		}
+	}
+	int64_t runStart = demoCurrentTime - totalMilliSeconds;
+
+	std::stringstream formattedTime;
+	formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
+	std::string formattedTimeString = formattedTime.str();
+
+	SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+	SQLDelayedQuery* query = &queryWrapper->query;
+
+	SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+	SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
+	std::string serverNameStripped = Q_StripColorAll(serverName);
+	SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
+	SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
+	SQLBIND_DELAYED(query, int, "@totalMilliseconds", totalMilliSeconds);
+	SQLBIND_DELAYED_TEXT(query, "@playerName", playername.c_str());
+	if (runInfo.style != "") {
+		SQLBIND_DELAYED_TEXT(query, "@style", runInfo.style.c_str());
+	}
+	else {
+		SQLBIND_DELAYED_NULL(query, "@style");
+	}
+	std::string playernameStripped = Q_StripColorAll(playername);
+	SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
+	SQLBIND_DELAYED(query, int, "@isTop10", isLogged);
+	SQLBIND_DELAYED(query, int, "@isNumber1", isNumberOne);
+	SQLBIND_DELAYED(query, int, "@isPersonalBest", isPersonalBest);
+
+	if (runInfo.teleports || runInfo.checkpoints || runInfo.isProRun) {
+		SQLBIND_DELAYED(query, int, "@runTeleProRun", runInfo.isProRun);
+		SQLBIND_DELAYED(query, int, "@runTeleTeleports", runInfo.teleports);
+		SQLBIND_DELAYED(query, int, "@runTeleCheckpoints", runInfo.checkpoints);
+	}
+	else {
+		SQLBIND_DELAYED_NULL(query, "@runTeleProRun");
+		SQLBIND_DELAYED_NULL(query, "@runTeleTeleports");
+		SQLBIND_DELAYED_NULL(query, "@runTeleCheckpoints");
+	}
+	SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
+	SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
+	SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
+	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
+	SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+	SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+	SQLBIND_DELAYED(query, int, "@wasVisible", wasVisible);
+	SQLBIND_DELAYED(query, int, "@wasFollowed", wasFollowed);
+	SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
+
+	// Do we have strafe deviation info?
+	int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
+	if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
+		SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum / strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
+	}
+	else {
+		SQLBIND_DELAYED_NULL(query, "@averageStrafeDeviation");
+	}
+
+	SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+	SQLBIND_DELAYED(query, int, "@runnerClientNum", playerNumber);
+
+	io.defragQueries->push_back(queryWrapper);
+
+	//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
+	//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+	if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged) && searchMode != SEARCH_ALL_DEFRAG) return qfalse; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+
+
+	int64_t startTime = runStart - bufferTime;
+	int64_t endTime = demoCurrentTime + bufferTime;
+	int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+	bool isTruncated = false;
+	int truncationOffset = 0;
+	if (earliestPossibleStart > startTime) {
+		truncationOffset = earliestPossibleStart - startTime;
+		startTime = earliestPossibleStart;
+		isTruncated = true;
+	}
+	//startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
+
+
+	std::stringstream ss;
+	ss << mapname << (runInfo.style != "" ? va("___%s", runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo.isProRun ? "_RTPRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va("_RT%dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "___" << playername << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+
+	std::string targetFilename = ss.str();
+	char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+	sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+
+	std::stringstream batSS;
+	batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+	batSS << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+	queryWrapper->batchString1 = batSS.str();
+	queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
+
+	delete[] targetFilenameFiltered;
+	//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
+	if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << (runInfo.isProRun ? " RUNTELE PRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va(" RUNTELE %dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "\n";
+
+	return qtrue;
 }
 
 void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
@@ -7690,7 +7861,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				//for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
 				if (runFound) { // really its just going to be 1 but whatever
-					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+					
+					qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars,demoCurrentTime, sourceDemoFile, io, bufferTime, lastGameStateChangeInDemoTime, demoType, opts, searchMode, wasDoingSQLiteExecution, CS_PLAYERS_here);
+					if (!result) continue;
+					/*int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char * info = demo.cut.Cl.gameState.stringData + stringOffset;
 					std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
 
@@ -7819,7 +7993,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 					//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-					if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged) && searchMode != SEARCH_ALL_DEFRAG) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+					if (!isNumberOne && (!isLogged) && searchMode != SEARCH_ALL_DEFRAG) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
 					
 
 					int64_t startTime = runStart - bufferTime;
@@ -7851,6 +8025,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					delete[] targetFilenameFiltered;
 					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
 					if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << (runInfo.isProRun ? " RUNTELE PRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va(" RUNTELE %dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "\n";
+					*/
 				}
 
 				

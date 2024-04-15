@@ -1742,7 +1742,7 @@ void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
 	int number, demoType_t demoType, float frameTime); // frameTime is for MOHAA
 
 void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean isVehiclePS, demoType_t demoType, float frameTime); // frametime is for MOHAA
-void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS);
+void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS, playerState_t* currentPS=NULL);
 
 
 void MSG_ReportChangeVectors_f(void);

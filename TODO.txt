@@ -16,6 +16,24 @@ Make demo converter. Let it for example fix up names for jomme. Find closest col
 - not sure if done yet? find amount of SD in a cap run
 
 
+q3 defrag: 
+stats[7]*65535 + stats[8](as uint16) = time roughly (actually multiply with 65536 and its correct)
+stats[12] & 8 => run finished? or just end trigger hit?
+stats[12] & 16 => alternates during run?
+stats[12] & 4 and stats[12] & 2 => active during run? 2 seems to get deactivated one frame after stats[12] & 8 becomes true (run end) but 4 stays on. also 2 can get activated one frame later than 4. idk. but both are off before a run?
+stats[12] & 512 => can be on? dunno what it means, was in the run with print at end
+ps->stats[13] & 32 (PSF_USERINPUT_JUMP) might mean jump held? (isjumping) 
+#define PSF_USERINPUT_NONE     0
+#define PSF_USERINPUT_FORWARD  1
+#define PSF_USERINPUT_BACKWARD 2
+#define PSF_USERINPUT_LEFT     8
+#define PSF_USERINPUT_RIGHT    16
+#define PSF_USERINPUT_JUMP     32
+#define PSF_USERINPUT_CROUCH   64
+#define PSF_USERINPUT_ATTACK   256
+#define PSF_USERINPUT_WALK     512
+i guess we could say that if !(stats[12] & 2) and (stats[12] & 8) then run is over and time can get counted from stats[7] and stats[8]?
+maybe 2 and 4 on stats means entering and exiting start/end triggers?
 
 do some stats. client number average score
 

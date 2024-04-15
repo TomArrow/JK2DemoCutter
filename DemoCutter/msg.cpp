@@ -3440,10 +3440,10 @@ MSG_ReadDeltaPlayerstate
 ===================
 */
 //void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, qboolean demo15detected ) {
-void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, demoType_t demoType, qboolean isVehiclePS) { // vehicle ps stuff is for JKA
+void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, demoType_t demoType, qboolean isVehiclePS, playerState_t *currentPS) { // vehicle ps stuff is for JKA
 	int			i, lc;
 	int			bits;
-	constexpr int netAnalysis1BitsStats = ~(STAT_HEALTH|STAT_ARMOR);
+	constexpr int netAnalysis1BitsStats = ~((1<<STAT_HEALTH)|(1<<STAT_ARMOR));
 	const netField_t	*field;
 	int			numFields;
 	int			startBit, endBit;
@@ -3451,7 +3451,7 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	int			*fromF, *toF;
 	int			trunc;
 	int			tmpNetArraysValue; // to read values of stats pers etc into
-	playerState_t	dummy;
+	static playerState_t	dummy;
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
@@ -3649,8 +3649,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				if (bits) {
 					for (i = 0; i < statCount; i++) {
 						if (bits & (1 << i)) {
-
-							std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": stats[" << i << "] " << to->stats[i] << "\n";
+							if (!currentPS) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": stats[" << i << "] " << to->stats[i] << " NON-CURRENTPS-DIFF\n";
+							}
+							else if (currentPS->stats[i] != to->stats[i]) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": stats[" << i << "] " << currentPS->stats[i] << " -> " << to->stats[i] << "\n";
+							}
 						}
 					}
 				}
@@ -3678,7 +3682,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < MAX_ACTIVEITEMS; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": activeItems[" << i << "] " << to->activeItems[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": activeItems[" << i << "] " << to->activeItems[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->activeItems[i] != to->activeItems[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": activeItems[" << i << "] " << currentPS->activeItems[i] << " -> " << to->activeItems[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3699,7 +3708,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < MAX_AMMO_AMOUNT; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_amount[" << i << "] " << to->ammo_amount[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_amount[" << i << "] " << to->ammo_amount[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->ammo_amount[i] != to->ammo_amount[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_amount[" << i << "] " << currentPS->ammo_amount[i] << " -> " << to->ammo_amount[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3720,7 +3734,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < MAX_AMMO; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_name_index[" << i << "] " << to->ammo_name_index[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_name_index[" << i << "] " << to->ammo_name_index[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->ammo_name_index[i] != to->ammo_name_index[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_name_index[" << i << "] " << currentPS->ammo_name_index[i] << " -> " << to->ammo_name_index[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3741,7 +3760,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < MAX_MAX_AMMO_AMOUNT; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": max_ammo_amount[" << i << "] " << to->max_ammo_amount[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": max_ammo_amount[" << i << "] " << to->max_ammo_amount[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->max_ammo_amount[i] != to->max_ammo_amount[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": max_ammo_amount[" << i << "] " << currentPS->max_ammo_amount[i] << " -> " << to->max_ammo_amount[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3772,7 +3796,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < 16; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": persistant[" << i << "] " << to->persistant[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": persistant[" << i << "] " << to->persistant[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->persistant[i] != to->persistant[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": persistant[" << i << "] " << currentPS->persistant[i] << " -> " << to->persistant[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3805,7 +3834,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < 16; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo[" << i << "] " << to->ammo[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo[" << i << "] " << to->ammo[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->ammo[i] != to->ammo[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo[" << i << "] " << currentPS->ammo[i] << " -> " << to->ammo[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3833,7 +3867,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					if (bits) {
 						for (i = 0; i < 16; i++) {
 							if (bits & (1 << i)) {
-								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": powerups[" << i << "] " << to->powerups[i] << "\n";
+								if (!currentPS) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": powerups[" << i << "] " << to->powerups[i] << " NON-CURRENTPS-DIFF\n";
+								}
+								else if (currentPS->powerups[i] != to->powerups[i]) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": powerups[" << i << "] " << currentPS->powerups[i] << " -> " << to->powerups[i] << "\n";
+								}
 							}
 						}
 					}
@@ -3859,7 +3898,12 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 						if (bits) {
 							for (i = 0; i < 16; i++) {
 								if (bits & (1 << i)) {
-									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": inventory[" << i << "] " << to->inventory[i] << "\n";
+									if (!currentPS) {
+										std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": inventory[" << i << "] " << to->inventory[i] << " NON-CURRENTPS-DIFF\n";
+									}
+									else if (currentPS->inventory[i] != to->inventory[i]) {
+										std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": inventory[" << i << "] " << currentPS->inventory[i] << " -> " << to->inventory[i] << "\n";
+									}
 								}
 							}
 						}

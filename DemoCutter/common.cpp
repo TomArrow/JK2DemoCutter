@@ -4564,6 +4564,9 @@ static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t*
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
 	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS_MAX, s, sizeof(clcCut->serverCommands[index]));
+	if (GlobalDebugOutputFlags & (1 << DEBUG_COMMANDS)) {
+		std::cerr << "COMMAND DEBUG: demotime " << GlobalDebugDemoTime << ": cmd " << seq << ": " << s << "\n";
+	}
 }
 qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught) {
 	__TRY{
@@ -4693,11 +4696,11 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 		//}
 		MSG_ReadData(msg, &newSnap.areamask, len);
 		// read playerinfo
-		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse);
+		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse, &clCut->snap.ps);
 
 		// JKA-specific
 		if ((demoType == DM_26 || demoType == DM_25) && newSnap.ps.m_iVehicleNum)
-			MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue);
+			MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->vps : NULL, &newSnap.vps, demoType, qtrue, &clCut->snap.vps);
 
 		// read packet entities
 		demoCutParsePacketEntities(msg, oldSnap, &newSnap, clCut, demoType);
