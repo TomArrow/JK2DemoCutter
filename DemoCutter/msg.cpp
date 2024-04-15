@@ -3443,12 +3443,14 @@ MSG_ReadDeltaPlayerstate
 void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *to, demoType_t demoType, qboolean isVehiclePS) { // vehicle ps stuff is for JKA
 	int			i, lc;
 	int			bits;
+	constexpr int netAnalysis1BitsStats = ~(STAT_HEALTH|STAT_ARMOR);
 	const netField_t	*field;
 	int			numFields;
 	int			startBit, endBit;
 	int			print;
 	int			*fromF, *toF;
 	int			trunc;
+	int			tmpNetArraysValue; // to read values of stats pers etc into
 	playerState_t	dummy;
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
@@ -3641,6 +3643,19 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					}
 				}
 			}
+
+			if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+				bits &= netAnalysis1BitsStats;
+				if (bits) {
+					for (i = 0; i < statCount; i++) {
+						if (bits & (1 << i)) {
+
+							std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": stats[" << i << "] " << to->stats[i] << "\n";
+						}
+					}
+				}
+			}
+			
 		}
 #ifdef _DONETPROFILE_
 		endBytes=msg->readcount;
@@ -3656,9 +3671,19 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				for (i = 0; i < MAX_ACTIVEITEMS; i++) {
 					if (bits & (1 << i)) {
 						to->activeItems[i] = MSG_ReadShort(msg);
+					}
+				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < MAX_ACTIVEITEMS; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": activeItems[" << i << "] " << to->activeItems[i] << "\n";
+							}
+						}
+					}
+				}
 			}
-		}
-	}
 
 			// parse ammo_amount
 			if (MSG_ReadBits(msg, 1)) {
@@ -3667,6 +3692,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				for (i = 0; i < MAX_AMMO_AMOUNT; i++) {
 					if (bits & (1 << i)) {
 						to->ammo_amount[i] = MSG_ReadShort(msg);
+					}
+				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < MAX_AMMO_AMOUNT; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_amount[" << i << "] " << to->ammo_amount[i] << "\n";
+							}
+						}
 					}
 				}
 			}
@@ -3680,6 +3715,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 						to->ammo_name_index[i] = MSG_ReadShort(msg);
 					}
 				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < MAX_AMMO; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo_name_index[" << i << "] " << to->ammo_name_index[i] << "\n";
+							}
+						}
+					}
+				}
 			}
 
 			// parse powerups
@@ -3689,6 +3734,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				for (i = 0; i < MAX_MAX_AMMO_AMOUNT; i++) {
 					if (bits & (1 << i)) {
 						to->max_ammo_amount[i] = MSG_ReadShort(msg);
+					}
+				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < MAX_MAX_AMMO_AMOUNT; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": max_ammo_amount[" << i << "] " << to->max_ammo_amount[i] << "\n";
+							}
+						}
 					}
 				}
 			}
@@ -3709,6 +3764,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 						}
 						else {
 							to->persistant[i] = MSG_ReadShort(msg);
+						}
+					}
+				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < 16; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": persistant[" << i << "] " << to->persistant[i] << "\n";
+							}
 						}
 					}
 				}
@@ -3735,6 +3800,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 						}
 					}
 				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < 16; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": ammo[" << i << "] " << to->ammo[i] << "\n";
+							}
+						}
+					}
+				}
 			}
 	#ifdef _DONETPROFILE_
 			endBytes=msg->readcount;
@@ -3753,6 +3828,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 						to->powerups[i] = MSG_ReadLong(msg);
 					}
 				}
+				if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+					//bits &= netAnalysis1BitsStats;
+					if (bits) {
+						for (i = 0; i < 16; i++) {
+							if (bits & (1 << i)) {
+								std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": powerups[" << i << "] " << to->powerups[i] << "\n";
+							}
+						}
+					}
+				}
 			}
 		
 			if (demoType == DM_14) {
@@ -3767,6 +3852,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					for (i = 0; i < 16; i++) { // Should only go to 15 technically (MAX_INVENTORY) but it's not like the bits are ever gonna contain more anyway...
 						if (bits & (1 << i)) {
 							to->inventory[i] = MSG_ReadShort(msg);
+						}
+					}
+					if (GlobalDebugOutputFlags & (1 << DEBUG_NETANALYSIS1)) {
+						//bits &= netAnalysis1BitsStats;
+						if (bits) {
+							for (i = 0; i < 16; i++) {
+								if (bits & (1 << i)) {
+									std::cerr << "NETANALYSIS1: demotime " << GlobalDebugDemoTime << ": inventory[" << i << "] " << to->inventory[i] << "\n";
+								}
+							}
 						}
 					}
 				}

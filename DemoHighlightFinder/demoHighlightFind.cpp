@@ -145,6 +145,7 @@ public:
 	std::string chatSearch = "";
 	std::string printSearch = "";
 	std::string stringSearch = "";
+	int netAnalysisMode = 0;
 };
 
 
@@ -4004,6 +4005,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				break;
 			case svc_snapshot_general:
 				malformedMessageCaught = false;
+				GlobalDebugDemoTime = demoCurrentTime;
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught, malformedMessageCaught,qtrue)) {
 					if (malformedMessageCaught) {
 						std::cout << "Trying to continue after malformed message...\n";
@@ -8060,6 +8062,7 @@ int main(int argcO, char** argvO) {
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
 	auto p = op.add<popl::Switch>("p", "print-debug", "Prints out various debug things, like all configstrings.");
+	auto a = op.add<popl::Implicit<int>>("a", "net-analysis", "Debugs some net stuff to understand how mods work. A bit like shownet but without showing all the normal stuff like angles/origin etc, and with support for pers/stats/ammo etc. Pass number for more (atm only mode 1)",1);
 	auto y = op.add<popl::Implicit<int>>("y", "player-frames-csv", "Writes CSV files containing position, velocity and viewangle of players. Pass 1 as a value to skip duplicate commandTime values",0);
 	auto z = op.add<popl::Value<std::string>>("z", "strafe-csv", "Writes CSV files containing different strafes. Pass 2 numbers separated by comma. Sync point (ups speed) and reset point ups (speed). Optionally, a third number for a minimum run length in milliseconds.");
 	auto Z = op.add<popl::Switch>("Z", "strafe-csv-interpolate", "Does the strafe CSV with interpolated values instead of leaving them empty when not available at a certain time interval.");
@@ -8099,6 +8102,7 @@ int main(int argcO, char** argvO) {
 	opts.entityDataToDb = e->is_set();
 	opts.onlyLogSaberKills = s->is_set();
 	opts.onlyLogKillSpreesWithSaberKills = S->is_set() ? S->value() : 0;
+	opts.netAnalysisMode = a->is_set() ? a->value() : 0;
 	opts.jumpMetaEventsLimit = bufferTime;//j->is_set() ? (j->value() == 0 ? bufferTime : j->value()) : 0;
 	opts.writeDemoPacketStats = d->is_set() ? (d->value() <= 0 ? -1 : d->value()) : 0;
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
@@ -8157,7 +8161,9 @@ int main(int argcO, char** argvO) {
 		}
 	}
 
-	if (opts.printDebug) GlobalDebugOutputFlags = ~0; // TODO Make this more flexible? Able to specify types of debug output? Merge the stufftext stuff into it too.
+	GlobalDebugOutputFlags = 0;
+	if (opts.printDebug) GlobalDebugOutputFlags |= (1 << DEBUG_COMMANDS) | (1 << DEBUG_CONFIGSTRING); // TODO Make this more flexible? Able to specify types of debug output? Merge the stufftext stuff into it too.
+	if (opts.netAnalysisMode == 1) GlobalDebugOutputFlags |= (1 << DEBUG_NETANALYSIS1);
 
 	highlightSearchMode_t searchMode = SEARCH_INTERESTING;
 	//if (argc > 3) {

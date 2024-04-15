@@ -31,6 +31,7 @@
 #include "tsl/htrie_map.h"
 
 extern int GlobalDebugOutputFlags;
+extern int64_t GlobalDebugDemoTime;
 extern const char* DPrintFLocation;
 
 #ifdef _WIN32
@@ -180,6 +181,11 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 
 
 
+typedef enum globalDebugOutputType_t {
+	DEBUG_CONFIGSTRING,
+	DEBUG_COMMANDS,
+	DEBUG_NETANALYSIS1
+};
 
 
 

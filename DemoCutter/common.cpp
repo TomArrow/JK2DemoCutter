@@ -18,12 +18,9 @@ constexpr char* postEOFMetadataMarker = "HIDDENMETA";
 //
 
 
-typedef enum globalDebugOutputType_t {
-	DEBUG_CONFIGSTRING,
-	DEBUG_COMMANDS,
-};
 
 int GlobalDebugOutputFlags = 0;
+int64_t GlobalDebugDemoTime = 0;
 
 
 
