@@ -73,7 +73,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 
 	std::vector<DemoReaderWrapper> demoReaders; 
-	std::vector<DemoReaderLight> pingDemoReaders;
+	//std::vector<DemoReaderLight> pingDemoReaders;
 	std::cout << "loading up demos...";
 	demoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
@@ -81,8 +81,24 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		demoReaders.emplace_back();
 		demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
 		demoReaders.back().sourceInfo = new DemoSource(); // yeah i guess we'll leak it. screw it, who cares. its a fake demosource entry thingie to track delay.
-		pingDemoReaders.emplace_back();
-		pingDemoReaders.back().LoadDemo((*inputFiles)[i].c_str());
+		//pingDemoReaders.emplace_back();
+		//pingDemoReaders.back().LoadDemo((*inputFiles)[i].c_str());
+		int	lowestPingsHere[MAX_CLIENTS_MAX];
+		qboolean	playerExistsAsEntity[MAX_CLIENTS_MAX];
+		DemoReaderLight* pingDemoReader = new DemoReaderLight();
+		pingDemoReader->LoadDemo((*inputFiles)[i].c_str());
+		pingDemoReader->ReadToEnd();
+		pingDemoReader->GetLowestPingData(lowestPingsHere);
+		pingDemoReader->GetPlayersSeen(playerExistsAsEntity);
+		pingDemoReader->FreePingData();
+		for (int p = 0; p < demoReaders.back().reader.getMaxClients(); p++) {
+			const char* playerCString = demoReaders.back().reader.GetPlayerConfigString(p, NULL);
+			if (*playerCString) {
+				std::cout << playerCString << " [median ping:" << lowestPingsHere[p] << "]" << std::endl;
+			}
+			demoReaders.back().playersToCopy.push_back({ p,(float)lowestPingsHere[p],qfalse }); // we just use this array here to track pings, nothing else (unlike DemoCombiner)
+		}
+
 	}
 	std::cout << "done.";
 
@@ -108,7 +124,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 			
 			// We simply track ping for all players here. "playersToCopy" doesn't mean the same thing it does for DemoCombine, it's just an array we use to track pings.
-			int	lowestPingsHere[MAX_CLIENTS_MAX];
+			/*int	lowestPingsHere[MAX_CLIENTS_MAX];
 			qboolean	playerExistsAsEntity[MAX_CLIENTS_MAX];
 			pingDemoReaders[i].ReadToEnd();
 			pingDemoReaders[i].GetLowestPingData(lowestPingsHere);
@@ -120,7 +136,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					std::cout << playerCString << " [median ping:" << lowestPingsHere[p] << "]" << std::endl;
 				}
 				demoReaders[i].playersToCopy.push_back({ p,(float)lowestPingsHere[p],qfalse }); // we just use this array here to track pings, nothing else (unlike DemoCombiner)
-			}
+			}*/
 			
 			int64_t cutStartOffset = demoReaders[i].reader.getCutStartOffset(qtrue);
 			demoReaders[i].sourceInfo->delay = cutStartOffset;
@@ -134,7 +150,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		}
 	}
 	
-	pingDemoReaders.clear();
+	//pingDemoReaders.clear();
 
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, getCS_LEVEL_START_TIME(demoType), "10000", demoType);
 
