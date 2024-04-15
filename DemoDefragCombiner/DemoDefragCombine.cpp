@@ -218,6 +218,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 				lastSpectatedClientNums[i]= originalPlayerstateClientNum;
 
+				tmpPS.saberEntityNum = inputFiles->size() + i; // so cgame doesnt confuse sabers with players/animents
+
 				// self explanatory.
 				if (i == 0) {
 					mainPlayerPS = tmpPS;
