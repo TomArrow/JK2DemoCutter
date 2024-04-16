@@ -189,6 +189,11 @@ typedef jpcre2::select<char> jp;
 // OC Defrag
 jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\]( which is his personal best time)?.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi");
 
+
+jp::Regex defragDarkFinishRegex(R"raw(\^7Info\^5: \^7(?<playername>[^\n]+?) \^7finished \^5'\^7(?<coursename>[^\n]+?)\^5' \[\^7\^\d(?<style>[^\n]+?)\^5\] \^7in \^5'\^3(?<time>(?<hours>\d\d):(?<minutes>\d\d):(?<seconds>\d\d):(?<milliseconds>\d\d\d))\^5' \(Diff to best\^5: \^\d(?<timediff>(?<plusminusdiff>[+-])(?<hoursdiff>\d\d):(?<minutesdiff>\d\d):(?<secondsdiff>\d\d):(?<millisecondsdiff>\d\d\d))\^5\).)raw", "mSi");
+jp::Regex defragDarkPersonalBestRegex(R"raw(\^4\[PERSONAL\] \^7(?<playername>[^\n]+?) \^5\[\^7(?<username>[^\n]+?)\^5\] \^7improved their personal best time for \^5'\^7(?<coursename>[^\n]+?)\^5' \[\^7\^\d(?<style>[^\n]+?)\^5\] -> '\^7(?<time>(?<hours>\d\d):(?<minutes>\d\d):(?<seconds>\d\d):(?<milliseconds>\d\d\d))\^5'.)raw", "mSi");
+jp::Regex defragDarkRecordRegex(R"raw(\^1\[ GLOBAL \] \^7(?<playername>[^\n]+?) \^5\[\^7(?<username>[^\n]+?)\^5\] \^7set a new record for \^5'\^7(?<coursename>[^\n]+?)\^5' \[\^7\^\d(?<style>[^\n]+?)\^5\] -> '\^7(?<time>(?<hours>\d\d):(?<minutes>\d\d):(?<seconds>\d\d):(?<milliseconds>\d\d\d))\^5'.)raw", "mSi");
+
 // Razor Defrag (different server)
 jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat the WORLD RECORD and )?(is now ranked) \^\d#(\d) \^7with)\s\^3(\d+):(\d+))raw", "mSi");
 jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on this map!\s*\^\d\]:)raw", "mSi");
@@ -199,6 +204,7 @@ class defragRunInfo_t {
 public:
 	int milliseconds = 0;
 	std::string playerName;
+	std::string defragPlayerName;
 	qboolean isNumber1 = qfalse;
 	//qboolean isTop10 = qfalse;
 	qboolean isLogged = qfalse;
@@ -1439,6 +1445,75 @@ qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
 	return qfalse;
 }
 
+std::vector<defragRunInfo_t> DARKDefragRuns;
+
+qboolean findDARKDefragRun(std::string printText) {
+	jp::VecNum vec_num, vec_num2, vec_num3;
+	jp::RegexMatch rm, rm2, rm3;
+
+	size_t count = rm.setRegexObject(&defragDarkFinishRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
+		
+		defragRunInfo_t* info = &DARKDefragRuns.emplace_back();
+
+		info->playerName = vec_num[matchNum][1];
+
+		if (vec_num[matchNum][2] != "main") {
+			info->courseName = vec_num[matchNum][2];
+		}
+		info->style = vec_num[matchNum][3];
+
+		int hours = atoi(vec_num[matchNum][5].c_str());
+		int minutes = atoi(vec_num[matchNum][6].c_str());
+		int seconds = atoi(vec_num[matchNum][7].c_str());
+		int milliseconds = atoi(vec_num[matchNum][8].c_str());
+		info->milliseconds = milliseconds + seconds*1000 + minutes*60*1000 + hours*60*60*1000;
+		/*info->playerName = vec_num[matchNum][1];
+		int seconds = atoi(vec_num[matchNum][6].c_str());
+		int pureMilliseconds = atoi(vec_num[matchNum][7].c_str());
+
+		info->milliseconds = pureMilliseconds + seconds * 1000;
+		info->isLogged = (qboolean)(vec_num[matchNum][4].length() > 0);
+		info->isNumber1 = (qboolean)(vec_num[matchNum][3].length() > 0);
+		info->isPersonalBest = lastWasPersonalBestMessage;*/
+
+		return qtrue;
+	}
+
+	size_t count2 = rm2.setRegexObject(&defragDarkPersonalBestRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num2)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num2.size(); matchNum++) { // really its just going to be 1 but whatever
+		// It was pb. Modify existing run.
+		if (DARKDefragRuns.size() && DARKDefragRuns.back().playerName == vec_num2[matchNum][1] ) {
+			DARKDefragRuns.back().defragPlayerName = vec_num2[matchNum][2]; // Replace player name with username.
+			DARKDefragRuns.back().isPersonalBest = qtrue;
+			DARKDefragRuns.back().isLogged = qtrue;
+		}
+		return qtrue;
+	}
+
+	size_t count3 = rm3.setRegexObject(&defragDarkRecordRegex)                          //set associated Regex object
+		.setSubject(&printText)                         //set subject string
+		.setNumberedSubstringVector(&vec_num3)         //pass pointer to VecNum vector
+		.match();
+
+	for (int matchNum = 0; matchNum < vec_num3.size(); matchNum++) { // really its just going to be 1 but whatever
+		// It was pb. Modify existing run.
+		if (DARKDefragRuns.size() && DARKDefragRuns.back().defragPlayerName == vec_num3[matchNum][2] ) {
+			DARKDefragRuns.back().isNumber1 = qtrue;
+		}
+		return qtrue;
+	}
+	return qfalse;
+}
+
 
 void updateForcePowersInfo(clientActive_t* clCut) { // TODO: make this adapt to JKA
 	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
@@ -2126,6 +2201,10 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 				playerNumber = clientNum;
 			}
 		}
+	}
+
+	if (runInfo.defragPlayerName.size()) {
+		playername = runInfo.defragPlayerName;
 	}
 
 	bool wasFollowed = false;
@@ -7982,6 +8061,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				} else if (findJAProDefragRun<max_clients>(printText, &runInfo, demoType)) {
 					runFound = qtrue;
 				}
+				else {
+					findDARKDefragRun(printText);
+				}
 
 
 				//for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
@@ -8156,6 +8238,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				
 				
 			}
+		}
+
+		if (DARKDefragRuns.size()) {
+			// Dark sends multiple messages depending on whether something was a personal best, record, etc...
+			// Luckily it sends them on the same frame. Unluckily, it sends them in such an order that the info about whether something was a PB or WR comes after the actual time etc.
+			// So we first get the info about the time, then info about PB, then info about record. 
+			// So we store all found runs in an array and just update it from later messages. Then we store it all.
+			for (int i = 0; i < DARKDefragRuns.size();i++) {
+				SaveDefragRun<max_clients>(DARKDefragRuns[i], sharedVars, demoCurrentTime, sourceDemoFile, io, bufferTime, lastGameStateChangeInDemoTime, demoType, opts, searchMode, wasDoingSQLiteExecution, CS_PLAYERS_here);
+			}
+			DARKDefragRuns.clear();
 		}
 
 		if (hadConfigStringCommands) {
