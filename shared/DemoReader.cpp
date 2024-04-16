@@ -1167,7 +1167,7 @@ playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 }
 
 
-void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS) {
+void DemoReader::InterpolatePlayerState(double time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS) {
 	float			f;
 	int				i;
 	playerState_t* out;
@@ -1284,7 +1284,7 @@ void DemoReader::InterpolatePlayerState(float time,SnapshotInfo* from, SnapshotI
 	//cg.predictedTimeFrac = f * (nextps->commandTime - curps->commandTime);
 }
 
-void DemoReader::InterpolatePlayer(int clientNum, float time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS) {
+void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS) {
 	float			f;
 	int				i;
 	playerState_t* out;

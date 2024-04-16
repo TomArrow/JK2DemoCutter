@@ -155,8 +155,8 @@ class DemoReader {
 	qboolean PlayerStateIsTeleport(clSnapshot_t* lastSnap, clSnapshot_t* snap);
 	entityState_t* findEntity(int number);
 
-	void InterpolatePlayerState(float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
-	void InterpolatePlayer(int clientNum, float time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS = qfalse);
+	void InterpolatePlayerState(double time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
+	void InterpolatePlayer(int clientNum, double time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS = qfalse);
 
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
