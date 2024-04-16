@@ -213,6 +213,9 @@ public:
 	qboolean isProRun = qfalse;
 	int teleports = 0;
 	int checkpoints = 0;
+	
+	// q3
+	bool checksumError = false;
 };
 
 
@@ -270,6 +273,90 @@ struct strafeDeviationInfo_t {
 bool gameIsSaberOnlyIsh = false; // Saber only-ish. The basic question this answers is: Does this gamemode allow normal weapons? Or only saber (and maybe mines)? Basically I'm trying to question whether this demo contains mostly saber combat. Aka if blasters and such are banned. So I can early cancel analyzing some demos.
 bool gameAllowsDoomingForcePowers = false; // Stuff like push/pull is allowed in this game. Hence if we are detecting saber kills that lead to dooms/suic, we need to try to exclude a few kills that might just be push/pull/grip etc
 int sentryModelIndex = -1; // Model index of sentry, so we don't have to do string comparison all the time
+
+
+class q3DefragInfo_t {
+	int32_t crs(int32_t a, int32_t b) {
+		return (int32_t)(((uint32_t)a & 0xffffffff) >> b);
+	}
+	int32_t cls(int32_t a, int32_t b) {
+		return (int)(((uint32_t)a << b) & 0xffffffff);
+	}
+public:
+	bool promode = false;
+	int version = 0;
+	int mapnameChecksum = 0;
+	int gameType = 0;
+	bool online = false;
+	bool cheats = false;
+	void SetMapName(const char* mapname) {
+		mapnameChecksum = 0;
+		if (!mapname || !*mapname) {
+			return;
+		}
+		while (*mapname) {
+			mapnameChecksum += *mapname;
+			mapname++;
+		}
+		mapnameChecksum &= 0xFF;
+	}
+
+	int calculateCorrectTime(playerState_t* ps, int serverTime, bool* errored) {
+		if (errored) {
+			*errored = false;
+		}
+		int normalTime = (int)((uint16_t)(int16_t)ps->stats[7]) * 65536 + ((uint16_t)(int16_t)ps->stats[8]);
+		if (online && version != 190) {
+			return normalTime;
+		}
+		if (version >= 19112 && cheats) {
+			return normalTime;
+		}
+		int time = normalTime;
+		time ^= abs((int)floorf(ps->origin[0])) & 0xFFFF;
+		time ^= (abs((int)floorf(ps->velocity[0])) & 0xFFFF)* 65536;
+		time ^= ps->stats[STAT_HEALTH] > 0 ? ps->stats[STAT_HEALTH] & 255 : 150;
+		time ^= (ps->movementDir & 15) << 28;
+
+		for (int i = 24; i > 0; i -= 8)
+		{
+			int32_t temp = (crs(time, i) ^ crs(time, i - 8)) & 0xff;
+			time = (time & ~cls(0xff, i)) | cls(temp, i);
+		}
+
+		int32_t randomThing = cls(serverTime, 2);
+		randomThing += cls(version + mapnameChecksum, 8);
+		randomThing ^= cls(serverTime, 0x18);
+		time ^= randomThing;
+		randomThing = crs(time, 0x1c);
+		randomThing |= cls(~randomThing, 4) & 0xff;
+		randomThing |= cls(randomThing, 8);
+		randomThing |= cls(randomThing, 0x10);
+		time ^= randomThing;
+		randomThing = crs(time, 0x16) & 0x3f;
+		time &= 0x3fffff;
+
+		int32_t randomThing2 = 0;
+		for (int l = 0; l < 3; l++)
+		{
+			randomThing2 += crs(time, 6 * l) & 0x3f;
+		}
+
+		randomThing2 += crs(time, 0x12) & 0xf;
+
+		if (randomThing != (randomThing2 & 0x3f))
+		{
+			if (errored) {
+				*errored = true;
+			}
+			std::cout << "Checksum error in Q3 defrag run\n";
+		}
+		return time;
+	}
+};
+q3DefragInfo_t q3DefragInfo;
+bool gameIsQ3Defrag = false;
+
 
 int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
 int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
@@ -891,6 +978,7 @@ struct frameInfo_t {
 	int legsAnimGeneral[MAX_CLIENTS_MAX];
 	int torsoAnimGeneral[MAX_CLIENTS_MAX];
 	int groundEntityNum[MAX_CLIENTS_MAX];
+	int psStats12[MAX_CLIENTS_MAX];
 }; 
 
 frameInfo_t lastFrameInfo;
@@ -1393,6 +1481,20 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 
 	int g_weaponDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
 	g_gametype = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_gametype"));
+	gameIsQ3Defrag = false;
+	if (demoType == DM_68) {
+		const char* gamename = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
+		if (!_stricmp(gamename, "defrag")) {
+			gameIsQ3Defrag = true;
+			q3DefragInfo.cheats = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_cheats"));
+			q3DefragInfo.promode = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "df_promode"));
+			q3DefragInfo.version = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_vers"));
+			q3DefragInfo.SetMapName(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname"));
+			q3DefragInfo.gameType = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_gametype"));
+			q3DefragInfo.online = q3DefragInfo.gameType > 4;
+
+		}
+	}
 
 	// JKA:
 	// Online forum says 65523 is saber only
@@ -4656,6 +4758,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 
 					thisFrameInfo.groundEntityNum[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.groundEntityNum;
+					thisFrameInfo.psStats12[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.stats[12]; // q3 defrag run tracking
 					VectorCopy(demo.cut.Cl.snap.ps.origin, thisFrameInfo.playerPositions[demo.cut.Cl.snap.ps.clientNum]);
 					VectorCopy(demo.cut.Cl.snap.ps.velocity, thisFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum]);
 					VectorCopy(demo.cut.Cl.snap.ps.viewangles, thisFrameInfo.playerAngles[demo.cut.Cl.snap.ps.clientNum]);
@@ -5167,6 +5270,28 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// My guess: It's only 1 frame with quick jumps and the server didn't send that particular frame due to snap limit.
 								// Or: It's not even a single frame? idk.
 								jumpDetected[i] = qtrue;
+							}
+
+							// Q3 defrag run tracking
+							if (gameIsQ3Defrag && i == demo.cut.Cl.snap.ps.clientNum && thisFrameInfo.psStats12[i] && lastFrameInfo.psStats12[i]) {
+								int thisFrameDefragInfo = thisFrameInfo.psStats12[i];
+								int lastFrameDefragInfo = lastFrameInfo.psStats12[i];
+								if ((thisFrameDefragInfo & 8) && !(thisFrameDefragInfo & 2) && (lastFrameDefragInfo & 2)) {
+									// IDK dont ask me rofl
+									defragRunInfo_t runInfo{};
+									runInfo.milliseconds = q3DefragInfo.calculateCorrectTime(&demo.cut.Cl.snap.ps, demo.cut.Cl.snap.serverTime,&runInfo.checksumError);
+									//runInfo.milliseconds = demo.cut.Cl.snap.ps.stats[7] * 65536 + (uint16_t)(int16_t)demo.cut.Cl.snap.ps.stats[8];
+									runInfo.knownClientNum = i;
+									runInfo.style = q3DefragInfo.promode ? "cpm" : "vq3";
+
+									int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
+									const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+									runInfo.playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "dfn");
+									if (!runInfo.playerName.size()) {
+										runInfo.playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
+									}
+									qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars, demoCurrentTime, sourceDemoFile, io, bufferTime, lastGameStateChangeInDemoTime, demoType, opts, searchMode, wasDoingSQLiteExecution, CS_PLAYERS_here);
+								}
 							}
 						}
 
