@@ -112,9 +112,12 @@ struct sharedVariables_t {
 };
 
 
+struct teleportInfo_t {
+	int64_t demoTime;
+	vec3_t position;
+};
 
-
-
+std::vector<teleportInfo_t> teleports; // teleport analysis. if we want to fast forward repeated attempts of stuff. (-A option)
 
 
 class ExtraSearchOptions {
@@ -146,6 +149,13 @@ public:
 	std::string printSearch = "";
 	std::string stringSearch = "";
 	int netAnalysisMode = 0;
+	int teleportAnalysis = 0; // 1 analyze teleports that are to the same place. 2 analyze being at same place multiple times (more expensive computation)
+	int64_t teleportAnalysisEndDemoTime = 0;
+	int teleportAnalysisBufferTimeFuture = 2000;
+	int teleportAnalysisBufferTimePast = 5000;
+	int teleportAnalysisMinTimeFastForward = 1000;
+	float teleportAnalysisMaxDistanceHorizontal = 100; 
+	float teleportAnalysisMaxDistanceVertical = 40; 
 };
 
 
@@ -3307,6 +3317,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 static void inline writeStrafeCSV(int i, const ExtraSearchOptions& opts);
 static void inline writePlayerDumpCSV(int i, const ExtraSearchOptions& opts);
+static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts);
 
 template<unsigned int max_clients>
 qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
@@ -3480,6 +3491,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			writeStrafeCSV(i, opts);
 		}
 	}
+
+	if (opts.teleportAnalysis) {
+		writeTeleportRelatedStuff(opts);
+	}
 	
 	// Dump player CSV if desired
 	if (opts.playerCSVDump) {
@@ -3524,6 +3539,180 @@ static void inline writePlayerDumpCSV(int clientNum, const ExtraSearchOptions& o
 
 		strafeCSVPlayerOutputHandle.close();
 	}
+}
+
+static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts) {
+
+	std::vector<std::pair<int64_t, int64_t>> fastForwardSegments;
+	int64_t totalSkippedTime = 0;
+	
+	if (opts.teleportAnalysis == 1) {
+		for (int i = 0; i < teleports.size(); i++) {
+			for (int c = teleports.size() - 1; c > i; c--) {
+				if ((teleports[c].demoTime - teleports[i].demoTime) < opts.teleportAnalysisMinTimeFastForward) break; // We're not gonna fast forward such short segments
+				if (VectorDistance(teleports[i].position, teleports[c].position) < 10.0f) {
+					fastForwardSegments.push_back({ teleports[i].demoTime,teleports[c].demoTime });
+					totalSkippedTime += teleports[c].demoTime - teleports[i].demoTime;
+					i = c + 1;
+				}
+			}
+		}
+	}
+	else if (opts.teleportAnalysis == 2) {
+
+		vec3_t distance;
+		const int quickSkipDuration = 1000;
+		int averageFrameDuration = (teleports.back().demoTime - teleports.front().demoTime) / teleports.size();
+		int framesQuickSkip = quickSkipDuration / averageFrameDuration;
+		for (int64_t i = 0; i < teleports.size(); i++) {
+		continueteleportcomparesearch:
+			for (int64_t c = teleports.size() - 1; c > i; c-= framesQuickSkip) { // we need to step over bigger parts as a rough search because otherwise its too damn slow
+
+				if (VectorDistance(teleports[i].position, teleports[c].position) < 1000.0f) {
+					// Might be nearby, do closer search
+					for (int64_t d = std::min(c+framesQuickSkip,(int64_t)teleports.size() - 1); d >= c; d --) {
+
+						if ((teleports[d].demoTime - teleports[i].demoTime) < opts.teleportAnalysisMinTimeFastForward) break; // We're not gonna fast forward such short segments
+						// TODO Check for overlap instead of checking distance of 64
+						VectorSubtract(teleports[i].position, teleports[d].position,distance);
+						if (VectorLength2(distance) < opts.teleportAnalysisMaxDistanceHorizontal && abs(distance[2]) < opts.teleportAnalysisMaxDistanceVertical) {
+							int64_t ffStart = teleports[i].demoTime+opts.teleportAnalysisBufferTimePast;
+							int64_t ffEnd = teleports[d].demoTime- opts.teleportAnalysisBufferTimeFuture;
+							fastForwardSegments.push_back({ ffStart,ffEnd });
+							totalSkippedTime += ffEnd - ffStart;
+							i = d + 1;
+							goto continueteleportcomparesearch;
+						}
+					}
+				}
+				/*if ((teleports[c].demoTime - teleports[i].demoTime) < 5000) break; // We're not gonna fast forward such short segments
+				// TODO Check for overlap instead of checking distance of 64
+				if (VectorDistance(teleports[i].position, teleports[c].position) < 64.0f) {
+					fastForwardSegments.push_back({ teleports[i].demoTime,teleports[c].demoTime });
+					totalSkippedTime += teleports[c].demoTime - teleports[i].demoTime;
+					i = c + 1;
+				}*/
+			}
+			if ((i % 100) == 0) {
+				std::cout << "Teleport analysis mode 2 progress: " << (100.0f*(float)i/(float)teleports.size()) << "%\r";
+			}
+		}
+	}
+	std::cout << "\n";
+	std::cout << fastForwardSegments.size() << " fast-forward segments found with total fast-forwarded time of " << totalSkippedTime << " milliseconds.\n";
+
+	std::stringstream ss;
+	// Capture
+	ss << ("<capture>\n");
+	ss << ("\t<start>0</start>\n");
+	ss << ("\t<end>0</end>\n");
+	ss << ("\t<speed>1.00</speed>\n");
+	ss << ("\t<view>chase</view>\n");
+	ss << ("\t<view>chase</view>\n");
+	ss << ("</capture>\n");
+
+	// Camera
+	ss << ("<camera>\n");
+	ss << ("\t<smoothPos>2</smoothPos>\n");
+	ss << ("\t<smoothAngles>1</smoothAngles>\n");
+	ss << ("\t<locked>0</locked>\n");
+	ss << ("\t<target>-1</target>\n");
+	ss << ("\t<flags>3</flags>\n");
+	ss << ("</camera>\n");
+
+	// Chase
+	ss << ("<chase>\n");
+	ss << ("\t<locked>0</locked>\n");
+	ss << ("</chase>\n");
+
+	// Line (timeline)
+	ss << ("<line>\n");
+	ss << ("\t<offset>0</offset>\n");
+	ss << ("\t<speed>1.00</speed>\n");
+	ss << ("\t<locked>1</locked>\n");
+
+	int64_t currentDemoTime = 0;
+	int64_t currentProjectTime = 0;
+	int64_t lastProjectTime = 0;
+	int64_t lastDemoTime = 0;
+	for (int i = 0; i < fastForwardSegments.size(); i++) {
+
+		currentProjectTime += fastForwardSegments[i].first - lastDemoTime;
+		ss << "\t<point>\n";
+		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].first << "</demotime>\n";
+		ss << "\t</point>\n";
+
+		currentProjectTime += 100;
+		ss << "\t<point>\n";
+		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].first+100 << "</demotime>\n";
+		ss << "\t</point>\n";
+
+		float speedupRatio = (fastForwardSegments[i].second - fastForwardSegments[i].first - 200.0f) / 800.0f; // the entire duration (minus 200 ms) must be passed in 800 ms.
+
+		currentProjectTime += 100;
+		ss << "\t<point>\n";
+		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].first + 100 + speedupRatio * 100.0f << "</demotime>\n";
+		ss << "\t</point>\n";
+
+
+		currentProjectTime += 600;
+		ss << "\t<point>\n";
+		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].second-100-100.0f*speedupRatio << "</demotime>\n";
+		ss << "\t</point>\n";
+
+		currentProjectTime += 100;
+		ss << "\t<point>\n";
+		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].second-100 << "</demotime>\n";
+		ss << "\t</point>\n";
+
+		currentProjectTime += 100;
+		ss << "\t<point>\n";
+		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].second << "</demotime>\n";
+		ss << "\t</point>\n";
+
+
+		lastProjectTime = currentProjectTime;
+		lastDemoTime = fastForwardSegments[i].second;
+	}
+
+	ss << ("</line>\n");
+
+	// DOF
+	ss << ("<dof>\n");
+	ss << ("\t<locked>0</locked>\n");
+	ss << ("\t<target>-1</target>\n");
+	ss << ("</dof>\n");
+
+	// Weather
+	ss << ("<weather>\n");
+	ss << ("\t<sun>\n");
+	ss << ("\t\t<active>0</active>\n");
+	ss << ("\t\t<size>1.0000</size>\n");
+	ss << ("\t\t<precision>10.0000</precision>\n");
+	ss << ("\t\t<yaw>45.0000</yaw>\n");
+	ss << ("\t\t<pitch>45.0000</pitch>\n");
+	ss << ("\t</sun>\n");
+	ss << ("\t<rain>\n");
+	ss << ("\t\t<active>0</active>\n");
+	ss << ("\t\t<number>100</number>\n");
+	ss << ("\t\t<range>1000.0000</range>\n");
+	ss << ("\t\t<back>0</back>\n");
+	ss << ("\t</rain>\n");
+	ss << ("</weather>\n");
+
+	std::ofstream mmeFastForwarderConfig;
+	mmeFastForwarderConfig.open("fastforward.cfg", std::ios_base::app); // append instead of overwrite
+
+	mmeFastForwarderConfig << ss.str();
+
+
+	mmeFastForwarderConfig.close();
 }
 
 static void inline writeStrafeCSV(int clientNum, const ExtraSearchOptions& opts) {
@@ -4427,6 +4616,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					playerTeams[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.stats[STAT_TEAM_MOH];
 				}
 
+
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
@@ -4938,6 +5128,27 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMoveGeneral = psGeneralSaberMove;
 							playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].speed = speed;
 						}
+					}
+
+					if (opts.teleportAnalysis == 1 && (opts.teleportAnalysisEndDemoTime > demoCurrentTime || !opts.teleportAnalysisEndDemoTime) ) {
+						static int oldTeleportBit = -1;
+						int currentTeleportBit = (demo.cut.Cl.snap.ps.eFlags & getEF_TELEPORTBIT(demoType));
+						if (oldTeleportBit == -1) {
+							oldTeleportBit = currentTeleportBit;
+						}
+						if (currentTeleportBit != oldTeleportBit) {
+							teleportInfo_t teleport;
+							teleport.demoTime = demoCurrentTime;
+							VectorCopy(demo.cut.Cl.snap.ps.origin, teleport.position);
+							teleports.push_back(teleport);
+							oldTeleportBit = currentTeleportBit;
+						}
+					}
+					else if (opts.teleportAnalysis == 2) { // just save location on every frame.
+						teleportInfo_t teleport;
+						teleport.demoTime = demoCurrentTime;
+						VectorCopy(demo.cut.Cl.snap.ps.origin, teleport.position);
+						teleports.push_back(teleport);
 					}
 				}
 
@@ -8451,6 +8662,8 @@ int main(int argcO, char** argvO) {
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
+	auto A = op.add<popl::Implicit<int>>("A", "teleport-analysis", "Find teleports in demo and make script to speed up time of repeated attempts with teleports putting the player back. Optionally, set to 2 to not only analyze teleports but all locations.",1);
+	auto x = op.add<popl::Value<std::string>>("x", "teleport-analysis-endtime", "Provide parameters for teleport analysis as numbers, separated by empty space: demotime of detection end, buffer around fast forward segments post, same thing pre (used so u dont cut off gameplay). Fourth and fifth value is distance to consider 'same place' in mode 2 (horizontal and vertical). Fifth value: minimum amount of time to consider fast-forwarding (excluding buffertimes). Defaults: 0 2000 5000 100 40 10000");
 	auto k = op.add<popl::Switch>("k", "kill-sprees-only-visible-kills", "Only find killsprees made up out of visible kills.");
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");
@@ -8509,6 +8722,35 @@ int main(int argcO, char** argvO) {
 	opts.printDebug = p->value();
 	opts.strafeCSVInterpolate = Z->value();
 	opts.playerCSVDump = y->is_set();
+	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
+	if (x->is_set()) {
+		int v[6];
+		int countfound = sscanf(x->value().c_str(),"%d %d %d %d %d %d",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5]);
+		if (countfound > 0) {
+
+			opts.teleportAnalysisEndDemoTime = v[0];
+		}
+		if (countfound > 1) {
+
+			opts.teleportAnalysisBufferTimeFuture = v[1];
+		}
+		if (countfound > 2) {
+
+			opts.teleportAnalysisBufferTimePast = v[2];
+		}
+		if (countfound > 3) {
+
+			opts.teleportAnalysisMaxDistanceHorizontal = v[3];
+		}
+		if (countfound > 4) {
+
+			opts.teleportAnalysisMaxDistanceVertical = v[4];
+		}
+		if (countfound > 5) {
+
+			opts.teleportAnalysisMinTimeFastForward = v[5];
+		}
+	}
 	opts.playerCSVDumpCommandTimeDupeSkip = y->is_set() ? y->value() == 1 : false;
 
 	if (C->is_set()) {
