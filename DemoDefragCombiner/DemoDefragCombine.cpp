@@ -104,6 +104,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 	std::map<int, int> lastSpectatedClientNums; // Need this for later.
 
+	SlotManager slotManager(demoReaders.size()*2); // reserve count of source demos * 2 (keep free ones cuz saberentitynum)
+
 	// Copy over player config strings
 	for (int i = 0; i < demoReaders.size(); i++) {
 		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
@@ -189,7 +191,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		qboolean allSourceDemosFinished = qtrue;
 		playerEntities.clear();
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].reader.SeekToTime(sourceTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (demoReaders[i].reader.SeekToTime(sourceTime - demoReaders[i].sourceInfo->delay)) 
+			{ // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
 				demoType_t sourceDemoType = demoReaders[i].reader.getDemoType();
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
@@ -267,6 +270,31 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				}
 
 
+				double thisTimeInServerTime;
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay, &thisTimeInServerTime);
+
+				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
+
+					int generalizedEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(it->second.eType, sourceDemoType);
+
+
+					// Shots, rockets etc
+					// We can't really tell who they belong to. Just copy them.
+					if (generalizedEntityType == ET_MISSILE_GENERAL) {
+
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							entityState_t tmpEntity = it->second;
+							tmpEntity.eType = ET_MISSILE_JK2;
+							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, demoType);
+							tmpEntity.number = targetEntitySlot;
+							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
+							retimeEntity(&tmpEntity, thisTimeInServerTime, time);
+							playerEntities[targetEntitySlot] = tmpEntity;
+						}
+					}
+				}
+
 				// Get new commands
 				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime - demoReaders[i].sourceInfo->delay);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
@@ -292,8 +320,12 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 							addThisEvent = qtrue;
 						}
 					}
-					if (eventNumber == EV_OBITUARY_JK2) {
+					else if (eventNumber == EV_OBITUARY_JK2) {
 						addThisEvent = qtrue; // TODO Fix this, this is nonsensical here really...just for testing
+					}
+					else if (eventNumber == EV_MISSILE_HIT_JK2 || eventNumber == EV_MISSILE_MISS_JK2 || eventNumber == EV_MISSILE_MISS_METAL_JK2) {
+						addThisEvent = qtrue; // for q3 rocket jumpeeee
+						thisEvent->theEvent.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(thisEvent->theEvent.weapon, sourceDemoType, demoType);
 					}
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
