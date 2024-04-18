@@ -3654,14 +3654,14 @@ static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts) {
 		currentProjectTime += 100;
 		ss << "\t<point>\n";
 		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
-		ss << "\t\t<demotime>" << fastForwardSegments[i].first + 100 + speedupRatio * 100.0f << "</demotime>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].first + 100 + (int64_t)(speedupRatio * 100.0f) << "</demotime>\n";
 		ss << "\t</point>\n";
 
 
 		currentProjectTime += 600;
 		ss << "\t<point>\n";
 		ss << "\t\t<time>" << currentProjectTime << "</time>\n";
-		ss << "\t\t<demotime>" << fastForwardSegments[i].second-100-100.0f*speedupRatio << "</demotime>\n";
+		ss << "\t\t<demotime>" << fastForwardSegments[i].second-100-(int64_t)(100.0f*speedupRatio) << "</demotime>\n";
 		ss << "\t</point>\n";
 
 		currentProjectTime += 100;
