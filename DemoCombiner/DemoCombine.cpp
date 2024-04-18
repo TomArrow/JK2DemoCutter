@@ -386,6 +386,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 				demoType_t sourceDemoType = demoReaders[i].reader.getDemoType();
 				int maxClientsThisDemo = demoReaders[i].reader.getMaxClients();
+				int smallestSnapNumUsed = INT_MAX;
 				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
 
 					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
@@ -427,6 +428,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 					
+					smallestSnapNumUsed = std::min(smallestSnapNumUsed, oldSnap->snapNum);
+
 					demoReaders[i].reader.convertPSTo(&tmpPS,demoType);
 
 
@@ -539,8 +542,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				// Get various related entities
 				int maxLengthTmp;
 				double thisTimeInServerTime;
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay,&thisTimeInServerTime);
+				int entitiesSnapNum = -1;
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay,&thisTimeInServerTime ,&entitiesSnapNum);
 				
+				smallestSnapNumUsed = std::min(smallestSnapNumUsed,entitiesSnapNum);
+
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 					
 					int generalizedEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(it->second.eType,sourceDemoType);
@@ -756,6 +762,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
 				std::map<int, entityState_t> entitiesHere;
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
+				int preciseEntitiesSnapNum = -1;
 				for (int c = 0; c < newEventsHere.size(); c++) {
 					Event* thisEvent = &newEventsHere[c];
 					int eventNumber = thisEvent->eventNumber; // This is currently all specialized for jk2 output! Maybe generalize some day... 
@@ -813,14 +820,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							int soundSourceEntity = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex); // TODO Siwtch to getNormalPlayerSlotIfExists?
 							if (soundSourceEntity != -1) {
 								thisEvent->theEvent.trickedentindex = soundSourceEntity;
-								remapConfigStrings(&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
+								remapConfigStrings(eventNumber,&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
 								addThisEvent = qtrue;
 							}
 						}
 						else {
 							// Not a player. could be a sentry. Who knows.
 							// We cannot know if we need it, so let's just take it.
-							remapConfigStrings(&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
+							remapConfigStrings(eventNumber,&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
 							addThisEvent = qtrue;
 						}
 					}
@@ -838,7 +845,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					else if (eventNumber == EV_SABER_HIT_JK2 || eventNumber == EV_SABER_BLOCK_JK2) { // How to get rid of hits with no corresponding player copied? Check distance?
 
-						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i].reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue);
+						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i].reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue,&preciseEntitiesSnapNum);
+
+						smallestSnapNumUsed = std::min(smallestSnapNumUsed, preciseEntitiesSnapNum);
 
 						// I think default max hitbox is 30x30x64? So middle to farthest point should be vector 15,15,30 length. but i think middle isnt centered?
 						// Is it -24 and then 40 on the top? So let's say max diagonal is distance of 15,15,40. aka sqrt(15*15+15*15+40*40) = 45.27692569068708313286904083492
@@ -886,6 +895,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				demoReaders[i].targetFramesRead++;
+
+
+				demoReaders[i].reader.purgeSnapsBefore(smallestSnapNumUsed);
 			}
 			/*else {
 				// We reached the end of this demo.

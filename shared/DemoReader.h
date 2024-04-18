@@ -217,8 +217,8 @@ public:
 	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
-	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime);
-	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS);
+	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime = NULL, int* sourceSnapNum = NULL);
+	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum = NULL);
 	std::vector<std::string> DemoReader::GetNewCommands(double time);
 	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime);
 	std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind=EK_ENTITY);
@@ -234,12 +234,14 @@ public:
 	qboolean EndReachedAtServerTime(int serverTime);
 	int getCurrentDemoTime();
 	int getDemoRecorderClientNum();
+	qboolean	purgeSnapsBefore(int snapNum);
 };
 
 
 
 
 
+void remapConfigStrings(int eventNumber,entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType);
 void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType);
 
 

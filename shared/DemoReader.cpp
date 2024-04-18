@@ -801,6 +801,7 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 	int lastPastSnap = -1;
 	int lastPastSnapCommandTime = -1;
 	int firstPacketWithPlayerInIt = -1;
+	SnapshotInfoMapIterator lastPastSnapIt;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		//if (it->second.serverTime <= time) {
 		
@@ -809,6 +810,7 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 		if (firstPacketWithPlayerInIt == -1) firstPacketWithPlayerInIt = it->first;
 		
 		if (it->second.playerCommandOrServerTimes[clientNum] <= time) {
+			lastPastSnapIt = it;
 			lastPastSnap = it->first;
 			//lastPastSnapCommandTime = it->second.playerState.commandTime;
 			lastPastSnapCommandTime = it->second.playerCommandOrServerTimes[clientNum];
@@ -860,7 +862,8 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 
 	// Okay now we want to locate the first snap with a different commandtime than lastPastSnap and then interpolate between the two.
 	int firstNextSnap = -1;
-	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+	//for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+	for (auto it = lastPastSnapIt; it != snapshotInfos.end(); it++) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
 
 		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 
@@ -1424,10 +1427,14 @@ std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
 	return retVal;
 }
 
-std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime = NULL) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time);
+
+	if (sourceSnapNum) {
+		*sourceSnapNum = -1;
+	}
 
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
@@ -1449,15 +1456,22 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * 
 			lastPastSnapServerTime = it->second.serverTime;
 		}
 	}
-
 	
+	if (sourceSnapNum) {
+		*sourceSnapNum = lastPastSnap;
+	}
+
 	return snapshotInfos[lastPastSnap].entities;
 }
 
-std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time+0.5);
+
+	if (sourceSnapNum) {
+		*sourceSnapNum = -1;
+	}
 
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
@@ -1469,6 +1483,9 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		if (it->second.serverTime == time) {
+			if (sourceSnapNum) {
+				*sourceSnapNum = it->first;
+			}
 			if (includingPS) {
 
 				std::map<int, entityState_t> retVal = it->second.entities;
@@ -1484,6 +1501,18 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 		}
 	}
 	return std::map<int, entityState_t>();
+}
+
+qboolean DemoReader::purgeSnapsBefore(int snapNum) { 
+
+	int countErase = 0;
+	SnapshotInfoMapIterator itEnd = snapshotInfos.find(snapNum);
+	SnapshotInfoMapIterator itStart = snapshotInfos.begin();
+	if (itEnd != snapshotInfos.end() && itEnd != itStart) {
+		snapshotInfos.erase(itStart, itEnd);
+		return qtrue;
+	}
+	return qfalse;
 }
 
 std::vector<std::string> DemoReader::GetNewCommands(double time) {
@@ -2372,8 +2401,8 @@ int main(int argc, char** argv) {
 }*/
 
 
-void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
-	int eventHere = generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity->event & ~EV_EVENT_BITS,demoType);
+void remapConfigStrings(int eventNumber, entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2,demoType_t demoType) {
+	int eventHere = generalizeGameValue<GMAP_EVENTS, UNSAFE>(eventNumber,demoType);
 	int maxLength = 0;
 	if (eventHere == EV_GENERAL_SOUND_GENERAL) {
 		int soundIndex = tmpEntity->eventParm;
@@ -2391,6 +2420,28 @@ void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoRea
 		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd, demoType);
 		tmpEntity->modelindex2 = newModelIndex;
 	}
+}
+
+void remapConfigStrings(entityState_t* tmpEntity, clientActive_t* clCut, DemoReader* reader, std::vector<std::string>* commandsToAdd, qboolean doModelIndex, qboolean doModelIndex2, demoType_t demoType) {
+	/*int eventHere = generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity->event & ~EV_EVENT_BITS,demoType);
+	int maxLength = 0;
+	if (eventHere == EV_GENERAL_SOUND_GENERAL) {
+		int soundIndex = tmpEntity->eventParm;
+		const char* soundName = reader->GetSoundConfigString(soundIndex, &maxLength);
+		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd, demoType);
+		tmpEntity->eventParm = newSoundIndex;
+	}
+	if (doModelIndex && tmpEntity->modelindex) {
+		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex, &maxLength);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd, demoType);
+		tmpEntity->modelindex = newModelIndex;
+	}
+	if (doModelIndex2 && tmpEntity->modelindex2) {
+		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex2, &maxLength);
+		int newModelIndex = G_ModelIndex((char*)modelName, clCut, commandsToAdd, demoType);
+		tmpEntity->modelindex2 = newModelIndex;
+	}*/
+	remapConfigStrings(tmpEntity->event & ~EV_EVENT_BITS, tmpEntity, clCut, reader, commandsToAdd, doModelIndex, doModelIndex2, demoType);
 }
 
 #ifdef RELDEBUG
