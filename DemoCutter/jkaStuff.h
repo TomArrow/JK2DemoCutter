@@ -4075,8 +4075,8 @@ static const int jkaAnimToDM16Mapping[] = //# animNumber_e
 	BOTH_STAND5TOSTAND8_DM16,	//# Transition from stand5 to stand8
 	BOTH_STAND7TOSTAND8_DM16,	//# Tavion putting hands on back of chair (cin #11)
 	BOTH_STAND8TOSTAND5_DM16,	//# Transition from stand8 to stand5
-		0,//BOTH_STAND9_DM16,			//# Kyle's standing idle_DM16, no weapon_DM16, hands down
-		0,//BOTH_STAND9IDLE1_DM16,		//# Kyle's random standing idle
+		BOTH_STAND2_DM16,			//0,//BOTH_STAND9_DM16,			//# Kyle's standing idle_DM16, no weapon_DM16, hands down
+		BOTH_STAND2IDLE1_DM16,			//0,//BOTH_STAND9IDLE1_DM16,		//# Kyle's random standing idle
 	BOTH_STAND5SHIFTWEIGHT_DM16,	//# Weightshift from stand5 to side and back to stand5
 	BOTH_STAND5SHIFTWEIGHTSTART_DM16,	//# From stand5 to side
 	BOTH_STAND5SHIFTWEIGHTSTOP_DM16,		//# From side to stand5
@@ -4607,22 +4607,22 @@ static const int jkaAnimToDM16Mapping[] = //# animNumber_e
 			0,//BOTH_SONICPAIN_END_DM16,
 
 	//new anim slots per Jarrod's request
-		0,//BOTH_STAND10_DM16,
-		0,//BOTH_STAND10_TALK1_DM16,
-		0,//BOTH_STAND10_TALK2_DM16,
-		0,//BOTH_STAND10TOSTAND1_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND10_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND10_TALK1_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND10_TALK2_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND10TOSTAND1_DM16,
 
-		0,//BOTH_STAND1_TALK1_DM16,
-		0,//BOTH_STAND1_TALK2_DM16,
-		0,//BOTH_STAND1_TALK3_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND1_TALK1_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND1_TALK2_DM16,
+		BOTH_STAND2_DM16,//0,//BOTH_STAND1_TALK3_DM16,
 
-		0,//BOTH_SIT4_DM16,
-		0,//BOTH_SIT5_DM16,
-		0,//BOTH_SIT5_TALK1_DM16,
-			0,//BOTH_SIT5_TALK2_DM16,
-		0,//BOTH_SIT5_TALK3_DM16,
+		BOTH_SIT1_DM16,//0,//BOTH_SIT4_DM16,
+		BOTH_SIT1_DM16,//0,//BOTH_SIT5_DM16,
+		BOTH_SIT1_DM16,//0,//BOTH_SIT5_TALK1_DM16,
+			BOTH_SIT1_DM16,//0,//BOTH_SIT5_TALK2_DM16,
+		BOTH_SIT1_DM16,//0,//BOTH_SIT5_TALK3_DM16,
 
-		0,//BOTH_SIT6_DM16,
+		BOTH_SIT1_DM16,//0,//BOTH_SIT6_DM16,
 	BOTH_SIT7_DM16,
 
 	//=================================================
