@@ -1604,6 +1604,14 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 		basePlayerStates[i].stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = 100;
 	}
 }
+void DemoReader::updateConfigStringRelatedInfo() { // TODO expand this to be time-relevant by also reading tinfo and filling health and armor and such
+	int maxLength;
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
+	maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	const char* systemInfo = thisDemo.cut.Cl.gameState.stringData + offset;
+	int g_entHUDFields = atoi(Info_ValueForKey(systemInfo, maxLength, "g_entHUDFields"));
+	extraFieldInfo.g_entHUDieldsValue = g_entHUDFields;
+}
 
 qboolean DemoReader::ReadMessage() {
 	if (endReached) return qfalse;
@@ -1769,6 +1777,7 @@ readNext:
 				Com_DPrintf("[NOTE] Demo cutter, parsing gamestate failed.\n");
 				return qfalse;
 			}
+			updateConfigStringRelatedInfo();
 			generateBasePlayerStates();
 			//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 			//newHandle = FS_FOpenFileWrite(newName);
@@ -1809,6 +1818,29 @@ readNext:
 				snapshotInfo.serverTime = thisDemo.cut.Cl.snap.serverTime;
 				for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+
+					if (extraFieldInfo.g_entHUDieldsValue) {
+						const int g_entHUDFieldsExtraFields = (1 << ENTITYEXTRA_HEALTH) | (1 << ENTITYEXTRA_ARMOR) | (1 << ENTITYEXTRA_FORCE) | (1 << ENTITYEXTRA_SABERDRAWANIMLEVEL) | (1 << ENTITYEXTRA_CURRENTWEAPONAMMO) | (1 << ENTITYEXTRA_TRIPMINEAMMO) | (1 << ENTITYEXTRA_HASSENTRY) | (1 << ENTITYEXTRA_HASMEDPACK) | (1 << ENTITYEXTRA_HASFORCEFIELD) | (1 << ENTITYEXTRA_HASSEEKER);
+						/*
+							// trickedentindex3: armor (8 bits), health (8 bits)
+							ent->client->ps.fd.forceMindtrickTargetIndex3 = ent->s.trickedentindex3 = ((MIN(127,MAX(-128,ent->client->ps.stats[STAT_HEALTH])) & 0xff) << 8) | (MIN(127, MAX(-128, ent->client->ps.stats[STAT_ARMOR])) & 0xff);
+							// trickedentindex4: force power (7 bits), current weapon ammo (7 bits), saberdrawanimlevel (2 bits)
+							ent->client->ps.fd.forceMindtrickTargetIndex4 = ent->s.trickedentindex4 = (ent->client->ps.fd.saberDrawAnimLevel & 3) << 14 | ((MAX(0, MIN(127, ent->client->ps.ammo[weaponData[ent->client->ps.weapon].ammoIndex])) & 127) << 7) | (MAX(0, MIN(127, ent->client->ps.fd.forcePower)) & 127);
+							// generic1: seeker, forcefield, bacta, sentry in inventory (1 bit each), mine count (4 bits)
+							ent->client->ps.generic1 = ent->s.generic1 = ((MAX(0, MIN(15, ent->client->ps.ammo[weaponData[WP_TRIP_MINE].ammoIndex])) & 15) << 4) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SENTRY_GUN))) << 3) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_MEDPAC))) << 2) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SHIELD))) << 1) | (!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SEEKER)));
+						*/
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] = (signed char)((thisEntity->trickedentindex3>>8) & 0xff);
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_ARMOR] = (signed char)((thisEntity->trickedentindex3) & 0xff);
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_FORCE] = thisEntity->trickedentindex4 & 127;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_SABERDRAWANIMLEVEL] = (thisEntity->trickedentindex4 >> 14) & 3;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_CURRENTWEAPONAMMO] = (thisEntity->trickedentindex4>>7) & 127;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_TRIPMINEAMMO] = (thisEntity->generic1 >>4) & 15;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HASSENTRY] = (thisEntity->generic1 >>3) & 1;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HASMEDPACK] = (thisEntity->generic1 >>2) & 1;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HASFORCEFIELD] = (thisEntity->generic1 >>1) & 1;
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HASSEEKER] = (thisEntity->generic1) & 1;
+						thisEntity->demoToolsData.entityExtraValuesBitmask = g_entHUDFieldsExtraFields;
+					}
 
 					int possibleDimensionNum = (thisEntity->forcePowersActive >> 20) & 31;
 					if (possibleDimensionNum) {
@@ -2260,6 +2292,7 @@ readNext:
 
 	if (hadConfigStringChanges) {
 		generateBasePlayerStates();
+		updateConfigStringRelatedInfo();
 	}
 
 /*#if DEBUG

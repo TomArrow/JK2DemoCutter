@@ -96,6 +96,7 @@ class DemoReader {
 		qboolean ownageExtraInfoMetaMarker = qfalse;
 		qboolean dimensionInfoConfirmed = qfalse;
 		dimensionDataType_t dimensionInfoType = (dimensionDataType_t )(-1);
+		int g_entHUDieldsValue = 0;
 		int64_t	cutStartOffset = 0;
 		int64_t	truncationOffset = 0;
 	} extraFieldInfo;
@@ -167,7 +168,7 @@ class DemoReader {
 	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
 	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
 
-
+	void updateConfigStringRelatedInfo();
 
 	void generateBasePlayerStates();
 

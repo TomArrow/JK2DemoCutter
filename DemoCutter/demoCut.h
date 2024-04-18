@@ -687,6 +687,8 @@ typedef enum
 // JK2 SP stuff end
 
 
+
+
 // xkan, 1/10/2003 - adapted from original SP
 typedef enum
 {
@@ -717,7 +719,23 @@ typedef struct {
 } trajectory_t;
 
 
+typedef enum entityExtraValues_t {
+	ENTITYEXTRA_HEALTH,
+	ENTITYEXTRA_ARMOR,
+	ENTITYEXTRA_FORCE,
+	ENTITYEXTRA_SABERDRAWANIMLEVEL,
+	ENTITYEXTRA_CURRENTWEAPONAMMO,
+	ENTITYEXTRA_TRIPMINEAMMO,
+	ENTITYEXTRA_HASSENTRY,
+	ENTITYEXTRA_HASMEDPACK,
+	ENTITYEXTRA_HASFORCEFIELD,
+	ENTITYEXTRA_HASSEEKER,
+	ENTITYEXTRA_COUNT
+};
+
 typedef struct demoToolsEntityData_t{
+	int entityExtraValuesBitmask;
+	short entityExtraValues[ENTITYEXTRA_COUNT];
 	int detectedDimension;
 	bool globalDimension;
 	bool globalEvent;
@@ -726,6 +744,8 @@ typedef struct demoToolsEntityData_t{
 	trajectory_t uninterpolatedPos;
 	trajectory_t uninterpolatedAPos;
 };
+
+
 
 typedef struct playerState_s {
 	// Shared between games:
@@ -3077,6 +3097,9 @@ typedef enum {
 } weapon_t;
 
 
+
+
+
 typedef enum {
 	WP_NONE_JK2,
 
@@ -3106,6 +3129,38 @@ typedef enum {
 
 	WP_NUM_WEAPONS_JK2
 } weapon_jk2_t;
+
+
+
+
+typedef struct weaponData_s
+{
+	//	char	classname[32];		// Spawning name
+
+	int		ammoIndex;			// Index to proper ammo slot
+	int		ammoLow;			// Count when ammo is low
+
+	int		energyPerShot;		// Amount of energy used per shot
+	int		fireTime;			// Amount of time between firings
+	int		range;				// Range of weapon
+
+	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+	int		altFireTime;		// Amount of time between alt-firings
+	int		altRange;			// Range of alt-fire
+
+	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+	int		altChargeSubTime;	// above for secondary
+
+	int		chargeSub;			// amount to subtract during charge on each interval
+	int		altChargeSub;		// above for secondary
+
+	int		maxCharge;			// stop subtracting once charged for this many ms
+	int		altMaxCharge;		// above for secondary
+} weaponData_t;
+
+extern weaponData_t weaponData_1_02[WP_NUM_WEAPONS_JK2];
+
+
 
 static const int jk2WeaponsToGeneral[]= {
 	WP_NONE_GENERAL,

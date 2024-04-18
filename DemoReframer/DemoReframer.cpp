@@ -647,7 +647,7 @@ int main(int argcO, char** argvO) {
 
 	opts.visAll = false;
 	//if (argc == 5 && !stricmp(argv[4],"visall")) {
-	if (args.size() > 3 && !stricmp(args[4].c_str(),"visall")) {
+	if (args.size() > 3 && !stricmp(args[3].c_str(),"visall")) {
 		opts.visAll = true;
 	}
 	if (v->is_set()) {
