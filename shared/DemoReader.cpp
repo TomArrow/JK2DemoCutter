@@ -802,12 +802,16 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 	int lastPastSnapCommandTime = -1;
 	int firstPacketWithPlayerInIt = -1;
 	SnapshotInfoMapIterator lastPastSnapIt;
+	SnapshotInfoMapIterator firstPacketWithPlayerInItIt;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		//if (it->second.serverTime <= time) {
 		
 		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 		
-		if (firstPacketWithPlayerInIt == -1) firstPacketWithPlayerInIt = it->first;
+		if (firstPacketWithPlayerInIt == -1) { 
+			firstPacketWithPlayerInItIt = it;
+			firstPacketWithPlayerInIt = it->first; 
+		}
 		
 		if (it->second.playerCommandOrServerTimes[clientNum] <= time) {
 			lastPastSnapIt = it;
@@ -823,6 +827,8 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 			return retVal;
 		}
 		else {
+			//if (oldSnap) *oldSnap = &firstPacketWithPlayerInItIt->second;
+			//if (newSnap) *newSnap = &firstPacketWithPlayerInItIt->second;
 			//return GetPlayerFromSnapshot(clientNum,&snapshotInfos[firstPacketWithPlayerInIt]);
 			return GetPlayerFromSnapshot(clientNum,firstPacketWithPlayerInIt,NULL, detailedPS);
 			/*SnapshotInfo* thatSnapshot = &snapshotInfos[firstPacketWithPlayerInIt];
@@ -862,6 +868,7 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 
 	// Okay now we want to locate the first snap with a different commandtime than lastPastSnap and then interpolate between the two.
 	int firstNextSnap = -1;
+	SnapshotInfoMapIterator firstNextSnapIt = lastPastSnapIt;
 	//for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 	for (auto it = lastPastSnapIt; it != snapshotInfos.end(); it++) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
 
@@ -869,15 +876,18 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 
 		if (it->second.playerCommandOrServerTimes[clientNum] > lastPastSnapCommandTime) {
 			firstNextSnap = it->first;
+			firstNextSnapIt = it;
 			break;
 		}
 	}
 
-	if (oldSnap) *oldSnap = &snapshotInfos[lastPastSnap];
-	if (newSnap) *newSnap = &snapshotInfos[firstNextSnap];
+	if (oldSnap) *oldSnap = &lastPastSnapIt->second;//&snapshotInfos[lastPastSnap];
+	if (newSnap) *newSnap = firstNextSnap == -1 ? NULL : &firstNextSnapIt->second;//&snapshotInfos[firstNextSnap];
 
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
-	InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal, detailedPS);
+	//InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal, detailedPS);
+	InterpolatePlayer(clientNum,time, &lastPastSnapIt->second, firstNextSnap == -1 ? NULL : &firstNextSnapIt->second, &retVal, detailedPS);
+	InterpolatePlayer(clientNum,time, &lastPastSnapIt->second, firstNextSnap == -1 ? NULL : &firstNextSnapIt->second, &retVal, detailedPS);
 
 	return retVal;
 	

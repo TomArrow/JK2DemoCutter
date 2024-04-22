@@ -151,8 +151,8 @@ public:
 	int netAnalysisMode = 0;
 	int teleportAnalysis = 0; // 1 analyze teleports that are to the same place. 2 analyze being at same place multiple times (more expensive computation)
 	int64_t teleportAnalysisEndDemoTime = 0;
-	int teleportAnalysisBufferTimeFuture = 2000;
-	int teleportAnalysisBufferTimePast = 5000;
+	int teleportAnalysisBufferTimeFuture = 5000;
+	int teleportAnalysisBufferTimePast = 2000;
 	int teleportAnalysisMinTimeFastForward = 1000;
 	float teleportAnalysisMaxDistanceHorizontal = 100; 
 	float teleportAnalysisMaxDistanceVertical = 40; 
@@ -3578,9 +3578,19 @@ static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts) {
 						if (VectorLength2(distance) < opts.teleportAnalysisMaxDistanceHorizontal && abs(distance[2]) < opts.teleportAnalysisMaxDistanceVertical) {
 							int64_t ffStart = teleports[i].demoTime+opts.teleportAnalysisBufferTimePast;
 							int64_t ffEnd = teleports[d].demoTime- opts.teleportAnalysisBufferTimeFuture;
+							if (fastForwardSegments.size()) {
+								// If we are using a negative teleportAnalysisBufferTimePast, make sure we do not conflict with the ending of the last fast forward segment.
+								ffStart = std::max(ffStart,fastForwardSegments.back().second);
+							}
+							if ((ffEnd-ffStart)<1000) {
+								break;
+							}
 							fastForwardSegments.push_back({ ffStart,ffEnd });
 							totalSkippedTime += ffEnd - ffStart;
 							i = d + 1;
+							//while (i > 0 && teleports[i-1].demoTime >= ffEnd) {
+							//	i--; // Allow us to fast forward after the end of this segment. // Edit: actually don't, we end up skipping important parts that way for reasons.
+							//}
 							goto continueteleportcomparesearch;
 						}
 					}
@@ -3630,6 +3640,11 @@ static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts) {
 	ss << ("\t<offset>0</offset>\n");
 	ss << ("\t<speed>1.00</speed>\n");
 	ss << ("\t<locked>1</locked>\n");
+
+	ss << "\t<point>\n";
+	ss << "\t\t<time>0</time>\n";
+	ss << "\t\t<demotime>0</demotime>\n";
+	ss << "\t</point>\n";
 
 	int64_t currentDemoTime = 0;
 	int64_t currentProjectTime = 0;
@@ -8663,7 +8678,7 @@ int main(int argcO, char** argvO) {
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
 	auto A = op.add<popl::Implicit<int>>("A", "teleport-analysis", "Find teleports in demo and make script to speed up time of repeated attempts with teleports putting the player back. Optionally, set to 2 to not only analyze teleports but all locations.",1);
-	auto x = op.add<popl::Value<std::string>>("x", "teleport-analysis-endtime", "Provide parameters for teleport analysis as numbers, separated by empty space: demotime of detection end, buffer around fast forward segments post, same thing pre (used so u dont cut off gameplay). Fourth and fifth value is distance to consider 'same place' in mode 2 (horizontal and vertical). Fifth value: minimum amount of time to consider fast-forwarding (excluding buffertimes). Defaults: 0 2000 5000 100 40 10000");
+	auto x = op.add<popl::Value<std::string>>("x", "teleport-analysis-endtime", "Provide parameters for teleport analysis as numbers, separated by empty space: demotime of detection end, buffer around fast forward segments post, same thing pre (used so u dont cut off gameplay). Fourth and fifth value is distance to consider 'same place' in mode 2 (horizontal and vertical). Fifth value: minimum amount of time to consider fast-forwarding (excluding buffertimes). Defaults: 0 5000 2000 100 40 10000");
 	auto k = op.add<popl::Switch>("k", "kill-sprees-only-visible-kills", "Only find killsprees made up out of visible kills.");
 	auto r = op.add<popl::Switch>("r", "reframe-if-needed", "Reframe demos if needed via --reframe parameter to DemoCutter command.");
 	auto D = op.add<popl::Switch>("D", "dump-stufftext", "Prints out stufftext commands in the demo as error output for convenient redirecting.");

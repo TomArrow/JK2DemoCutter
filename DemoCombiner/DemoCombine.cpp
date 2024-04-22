@@ -428,7 +428,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 					
-					smallestSnapNumUsed = std::min(smallestSnapNumUsed, oldSnap->snapNum);
+					tmpPS.eFlags &= ~EF_CONNECTION; // dont show ppl as lagging, who cares. just gets in the way.
+
+					if (oldSnap) {
+						smallestSnapNumUsed = std::min(smallestSnapNumUsed, oldSnap->snapNum);
+					}
 
 					demoReaders[i].reader.convertPSTo(&tmpPS,demoType);
 

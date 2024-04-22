@@ -194,13 +194,22 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 			if (demoReaders[i].reader.SeekToTime(sourceTime - demoReaders[i].sourceInfo->delay)) 
 			{ // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
+
+				int smallestSnapNumUsed = INT_MAX;
+
 				demoType_t sourceDemoType = demoReaders[i].reader.getDemoType();
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
 				//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime); 
 				SnapshotInfo* snapInfo = demoReaders[i].reader.GetSnapshotInfoAtOrBeforeDemoTime(sourceTime - demoReaders[i].sourceInfo->delay, qtrue); // Find out which player to show at this time
-				tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(snapInfo->playerState.clientNum, sourceTime - demoReaders[i].sourceInfo->delay - demoReaders[i].playersToCopy[snapInfo->playerState.clientNum].pingCompensation); // Interpolate him. TODO: Make more efficient.
+				SnapshotInfo* realSourceSnap = NULL;
+				tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(snapInfo->playerState.clientNum, sourceTime - demoReaders[i].sourceInfo->delay - demoReaders[i].playersToCopy[snapInfo->playerState.clientNum].pingCompensation, &realSourceSnap); // Interpolate him. TODO: Make more efficient.
 				std::map<int, entityState_t> hereEntities = snapInfo->entities;
+
+				smallestSnapNumUsed = std::min(smallestSnapNumUsed, snapInfo->snapNum);
+				if (realSourceSnap) {
+					smallestSnapNumUsed = std::min(smallestSnapNumUsed, realSourceSnap->snapNum);
+				}
 
 				demoReaders[i].reader.convertPSTo(&tmpPS,demoType);
 
@@ -271,7 +280,10 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 
 				double thisTimeInServerTime;
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay, &thisTimeInServerTime);
+				int entitiesSourceSnapNum = INT_MAX;
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay, &thisTimeInServerTime,&entitiesSourceSnapNum);
+
+				smallestSnapNumUsed = std::min(smallestSnapNumUsed, entitiesSourceSnapNum);
 
 				for (auto it = sourceEntitiesAtTime.begin(); it != sourceEntitiesAtTime.end(); it++) {
 
@@ -329,10 +341,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 					}
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
+
+				demoReaders[i].reader.purgeSnapsBefore(smallestSnapNumUsed);
 			}
+
 			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)) {
 				allSourceDemosFinished = qfalse;
 			}
+
 		}
 
 		// Find empty places in entities and add events.
