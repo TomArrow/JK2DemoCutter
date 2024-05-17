@@ -150,19 +150,6 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	}
 }
 
-qboolean DemoReaderLight::CloseDemo() {
-
-	FS_FCloseFile(oldHandle);
-	return qtrue;
-}
-qboolean DemoReaderLight::AnySnapshotParsed() {
-
-	return anySnapshotParsed;
-}
-qboolean DemoReaderLight::EndReached() {
-
-	return endReached;
-}
 qboolean DemoReaderLight::EndReachedAtTime(float time) {
 	SeekToTime(time);
 	return (qboolean)(demoCurrentTime < time);
@@ -187,23 +174,7 @@ qboolean DemoReaderLight::SeekToServerTime(int serverTime) {
 	if (lastKnownTime < serverTime && endReached) return qfalse;
 	return qtrue;
 }
-qboolean DemoReaderLight::SeekToCommandTime(int serverTime) {
-	while (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && !endReached) {
-		ReadMessage();
-	}
-	if (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && endReached) return qfalse;
-	return qtrue;
-}
-qboolean DemoReaderLight::SeekToAnySnapshotIfNotYet() {
-	while (!anySnapshotParsed && !endReached) {
-		ReadMessage();
-	}
-	if (!anySnapshotParsed && endReached) return qfalse;
-	return qtrue;
-}
-playerState_t DemoReaderLight::GetCurrentPlayerState() {
-	return thisDemo.cut.Cl.snap.ps;
-}
+
 
 void DemoReaderLight::GetPlayersSeen(qboolean* playersSeenA) { // Requires pointer to array with 32 qbooleans
 	Com_Memcpy(playersSeenA, playerSeen, sizeof(playerSeen));
@@ -297,43 +268,8 @@ void DemoReaderLight::FreePingData() {
 }
 
 
-std::map<int,entityState_t> DemoReaderLight::GetCurrentEntities() {
-	std::map<int, entityState_t> retVal;
-	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
-		entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-		retVal[thisEntity->number] = *thisEntity;
-	}
-	return retVal;
-}
 
 
-
-clSnapshot_t DemoReaderLight::GetCurrentSnap() {
-	return thisDemo.cut.Cl.snap;
-}
-
-const char* DemoReaderLight::GetPlayerConfigString(int playerNum,int* maxLength) {
-	int offset = thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + playerNum];
-	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
-	return thisDemo.cut.Cl.gameState.stringData + offset;
-}
-const char* DemoReaderLight::GetConfigString(int configStringNum, int* maxLength) {
-	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringNum];
-	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
-	return thisDemo.cut.Cl.gameState.stringData + offset;
-}
-
-
-qboolean DemoReaderLight::ReadMessage() {
-	if (endReached) return qfalse;
-	qboolean realReadResult = qfalse;
-	realReadResult = ReadMessageReal();
-	if (!realReadResult) {
-		endReached = qtrue;
-		return qfalse;
-	}
-	return qtrue;
-}
 
 
 qboolean DemoReaderLight::ReadMessageReal() {

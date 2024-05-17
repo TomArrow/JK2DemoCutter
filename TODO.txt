@@ -13,6 +13,12 @@ For example, enhanceonly didnt properly handle death/alive state and still doesn
 Make demo converter. Let it for example fix up names for jomme. Find closest color from the NT mod colors.
 
 
+todo combiner: dismemberment entities? make sure to convert properly between dm_15 and dm_16! check demo15detected in jomme
+todo combiner: convert nt name colors to hex?
+
+find: dooms on heads of other ppl or other objects?
+
+
 - not sure if done yet? find amount of SD in a cap run
 
 IMPORTANT: handle bcs... (bcs0 bcs1 bcs3)

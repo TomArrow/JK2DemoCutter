@@ -344,19 +344,6 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	}
 }
 
-qboolean DemoReader::CloseDemo() {
-
-	FS_FCloseFile(oldHandle);
-	return qtrue;
-}
-qboolean DemoReader::AnySnapshotParsed() {
-
-	return anySnapshotParsed;
-}
-qboolean DemoReader::EndReached() {
-
-	return endReached;
-}
 qboolean DemoReader::EndReachedAtTime(double time) {
 	SeekToTime(time);
 	return (qboolean)(demoCurrentTime < time);
@@ -364,9 +351,6 @@ qboolean DemoReader::EndReachedAtTime(double time) {
 qboolean DemoReader::EndReachedAtServerTime(int serverTime) {
 	SeekToServerTime(serverTime);
 	return (qboolean)(lastKnownTime < serverTime);
-}
-int DemoReader::getCurrentDemoTime() {
-	return demoCurrentTime;
 }
 
 qboolean DemoReader::SeekToTime(double time) {
@@ -383,6 +367,24 @@ qboolean DemoReader::SeekToServerTime(int serverTime) {
 	if (lastKnownTime < serverTime && endReached) return qfalse;
 	return qtrue;
 }
+
+
+
+qboolean DemoReader::SeekToPlayerCommandOrServerTime(int clientNum, int serverTime) {
+	while (lastKnownCommandOrServerTimes[clientNum] < serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownCommandOrServerTimes[clientNum] < serverTime && endReached) return qfalse;
+	return qtrue;
+}
+qboolean DemoReader::SeekToPlayerInPacket(int clientNum) {
+	while (lastKnownCommandOrServerTimes[clientNum] <= 0 && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownCommandOrServerTimes[clientNum] <= 0 && endReached) return qfalse;
+	return qtrue;
+}
+
 int DemoReader::GetFirstServerTimeAfterServerTime(int serverTime) {
 	while (lastKnownTime <= serverTime && !endReached) {
 		ReadMessage();
@@ -492,37 +494,6 @@ SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
 SnapshotInfo* DemoReader::GetSnapshotInfoAtOrBeforeDemoTime(float demoTime, qboolean includeAfterIfFirst) {
 	SnapshotInfoMapIterator it = GetSnapshotInfoAtOrBeforeDemoTimeIterator(demoTime, includeAfterIfFirst);
 	return it!= snapshotInfos.end() ? &it->second : NULL;
-}
-qboolean DemoReader::SeekToCommandTime(int serverTime) {
-	while (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && !endReached) {
-		ReadMessage();
-	}
-	if (thisDemo.cut.Clc.lastKnownCommandTime < serverTime && endReached) return qfalse;
-	return qtrue;
-}
-qboolean DemoReader::SeekToPlayerCommandOrServerTime(int clientNum,int serverTime) {
-	while (lastKnownCommandOrServerTimes[clientNum] < serverTime && !endReached) {
-		ReadMessage();
-	}
-	if (lastKnownCommandOrServerTimes[clientNum] < serverTime && endReached) return qfalse;
-	return qtrue;
-}
-qboolean DemoReader::SeekToPlayerInPacket(int clientNum) {
-	while (lastKnownCommandOrServerTimes[clientNum] <=0 && !endReached) {
-		ReadMessage();
-	}
-	if (lastKnownCommandOrServerTimes[clientNum] <= 0 && endReached) return qfalse;
-	return qtrue;
-}
-qboolean DemoReader::SeekToAnySnapshotIfNotYet() {
-	while (!anySnapshotParsed && !endReached) {
-		ReadMessage();
-	}
-	if (!anySnapshotParsed && endReached) return qfalse;
-	return qtrue;
-}
-playerState_t DemoReader::GetCurrentPlayerState() {
-	return thisDemo.cut.Cl.snap.ps;
 }
 
 // Don't call if you're not sure if the snapnum exists.
@@ -1056,7 +1027,7 @@ void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bo
 	}
 	
 }
-void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) {
+void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) { // dont really bother using this unless ur intended output is DM_15 or DM_16. It's a mess.
 
 	if (targetDemoType == demoType)
 	{
@@ -1094,7 +1065,7 @@ void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) {
 			ps->weapon = specializedGameValueMapUnsafe<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType, targetDemoType);
 			ps->genericEnemyIndex = -1; // Don't draw seeker drone pls.
 		}
-		if (demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68) { // TODO: Do all this more elegeantly? Please?
+		if (targetDemoType == DM_15 &&( demoType == DM_14 || demoType == DM_16 || demoType == DM_26 || demoType == DM_25 || demoType == DM_68)) { // TODO: Do all this more elegeantly? Please?
 
 			//ps->torsoAnim = animMappingTable_1_04_to_1_02[ps->torsoAnim];
 			//ps->legsAnim = animMappingTable_1_04_to_1_02[ps->legsAnim];
@@ -1102,6 +1073,10 @@ void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) {
 			ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, DM_16, DM_15);
 			//ps->legsAnim = MV_MapAnimation102(ps->legsAnim);
 			ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, DM_16, DM_15);
+		}
+		else if (demoType == DM_15 && (targetDemoType == DM_16 || targetDemoType == DM_15_1_03)) {
+			ps->torsoAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, DM_15, DM_16);
+			ps->legsAnim = specializedGameValueMapUnsafe<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, DM_15, DM_16);
 		}
 
 		if (demoType < DM_15 || demoType > DM_16) {
@@ -1428,15 +1403,6 @@ void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from
 
 
 
-std::map<int,entityState_t> DemoReader::GetCurrentEntities() {
-	std::map<int, entityState_t> retVal;
-	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
-		entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-		retVal[thisEntity->number] = *thisEntity;
-	}
-	return retVal;
-}
-
 std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
@@ -1605,16 +1571,7 @@ int DemoReader::GetFirstSnapServerTime() {
 	return thisDemo.cut.Clc.firstSnapServerTime;
 }
 
-clSnapshot_t DemoReader::GetCurrentSnap() {
-	return thisDemo.cut.Cl.snap;
-}
 
-const char* DemoReader::GetPlayerConfigString(int playerNum,int* maxLength) {
-	int configStringBaseIndex = getCS_PLAYERS(demoType); // (demoType == DM_26 || demoType == DM_25) ? CS_PLAYERS_JKA : CS_PLAYERS;
-	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + playerNum];
-	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
-	return thisDemo.cut.Cl.gameState.stringData + offset;
-}
 const char* DemoReader::GetSoundConfigString(int soundNum,int* maxLength) {
 	int configStringBaseIndex = getCS_SOUNDS(demoType);// (demoType == DM_26 || demoType == DM_25) ? CS_SOUNDS_JKA : CS_SOUNDS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + soundNum];
@@ -1627,11 +1584,7 @@ const char* DemoReader::GetModelConfigString(int modelNum,int* maxLength) {
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
-const char* DemoReader::GetConfigString(int configStringNum, int* maxLength) {
-	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringNum];
-	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
-	return thisDemo.cut.Cl.gameState.stringData + offset;
-}
+
 
 void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-relevant by also reading tinfo and filling health and armor and such
 	int maxLength;
@@ -1652,16 +1605,6 @@ void DemoReader::updateConfigStringRelatedInfo() { // TODO expand this to be tim
 	extraFieldInfo.g_entHUDieldsValue = g_entHUDFields;
 }
 
-qboolean DemoReader::ReadMessage() {
-	if (endReached) return qfalse;
-	qboolean realReadResult = qfalse;
-	realReadResult = ReadMessageReal();
-	if (!realReadResult) {
-		endReached = qtrue;
-		return qfalse;
-	}
-	return qtrue;
-}
 
 int DemoReader::getDemoRecorderClientNum() {
 	SeekToAnySnapshotIfNotYet();

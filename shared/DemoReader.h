@@ -6,6 +6,8 @@
 #include "jpcre2.hpp"
 #include <demoCut.h>
 
+#include <DemoReaderBase.h>
+
 #define PLAYERSTATE_FUTURE_SEEK 60000
 
 typedef jpcre2::select<char> jp;
@@ -21,7 +23,7 @@ enum highlightSearchMode_t {
 
 class Command {
 public:
-	int demoTime;
+	int64_t demoTime;
 	int serverTime;
 	std::string command;
 };
@@ -61,12 +63,8 @@ typedef enum dimensionDataType_t {
 	DIM_OWNAGE
 };
 
-class DemoReader {
+class DemoReader : public DemoReaderBase {
 
-	std::string originalDemoPath = "";
-
-	bool	isMOHAADemo = false;
-	int		maxClientsThisDemo = MAX_CLIENTS;
 
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
 	jp::Regex defragRecordFinishRegex;
@@ -78,7 +76,7 @@ class DemoReader {
 	//std::map<int, int> playerFirstFollowed;
 	//std::map<int, int> playerFirstFollowedOrVisible;
 	//std::map<int, int> lastEventTime;
-	int lastEventTime[MAX_GENTITIES]{};
+	int64_t lastEventTime[MAX_GENTITIES]{};
 	//std::map<int, int> lastEvent;
 	int lastEvent[MAX_GENTITIES]{};
 
@@ -105,25 +103,6 @@ class DemoReader {
 	std::vector<Command> readCommands;
 	std::vector<Event> readEvents;
 
-	int lastKnownRedFlagCarrier = -1;
-	int lastKnownBlueFlagCarrier = -1;
-	demo_t			thisDemo;
-
-	// Info during reading
-	demoType_t		demoType;
-	qboolean		isCompressedFile;
-	fileHandle_t	oldHandle = 0;
-	int				oldSize;
-	int				readGamestate = 0;
-
-	int				demoStartTime = 0;
-	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int64_t			demoCurrentTime = 0;
-	int				lastGameStateChange = 0;
-	int				lastGameStateChangeInDemoTime = 0;
-	int				lastKnownTime = 0;
-	int				lastKnownInOrderTime = 0;
-	int				maxSequenceNum = -9999;
 	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
 	qboolean wasFirstCommandByte = qfalse;
@@ -137,8 +116,6 @@ class DemoReader {
 	double			lastGottenEventsTime[EK_COUNT] = { 0 };
 	int				lastGottenEventsServerTime[EK_COUNT] = { 0 };
 
-	qboolean		anySnapshotParsed = qfalse;
-	qboolean		endReached = qfalse;
 
 
 	//clSnapshot_t lastSnap;
@@ -162,9 +139,9 @@ class DemoReader {
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
 
-	qboolean ReadMessage();
+	//qboolean ReadMessage();
 
-	qboolean ReadMessageReal();
+	qboolean ReadMessageReal() override;
 	playerState_t GetPlayerFromSnapshot(int clientNum, int snapNum, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
 	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
 
@@ -174,6 +151,7 @@ class DemoReader {
 
 public:
 
+	qboolean LoadDemo(const char* sourceDemoFile);
 	void convertPSTo(playerState_t* ps, demoType_t targetDemoType);
 
 	DemoReader::DemoReader() : defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[((\^200:00.000\^7)|(\^2(\d+):(\d+.\d+)\^7))\]\.)raw", "mSi") {
@@ -203,36 +181,28 @@ public:
 	SnapshotInfoMapIterator GetSnapshotInfoAtOrBeforeDemoTimeIterator(float demoTime, qboolean includeAfterIfFirst = qtrue);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
 	SnapshotInfoMapIterator GetSnapshotInfoAtServerTimeIterator(int serverTime);
-	qboolean SeekToServerTime(int serverTime);
-	qboolean SeekToCommandTime(int serverTime);
+	qboolean SeekToServerTime(int serverTime); 
 	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
 	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
-	qboolean SeekToAnySnapshotIfNotYet();
-	qboolean LoadDemo(const char* sourceDemoFile);
-	qboolean CloseDemo();
-	playerState_t GetCurrentPlayerState();
+
+	
 	playerState_t GetInterpolatedPlayerState(double time);
 	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL);
 	std::map<int, entityState_t> GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnap = NULL);
 	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
-	std::map<int, entityState_t> DemoReader::GetCurrentEntities();
-	std::map<int, entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime = NULL, int* sourceSnapNum = NULL);
-	std::map<int, entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum = NULL);
-	std::vector<std::string> DemoReader::GetNewCommands(double time);
-	std::vector<std::string> DemoReader::GetNewCommandsAtServerTime(int serverTime);
-	std::vector<Event> DemoReader::GetNewEvents(double time, eventKind_t kind=EK_ENTITY);
-	std::vector<Event> DemoReader::GetNewEventsAtServerTime(int serverTime, eventKind_t kind=EK_ENTITY);
-	clSnapshot_t GetCurrentSnap();
-	const char* GetConfigString(int configStringNum, int* maxLength);
-	const char* GetPlayerConfigString(int playerNum, int* maxLength);
+
+	std::map<int, entityState_t> GetEntitiesAtTime(double time, double * translatedTime = NULL, int* sourceSnapNum = NULL);
+	std::map<int, entityState_t> GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum = NULL);
+	std::vector<std::string> GetNewCommands(double time);
+	std::vector<std::string> GetNewCommandsAtServerTime(int serverTime);
+	std::vector<Event> GetNewEvents(double time, eventKind_t kind=EK_ENTITY);
+	std::vector<Event> GetNewEventsAtServerTime(int serverTime, eventKind_t kind=EK_ENTITY);
+	
 	const char* GetModelConfigString(int modelNum, int* maxLength);
 	const char* GetSoundConfigString(int soundNum, int* maxLength);
-	qboolean AnySnapshotParsed();
-	qboolean EndReached();
 	qboolean EndReachedAtTime(double time);
 	qboolean EndReachedAtServerTime(int serverTime);
-	int getCurrentDemoTime();
 	int getDemoRecorderClientNum();
 	qboolean	purgeSnapsBefore(int snapNum);
 };

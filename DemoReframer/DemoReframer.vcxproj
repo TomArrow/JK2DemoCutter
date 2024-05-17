@@ -25,6 +25,7 @@
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\animMappingTable.cpp" />
     <ClCompile Include="..\shared\DemoReader.cpp" />
+    <ClCompile Include="..\shared\DemoReaderBase.cpp" />
     <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zArcIn.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zBuf.c" />
@@ -92,6 +93,7 @@
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h" />
     <ClInclude Include="..\shared\DemoReader.h" />
+    <ClInclude Include="..\shared\DemoReaderBase.h" />
     <ClInclude Include="..\shared\include\jpcre2.hpp" />
     <ClInclude Include="..\shared\include\pcre2.h" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />

@@ -25,6 +25,7 @@ public:
 	int interpolateEntitiesMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
 	int interpolatePlayerStateMaxDelay = 0; // Try to find "gaps" in entity visibility and repeat the last state of the entity.
 	bool skipMainPlayerDeadFrames = false; // For reframes: Skip frames that don't contain main player.
+	bool visAll = false; // For reframes: Everything is visible, not just combined visibility mask of the different source demos
 };
 
 
@@ -916,8 +917,12 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
 
-		
-		Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));
+		if (opts.visAll) {
+			Com_Memset(demo.cut.Cl.snap.areamask, 0, sizeof(demo.cut.Cl.snap.areamask));
+		}
+		else {
+			Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));
+		}
 		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
 		bool doWriteSnap = !(opts.skipMainPlayerDeadFrames /* && reframeClientNum != -1*/ && mainPlayerServerTime != time);
@@ -1054,6 +1059,7 @@ int main(int argcO, char** argvO) {
 	auto i = op.add<popl::Implicit<int>>("i", "interpolate-entities", "Interpolate entity positions. Automatically implies -p/--persist-entities.  Millisecond value of maximum gap to fill.", -1);
 	auto I = op.add<popl::Implicit<int>>("I", "interpolate-playerstate", "Interpolate playerstate positions. Automatically implies -p/--persist-entities.  Millisecond value of maximum gap to fill.", -1);
 	auto s = op.add<popl::Switch>("s", "skip-main-player-deadframes", "For reframing: Skip frames that don't contain the main player, to reduce stutter.");
+	auto v = op.add<popl::Switch>("v", "visall", "For reframing: Set visibility mask such that everything is visible (if demos have visual artifacts like level disappearing).");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
@@ -1085,6 +1091,7 @@ int main(int argcO, char** argvO) {
 		opts.persistEntitiesMaxDelay = opts.interpolateEntitiesMaxDelay;
 	}
 	opts.skipMainPlayerDeadFrames = s->is_set();
+	opts.visAll = v->is_set();
 
 	//outputName = argv[1];
 	outputName = args[0].c_str();

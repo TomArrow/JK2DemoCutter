@@ -206,6 +206,9 @@
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c">
       <Filter>Common\lzmaSDK</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\DemoReaderBase.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -278,6 +281,9 @@
     </ClInclude>
     <ClInclude Include="..\shared\files_lzma.hpp">
       <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\DemoReaderBase.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -2,47 +2,23 @@
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
 #include <demoCut.h>
+#include <DemoReaderBase.h>
 
 
 
 
-class DemoReaderLight {
+class DemoReaderLight : public DemoReaderBase {
 
-	std::string originalDemoPath = "";
-
-	bool	isMOHAADemo = false;
-	int		maxClientsThisDemo;
 
 	std::map<int, int> lastEvent;
 
 	std::vector<int> pingValues[MAX_CLIENTS_MAX];
 	qboolean		playerSeen[MAX_CLIENTS_MAX];
 
-	int lastKnownRedFlagCarrier = -1;
-	int lastKnownBlueFlagCarrier = -1;
-	demo_t			thisDemo;
-
-	// Info during reading
-	demoType_t		demoType;
-	qboolean		isCompressedFile;
-	fileHandle_t	oldHandle = 0;
-	int				oldSize;
-	int				readGamestate = 0;
-
-	int				demoStartTime = 0;
-	int				demoBaseTime = 0; // Fixed offset in demo time (due to servertime resets)
-	int				demoCurrentTime = 0;
-	int				lastGameStateChange = 0;
-	int				lastGameStateChangeInDemoTime = 0;
-	int				lastKnownTime = 0;
-	int				lastKnownInOrderTime = 0;
-	int				maxSequenceNum = -9999;
 
 	float			lastGottenCommandsTime = 0;
 	float			lastGottenEventsTime = 0;
 
-	qboolean		anySnapshotParsed = qfalse;
-	qboolean		endReached = qfalse;
 
 
 	//clSnapshot_t lastSnap;
@@ -63,30 +39,19 @@ class DemoReaderLight {
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
 
-	qboolean ReadMessage();
+	//qboolean ReadMessage();
 
-	qboolean ReadMessageReal();
+	qboolean ReadMessageReal() override;
 	qboolean SeekToServerTime(int serverTime);
 
 
 public:
 
+	qboolean LoadDemo(const char* sourceDemoFile);
 	demoType_t getDemoType();
 	bool isThisMOHAADemo();
 	qboolean SeekToTime(int time);
-	qboolean SeekToCommandTime(int serverTime);
-	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
-	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
-	qboolean SeekToAnySnapshotIfNotYet();
-	qboolean LoadDemo(const char* sourceDemoFile);
-	qboolean CloseDemo();
-	playerState_t GetCurrentPlayerState();
-	std::map<int, entityState_t> GetCurrentEntities();
-	clSnapshot_t GetCurrentSnap();
-	const char* GetConfigString(int configStringNum, int* maxLength);
-	const char* GetPlayerConfigString(int playerNum, int* maxLength);
-	qboolean AnySnapshotParsed();
-	qboolean EndReached();
+	
 	qboolean EndReachedAtTime(float time);
 
 	void ReadToEnd();

@@ -209,6 +209,9 @@
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c">
       <Filter>Common\lzmaSDK</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\DemoReaderBase.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -301,6 +304,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\shared\otherGameStuff2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\DemoReaderBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

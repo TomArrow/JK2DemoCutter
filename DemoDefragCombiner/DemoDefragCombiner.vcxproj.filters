@@ -209,6 +209,9 @@
     <ClCompile Include="..\shared\DemoReaderLight.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\DemoReaderBase.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -275,6 +278,9 @@
     </ClInclude>
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp">
       <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\DemoReaderBase.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
