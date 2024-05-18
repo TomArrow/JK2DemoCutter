@@ -167,7 +167,6 @@ public:
 	SnapshotInfoMapIterator GetSnapshotInfoAtOrBeforeDemoTimeIterator(float demoTime, qboolean includeAfterIfFirst = qtrue);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
 	SnapshotInfoMapIterator GetSnapshotInfoAtServerTimeIterator(int serverTime);
-	qboolean SeekToServerTime(int serverTime); 
 	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
 	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
 
@@ -188,7 +187,6 @@ public:
 	const char* GetModelConfigString(int modelNum, int* maxLength);
 	const char* GetSoundConfigString(int soundNum, int* maxLength);
 	qboolean EndReachedAtTime(double time);
-	qboolean EndReachedAtServerTime(int serverTime);
 	int getDemoRecorderClientNum();
 	qboolean	purgeSnapsBefore(int snapNum);
 };

@@ -9,6 +9,15 @@ typedef enum dimensionDataType_t {
 	DIM_OWNAGE
 };
 
+
+struct MetaEventItemAbsolute {
+	int timeFromDemoStart; // Relative to the demo start
+	int serverTime = 0; // correlated
+	qboolean serverTimeCorrelated = qfalse; // whether the serverTime value is already set for this one
+	metaEventType_t type;
+};
+
+
 class DemoReaderBase {
 	void	parseMetaEvents(const char* meString);
 
@@ -56,11 +65,19 @@ protected:
 	qboolean firstCommandByteRead = qfalse;
 	rapidjson::Document* jsonSourceFileMetaDocument = NULL;
 	std::vector<MetaEventItemAbsolute> metaEvents;
+	std::vector<MetaEventItemAbsolute>::iterator metaEventsTrackIterator;
+	std::vector<MetaEventItemAbsolute>::iterator gottenMetaEventsIterator;
 	int64_t metaHighlight = -1;
 
 	qboolean tryReadMetadata(msg_t* msg);
+	void trackMetaEventsTiming();
 public:
 
+	DemoReaderBase() {
+
+		metaEventsTrackIterator = metaEvents.begin();
+		gottenMetaEventsIterator = metaEvents.begin();
+	}
 
 	qboolean ReadMessage();
 	virtual qboolean ReadMessageReal() = 0;
@@ -76,4 +93,8 @@ public:
 	qboolean AnySnapshotParsed();
 	qboolean EndReached();
 	int64_t getCurrentDemoTime();
+	qboolean SeekToServerTime(int serverTime);
+	std::vector<MetaEventItemAbsolute> GetNewMetaEventsAtServerTime(int serverTime);
+	int GetMetaEventCount();
+	qboolean EndReachedAtServerTime(int serverTime);
 };

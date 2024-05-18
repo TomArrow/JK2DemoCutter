@@ -5164,10 +5164,5 @@ struct MetaEventItem {
 	int relativeTime; // Relative to the kill
 	metaEventType_t type;
 };
-struct MetaEventItemAbsolute {
-	int timeFromDemoStart; // Relative to the demo start
-	metaEventType_t type;
-};
-
 
 #endif

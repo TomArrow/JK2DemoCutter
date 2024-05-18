@@ -93,6 +93,10 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 
 	isMOHAADemo = isThisMOHAADemo();
 
+
+	wasFirstCommandByte = qfalse;
+	firstCommandByteRead = qfalse;
+
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
 
 	/*ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
@@ -137,6 +141,10 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
 	lastGottenEventsTime = 0;
+	thisDemo.cut.Clc.firstSnapServerTime = -1;
+	endReached = qfalse;
+
+	serverTimes.clear();
 
 	for (int i = 0; i < maxClientsThisDemo; i++) {
 		pingValues[i].clear();
@@ -148,6 +156,7 @@ qboolean DemoReaderLight::LoadDemo(const char* sourceDemoFile) {
 	while (readGamestate == 0 && !endReached) {
 		ReadMessage(); // Will only read pretty much the first message so we have gamestate and are somewhat "initialized" i guess
 	}
+	return qtrue;
 }
 
 qboolean DemoReaderLight::EndReachedAtTime(float time) {
@@ -167,13 +176,7 @@ void DemoReaderLight::ReadToEnd() {
 		ReadMessage();
 	}
 }
-qboolean DemoReaderLight::SeekToServerTime(int serverTime) {
-	while (lastKnownTime < serverTime && !endReached) {
-		ReadMessage();
-	}
-	if (lastKnownTime < serverTime && endReached) return qfalse;
-	return qtrue;
-}
+
 
 
 void DemoReaderLight::GetPlayersSeen(qboolean* playersSeenA) { // Requires pointer to array with 32 qbooleans
@@ -327,8 +330,15 @@ readNext:
 			return qfalse;
 		}
 		cmd = MSG_ReadByte(&oldMsg);
+		wasFirstCommandByte = (qboolean)!firstCommandByteRead;
+		firstCommandByteRead = qtrue;
 		cmd = generalizeGameSVCOp(cmd,demoType);
 		if (cmd == svc_EOF_general) {
+			// TODO Check for svc_extension/svc_voip (ioq3/wolfcamql)
+			if (wasFirstCommandByte) {
+				// check for hidden meta content
+				tryReadMetadata(&oldMsg);
+			}
 			break;
 		}
 		//I'm not sure what this does or why it does it...
@@ -432,7 +442,13 @@ readNext:
 				demoStartTime = thisDemo.cut.Cl.snap.serverTime;
 			}*/
 			demoCurrentTime = demoBaseTime + thisDemo.cut.Cl.snap.serverTime - demoStartTime;
+			if (thisDemo.cut.Cl.snap.serverTime <= 0) {
+				std::cerr << "serverTime is 0?\n";
+			}
 			lastKnownTime = thisDemo.cut.Cl.snap.serverTime;
+
+			trackMetaEventsTiming();
+			serverTimes.push_back(thisDemo.cut.Cl.snap.serverTime);
 
 			playerSeen[thisDemo.cut.Cl.snap.ps.clientNum] = qtrue;
 
@@ -722,6 +738,81 @@ int main(int argc, char** argv) {
 	std::cin.get();
 #endif
 }*/
+
+int DemoReaderLight::GetLastServerTimeBeforeServerTime(int serverTime) {
+
+	if (!SeekToServerTime(serverTime)) return -1;
+
+	if (demoBaseTime) { // Continuity not guaranteed. Do slow linear search
+		int lastServerTime = -1;
+		for (auto it = serverTimes.begin(); it != serverTimes.end(); it++) {
+			if (*it >= serverTime) return lastServerTime;
+			lastServerTime = *it;
+		}
+	}
+	else {
+		// Do fast binary search
+		//auto lower = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), serverTime, snapshotInfosServerTimeSmallerPredicate); // Should be first one that has greater server time.
+		auto lower = std::lower_bound(serverTimes.begin(), serverTimes.end(), serverTime); // Should be first one that has greater server time.
+		if (lower != serverTimes.end() && lower != serverTimes.begin()) {
+			return *(--lower); // ? untested, but should work? 
+		}
+	}
+	return -1; // Shouldn't happen really but whatever
+}
+
+SnapshotTimesIterator DemoReaderLight::GetSnapshotTimeAtServerTimeIterator(int serverTime) {
+	if (SeekToServerTime(serverTime)) {
+		if (demoBaseTime) { // demoBaseTime should be 0 for any regular demo BUT some demos might include a serverTime reset, in which case demoBaseTime is increased. At this point there is no more serverTime regularity guaranteed hence we cannot use binary search and have to do a slow linear search
+			for (auto it = serverTimes.begin(); it != serverTimes.end(); it++) {
+				if (*it == serverTime) return it;
+			}
+		}
+		else { // Binary search
+			auto lower = std::lower_bound(serverTimes.begin(), serverTimes.end(), serverTime);
+			if (lower != serverTimes.end() && *lower == serverTime) return lower;
+		}
+		return serverTimes.end(); // Can happen if that particular time's snapshot is missing from the demo.
+	}
+	else {
+		return serverTimes.end();
+	}
+
+}
+int DemoReaderLight::GetFirstServerTimeAfterServerTime(int serverTime) {
+	while (lastKnownTime <= serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownTime <= serverTime && endReached) return -1;
+
+	if (demoBaseTime) { // Continuity not guaranteed. Do slow linear search
+
+		for (auto it = serverTimes.begin(); it != serverTimes.end(); it++) {
+			if (*it > serverTime) return *it;
+		}
+	}
+	else {
+		// Do fast binary search
+		auto upper = std::upper_bound(serverTimes.begin(), serverTimes.end(), serverTime); // Should be first one that has greater server time.
+		if (upper != serverTimes.end() /* && upper->second.serverTime > serverTime*/) {
+			return *upper;
+		}
+	}
+	return -1; // Shouldn't happen really but whatever
+}
+SnapshotTimesIterator DemoReaderLight::GetFirstSnapshotTimeAfterSnapshotTimeIterator(SnapshotTimesIterator oldSnapInfoIt, int pastServerTime) {
+	while (lastKnownTime <= pastServerTime && !endReached) {
+		ReadMessage();
+	}
+	while (oldSnapInfoIt != serverTimes.end() && *oldSnapInfoIt <= pastServerTime) {
+
+		oldSnapInfoIt++;
+	}
+	return oldSnapInfoIt;
+}
+SnapshotTimesIterator DemoReaderLight::SnapNullIt() {
+	return serverTimes.end();
+}
 
 #ifdef RELDEBUG
 //#pragma optimize("", on)

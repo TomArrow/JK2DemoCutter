@@ -145,6 +145,9 @@ qboolean DemoReaderBase::tryReadMetadata(msg_t* msg) {
 			);
 		}
 
+		metaEventsTrackIterator = metaEvents.begin();
+		gottenMetaEventsIterator = metaEvents.begin();
+
 		return qtrue;
 
 	}
@@ -169,6 +172,49 @@ void	DemoReaderBase::parseMetaEvents(const char* meString) {
 		if(*text) text++;
 	}
 
+}
+void DemoReaderBase::trackMetaEventsTiming() {
+	
+	while (metaEventsTrackIterator != metaEvents.end() && demoCurrentTime >= metaEventsTrackIterator->timeFromDemoStart) {
+		if (demoCurrentTime != metaEventsTrackIterator->timeFromDemoStart) {
+			std::cerr << "WARNING: current demo time " << demoCurrentTime << "does not cleanly match meta event time " << metaEventsTrackIterator->timeFromDemoStart << "\n";
+		}
+		metaEventsTrackIterator->serverTime = thisDemo.cut.Cl.snap.serverTime;
+		metaEventsTrackIterator->serverTimeCorrelated = qtrue;
+		metaEventsTrackIterator++;
+	}
+}
+
+std::vector<MetaEventItemAbsolute> DemoReaderBase::GetNewMetaEventsAtServerTime(int serverTime) {
+	std::vector<MetaEventItemAbsolute> retVal;
+	SeekToServerTime(serverTime);
+	while (gottenMetaEventsIterator != metaEvents.end()) {
+		if (gottenMetaEventsIterator->serverTime <= serverTime) {
+			retVal.push_back(*gottenMetaEventsIterator);
+		}
+		else {
+			break;
+		}
+		gottenMetaEventsIterator++;
+	}
+	return retVal;
+}
+
+
+qboolean DemoReaderBase::SeekToServerTime(int serverTime) {
+	while (lastKnownTime < serverTime && !endReached) {
+		ReadMessage();
+	}
+	if (lastKnownTime < serverTime && endReached) return qfalse;
+	return qtrue;
+}
+
+int DemoReaderBase::GetMetaEventCount(){
+	return metaEvents.size();
+}
+qboolean DemoReaderBase::EndReachedAtServerTime(int serverTime) {
+	SeekToServerTime(serverTime);
+	return (qboolean)(lastKnownTime < serverTime);
 }
 
 #ifdef RELDEBUG

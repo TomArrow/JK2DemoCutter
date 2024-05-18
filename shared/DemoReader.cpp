@@ -342,15 +342,12 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	while (readGamestate == 0 && !endReached) {
 		ReadMessage(); // Will only read pretty much the first message so we have gamestate and are somewhat "initialized" i guess
 	}
+	return qtrue;
 }
 
 qboolean DemoReader::EndReachedAtTime(double time) {
 	SeekToTime(time);
 	return (qboolean)(demoCurrentTime < time);
-}
-qboolean DemoReader::EndReachedAtServerTime(int serverTime) {
-	SeekToServerTime(serverTime);
-	return (qboolean)(lastKnownTime < serverTime);
 }
 
 qboolean DemoReader::SeekToTime(double time) {
@@ -358,13 +355,6 @@ qboolean DemoReader::SeekToTime(double time) {
 		ReadMessage();
 	}
 	if (demoCurrentTime < time && endReached) return qfalse;
-	return qtrue;
-}
-qboolean DemoReader::SeekToServerTime(int serverTime) {
-	while (lastKnownTime < serverTime && !endReached) {
-		ReadMessage();
-	}
-	if (lastKnownTime < serverTime && endReached) return qfalse;
 	return qtrue;
 }
 
@@ -1937,6 +1927,8 @@ readNext:
 			if (thisSnapshotInfo) {
 				thisSnapshotInfo->demoTime = demoCurrentTime;
 			}
+
+			trackMetaEventsTiming();
 
 			// Fire playerstate events
 			if (thisDemo.cut.Cl.snap.ps.externalEvent && thisDemo.cut.Cl.snap.ps.externalEvent != oldPS[thisDemo.cut.Cl.snap.ps.clientNum].externalEvent) {

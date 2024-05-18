@@ -5,6 +5,7 @@
 #include <DemoReaderBase.h>
 
 
+typedef std::vector<int>::iterator SnapshotTimesIterator;
 
 
 class DemoReaderLight : public DemoReaderBase {
@@ -14,6 +15,8 @@ class DemoReaderLight : public DemoReaderBase {
 
 	std::vector<int> pingValues[MAX_CLIENTS_MAX];
 	qboolean		playerSeen[MAX_CLIENTS_MAX];
+
+	std::vector<int> serverTimes;
 
 
 	float			lastGottenCommandsTime = 0;
@@ -42,7 +45,7 @@ class DemoReaderLight : public DemoReaderBase {
 	//qboolean ReadMessage();
 
 	qboolean ReadMessageReal() override;
-	qboolean SeekToServerTime(int serverTime);
+	//qboolean SeekToServerTime(int serverTime);
 
 
 public:
@@ -59,5 +62,11 @@ public:
 	void GetLowestPingData(int* playerPingData); // Requires pointer to array with 32 ints
 	void GetMedianOfLocalAveragesPingData(float* playerPingData); // Requires pointer to array with 32 ints
 	void GetPlayersSeen(qboolean* playersSeenA); // Requires pointer to array with 32 qbooleans
-	void FreePingData();
+	void FreePingData(); 
+	
+	int GetLastServerTimeBeforeServerTime(int serverTime);
+	SnapshotTimesIterator GetSnapshotTimeAtServerTimeIterator(int serverTime);
+	int GetFirstServerTimeAfterServerTime(int serverTime);
+	SnapshotTimesIterator GetFirstSnapshotTimeAfterSnapshotTimeIterator(SnapshotTimesIterator oldSnapInfoIt, int pastServerTime);
+	SnapshotTimesIterator SnapNullIt();
 };

@@ -1,5 +1,6 @@
 #include "demoCut.h"
 #include "DemoReader.h"
+#include "DemoReaderLight.h"
 #include "anims.h"
 #include <vector>
 #include <sstream>
@@ -70,6 +71,13 @@ public:
 	int packetsUsed = 0;
 	std::vector<std::string> commandDupesToFilter;
 	SnapshotInfoMapIterator currentSnapIt, nextSnapIt, nullIt;
+};
+
+class DemoReaderLightTrackingWrapper {
+public:
+	DemoReaderLight reader;
+	std::vector<MetaEventItemAbsolute> metaEventDupesToFilter;
+	SnapshotTimesIterator currentSnapIt, nextSnapIt, nullIt;
 };
 
 
@@ -158,14 +166,173 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	std::cout << "loading up demos...";
 	int startTime = INT_MAX;
 	demoReaders.reserve(inputFiles->size()); // This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
+	qboolean needPrePass = qfalse;
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
 		demoReaders.emplace_back();
-		demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
+		if (!demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str())) {
+			std::cerr << "Failed to open " << (*inputFiles)[i] << ". Aborting.\n";
+			return qfalse;
+		}
+		needPrePass = (qboolean)(needPrePass || demoReaders.back().reader.GetMetaEventCount());
 		demoReaders.back().currentSnapIt = demoReaders.back().nextSnapIt = demoReaders.back().nullIt = demoReaders.back().reader.SnapNullIt();
 		startTime = std::min(startTime, demoReaders.back().reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
 	}
+	std::vector<MetaEventItemAbsolute> newMetaEvents;
+	if (needPrePass) {
+		std::cout << "... meta events found, doing prepass ...";
+		std::vector<DemoReaderLightTrackingWrapper> pingDemoReaders;
+		pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
+		for (int i = 0; i < inputFiles->size(); i++) {
+			pingDemoReaders.emplace_back();
+			pingDemoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
+			pingDemoReaders.back().reader.ReadToEnd();
+			pingDemoReaders.back().currentSnapIt = pingDemoReaders.back().nextSnapIt = pingDemoReaders.back().nullIt = pingDemoReaders.back().reader.SnapNullIt();
+		}
+		int prePassTime = startTime;
+
+		std::vector<metaEventType_t> metaEventsToAdd;
+
+		// Do a mini version of the main loop later on to combine & deduplicate meta events.
+		while (1) {
+			metaEventsToAdd.clear();
+			qboolean allSourceDemosFinished = qtrue;
+			int nonSkippedDemoIndex = 0;
+
+			// Assemble the entities etc
+			for (int i = 0; i < pingDemoReaders.size(); i++) {
+				if (pingDemoReaders[i].reader.SeekToServerTime(prePassTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+
+					SnapshotTimesIterator snapInfoHereIterator = pingDemoReaders[i].nullIt;
+					if (pingDemoReaders[i].nextSnapIt != pingDemoReaders[i].nullIt) {
+						if (*pingDemoReaders[i].nextSnapIt== prePassTime) {
+							snapInfoHereIterator = pingDemoReaders[i].nextSnapIt;
+						}
+					}
+					else {
+						snapInfoHereIterator = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(prePassTime);
+					}
+					int serverTimeHere = snapInfoHereIterator == pingDemoReaders[i].nullIt ? -1 : *snapInfoHereIterator;
+					qboolean snapIsInterpolated = qfalse;
+					if (serverTimeHere == -1) {
+						SnapshotTimesIterator thisDemoLastSnapshotIt = pingDemoReaders[i].nullIt;
+						SnapshotTimesIterator thisDemoNextSnapshotIt = pingDemoReaders[i].nullIt;
+
+						// Find last
+						if (pingDemoReaders[i].currentSnapIt != pingDemoReaders[i].nullIt) {
+							thisDemoLastSnapshotIt = pingDemoReaders[i].currentSnapIt;
+						}
+						else {
+
+							int thisDemoLastServerTime = pingDemoReaders[i].reader.GetLastServerTimeBeforeServerTime(prePassTime);
+							thisDemoLastSnapshotIt = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(thisDemoLastServerTime);
+						}
+
+						// Find next
+						if (pingDemoReaders[i].nextSnapIt != pingDemoReaders[i].nullIt) {
+							thisDemoNextSnapshotIt = pingDemoReaders[i].nextSnapIt;
+						}
+						else {
+
+							int thisDemoNextServerTime = pingDemoReaders[i].reader.GetFirstServerTimeAfterServerTime(prePassTime);
+							thisDemoNextSnapshotIt = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(thisDemoNextServerTime);
+						}
+
+
+						if (thisDemoLastSnapshotIt == pingDemoReaders[i].nullIt || thisDemoNextSnapshotIt == pingDemoReaders[i].nullIt) continue;
+
+						snapInfoHereIterator = thisDemoLastSnapshotIt;
+						serverTimeHere = *thisDemoLastSnapshotIt;
+						// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
+						snapIsInterpolated = qtrue;
+					}
+					else {
+						pingDemoReaders[i].currentSnapIt = snapInfoHereIterator;
+					}
+
+
+					// Get new commands
+					std::vector<MetaEventItemAbsolute> newMetaEventsHere = pingDemoReaders[i].reader.GetNewMetaEventsAtServerTime(prePassTime);
+					for (int c = 0; c < newMetaEventsHere.size(); c++) {
+
+						// New handling to avoid dupes
+						qboolean isADupe = qfalse;
+						for (int sc = 0; sc < pingDemoReaders[i].metaEventDupesToFilter.size(); sc++) {
+							if (pingDemoReaders[i].metaEventDupesToFilter[sc].type == newMetaEventsHere[c].type) {
+								isADupe = qtrue;
+								pingDemoReaders[i].metaEventDupesToFilter.erase(pingDemoReaders[i].metaEventDupesToFilter.begin() + sc);
+								break;
+							}
+						}
+
+						if (!isADupe) {
+							metaEventsToAdd.push_back(newMetaEventsHere[c].type);
+							for (int sd = 0; sd < pingDemoReaders.size(); sd++) {
+								if (sd != i) {
+									pingDemoReaders[sd].metaEventDupesToFilter.push_back(newMetaEventsHere[c]);
+								}
+							}
+						}
+					}
+
+					if (!snapIsInterpolated) { // We already parsed this. If we didn't find a dupe of an older command now, we won't find it later either. (and it might be stuff that was only sent to some of the clients, like team chat)
+
+						pingDemoReaders[i].metaEventDupesToFilter.clear();
+					}
+
+
+				}
+				if (!pingDemoReaders[i].reader.EndReachedAtServerTime(prePassTime)) {
+					allSourceDemosFinished = qfalse;
+				}
+			}
+
+
+			for (int nme = 0; nme < metaEventsToAdd.size(); nme++) {
+				int64_t newMetaEventDemoTime = prePassTime - startTime;
+				if (newMetaEventDemoTime < 0) {
+					std::cerr << "Error merging meta events, new demo time < 0:" << newMetaEventDemoTime << "\n";
+					continue; // Probably bugged due to demo being around a map change or such
+				}
+				MetaEventItemAbsolute newItem;
+				newItem.timeFromDemoStart = newMetaEventDemoTime;
+				newItem.type = metaEventsToAdd[nme];
+				newItem.serverTime = prePassTime;
+				newItem.serverTimeCorrelated = qtrue;
+				newMetaEvents.push_back(newItem);
+			}
+
+			int oldTime = prePassTime;
+			prePassTime = INT_MAX;
+			for (int i = 0; i < pingDemoReaders.size(); i++) {
+				if (pingDemoReaders[i].currentSnapIt != pingDemoReaders[i].nullIt) {
+
+					pingDemoReaders[i].nextSnapIt = pingDemoReaders[i].reader.GetFirstSnapshotTimeAfterSnapshotTimeIterator(pingDemoReaders[i].currentSnapIt, oldTime);
+				}
+				else if (pingDemoReaders[i].nextSnapIt == pingDemoReaders[i].nullIt || *pingDemoReaders[i].nextSnapIt <= oldTime) {
+					int thisDemoNextServerTime = pingDemoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
+					pingDemoReaders[i].nextSnapIt = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(thisDemoNextServerTime);
+				}
+				if (pingDemoReaders[i].nextSnapIt != pingDemoReaders[i].nullIt) {
+
+					int nextTimeThisDemo = *pingDemoReaders[i].nextSnapIt;
+					prePassTime = std::min(prePassTime, nextTimeThisDemo); // Find nearest serverTime of all the demos.
+				}
+			}
+
+
+			if (allSourceDemosFinished || prePassTime == INT_MAX) break;
+		}
+		std::sort(newMetaEvents.begin(), newMetaEvents.end(), [](MetaEventItemAbsolute a, MetaEventItemAbsolute b)
+			{
+				return a.timeFromDemoStart < b.timeFromDemoStart;
+			}
+		);
+
+		pingDemoReaders.clear();
+	}
 	std::cout << "done.";
+
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
 
