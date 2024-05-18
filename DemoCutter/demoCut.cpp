@@ -487,8 +487,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 							if (!jsonMetaDocument->HasMember(newName)) {
 
-								rapidjson::Value newNameRapid;
-								newNameRapid.SetString(newName,strlen(newName));
+								rapidjson::Value newNameRapid(newName, jsonMetaDocument->GetAllocator());
+								//newNameRapid.SetString(newName,strlen(newName));
 								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo copied to new demo as " << newName << ".\n";
 								jsonMetaDocument->AddMember(newNameRapid, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
 							}

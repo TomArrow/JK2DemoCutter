@@ -97,4 +97,5 @@ public:
 	std::vector<MetaEventItemAbsolute> GetNewMetaEventsAtServerTime(int serverTime);
 	int GetMetaEventCount();
 	qboolean EndReachedAtServerTime(int serverTime);
+	qboolean copyMetadataTo(rapidjson::Document* targetDocument, qboolean keepKeys);
 };

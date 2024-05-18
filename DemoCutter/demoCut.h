@@ -4750,6 +4750,7 @@ qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* c
 void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
 
 const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* searchName);
+std::string printRapidJsonValue(rapidjson::Value* value);
 
 std::string makeConfigStringCommand(int index, std::string value);
 int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
@@ -4764,7 +4765,6 @@ int64_t demoCutGetDemoNameTruncationOffset(const char* demoName);
 int strNumLen(const char* s);
 int atoiWhileNumber(const char* s);
 int atoiWhileNumber(const char** s);
-
 
 
 

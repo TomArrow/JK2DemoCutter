@@ -11,6 +11,8 @@
 #include "otherGameStuff2.h"
 
 #include "popl.hpp"
+#include "include/rapidjson/document.h"
+#include "include/rapidjson/writer.h"
 
 // TODO attach amount of dropped frames in filename.
 
@@ -179,6 +181,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		startTime = std::min(startTime, demoReaders.back().reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
 	}
 	std::vector<MetaEventItemAbsolute> newMetaEvents;
+	std::stringstream metaEventString;
 	if (needPrePass) {
 		std::cout << "... meta events found, doing prepass ...";
 		std::vector<DemoReaderLightTrackingWrapper> pingDemoReaders;
@@ -192,6 +195,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		int prePassTime = startTime;
 
 		std::vector<metaEventType_t> metaEventsToAdd;
+
 
 		// Do a mini version of the main loop later on to combine & deduplicate meta events.
 		while (1) {
@@ -330,6 +334,10 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		);
 
 		pingDemoReaders.clear();
+
+		for (int me = 0; me < newMetaEvents.size(); me++) {
+			metaEventString << (me > 0 ? "," : "") << metaEventKeyNames[newMetaEvents[me].type] << newMetaEvents[me].timeFromDemoStart;
+		}
 	}
 	std::cout << "done.";
 
@@ -406,6 +414,40 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	if (!newHandle) {
 		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
+	}
+
+	if (newMetaEvents.size()) {
+		// TODO: Save "oto": Original total offset. Throughout all cuts, what's the offset from the original file now?
+
+		rapidjson::Document* jsonMetaDocument = new rapidjson::Document();
+		jsonMetaDocument->SetObject();
+		std::string meString = metaEventString.str();
+		const char* meStringC = meString.c_str();
+		jsonMetaDocument->AddMember("me", rapidjson::Value(meStringC, jsonMetaDocument->GetAllocator()).Move(), jsonMetaDocument->GetAllocator());
+		jsonMetaDocument->AddMember("wr", "DemoMerger", jsonMetaDocument->GetAllocator());
+		jsonMetaDocument->AddMember("fd", true, jsonMetaDocument->GetAllocator()); // fake demo
+
+		for (int i = 0; i < demoReaders.size();i++) {
+			demoReaders[i].reader.copyMetadataTo(jsonMetaDocument,qfalse);
+		}
+		const char* noteName = jsonGetRealMetadataKeyName(jsonMetaDocument,"note");
+		if (noteName && _stricmp(noteName,"note")) {
+
+			rapidjson::Value newNameRapid;
+			newNameRapid.SetString("note", strlen("note"));
+			std::cout << "Making one of the original notes the new note.\n";
+			std::string note = (*jsonMetaDocument)[noteName].GetString();
+			const char* noteC = note.c_str();
+			jsonMetaDocument->AddMember(newNameRapid, rapidjson::Value(noteC, jsonMetaDocument->GetAllocator()).Move(), jsonMetaDocument->GetAllocator());
+		}
+
+		rapidjson::StringBuffer sb;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+		jsonMetaDocument->Accept(writer);
+		const char* finalJsonMetaString = sb.GetString();
+		demoCutWriteEmptyMessageWithMetadata(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType, createCompressedOutput, finalJsonMetaString);
+		delete jsonMetaDocument;
+		jsonMetaDocument = NULL;
 	}
 
 	// Write demo header

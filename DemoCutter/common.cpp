@@ -5305,6 +5305,34 @@ const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* sea
 
 
 
+std::string printRapidJsonValue(rapidjson::Value* value) {
+	if (value->IsString()) {
+		return value->GetString();
+	}
+	else {
+		std::stringstream ss;
+		if (value->IsDouble()) {
+			ss << value->GetDouble();
+		}
+		else if (value->IsBool()) {
+			ss << value->GetBool();
+		}
+		else if (value->IsInt64()) {
+			ss << value->GetInt64();
+		}
+		else {
+			ss << "unhandled json type";
+		}
+		return ss.str();
+	}
+}
+
+
+
+
+
+
+
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw) {
 	byte			bufData[MAX_MSGLEN];
 	std::vector<byte>			bufDataRaw;
@@ -7184,12 +7212,4 @@ const char* metaEventKeyNames[METAEVENT_COUNT] = {
 	"l",
 	//"hl" // not really used, internal for democutter toools
 };
-
-
-
-
-
-
-
-
 

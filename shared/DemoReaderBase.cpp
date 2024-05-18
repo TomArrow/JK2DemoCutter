@@ -216,6 +216,47 @@ qboolean DemoReaderBase::EndReachedAtServerTime(int serverTime) {
 	SeekToServerTime(serverTime);
 	return (qboolean)(lastKnownTime < serverTime);
 }
+qboolean DemoReaderBase::copyMetadataTo(rapidjson::Document* targetDocument, qboolean keepKeys) {
+	if (jsonSourceFileMetaDocument) {
+		for (rapidjson::Value::MemberIterator it = jsonSourceFileMetaDocument->MemberBegin(); it != jsonSourceFileMetaDocument->MemberEnd(); it++) {
+							
+			const char* newName = NULL;
+							
+			if (keepKeys/* || it->name == "of" || it->name == "oco" || it->name == "odm" || it->name == "oip" || it->name == "ost"*/) {
+				newName = it->name.GetString();
+			} else {
+				// We add "_" before the name because a lot of metadata can potentially stop being meaningful once we do a cut to the file with existing metadata,
+				// since metadata can contain stuff relative to positioning of events inside a demo and metadata can be completely custom.
+				// We thus indicate the "generation" of the metadata by the amount of underscores before it.
+				// But if the demo cut is starting at 0, we can keep the original name.
+				// Also, metadata we KNOW to be ok to copy we keep (like original filename)
+				newName = va("_%s", it->name.GetString());
+			}
+
+			auto existingMember = targetDocument->FindMember(newName);
+			auto end = targetDocument->MemberEnd();
+			//if (!targetDocument->HasMember(newName)) {
+			if (existingMember == end) {
+
+				rapidjson::Value newNameRapid(newName, targetDocument->GetAllocator());
+				//newNameRapid.SetString(newName,strlen(newName));
+				std::cout << "Metadata member '" << it->name.GetString() << "' copied to other demo as " << newName 
+#if DEBUG
+					<< "(value: " << printRapidJsonValue(&it->value) <<")"
+#endif
+					<< ".\n";
+				targetDocument->AddMember(newNameRapid, it->value, targetDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+				//it = jsonSourceFileMetaDocument->MemberBegin();
+			}
+			else {
+				// Already exists.. eh. don't really care. just discard.
+				std::cout << "Metadata member '" << it->name.GetString() << "' not copied, already exists.\n";
+			}
+		}
+		return qtrue;
+	}
+	return qfalse;
+}
 
 #ifdef RELDEBUG
 //#pragma optimize("", on)
