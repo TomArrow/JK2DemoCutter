@@ -5878,6 +5878,51 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 
 
 
+
+
+
+
+
+
+
+int strNumLen(const char* s) {
+	if (!s) return 0;
+	int len = 0;
+	while (*s >= '0' && *s <= '9' || *s == '-') {
+		len++;
+		s++;
+	}
+	return len;
+}
+int atoiWhileNumber(const char* s) {
+	static char numString[20];
+	if (!s) return 0;
+	int len = 0;
+	while (*s >= '0' && *s <= '9' || *s == '-') {
+		numString[len] = *s;
+		len++;
+		s++;
+	}
+	numString[len] = 0;
+	return atoi(numString);
+}
+int atoiWhileNumber(const char** s) {
+	static char numString[20];
+	if (!s || !*s) return 0;
+	int len = 0;
+	while (**s >= '0' && **s <= '9' || **s == '-') {
+		numString[len] = **s;
+		len++;
+		(*s)++;
+	}
+	numString[len] = 0;
+	return atoi(numString);
+}
+
+
+
+
+
 /*
 =================
 IntegerToBoundingBox (MOHAA)
@@ -7116,6 +7161,29 @@ void initializeGameInfos() {
 
 
 
+
+
+
+
+
+
+
+
+
+const char* metaEventKeyNames[METAEVENT_COUNT] = {
+	"tc",
+	"ec",
+	"c",
+	"r",
+	"k",
+	"d",
+	"j",
+	"sh",
+	"sb",
+	"ef",
+	"l",
+	//"hl" // not really used, internal for democutter toools
+};
 
 
 

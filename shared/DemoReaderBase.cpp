@@ -99,7 +99,77 @@ int64_t DemoReaderBase::getCurrentDemoTime() {
 	return demoCurrentTime;
 }
 
+qboolean DemoReaderBase::tryReadMetadata(msg_t* msg) {
+	const char* maybeMeta = demoCutReadPossibleMetadata(msg, demoType);
+	if (maybeMeta) {
 
+		jsonSourceFileMetaDocument = new rapidjson::Document();
+		if (jsonSourceFileMetaDocument->Parse(maybeMeta).HasParseError() || !jsonSourceFileMetaDocument->IsObject()) {
+			// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
+			// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
+			// will quit the process. Because the user can after all just adjust and fix the commandline.
+			std::cout << "Old demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+			delete jsonSourceFileMetaDocument;
+			jsonSourceFileMetaDocument = NULL;
+			return qfalse;
+		}
+
+		const char* realExtraFieldsMetaname = jsonGetRealMetadataKeyName(jsonSourceFileMetaDocument, "extraFields");
+		if (realExtraFieldsMetaname) {
+			const char* extraFields = (*jsonSourceFileMetaDocument)[realExtraFieldsMetaname].GetString();
+			if (extraFields) {
+				if (!stricmp(extraFields, "ownage")) {
+					extraFieldInfo.ownageExtraInfoMetaMarker = qtrue;
+				}
+			}
+		}
+		if (jsonSourceFileMetaDocument->HasMember("cso")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+			extraFieldInfo.cutStartOffset = (*jsonSourceFileMetaDocument)["cso"].GetInt64();
+		}
+		if (jsonSourceFileMetaDocument->HasMember("trim")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+			extraFieldInfo.truncationOffset = (*jsonSourceFileMetaDocument)["trim"].GetInt64();
+		}
+		if (jsonSourceFileMetaDocument->HasMember("hl")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+			metaHighlight = (*jsonSourceFileMetaDocument)["hl"].GetInt64()- extraFieldInfo.cutStartOffset;
+		}
+		if (jsonSourceFileMetaDocument->HasMember("me")) {
+			const char* metaEvents = (*jsonSourceFileMetaDocument)["me"].GetString();
+			parseMetaEvents(metaEvents);
+		}
+
+		if (metaEvents.size()) {
+			std::sort(metaEvents.begin(), metaEvents.end(), [](MetaEventItemAbsolute a, MetaEventItemAbsolute b)
+				{
+					return a.timeFromDemoStart < b.timeFromDemoStart;
+				}
+			);
+		}
+
+		return qtrue;
+
+	}
+}
+void	DemoReaderBase::parseMetaEvents(const char* meString) {
+	const char* text = meString;
+	if (!meString || !*meString) {
+		return;
+	}
+	while (*text) {
+		for (int i = 0; i < METAEVENT_COUNT; i++) {
+			int KeyLen = strlen(metaEventKeyNames[i]);
+			if (!_strnicmp(text, metaEventKeyNames[i], KeyLen)) {
+				text += KeyLen;
+				MetaEventItemAbsolute item;
+				item.type = (metaEventType_t)i;
+				item.timeFromDemoStart = atoiWhileNumber(&text) - extraFieldInfo.cutStartOffset;
+				metaEvents.push_back(item);
+				break;
+			}
+		}
+		if(*text) text++;
+	}
+
+}
 
 #ifdef RELDEBUG
 //#pragma optimize("", on)

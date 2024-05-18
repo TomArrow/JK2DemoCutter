@@ -4761,7 +4761,9 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut = NULL);
 int64_t demoCutGetDemoNameTruncationOffset(const char* demoName);
 
-
+int strNumLen(const char* s);
+int atoiWhileNumber(const char* s);
+int atoiWhileNumber(const char** s);
 
 
 
@@ -5127,6 +5129,45 @@ inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, dem
 
 entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
 entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char, int>* playerMapClientNumMap);
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Meta event related
+typedef enum metaEventType_t {
+	METAEVENT_TEAMCAPTURE,
+	METAEVENT_ENEMYTEAMCAPTURE,
+	METAEVENT_CAPTURE,
+	METAEVENT_RETURN,
+	METAEVENT_KILL,
+	METAEVENT_DEATH,
+	METAEVENT_JUMP,
+	METAEVENT_SABERHIT, // any kind of saber hit, regardless of who is hit or who is ttacking
+	METAEVENT_SABERBLOCK, // any saber block, no matter by who or to who
+	METAEVENT_EFFECT, // effect event of any sort
+	METAEVENT_LAUGH, // effect event of any sort
+	//METAEVENT_HIGHLIGHT, // highlight of the demo. not really used, internal for democutter tools for merging and such
+	METAEVENT_COUNT
+};
+
+extern const char* metaEventKeyNames[METAEVENT_COUNT];
+struct MetaEventItem {
+	int relativeTime; // Relative to the kill
+	metaEventType_t type;
+};
+struct MetaEventItemAbsolute {
+	int timeFromDemoStart; // Relative to the demo start
+	metaEventType_t type;
+};
 
 
 #endif

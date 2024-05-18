@@ -59,9 +59,6 @@ public:
 typedef std::map<int, SnapshotInfo> SnapshotInfoMap;
 typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 
-typedef enum dimensionDataType_t {
-	DIM_OWNAGE
-};
 
 class DemoReader : public DemoReaderBase {
 
@@ -90,14 +87,6 @@ class DemoReader : public DemoReaderBase {
 	int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
 	int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
 
-	struct {
-		qboolean ownageExtraInfoMetaMarker = qfalse;
-		qboolean dimensionInfoConfirmed = qfalse;
-		dimensionDataType_t dimensionInfoType = (dimensionDataType_t )(-1);
-		int g_entHUDieldsValue = 0;
-		int64_t	cutStartOffset = 0;
-		int64_t	truncationOffset = 0;
-	} extraFieldInfo;
 
 	SnapshotInfoMap snapshotInfos;
 	std::vector<Command> readCommands;
@@ -105,9 +94,6 @@ class DemoReader : public DemoReaderBase {
 
 	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
-	qboolean wasFirstCommandByte = qfalse;
-	qboolean firstCommandByteRead = qfalse;
-	rapidjson::Document* jsonSourceFileMetaDocument = NULL;
 
 	playerState_t	oldPS[MAX_CLIENTS_MAX];
 

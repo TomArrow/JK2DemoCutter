@@ -571,34 +571,8 @@ std::map<int, int> timeCheckedForKillStreaks;
 
 // Meta events (for logging surrounding jumps, kills etc for each kill for music sync)
 
-typedef enum metaEventType_t {
-	METAEVENT_TEAMCAPTURE,
-	METAEVENT_ENEMYTEAMCAPTURE,
-	METAEVENT_CAPTURE,
-	METAEVENT_RETURN,
-	METAEVENT_KILL,
-	METAEVENT_DEATH,
-	METAEVENT_JUMP,
-	METAEVENT_SABERHIT, // any kind of saber hit, regardless of who is hit or who is ttacking
-	METAEVENT_SABERBLOCK, // any saber block, no matter by who or to who
-	METAEVENT_EFFECT, // effect event of any sort
-	METAEVENT_LAUGH, // effect event of any sort
-	METAEVENT_COUNT
-};
 
-const char* metaEventKeyNames[METAEVENT_COUNT] = {
-	"tc",
-	"ec",
-	"c",
-	"r",
-	"k",
-	"d",
-	"j",
-	"sh",
-	"sb",
-	"ef",
-	"l",
-};
+
 
 class MetaEvent {
 
@@ -630,11 +604,6 @@ public:
 		timeDelta = timeDeltaA;
 	}
 };
-struct MetaEvent_Kill {
-	int relativeTime; // Relative to the kill
-	metaEventType_t type;
-};
-
 
 // Kill object for metaevent tracking
 // These are chained together in a slightly nonintuitive way.
@@ -653,7 +622,7 @@ class MetaEventTracker { // kill for meta events
 	MetaEventTracker* previous = NULL;
 	SQLDelayedQueryWrapper_t* queryWrapper = NULL;
 	bool destroyPrevious = true;
-	std::vector<MetaEvent_Kill> metaEvents;
+	std::vector<MetaEventItem> metaEvents;
 	int64_t demoTime;
 	int64_t demoTimeStart;
 	int bufferTimeReal;
@@ -663,7 +632,7 @@ class MetaEventTracker { // kill for meta events
 	
 	inline void addEvent(MetaEvent* metaEventAbs) {
 		int delta = (int)(metaEventAbs->demoTime - demoTime);
-		MetaEvent_Kill metaEvent{ delta ,metaEventAbs->type };
+		MetaEventItem metaEvent{ delta ,metaEventAbs->type };
 		metaEvents.push_back(metaEvent);
 	}
 public:
@@ -682,7 +651,7 @@ public:
 		// Dump metaEvents into query
 		if (queryWrapper) { // Let's be sure
 
-			std::sort(metaEvents.begin(),metaEvents.end(), [](MetaEvent_Kill a, MetaEvent_Kill b)
+			std::sort(metaEvents.begin(),metaEvents.end(), [](MetaEventItem a, MetaEventItem b)
 				{
 					return a.relativeTime < b.relativeTime;
 				}

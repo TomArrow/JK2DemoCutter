@@ -5,8 +5,13 @@
 
 
 
+typedef enum dimensionDataType_t {
+	DIM_OWNAGE
+};
 
 class DemoReaderBase {
+	void	parseMetaEvents(const char* meString);
+
 protected:
 
 	std::string originalDemoPath = "";
@@ -36,6 +41,24 @@ protected:
 	int				lastKnownTime = 0;
 	int				lastKnownInOrderTime = 0;
 	int				maxSequenceNum = -9999;
+
+	
+	struct {
+		qboolean ownageExtraInfoMetaMarker = qfalse;
+		qboolean dimensionInfoConfirmed = qfalse;
+		dimensionDataType_t dimensionInfoType = (dimensionDataType_t )(-1);
+		int g_entHUDieldsValue = 0;
+		int64_t	cutStartOffset = 0;
+		int64_t	truncationOffset = 0;
+	} extraFieldInfo;
+
+	qboolean wasFirstCommandByte = qfalse;
+	qboolean firstCommandByteRead = qfalse;
+	rapidjson::Document* jsonSourceFileMetaDocument = NULL;
+	std::vector<MetaEventItemAbsolute> metaEvents;
+	int64_t metaHighlight = -1;
+
+	qboolean tryReadMetadata(msg_t* msg);
 public:
 
 

@@ -1684,35 +1684,7 @@ readNext:
 			// TODO Check for svc_extension/svc_voip (ioq3/wolfcamql)
 			if (wasFirstCommandByte) {
 				// check for hidden meta content
-				const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
-				if (maybeMeta) {
-
-					jsonSourceFileMetaDocument = new rapidjson::Document();
-					if (jsonSourceFileMetaDocument->Parse(maybeMeta).HasParseError() || !jsonSourceFileMetaDocument->IsObject()) {
-						// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
-						// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
-						// will quit the process. Because the user can after all just adjust and fix the commandline.
-						std::cout << "Old demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
-						break;
-					}
-
-					const char* realExtraFieldsMetaname = jsonGetRealMetadataKeyName(jsonSourceFileMetaDocument, "extraFields");
-					if (realExtraFieldsMetaname) {
-						const char* extraFields = (*jsonSourceFileMetaDocument)[realExtraFieldsMetaname].GetString();
-						if (extraFields) {
-							if (!stricmp(extraFields,"ownage")) {
-								extraFieldInfo.ownageExtraInfoMetaMarker = qtrue;
-							}
-						}
-					}
-					if (jsonSourceFileMetaDocument->HasMember("cso")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
-						extraFieldInfo.cutStartOffset = (*jsonSourceFileMetaDocument)["cso"].GetInt64();
-					}
-					if (jsonSourceFileMetaDocument->HasMember("trim")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
-						extraFieldInfo.truncationOffset = (*jsonSourceFileMetaDocument)["trim"].GetInt64();
-					}
-
-				}
+				tryReadMetadata(&oldMsg);
 			}
 			break;
 		}
