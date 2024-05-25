@@ -316,6 +316,39 @@ char* QDECL va(const char* format, ...) {
 	return buf;
 }
 
+
+qboolean getModelAndSkinFromSkinPath(const char* skinPath, char* outModel, int outModelMaxLen, char* outSkin, int outSkinMaxLen) {
+	if (strncmp(skinPath, "models/players", sizeof("models/players") - 1)) {
+		return qfalse;
+	}
+	skinPath += sizeof("models/players") - 1;
+	while (*skinPath == '/') {
+		skinPath++;
+	}
+	while (*skinPath && *skinPath != '/' && outModelMaxLen > 1) {
+		*outModel = tolower(*skinPath);
+		skinPath++;
+		outModel++;
+		outModelMaxLen--;
+	}
+	*outModel = 0;
+	while (*skinPath == '/') {
+		skinPath++;
+	}
+	if (strncmp(skinPath, "model_", sizeof("model_") - 1)) {
+		return qfalse;
+	}
+	skinPath += sizeof("model_") - 1;
+	while (*skinPath && *skinPath != '.' && outSkinMaxLen > 1) {
+		*outSkin = tolower(*skinPath);
+		skinPath++;
+		outSkin++;
+		outSkinMaxLen--;
+	}
+	*outSkin = 0;
+	return qtrue;
+}
+
 void sanitizeFilename(const char* input, char* output,qboolean allowExtension) {
 
 	char* lastDot = NULL;
@@ -1610,6 +1643,10 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	s->m_iVehicleNum = ps->m_iVehicleNum;
 
 	s->demoToolsData = ps->demoToolsData;
+
+	if (demoType == DM_14) {
+		s->modelindex3 = ps->saberColor;
+	}
 }
 
 int getMOHTeam(entityState_t* s) {
@@ -1978,6 +2015,10 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		ps->stats[STAT_HOLDABLE_ITEM] = 7;// stupid lol, setting it to datapad. its just used for inventory selection stuff and we need it to draw inventory on screen.
 	}
 
+
+	if (demoType == DM_14) {
+		ps->saberColor = (saber_colors_t)s->modelindex3;
+	}
 }
 
 void EnhancePlayerStateWithBaseState(playerState_t* ps, playerState_t* baseState, demoType_t demoType) {
@@ -5836,7 +5877,7 @@ G_FindConfigstringIndex
 
 ================
 */
-int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd,demoType_t demoType) {
+int G_FindConfigstringIndex(const char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd,demoType_t demoType) {
 	int		i;
 	//char	s[MAX_STRING_CHARS];
 	char* s;
@@ -5876,13 +5917,16 @@ int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, cli
 }
 
 
-int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+int G_SoundIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_SOUNDS(demoType), MAX_SOUNDS, qtrue, clCut, commandsToAdd, demoType);
 }
-int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+int G_ModelIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qtrue, clCut, commandsToAdd, demoType);
 }
-int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+int G_GrappleSkinIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+	return G_FindConfigstringIndex(name, getCS_MAX(demoType)+ CS_GRAPPLESKIN_MAX_OFFSET, MAX_GRAPPLESKINS, qtrue, clCut, commandsToAdd, demoType);
+}
+int G_ModelIndex_NoAdd(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qfalse, clCut, commandsToAdd, demoType);
 }
 
@@ -6540,7 +6584,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsMOHAA_ver_6,sizeof(playerStateFieldsMOHAA_ver_6) / sizeof(playerStateFieldsMOHAA_ver_6[0]),}
 		},
 		MAX_CONFIGSTRINGS_MOH,
-		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH_OLD, EF_TELEPORT_BIT},
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH_OLD, EF_TELEPORT_BIT,CS_SOUNDTRACK_MOH + 1},
 		MAX_CLIENTS_MOH
 	},
 	{ // MOHAA expansions
@@ -6583,7 +6627,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsMOHAA_ver_15,sizeof(playerStateFieldsMOHAA_ver_15) / sizeof(playerStateFieldsMOHAA_ver_15[0]),}
 		},
 		MAX_CONFIGSTRINGS_MOH,
-		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH, EF_TELEPORT_BIT},
+		{CS_MODELS_MOH,CS_SOUNDS_MOH,CS_PLAYERS_MOH,ET_EVENTS_MOH,-1,ANIM_TOGGLEBIT_MOH,CS_LEVEL_START_TIME_MOH, EF_TELEPORT_BIT,CS_SOUNDTRACK_MOH+1}, // not sure about the value for CS_MAX here. CS_MAX itself is broken in openmohaa but no server i know ever used one above 1880
 		MAX_CLIENTS_MOH
 	},
 	{
@@ -6623,7 +6667,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFields_jk2sp,sizeof(playerStateFields_jk2sp) / sizeof(playerStateFields_jk2sp[0]),}
 		},
 		MAX_CONFIGSTRINGS_JK2SP,//MAX_CONFIGSTRINGS,
-		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME, EF_TELEPORT_BIT},
+		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME, EF_TELEPORT_BIT, CS_MAX_JK2SP},
 		1 // Just the main player
 	},
 	{ // First is treated as default.
@@ -6758,7 +6802,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA, CS_MAX_JKA},
 	},{
 		DM_26,
 		{
@@ -6801,7 +6845,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA, CS_MAX_JKA},
 	},{
 		DM_26_XBOX,
 		{
@@ -6880,7 +6924,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsQ3DM68,sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),}
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3, CS_LEVEL_START_TIME_Q3,EF_TELEPORT_BIT_Q3,CS_MAX_Q3},
 		MAX_CLIENTS_Q3
 	},{
 		DM_67,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -6919,7 +6963,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsQ3DM68,sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),}
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3, CS_LEVEL_START_TIME_Q3,EF_TELEPORT_BIT_Q3,CS_MAX_Q3},
 		MAX_CLIENTS_Q3
 	},{
 		DM_68,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -6958,7 +7002,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFieldsQ3DM68,sizeof(playerStateFieldsQ3DM68) / sizeof(playerStateFieldsQ3DM68[0]),}
 		},
 		MAX_CONFIGSTRINGS_Q3,
-		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3},
+		{CS_MODELS_Q3,CS_SOUNDS_Q3,CS_PLAYERS_Q3,ET_EVENTS_Q3,-1,ANIM_TOGGLEBIT_Q3, CS_LEVEL_START_TIME_Q3,EF_TELEPORT_BIT_Q3,CS_MAX_Q3},
 		MAX_CLIENTS_Q3
 	},{ // Quake live based on QL
 		DM_73,  // Yes, I added this entry. This doesn't actually mean that this is implemented ok? It's just in case I implement it in the future.
@@ -7122,6 +7166,7 @@ void initializeGameInfos() {
 			if (!gameInfos[i].constants.anim_togglebit) gameInfos[i].constants.anim_togglebit = ANIM_TOGGLEBIT;
 			if (!gameInfos[i].constants.cs_level_start_time) gameInfos[i].constants.cs_level_start_time = CS_LEVEL_START_TIME;
 			if (!gameInfos[i].constants.ef_teleportbit) gameInfos[i].constants.ef_teleportbit = EF_TELEPORT_BIT;
+			if (!gameInfos[i].constants.cs_max) gameInfos[i].constants.cs_max = CS_MAX_JK2;
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 
 			// BTw for dynamically created arrays here: We don't care about destroying them. They are created one time at startup and that's it. When program closes they disappear too.

@@ -853,6 +853,203 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 	return retVal;
 	
 }
+entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*SnapshotInfo** oldSnap = NULL, SnapshotInfo** newSnap = NULL,*/ float* translatedTime) {
+	entityState_t retVal;
+	Com_Memset(&retVal, 0, sizeof(entityState_t));
+
+	//if (oldSnap) *oldSnap = NULL;
+	//if (newSnap) *newSnap = NULL;
+
+	SeekToAnySnapshotIfNotYet();
+	SeekToTime(time);
+
+	
+	// Now let's translate time into server time
+	time = time - demoBaseTime + demoStartTime;
+
+	if (translatedTime) {
+		*translatedTime = time;
+	}
+
+	SeekToServerTime(time+200.0); // nextthink of NPCs is every 100 or 50 ms. just go 200 to the future, should be safe?
+
+	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
+
+	// Ok now we are sure we have at least one snapshot. Good.
+	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
+
+	int lastPastSnap = -1;
+	int firstPacketWithPlayerInIt = -1;
+	SnapshotInfoMapIterator lastPastSnapIt;
+	SnapshotInfoMapIterator firstPacketWithPlayerInItIt;
+	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
+		//if (it->second.serverTime <= time) {
+		
+		if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		
+		if (firstPacketWithPlayerInIt == -1) { 
+			firstPacketWithPlayerInItIt = it;
+			firstPacketWithPlayerInIt = it->first; 
+		}
+		
+		if (it->second.serverTime <= time) {
+			lastPastSnapIt = it;
+			lastPastSnap = it->first;
+		}
+	}
+	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
+		if (firstPacketWithPlayerInIt == -1) {
+			// Uhm. Ok. Maybe handle this better at some later time but for now we just return that empty playerState.
+			// We should probably keep seeking then or sth.
+			return retVal;
+		}
+		else {
+			return firstPacketWithPlayerInItIt->second.entities[entityNum];
+		}
+	}
+
+	// Ok now we wanna make sure we have at least one snap after the last one before "time" that has a different commandTime so we have something to interpolate.
+	while (lastMessageWithEntity.find(entityNum)->second <= lastPastSnap && !endReached) {
+		ReadMessage();
+	}
+
+	// already at end, nothing we can interpolate.
+	// Just return the last state we have about this player.
+	// TODO actually: give way to return info about whether demo is over and such. So we dont end up with stuck entities in one place, tehy should disappear instead.
+	// Although... in case of short visibility interruptions it might actually be better to keep returning interpolated values? (but is that related?)
+	if (lastMessageWithEntity.find(entityNum)->second <= lastPastSnap && endReached) {
+		//if (lastMessageWithEntity.find(clientNum) == lastMessageWithEntity.end()) {
+			// We never knew anything about this player at all.
+		//	return retVal;
+		//}
+		//else 
+		{
+
+			//if (oldSnap) *oldSnap = &snapshotInfos[lastMessageWithEntity[entityNum]];
+			//if (newSnap) *newSnap = &snapshotInfos[lastMessageWithEntity[entityNum]];
+			//return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
+			return snapshotInfos[lastMessageWithEntity[entityNum]].entities[entityNum];
+		}
+	}
+
+
+	const int maxInterpolationDuration = 150;
+
+	// Okay now we want to locate the first snap each with a different position or angular position than lastPastSnap and then (maybe) interpolate between the two.
+	int firstNextDifferentAngleSnap = -1;
+	SnapshotInfoMapIterator firstNextDifferentAngleSnapIt = lastPastSnapIt;
+	int firstNextDifferentPositionSnap = -1;
+	SnapshotInfoMapIterator firstNextDifferentPositionSnapIt = lastPastSnapIt;
+	for (auto it = lastPastSnapIt; it != snapshotInfos.end(); it++) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
+
+		if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+
+		if (firstNextDifferentAngleSnap == -1 && it->second.serverTime > lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].apos.trBase, lastPastSnapIt->second.entities[entityNum].apos.trBase)) {
+			firstNextDifferentAngleSnap = it->first;
+			firstNextDifferentAngleSnapIt = it;
+		}
+
+		if (firstNextDifferentPositionSnap == -1 && it->second.serverTime > lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].pos.trBase, lastPastSnapIt->second.entities[entityNum].pos.trBase)) {
+			firstNextDifferentPositionSnap = it->first;
+			firstNextDifferentPositionSnapIt = it;
+		}
+
+		if (firstNextDifferentAngleSnap != -1 && firstNextDifferentPositionSnap != -1 || (it->second.serverTime-lastPastSnapIt->second.serverTime) > maxInterpolationDuration) {
+			break;
+		}
+	}
+
+
+
+	//if (oldSnap) *oldSnap = &lastPastSnapIt->second;//&snapshotInfos[lastPastSnap];
+	//if (newSnap) *newSnap = firstNextDifferentAngleSnap == -1 ? NULL : &firstNextDifferentAngleSnapIt->second;//&snapshotInfos[firstNextSnap];
+
+	retVal = lastPastSnapIt->second.entities[entityNum];
+
+
+	// We do angles and position separately.
+
+	// Angles 
+	if (firstNextDifferentAngleSnap != -1){
+
+		int interpStartSnap = -1;
+		SnapshotInfoMapIterator interpStartSnapIt= lastPastSnapIt;
+		if((firstNextDifferentAngleSnapIt->second.serverTime - lastPastSnapIt->second.serverTime) < maxInterpolationDuration){
+			// Ok we have the interpolation end time but we need the start time too. Find the last snap that has identical angles to lastpastsnapit
+			for (SnapshotInfoMapIterator it = lastPastSnapIt, itLast = it; itLast != snapshotInfos.begin(); itLast=it,it--) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
+
+				if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+
+				if (it->second.serverTime < lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].apos.trBase, lastPastSnapIt->second.entities[entityNum].apos.trBase)) {
+					interpStartSnap = itLast->first;
+					interpStartSnapIt = itLast;
+					break;
+				}
+				if ((lastPastSnapIt->second.serverTime - it->second.serverTime) > maxInterpolationDuration) {
+					break;
+				}
+			}
+		}
+		else {
+			interpStartSnap = lastPastSnapIt->first;
+		}
+		if (interpStartSnap != -1) {
+
+			int interpStartTime = interpStartSnapIt->second.serverTime;
+			if ((firstNextDifferentAngleSnapIt->second.serverTime- interpStartTime) > maxInterpolationDuration) {
+				interpStartTime = firstNextDifferentAngleSnapIt->second.serverTime - maxInterpolationDuration;
+			}
+			float f = ((double)time - (double)interpStartTime) / ((double)firstNextDifferentAngleSnapIt->second.serverTime - (double)interpStartTime);
+			for (int i = 0; i < 3; i++) {
+				retVal.apos.trBase[i] = LerpAngle(
+					retVal.apos.trBase[i], firstNextDifferentAngleSnapIt->second.entities[entityNum].apos.trBase[i], f);
+			}
+		}
+	}
+
+	// Position
+	if (firstNextDifferentPositionSnap != -1){
+
+		int interpStartSnap = -1;
+		SnapshotInfoMapIterator interpStartSnapIt = lastPastSnapIt;
+
+		if((firstNextDifferentPositionSnapIt->second.serverTime - lastPastSnapIt->second.serverTime) < maxInterpolationDuration){
+			// Ok we have the interpolation end time but we need the start time too. Find the last snap that has identical angles to lastpastsnapit
+			for (SnapshotInfoMapIterator it = lastPastSnapIt, itLast = it; itLast != snapshotInfos.begin(); itLast=it,it--) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
+
+				if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+
+				if (it->second.serverTime < lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].pos.trBase, lastPastSnapIt->second.entities[entityNum].pos.trBase)) {
+					interpStartSnap = itLast->first;
+					interpStartSnapIt = itLast;
+					break;
+				}
+				if ((lastPastSnapIt->second.serverTime - it->second.serverTime) > maxInterpolationDuration) {
+					break;
+				}
+			}
+		}
+		else {
+			interpStartSnap = lastPastSnapIt->first;
+		}
+		if (interpStartSnap != -1) {
+
+			int interpStartTime = interpStartSnapIt->second.serverTime;
+			if ((firstNextDifferentPositionSnapIt->second.serverTime - interpStartTime) > maxInterpolationDuration) {
+				interpStartTime = firstNextDifferentPositionSnapIt->second.serverTime - maxInterpolationDuration;
+			}
+			float f = ((double)time - (double)interpStartTime) / ((double)firstNextDifferentPositionSnapIt->second.serverTime - (double)interpStartTime);
+			for (int i = 0; i < 3; i++) {
+
+				retVal.pos.trBase[i] = retVal.pos.trBase[i] + f * (firstNextDifferentPositionSnapIt->second.entities[entityNum].pos.trBase[i] - retVal.pos.trBase[i]);
+				retVal.pos.trDelta[i] = retVal.pos.trDelta[i] + f * (firstNextDifferentPositionSnapIt->second.entities[entityNum].pos.trDelta[i] - retVal.pos.trDelta[i]);
+			}
+		}
+	}/**/
+
+	return retVal;
+	
+}
 
 // It's like a cheaper version of GetInterpolatedPlayer. We don't interpolate anything. We just return the last player state or the next one if no last one exists.
 // It ignores command times and is based purely on server time.

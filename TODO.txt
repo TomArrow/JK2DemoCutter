@@ -13,6 +13,15 @@ For example, enhanceonly didnt properly handle death/alive state and still doesn
 Make demo converter. Let it for example fix up names for jomme. Find closest color from the NT mod colors.
 
 
+
+way to have ET_GRAPPLE to have skins:
+- use CS_CHARSKINS
+- use new configstring to store merely "blue" or "red" to have more combinations and have a double key?
+- include team for player so we can override skins
+- what field to use? we can use tricketentindex 1 and 2. 16 bit each. uh. is 256*256 enough? 8 bits for skin, 8 bits for subskin index? then uh, maybe EF_REDTEAM or EF_BLUETEAM flag?
+- or what about doing ET_PLAYER and have index pointing to this player's info in the unused configstrings above CS_MAX?
+
+
 todo combiner: dismemberment entities? make sure to convert properly between dm_15 and dm_16! check demo15detected in jomme
 todo combiner: convert nt name colors to hex?
 

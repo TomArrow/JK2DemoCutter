@@ -58,6 +58,7 @@ public:
 
 typedef std::map<int, SnapshotInfo> SnapshotInfoMap;
 typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
+typedef SnapshotInfoMap::reverse_iterator SnapshotInfoMapIteratorReverse;
 
 
 class DemoReader : public DemoReaderBase {
@@ -176,6 +177,7 @@ public:
 	std::map<int, entityState_t> GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnap = NULL);
 	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
+	entityState_t GetInterpolatedNPC(int entityNum, double time, /*SnapshotInfo** oldSnap = NULL, SnapshotInfo** newSnap = NULL, */float* translatedTime = NULL);
 
 	std::map<int, entityState_t> GetEntitiesAtTime(double time, double * translatedTime = NULL, int* sourceSnapNum = NULL);
 	std::map<int, entityState_t> GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum = NULL);
@@ -236,18 +238,25 @@ public:
 
 
 class SlotManager {
-	struct sourceDemoMapping {
-		int demoIndex;
-		int entityNum;
-		qboolean isModel;
-	};
 
 	const int maxAvailableSlots = MAX_GENTITIES - 2;
 	int availableSlots = maxAvailableSlots;
 	int lowestPossibleEntityNum = MAX_CLIENTS;
+	vec3_t modelDistanceOrigin{};
+public:
+	typedef enum sourceDemoMappingType {
+		SDMT_NONE,
+		SDMT_G2
+	};
+	struct sourceDemoMapping {
+		int demoIndex;
+		int entityNum;
+		qboolean isModel;
+		sourceDemoMappingType type;
+	};
+private:
 	std::map<int, sourceDemoMapping> mappings;
 	typedef std::map<int, sourceDemoMapping>::iterator mappingIterator;
-	vec3_t modelDistanceOrigin{};
 public:
 	SlotManager() {
 
@@ -278,7 +287,7 @@ public:
 		// Error: No free slot found
 		return -1;
 	}
-	int getEntitySlot(int demoIndex, int entityNum) {
+	int getEntitySlot(int demoIndex, int entityNum, sourceDemoMappingType type = SDMT_NONE) {
 		// Check if mapping already exists
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
 			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
@@ -289,7 +298,7 @@ public:
 		for (int i = lowestPossibleEntityNum; i < MAX_GENTITIES - 2; i++) {
 			if (mappings.find(i) == mappings.end()) {
 				// Free slot!
-				mappings[i] = { demoIndex,entityNum,qfalse };
+				mappings[i] = { demoIndex,entityNum,qfalse,type };
 				availableSlots--;
 				return i;
 			}
@@ -301,7 +310,8 @@ public:
 		VectorCopy(originA, modelDistanceOrigin);
 	}
 	// These are released as soon as they disappear from the demo. We don't need consistency from frame to frame on them. It's just random models/movers etc., they only need to be visible.
-	int getModelSlot(int demoIndex, int entityNum) {
+	// TODO actually do this?
+	int getModelSlot(int demoIndex, int entityNum, sourceDemoMappingType type = SDMT_NONE) {
 		// Check if mapping already exists
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
 			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
@@ -312,7 +322,7 @@ public:
 		for (int i = lowestPossibleEntityNum; i < MAX_GENTITIES - 2; i++) {
 			if (mappings.find(i) == mappings.end()) {
 				// Free slot!
-				mappings[i] = { demoIndex,entityNum,qtrue };
+				mappings[i] = { demoIndex,entityNum,qtrue,type };
 				availableSlots--;
 				return i;
 			}
@@ -339,14 +349,14 @@ public:
 		}
 		return -1;
 	}
-	std::vector<int> freeSlots(int demoIndex) { // Returns the erased slots
-		std::vector<int> erasedSlots;
+	std::vector<std::tuple<int,sourceDemoMapping>> freeSlots(int demoIndex) { // Returns the erased slots
+		std::vector<std::tuple<int, sourceDemoMapping>> erasedSlots;
 		int countErased = 0;
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
 			mappingIterator iteratorHere = it;
 			it++;
 			if (iteratorHere->second.demoIndex == demoIndex) {
-				erasedSlots.push_back(iteratorHere->first);
+				erasedSlots.push_back(std::tuple(iteratorHere->first,iteratorHere->second));
 				mappings.erase(iteratorHere);
 				availableSlots++;
 				countErased++;

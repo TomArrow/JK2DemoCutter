@@ -6,6 +6,7 @@
 #include <sstream>
 #include <set>
 #include <chrono>
+#include <jk2spStuff.h>
 
 // TODO attach amount of dropped frames in filename.
 
@@ -325,6 +326,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	strcpy_s(infoCopy, isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy, demoType);
+	infoCopy[0] = 0;
+	strcpy_s(infoCopy, isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING, demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[1]);
+	Info_SetValueForKey_Big(infoCopy, sizeof(infoCopy), "g_demoCombinerFields", "1");
+	demoCutConfigstringModifiedManual(&demo.cut.Cl, 1, infoCopy, demoType);
 
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_MOTD, "^7This demo was artificially created using JK2DemoCutter tools.", demoType);
 
@@ -396,7 +401,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					int targetClientNum = -1;
 					if (asG2AnimEnt) {
-						targetClientNum = slotManager.getEntitySlot(i, clientNumHere);
+						targetClientNum = slotManager.getEntitySlot(i, clientNumHere, SlotManager::sourceDemoMappingType::SDMT_G2);
 					}
 					else {
 
@@ -405,6 +410,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						if (isNewPlayer) {
 
 							tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+
+							if (sourceDemoType == DM_14) {
+								static char copy[MAX_INFO_STRING];
+								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength,sizeof(copy)),tmpConfigString);
+								tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay - pingCompensationHere, NULL,NULL, qfalse, NULL);
+								// DM_14 (jk2sp) stores saber color differently
+								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", tmpPS.saberColor), demoReaders[i].reader.isThisMOHAADemo());
+							}
 
 							if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
 								//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
@@ -512,6 +525,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								//const char* playerInfo = demoReaders[i].reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
 								const char* playerInfo = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &maxLength);
 								std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
+								int thisPlayerTeam = atoi(Info_ValueForKey(playerInfo, maxLength, "t"));
+								int thisPlayerColor1 = sourceDemoType == DM_14 ? tmpPS.saberColor : atoi(Info_ValueForKey(playerInfo, maxLength, "c1"));
 
 								std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
 								size_t firstSlash = thisModel.find_first_of("/");
@@ -535,6 +550,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								}
 
 								tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd, demoType);
+								tmpES.trickedentindex = variantExists ? G_GrappleSkinIndex(variant.c_str(), &demo.cut.Cl, &commandsToAdd, demoType) : 0;
+								tmpES.trickedentindex |= std::clamp(thisPlayerTeam,0,3) << 6;
+								tmpES.trickedentindex |= std::clamp(thisPlayerColor1,0,15) << 8; // saber color. 0-15 
+
 							}
 						}
 						//playerEntities[copiedPlayerIndex] = tmpES;
@@ -623,7 +642,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 
 						if (ownerSlot != -1) {
-							int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+							int targetEntitySlot = slotManager.getEntitySlot(i, it->first, SlotManager::sourceDemoMappingType::SDMT_G2);
 							if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 								entityState_t tmpEntity = it->second;
 								tmpEntity.eType = ET_GENERAL_JK2;
@@ -688,14 +707,34 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					}
 					// Single player NPCs
-					else if (generalizedEntityType == ET_PLAYER_GENERAL && sourceDemoType == DM_14) {
+					else if (generalizedEntityType == ET_PLAYER_GENERAL && sourceDemoType == DM_14 && it->second.number > 0 && (it->second.eFlags & EF_NPC_JK2SP)) {
 						
-						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first, SlotManager::sourceDemoMappingType::SDMT_G2);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
-							entityState_t tmpEntity = it->second;
+							//entityState_t tmpEntity = it->second;
+							entityState_t tmpEntity = demoReaders[i].reader.GetInterpolatedNPC(it->first, sourceTime - demoReaders[i].sourceInfo->delay,NULL);
 							tmpEntity.eType = ET_GRAPPLE_JK2;
 							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qtrue, qfalse, demoType);
 							tmpEntity.modelindex = tmpEntity.modelindex ? tmpEntity.modelindex : G_ModelIndex(va("models/players/stormtrooper/model.glm"), &demo.cut.Cl, &commandsToAdd, demoType); // By unmodded default these don't contain a modelIndex as that is sent directly between server and client in SP.
+							bool skinFound = false;
+							int grappleSkinIndex;
+							if (tmpEntity.modelindex2) {
+								static char model[256];
+								static char skin[256];
+								int csIndex = CS_CHARSKINS_JK2SP +tmpEntity.modelindex2;
+								const char* skinPath = demoReaders[i].reader.GetConfigString(csIndex,NULL);
+								if (getModelAndSkinFromSkinPath(skinPath,model,256,skin,256)) {
+									grappleSkinIndex = G_GrappleSkinIndex(skin, &demo.cut.Cl, &commandsToAdd, demoType);
+									skinFound = true;
+								}
+							}
+							if (!skinFound) {
+								grappleSkinIndex = 0; //G_GrappleSkinIndex("default", &demo.cut.Cl, &commandsToAdd, demoType);
+							}
+							tmpEntity.trickedentindex = grappleSkinIndex; // bottom 6 bits btw. above that we have 2 bits for team then. 0 in this case (team_free)
+							//tmpEntity.trickedentindex |= std::clamp(0, 0, 3) << 6;
+							tmpEntity.trickedentindex |= std::clamp(tmpEntity.modelindex3, 0, 15) << 8; // saber color. 0-15 
+
 							tmpEntity.number = targetEntitySlot;
 							tmpEntity.legsAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.legsAnim,sourceDemoType, demoType);
 							tmpEntity.torsoAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.torsoAnim,sourceDemoType, demoType);
@@ -910,19 +949,24 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)) {
 				allSourceDemosFinished = qfalse;
 			}*/
-			qboolean endReached, showEndReached;
+			qboolean endReached = qfalse, showEndReached=qfalse;
 			if ((endReached= demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay))
 					|| (showEndReached = (qboolean)(sourceTime > (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->showEnd)))) {
 				if (!demoReaders[i].sourceInfo->isFinished) {
 					std::cout << "Demo " << i << " has ended at " << sourceTime << " (" << demoReaders[i].reader.getCurrentDemoTime() << "). Demo had a delay of " << demoReaders[i].sourceInfo->delay << ". endReached: " << endReached << ", showEndReached: " << showEndReached << std::endl;
 					// We reached the end of this demo.
-					std::vector<int> erasedSlots = slotManager.freeSlots(i);
+					std::vector<std::tuple<int,SlotManager::sourceDemoMapping>> erasedSlots = slotManager.freeSlots(i);
 					for (int sl = 0; sl < erasedSlots.size(); sl++) {
-						int erasedSlot = erasedSlots[sl];
-						if (erasedSlot >= 0 && erasedSlot < MAX_CLIENTS) {
-							commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + erasedSlot, ""));
-							demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + erasedSlot, "", demoType);
-							commandsToAdd.push_back(va("kg2 %d", erasedSlot)); // Send kg2 for every erased slot.
+						std::tuple<int, SlotManager::sourceDemoMapping>* erasedSlot = &erasedSlots[sl];
+						int slotNum = std::get<0>(*erasedSlot);
+						SlotManager::sourceDemoMapping* mapping = &std::get<1>(*erasedSlot);
+						if (slotNum >= 0 && slotNum < MAX_CLIENTS) {
+							commandsToAdd.push_back(makeConfigStringCommand(CS_PLAYERS + slotNum, ""));
+							demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + slotNum, "", demoType);
+							commandsToAdd.push_back(va("kg2 %d", slotNum)); // Send kg2 for every erased player slot.
+						}
+						else if (mapping->type == SlotManager::sourceDemoMappingType::SDMT_G2) {
+							commandsToAdd.push_back(va("kg2 %d", slotNum)); // Send kg2 for every erased slot that used ghoul2.
 						}
 					}
 					demoReaders[i].sourceInfo->isFinished = qtrue;

@@ -367,6 +367,33 @@ typedef struct _iobuf
 #define	CS_SOUNDS				(CS_MODELS+MAX_MODELS)
 #define	CS_PLAYERS				(CS_SOUNDS+MAX_SOUNDS)
 
+/*
+Ghoul2 Insert Start
+*/
+#define CS_CHARSKINS_JK2			(CS_PLAYERS+MAX_CLIENTS)
+/*
+Ghoul2 Insert End
+*/
+#define	MAX_CHARSKINS_JK2		64		// character skins
+#define MAX_LOCATIONS_JK2		64
+#define MAX_FX_JK2				64		// max effects strings, I'm hoping that 64 will be plenty
+#define MAX_LIGHT_STYLES_JK2		64
+#define MAX_STRING_PACKAGES_JK2	30
+#define CS_LOCATIONS_JK2			(CS_CHARSKINS_JK2+MAX_CHARSKINS_JK2)
+#define CS_PARTICLES_JK2			(CS_LOCATIONS_JK2+MAX_LOCATIONS_JK2)
+#define CS_EFFECTS_JK2				(CS_PARTICLES_JK2+MAX_LOCATIONS_JK2)
+#define	CS_LIGHT_STYLES_JK2			(CS_EFFECTS_JK2 + MAX_FX_JK2)
+#define CS_STRING_PACKAGES_JK2		(CS_LIGHT_STYLES_JK2 + (MAX_LIGHT_STYLES_JK2*3))
+
+#define CS_MAX_JK2					(CS_STRING_PACKAGES_JK2+MAX_STRING_PACKAGES_JK2)
+
+#if (CS_MAX_JK2) > MAX_CONFIGSTRINGS
+#error overflow: (CS_MAX_JK2) > MAX_CONFIGSTRINGS
+#endif
+
+#define CS_GRAPPLESKIN_MAX_OFFSET 0
+#define MAX_GRAPPLESKINS 64
+
 //#define	MAX_GAMESTATE_CHARS	16000
 #define	MAX_GAMESTATE_CHARS	41952 // Mohaa is hungry...
 
@@ -3842,7 +3869,7 @@ extern demo_t demo;
 
 
 void sanitizeFilename(const char* input, char* output, qboolean allowExtension=qfalse);
-
+qboolean getModelAndSkinFromSkinPath(const char* skinPath, char* outModel, int outModelMaxLen, char* outSkin, int outSkinMaxLen);
 
 std::vector<std::string> splitString(std::string input, std::string separator, bool trim = true, bool allowEmpty = false);
 
@@ -4753,10 +4780,11 @@ const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* sea
 std::string printRapidJsonValue(rapidjson::Value* value);
 
 std::string makeConfigStringCommand(int index, std::string value);
-int G_FindConfigstringIndex(char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-int G_SoundIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-int G_ModelIndex(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-int G_ModelIndex_NoAdd(char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_FindConfigstringIndex(const char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_SoundIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_ModelIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_GrappleSkinIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_ModelIndex_NoAdd(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut = NULL);
@@ -4823,6 +4851,7 @@ struct gameConstantsInfo_t {
 	int anim_togglebit;
 	int cs_level_start_time;
 	int ef_teleportbit;
+	int cs_max;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -4953,6 +4982,9 @@ inline int getANIM_TOGGLEBIT(demoType_t demoType) {
 }
 inline int getEF_TELEPORTBIT(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.ef_teleportbit;
+}
+inline int getCS_MAX(demoType_t demoType) {
+	return gameInfosMapped[demoType]->constants.cs_max;
 }
 inline int getMAX_CLIENTS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->maxClients;
