@@ -26,6 +26,7 @@
 
 #define DEBUGSTATSDB
 
+#define BUFFERBAT
 
 std::queue<entityState_t*> parsedEventEntities;
 
@@ -97,12 +98,12 @@ struct ioHandles_t {
 	queryCollection* packetStatsQueries;
 
 	// Output bat files
-	std::ofstream* outputBatHandle;
-	std::ofstream* outputBatHandleKillSprees;
-	std::ofstream* outputBatHandleDefrag;
-	std::ofstream* outputBatHandleCaptures;
-	std::ofstream* outputBatHandleLaughs;
-	std::ofstream* outputBatHandleSpecial;
+	std::ostream* outputBatHandle;
+	std::ostream* outputBatHandleKillSprees;
+	std::ostream* outputBatHandleDefrag;
+	std::ostream* outputBatHandleCaptures;
+	std::ostream* outputBatHandleLaughs;
+	std::ostream* outputBatHandleSpecial;
 };
 struct sharedVariables_t {
 	std::string oldPath;
@@ -3288,6 +3289,15 @@ static void inline writeStrafeCSV(int i, const ExtraSearchOptions& opts);
 static void inline writePlayerDumpCSV(int i, const ExtraSearchOptions& opts);
 static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts);
 
+
+inline size_t streamsize(std::ostream* stream) {
+	size_t oldPointer = stream->tellp();
+	stream->seekp(0, std::ios::end);
+	size_t end = stream->tellp();
+	stream->seekp(oldPointer, std::ios::beg);
+	return end;
+}
+
 template<unsigned int max_clients>
 qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 
@@ -3350,6 +3360,22 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	}
 
 
+
+#ifdef BUFFERBAT
+	std::stringstream outputBatSS;
+	std::stringstream outputBatSSKillSprees;
+	std::stringstream outputBatSSDefrag;
+	std::stringstream outputBatSSCaptures;
+	std::stringstream outputBatSSLaughs;
+	std::stringstream outputBatSSSpecial;
+
+	io.outputBatHandle = &outputBatSS;
+	io.outputBatHandleKillSprees = &outputBatSSKillSprees;
+	io.outputBatHandleDefrag = &outputBatSSDefrag;
+	io.outputBatHandleCaptures = &outputBatSSCaptures;
+	io.outputBatHandleLaughs = &outputBatSSLaughs;
+	io.outputBatHandleSpecial = &outputBatSSSpecial;
+#else
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
 	std::ofstream outputBatHandleDefrag;
@@ -3370,6 +3396,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleCaptures->open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleLaughs->open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleSpecial->open(outputBatFileSpecial, std::ios_base::app); // append instead of overwrite
+#endif
 
 	// Save demo stats
 	const char* demoNameCStr = sharedVars.oldBasename.c_str();
@@ -3471,13 +3498,53 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			writePlayerDumpCSV(i, opts);
 		}
 	}
+#ifdef BUFFERBAT
 
+	if (streamsize(io.outputBatHandle)) {
+		std::ofstream outputBatHandle;
+		outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
+		outputBatHandle << io.outputBatHandle->rdbuf();
+		outputBatHandle.close();
+	}
+	if (streamsize(io.outputBatHandleKillSprees)) {
+		std::ofstream outputBatHandleKillSprees;
+		outputBatHandleKillSprees.open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
+		outputBatHandleKillSprees << io.outputBatHandleKillSprees->rdbuf();
+		outputBatHandleKillSprees.close();
+	}
+	if (streamsize(io.outputBatHandleDefrag)) {
+		std::ofstream outputBatHandleDefrag;
+		outputBatHandleDefrag.open(outputBatFileDefrag, std::ios_base::app); // append instead of overwrite
+		outputBatHandleDefrag << io.outputBatHandleDefrag->rdbuf();
+		outputBatHandleDefrag.close();
+	}
+	if (streamsize(io.outputBatHandleCaptures)) {
+		std::ofstream outputBatHandleCaptures;
+		outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
+		outputBatHandleCaptures << io.outputBatHandleCaptures->rdbuf();
+		outputBatHandleCaptures.close();
+	}
+	if (streamsize(io.outputBatHandleLaughs)) {
+		std::ofstream outputBatHandleLaughs;
+		outputBatHandleLaughs.open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
+		outputBatHandleLaughs << io.outputBatHandleLaughs->rdbuf();
+		outputBatHandleLaughs.close();
+	}
+	if (streamsize(io.outputBatHandleSpecial)) {
+		std::ofstream outputBatHandleSpecial;
+		outputBatHandleSpecial.open(outputBatFileSpecial, std::ios_base::app); // append instead of overwrite
+		outputBatHandleSpecial << io.outputBatHandleSpecial->rdbuf();
+		outputBatHandleSpecial.close();
+	}
+
+#else
 	io.outputBatHandle->close();
 	io.outputBatHandleKillSprees->close();
 	io.outputBatHandleDefrag->close();
 	io.outputBatHandleCaptures->close();
 	io.outputBatHandleLaughs->close();
 	io.outputBatHandleSpecial->close();
+#endif
 
 	lock.unlock();
 	
