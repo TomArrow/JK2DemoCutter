@@ -2375,7 +2375,7 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 }
 
 // TODO Optimize this a bit more with the random usage of std::string/const char etc?
-void logSpecialThing(const char* specialType, std::string details, std::string comment, int reframeClientNum, int64_t demoCurrentTime, int bufferTime, int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
+void logSpecialThing(const char* specialType, std::string details, std::string comment, std::string playerNameIfExists, int reframeClientNum, int64_t demoCurrentTime, int bufferTime, int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
 	
 	int duration = 0;
 
@@ -2425,7 +2425,7 @@ void logSpecialThing(const char* specialType, std::string details, std::string c
 
 	std::stringstream ss;
 	std::string detailsString = details;
-	ss << mapname << std::setfill('0') << "___SPECIAL___" << specialType << "___" << details << detailsString.substr(0,70) << (detailsString.size() > 70 ? "--" : "") << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+	ss << mapname << std::setfill('0') << "___SPECIAL___" << specialType << "___" << playerNameIfExists << (playerNameIfExists.size() ? "___" : "") << detailsString.substr(0, 70) << (detailsString.size() > 70 ? "--" : "")<< (reframeClientNum != -1 ? va("_%d", reframeClientNum) : "") << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 	std::string targetFilename = ss.str();
 	char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -8204,7 +8204,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
 						msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
 					}
-					logSpecialThing("STRINGSEARCH", opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+					logSpecialThing("STRINGSEARCH", msgInfo.isValid? msgInfo.message : opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 				}
 			}
 
@@ -8216,7 +8216,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doChatSearch) {
 					if (strstr(rawChatCommand.c_str(),opts.chatSearch.c_str()) || strstr(chatCommand.c_str(), opts.chatSearch.c_str())) {
 						parsedChatMessage_t msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
-						logSpecialThing("CHATSEARCH",opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+						logSpecialThing("CHATSEARCH", msgInfo.isValid ? msgInfo.message : opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 					}
 				}
 
@@ -8343,7 +8343,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doPrintSearch) {
 					std::string strippedPrint = Q_StripColorAll(printText);
 					if (strstr(printText.c_str(), opts.printSearch.c_str()) || strstr(strippedPrint.c_str(), opts.printSearch.c_str())) {
-						logSpecialThing("PRINTSEARCH", opts.printSearch, printText, -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+						logSpecialThing("PRINTSEARCH", opts.printSearch, printText,"", -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 					}
 				}
 
