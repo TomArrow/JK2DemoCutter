@@ -5162,10 +5162,222 @@ inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, dem
 entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
 entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char, int>* playerMapClientNumMap);
 
+typedef enum chatType_t
+{
+	CHATTYPE_NONE,
+	CHATTYPE_PRIVATE,
+	CHATTYPE_TEAM,
+	CHATTYPE_PUBLIC
+};
+class parsedChatMessage_t
+{
+public:
+	bool isValid = false;
+	std::string playerName = "";
+	int playerNum = -1;
+	chatType_t type = CHATTYPE_PUBLIC;
+	std::string message = "";
+	bool commandComesFromJKWatcher = false;
+};
+
+bool isNumber(const char* str);
 
 
+static const char privateChatBegin[]{ "[" };
+static const char teamChatBegin[]{ "(" };
+static const char privateChatSeparator[]{ "^7]: ^6" };
+static const char teamChatSeparator[]{ "^7): ^5" };
+static const char publicChatSeparator[]{ "^7: ^2" };
 
+template<int max_clients>
+inline parsedChatMessage_t ParseChatMessage(clientActive_t* clCut, demoType_t demoType, const char* nameChatSegmentA, const char* extraArgument = NULL)
+{
+	parsedChatMessage_t retVal;
 
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+	int sentNumber = -1;
+
+	if (extraArgument) // This is jka only i think, sending the client num as an extra
+	{
+		if (!isNumber(extraArgument))
+		{
+			std::cerr << "Chat message parsing, received extra argument that is not a number: " << (extraArgument ? extraArgument : "") << " (" << nameChatSegmentA << ")\n";
+		}
+		else
+		{
+			sentNumber = atoi(extraArgument);
+		}
+	}
+
+	const char* nameChatSegment = nameChatSegmentA;
+	chatType_t detectedChatType = CHATTYPE_PUBLIC;
+	if (strlen(nameChatSegment) < (sizeof(privateChatBegin) - 1))
+	{
+		return retVal; // Idk
+	}
+
+	const char* separator;
+	if (!_strnicmp(nameChatSegment, privateChatBegin, sizeof(privateChatBegin) - 1))
+	{
+		detectedChatType = CHATTYPE_PRIVATE;
+		nameChatSegment = nameChatSegment += sizeof(privateChatBegin) - 1;
+		separator = privateChatSeparator;
+	}
+	if (!_strnicmp(nameChatSegment, teamChatBegin, sizeof(teamChatBegin) - 1))
+	{
+		detectedChatType = CHATTYPE_TEAM;
+		nameChatSegment = nameChatSegment += sizeof(teamChatBegin) - 1;
+		separator = teamChatSeparator;
+	}
+	else
+	{
+		separator = publicChatSeparator;
+	}
+
+	int separatorLength = strlen(separator);
+
+	//string[] nameChatSplits = nameChatSegment.Split(new string[]{ separator }, StringSplitOptions.None);
+	std::vector<std::string> nameChatSplits = splitString(nameChatSegment, separator, false, true);
+
+	std::vector<int> possiblePlayers;
+	if (nameChatSplits.size() > 2)
+	{
+		// WTf. Someone is messing around and having a complete meme name or meme message consisting of the separator sequence.
+		// Let's TRY find out who it is.
+		std::stringstream sb;
+		for (int i = 0; i < nameChatSplits.size() - 1; i++)
+		{
+			if (i != 0)
+			{
+				sb << separator;
+			}
+			sb << nameChatSplits[i];
+			std::string possibleNameStr = sb.str();
+			const char* possibleName = possibleNameStr.c_str();
+			/*foreach(PlayerInfo playerInfo in infoPool.playerInfo)
+			{
+				if (playerInfo.infoValid && playerInfo.name == possibleName)
+				{
+					possiblePlayers.Add(playerInfo.clientNum);
+				}
+			}*/
+			for (int clientNum = 0; clientNum < max_clients; clientNum++) {
+
+				int stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+				const char* playerInfo = clCut->gameState.stringData + stringOffset;
+
+				if (!*playerInfo) continue;
+
+				const char* playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
+
+				if (!_stricmp(playerNameCompare, possibleName)) {
+					possiblePlayers.push_back(clientNum);
+				}
+			}
+		}
+	}
+	else
+	{
+		for (int clientNum = 0; clientNum < max_clients; clientNum++) {
+
+			int stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+			const char* playerInfo = clCut->gameState.stringData + stringOffset;
+
+			if (!*playerInfo) continue;
+
+			const char* playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
+
+			if (!_stricmp(playerNameCompare, nameChatSplits[0].c_str())) {
+				possiblePlayers.push_back(clientNum);
+			}
+		}
+		/*foreach(PlayerInfo playerInfo in infoPool.playerInfo)
+		{
+			if (playerInfo.infoValid && playerInfo.name == nameChatSplits[0])
+			{
+				possiblePlayers.Add(playerInfo.clientNum);
+			}
+		}*/
+	}
+
+	int playerNum = -1;
+
+	if (possiblePlayers.size() == 0)
+	{
+		if (sentNumber == -1)
+		{
+			std::cerr << "Could not identify sender of (t)chat message. Zero matches: " << nameChatSegmentA << "\n";
+			return retVal;
+		}
+		else
+		{
+			std::cerr << "Could not identify sender of (t)chat message (" << nameChatSegmentA << "), zero matches, but extra argument number " << sentNumber << " helped.\n";
+			playerNum = sentNumber;
+		}
+	}
+	else if (possiblePlayers.size() > 1)
+	{
+		if (sentNumber == -1)
+		{
+			std::cerr << "Could not reliably identify sender of (t)chat message. More than 1 match: " << nameChatSegmentA << ".\n";
+			return retVal;
+		}
+		else
+		{
+			int confirmedNumber = -1;
+			for (int i = 0; i < possiblePlayers.size(); i++)
+			{
+				if (possiblePlayers[i] == sentNumber)
+				{
+					confirmedNumber = sentNumber;
+				}
+			}
+			if (confirmedNumber == -1)
+			{
+				std::cerr << "Could not reliably identify sender of (t)chat message. More than 1 match: " << nameChatSegmentA << " and extra argument number " << sentNumber << " matched none.\n";
+				return retVal;
+			}
+			else
+			{
+				std::cerr << "Could not reliably identify sender of (t)chat message (" << nameChatSegmentA << "), but extra argument number " << sentNumber << " cleared it up.\n";
+				playerNum = confirmedNumber;
+			}
+		}
+	}
+	else
+	{
+		playerNum = possiblePlayers[0];
+	}
+
+	int stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + playerNum];
+	const char* playerInfo = clCut->gameState.stringData + stringOffset;
+
+	if (!*playerInfo) return retVal;
+
+	const char* playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
+
+	if (!*playerName)
+	{
+		// Shouldn't really happen here in demo tools but let's keep it for safety.
+		std::cerr << "Received message from player whose name is now null, wtf.";
+		return retVal;
+	}
+
+	const char* messageRaw = nameChatSegment += strlen(playerName) + separatorLength;
+	//int[] ourClientNums = serverWindow.getJKWatcherClientNums();
+	const char jkwatcherprivprefix[]{ "   " };
+	bool commandComesFromJKWatcher = /*ourClientNums.Contains(playerNum) || */(!_strnicmp(messageRaw, jkwatcherprivprefix, sizeof(jkwatcherprivprefix) - 1) && detectedChatType == CHATTYPE_PRIVATE);
+
+	// return new ParsedChatMessage(){ message = messageRaw.Trim(), playerName = playerName, playerNum = playerNum, type = detectedChatType, commandComesFromJKWatcher = commandComesFromJKWatcher };
+	retVal.isValid = true;
+	retVal.commandComesFromJKWatcher = commandComesFromJKWatcher;
+	retVal.message = messageRaw;
+	retVal.playerName = playerName;
+	retVal.playerNum = playerNum;
+	retVal.type = detectedChatType;
+	return retVal;
+}
 
 
 

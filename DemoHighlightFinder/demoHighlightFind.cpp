@@ -83,6 +83,7 @@ struct ioHandles_t {
 	sqlite3_stmt* insertConfigStringDataStatement;
 
 	// Delayer query stuff
+	queryCollection* markQueries;
 	queryCollection* specialQueries;
 	queryCollection* laughQueries;
 	queryCollection* defragQueries;
@@ -104,6 +105,7 @@ struct ioHandles_t {
 	std::ostream* outputBatHandleCaptures;
 	std::ostream* outputBatHandleLaughs;
 	std::ostream* outputBatHandleSpecial;
+	std::ostream* outputBatHandleMarks;
 };
 struct sharedVariables_t {
 	std::string oldPath;
@@ -2373,7 +2375,7 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 }
 
 // TODO Optimize this a bit more with the random usage of std::string/const char etc?
-void logSpecialThing(const char* specialType, std::string details, int64_t demoCurrentTime, int bufferTime, int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
+void logSpecialThing(const char* specialType, std::string details, std::string comment, int reframeClientNum, int64_t demoCurrentTime, int bufferTime, int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
 	
 	int duration = 0;
 
@@ -2431,7 +2433,13 @@ void logSpecialThing(const char* specialType, std::string details, int64_t demoC
 
 	std::stringstream batSS;
 	batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+	if (comment.size()) {
+		batSS << "\nrem comment: " << comment;
+	}
 	batSS << "\n" << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+	if (reframeClientNum != -1 && opts.reframeIfNeeded) {
+		batSS << " --reframe " << reframeClientNum; // dont differently than with kills aand killsprees cuz we dont do meta event tracking here. idk, whatever. TODO? 
+	}
 	queryWrapper->batchString1 = batSS.str();
 	queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
@@ -3215,6 +3223,33 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;*/
 		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleSpecial) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
+	// Marks
+	for (auto it = io.markQueries->begin(); it != io.markQueries->end(); it++) {
+		/* // TODO put in database
+		(*it)->query.bind(io.insertLaughsStatement);
+
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.insertLaughsStatement);
+		uint64_t insertedId = -1;
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting laugh spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		else {
+			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
+			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
+				std::cerr << "Error retrieving inserted laughs id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			else {
+				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
+			}
+			sqlite3_reset(io.selectLastInsertRowIdStatement);
+		}
+		sqlite3_reset(io.insertLaughsStatement);
+		//wasDoingSQLiteExecution = false;
+				
+		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;*/
+		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleMarks) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
+	}
 
 	// Player demo stats
 	for (auto it = io.playerDemoStatsQueries->begin(); it != io.playerDemoStatsQueries->end(); it++) {
@@ -3299,7 +3334,7 @@ inline size_t streamsize(std::ostream* stream) {
 }
 
 template<unsigned int max_clients>
-qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
+qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const char* outputBatFileMarks, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 
 	ioHandles_t io;
 
@@ -3307,6 +3342,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 
 
+	io.markQueries = new queryCollection();
 	io.specialQueries = new queryCollection();
 	io.laughQueries = new queryCollection();
 	io.defragQueries = new queryCollection();
@@ -3368,6 +3404,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	std::stringstream outputBatSSCaptures;
 	std::stringstream outputBatSSLaughs;
 	std::stringstream outputBatSSSpecial;
+	std::stringstream outputBatSSMarks;
 
 	io.outputBatHandle = &outputBatSS;
 	io.outputBatHandleKillSprees = &outputBatSSKillSprees;
@@ -3375,6 +3412,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleCaptures = &outputBatSSCaptures;
 	io.outputBatHandleLaughs = &outputBatSSLaughs;
 	io.outputBatHandleSpecial = &outputBatSSSpecial;
+	io.outputBatHandleMarks = &outputBatSSMarks;
 #else
 	std::ofstream outputBatHandle;
 	std::ofstream outputBatHandleKillSprees;
@@ -3382,6 +3420,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	std::ofstream outputBatHandleCaptures;
 	std::ofstream outputBatHandleLaughs;
 	std::ofstream outputBatHandleSpecial;
+	std::ofstream outputBatHandleMarks;
 
 	io.outputBatHandle = &outputBatHandle;
 	io.outputBatHandleKillSprees = &outputBatHandleKillSprees;
@@ -3389,6 +3428,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleCaptures = &outputBatHandleCaptures;
 	io.outputBatHandleLaughs = &outputBatHandleLaughs;
 	io.outputBatHandleSpecial = &outputBatHandleSpecial;
+	io.outputBatHandleMarks = &outputBatHandleMarks;
 
 	io.outputBatHandle->open(outputBatFile, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleKillSprees->open(outputBatFileKillSprees, std::ios_base::app); // append instead of overwrite
@@ -3396,6 +3436,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleCaptures->open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleLaughs->open(outputBatFileLaughs, std::ios_base::app); // append instead of overwrite
 	io.outputBatHandleSpecial->open(outputBatFileSpecial, std::ios_base::app); // append instead of overwrite
+	io.outputBatHandleMarks->open(outputBatFileMarks, std::ios_base::app); // append instead of overwrite
 #endif
 
 	// Save demo stats
@@ -3535,6 +3576,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		outputBatHandleSpecial.open(outputBatFileSpecial, std::ios_base::app); // append instead of overwrite
 		outputBatHandleSpecial << io.outputBatHandleSpecial->rdbuf();
 		outputBatHandleSpecial.close();
+	}
+	if (streamsize(io.outputBatHandleMarks)) {
+		std::ofstream outputBatHandleMarks;
+		outputBatHandleMarks.open(outputBatFileMarks, std::ios_base::app); // append instead of overwrite
+		outputBatHandleMarks << io.outputBatHandleMarks->rdbuf();
+		outputBatHandleMarks.close();
 	}
 
 #else
@@ -8153,7 +8200,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				std::string rawcommand = command;
 				std::string strippedCommand = Q_StripColorAll(rawcommand);
 				if (strstr(rawcommand.c_str(), opts.stringSearch.c_str()) || strstr(strippedCommand.c_str(), opts.stringSearch.c_str())) {
-					logSpecialThing("STRINGSEARCH", opts.stringSearch, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+					parsedChatMessage_t msgInfo;
+					if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
+						msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
+					}
+					logSpecialThing("STRINGSEARCH", opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 				}
 			}
 
@@ -8164,7 +8215,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// Detect a special chat search
 				if (opts.doChatSearch) {
 					if (strstr(rawChatCommand.c_str(),opts.chatSearch.c_str()) || strstr(chatCommand.c_str(), opts.chatSearch.c_str())) {
-						logSpecialThing("CHATSEARCH",opts.chatSearch, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+						parsedChatMessage_t msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
+						logSpecialThing("CHATSEARCH",opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 					}
 				}
 
@@ -8291,7 +8343,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doPrintSearch) {
 					std::string strippedPrint = Q_StripColorAll(printText);
 					if (strstr(printText.c_str(), opts.printSearch.c_str()) || strstr(strippedPrint.c_str(), opts.printSearch.c_str())) {
-						logSpecialThing("PRINTSEARCH", opts.printSearch, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+						logSpecialThing("PRINTSEARCH", opts.printSearch, printText, -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 					}
 				}
 
@@ -8644,7 +8696,7 @@ cuterror:
 
 
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const char* outputBatFileMarks, highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 	char			ext[7]{};
 	demoType_t		demoType;
 	qboolean		isCompressedFile = qfalse;
@@ -8652,13 +8704,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int maxClientsHere = getMAX_CLIENTS(demoType);
 	switch (maxClientsHere) {
 	case 1: // JK 2 SP
-		return demoHighlightFindExceptWrapper<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, searchMode, opts);
+		return demoHighlightFindExceptWrapper<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
 		break;
 	case 32:
-		return demoHighlightFindExceptWrapper<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, searchMode, opts);
+		return demoHighlightFindExceptWrapper<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
 		break;
 	case 64:
-		return demoHighlightFindExceptWrapper<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, searchMode, opts);
+		return demoHighlightFindExceptWrapper<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
 		break;
 	default:
 		throw std::exception("unsupported MAX_CLIENTS count.");
@@ -8875,7 +8927,7 @@ int main(int argcO, char** argvO) {
 	Com_Printf("Looking at %s.\n", demoName); 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	DPrintFLocation = demoName;
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat","highlightExtractionScriptSpecial.bat", searchMode, opts)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat","highlightExtractionScriptSpecial.bat","highlightExtractionScriptMarks.bat", searchMode, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Highlights successfully found in %.5f seconds.\n",seconds);

@@ -6315,6 +6315,26 @@ mohParsePrintDeathMsgReturnEntityState:
 }
 
 
+
+
+bool isNumber(const char* str)
+{
+	if (!str || !*str) return false;
+	while(*str)
+	{
+		if (!(*str >= '0' && *str <= '9'))
+		{
+			return false;
+		}
+		str++;
+	}
+	return true;
+}
+
+
+
+
+
 int64_t demoCutGetDemoNameTruncationOffset(const char* demoName) {
 	static char numberBuffer[100];
 	int numberBufferIndex = 0;
