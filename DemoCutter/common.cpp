@@ -4893,7 +4893,7 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 			oldstate = 0;
 			oldnum = 99999;
 		}
-		newstate = &clCut->parseEntities[clCut->parseEntitiesNum];
+		newstate = &clCut->parseEntities[clCut->parseEntitiesNum & (MAX_PARSE_ENTITIES - 1)];
 		if (!oldstate && (newnum == (MAX_GENTITIES - 1))) {
 			break;
 		}
@@ -4919,7 +4919,7 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 		if (newstate->number == MAX_GENTITIES - 1)
 			continue;
 		clCut->parseEntitiesNum++;
-		clCut->parseEntitiesNum &= (MAX_PARSE_ENTITIES - 1);
+		//clCut->parseEntitiesNum &= (MAX_PARSE_ENTITIES - 1);
 		newSnap->numEntities++;
 	}
 }
@@ -5050,7 +5050,7 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 			// is too old, so we can't reconstruct it properly.
 			Com_DPrintf("Delta frame too old.\n");
 		}
-		else if (clCut->parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128) {
+		else if (clCut->parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128) { // is this reliable? assumes max of 128 entities in packet?
 			Com_DPrintf("Delta parseEntitiesNum too old.\n");
 		}
 		else {
@@ -6312,6 +6312,243 @@ mohParsePrintDeathMsgReturnEntityState:
 		*retVal = tmpEs;
 		return retVal;
 	}
+}
+
+static float RadiusFromBounds(const vec3_t mins, const vec3_t maxs) {
+	int		i;
+	vec3_t	corner;
+	float	a, b;
+
+	for (i = 0; i < 3; i++) {
+		a = fabsf(mins[i]);
+		b = fabsf(maxs[i]);
+		corner[i] = a > b ? a : b;
+	}
+
+	return VectorLength(corner);
+}
+static void GetAbsMinsMaxs(qboolean isBModel, vec3_t origin, vec3_t angles, vec3_t mins, vec3_t maxs, vec3_t absmin, vec3_t absmax) {
+
+	// set the abs box
+	if (isBModel && (angles[0] || angles[1] || angles[2])) {
+		// expand for rotation
+		float		max;
+		int			i;
+
+		max = RadiusFromBounds(mins, maxs);
+		for (i = 0; i < 3; i++) {
+			absmin[i] = origin[i] - max;
+			absmax[i] = origin[i] + max;
+		}
+	}
+	else {
+		// normal
+		VectorAdd(origin, mins, absmin);
+		VectorAdd(origin, maxs, absmax);
+	}
+
+	// because movement is clipped an epsilon away from an actual edge,
+	// we must fully check even when bounding boxes don't quite touch
+	absmin[0] -= 1;
+	absmin[1] -= 1;
+	absmin[2] -= 1;
+	absmax[0] += 1;
+	absmax[1] += 1;
+	absmax[2] += 1;
+}
+
+int G_GetHitLocation(entityState_t* target, vec3_t ppoint)
+{
+	vec3_t			point, point_dir;
+	vec3_t			forward, right, up;
+	vec3_t			tangles, tcenter;
+	float			tradius;
+	float			udot, fdot, rdot;
+	int				Vertical, Forward, Lateral;
+	int				HitLoc;
+	vec3_t			mins, maxs, absmin, absmax;
+
+	//get target forward, right and up
+	//if (target->client)
+	{//ignore player's pitch and roll
+		VectorSet(tangles, 0, target->apos.trBase[YAW], 0);
+	}
+
+	AngleVectors(tangles, forward, right, up);
+
+	//get center of target
+	IntegerToBoundingBox(target->solid,mins,maxs);
+	GetAbsMinsMaxs(qboolean(target->solid== SOLID_BMODEL),target->pos.trBase,target->apos.trBase,mins,maxs,absmin,absmax);
+	VectorAdd(absmin, absmax, tcenter);
+	VectorScale(tcenter, 0.5, tcenter);
+
+	//get radius width of target
+	tradius = (fabs(maxs[0]) + fabs(maxs[1]) + fabs(mins[0]) + fabs(mins[1])) / 4;
+
+	//get impact point
+	if (ppoint && !VectorCompare(ppoint, vec3_origin))
+	{
+		VectorCopy(ppoint, point);
+	}
+	else
+	{
+		return HL_NONE;
+	}
+
+	/*	
+	// Get radius width of target.
+	tradius = (fabs(target->r.maxs[0]) + fabs(target->r.maxs[1]) + fabs(target->r.mins[0]) + fabs(target->r.mins[1]))/4;
+
+	//get impact dir
+		if(pdir && !VectorCompare(pdir, vec3_origin))
+		{
+			VectorCopy(pdir, dir);
+		}
+		else
+		{
+			return;
+		}
+
+	//put point at controlled distance from center
+		VectorSubtract(point, tcenter, tempvec);
+		tempvec[2] = 0;
+		hdist = VectorLength(tempvec);
+
+		VectorMA(point, hdist - tradius, dir, point);
+		//now a point on the surface of a cylinder with a radius of tradius
+	*/
+	VectorSubtract(point, tcenter, point_dir);
+	VectorNormalize(point_dir);
+
+	//Get bottom to top (Vertical) position index
+	udot = DotProduct(up, point_dir);
+	if (udot > .800)
+		Vertical = 4;
+	else if (udot > .400)
+		Vertical = 3;
+	else if (udot > -.333)
+		Vertical = 2;
+	else if (udot > -.666)
+		Vertical = 1;
+	else
+		Vertical = 0;
+
+	//Get back to front (Forward) position index
+	fdot = DotProduct(forward, point_dir);
+	if (fdot > .666)
+		Forward = 4;
+	else if (fdot > .333)
+		Forward = 3;
+	else if (fdot > -.333)
+		Forward = 2;
+	else if (fdot > -.666)
+		Forward = 1;
+	else
+		Forward = 0;
+
+	//Get left to right (Lateral) position index
+	rdot = DotProduct(right, point_dir);
+	if (rdot > .666)
+		Lateral = 4;
+	else if (rdot > .333)
+		Lateral = 3;
+	else if (rdot > -.333)
+		Lateral = 2;
+	else if (rdot > -.666)
+		Lateral = 1;
+	else
+		Lateral = 0;
+
+	HitLoc = Vertical * 25 + Forward * 5 + Lateral;
+
+	if (HitLoc <= 10)
+	{//feet
+		if (rdot > 0)
+		{
+			return HL_FOOT_RT;
+		}
+		else
+		{
+			return HL_FOOT_LT;
+		}
+	}
+	else if (HitLoc <= 50)
+	{//legs
+		if (rdot > 0)
+		{
+			return HL_LEG_RT;
+		}
+		else
+		{
+			return HL_LEG_LT;
+		}
+	}
+	else if (HitLoc == 56 || HitLoc == 60 || HitLoc == 61 || HitLoc == 65 || HitLoc == 66 || HitLoc == 70)
+	{//hands
+		if (rdot > 0)
+		{
+			return HL_HAND_RT;
+		}
+		else
+		{
+			return HL_HAND_LT;
+		}
+	}
+	else if (HitLoc == 83 || HitLoc == 87 || HitLoc == 88 || HitLoc == 92 || HitLoc == 93 || HitLoc == 97)
+	{//arms
+		if (rdot > 0)
+		{
+			return HL_ARM_RT;
+		}
+		else
+		{
+			return HL_ARM_LT;
+		}
+	}
+	else if ((HitLoc >= 107 && HitLoc <= 109) ||
+		(HitLoc >= 112 && HitLoc <= 114) ||
+		(HitLoc >= 117 && HitLoc <= 119))
+	{//head
+		return HL_HEAD;
+	}
+	else
+	{
+		if (udot < 0.3)
+		{
+			return HL_WAIST;
+		}
+		else if (fdot < 0)
+		{
+			if (rdot > 0.4)
+			{
+				return HL_BACK_RT;
+			}
+			else if (rdot < -0.4)
+			{
+				return HL_BACK_LT;
+			}
+			else
+			{
+				return HL_BACK;
+			}
+		}
+		else
+		{
+			if (rdot > 0.3)
+			{
+				return HL_CHEST_RT;
+			}
+			else if (rdot < -0.3)
+			{
+				return HL_CHEST_LT;
+			}
+			else
+			{
+				return HL_CHEST;
+			}
+		}
+	}
+	return HL_NONE;
 }
 
 

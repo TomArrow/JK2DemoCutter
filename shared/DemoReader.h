@@ -38,6 +38,42 @@ enum eventKind_t {
 };
 
 
+template<class T, size_t sample_count>
+class RollingAverage {
+	T samples[sample_count];
+	T sum = 0;
+	int64_t amountAdded = 0;
+public:
+	const size_t sample_count = sample_count;
+	inline void add(T num) {
+		size_t currentIndex = amountAdded % sample_count;
+		if (amountAdded >= sample_count) {
+			sum -= samples[currentIndex];
+		}
+		sum += num;
+		samples[currentIndex] = num;
+		amountAdded++;
+	}
+	inline T getAverage() {
+		if (amountAdded >= sample_count) {
+			return sum / (T)sample_count;
+		}
+		else {
+			return sum / (T)amountAdded;
+		}
+	}
+	inline bool averageValid() {
+		return amountAdded >= sample_count;
+	}
+	inline void clear() {
+		// No need to clear samples[] since we never rely on it being nulled.
+		// The only read operations from it happen after all indexes of the array have already been written to.
+		sum = 0;
+		amountAdded = 0;
+	}
+};
+
+
 class Event {
 public:
 #ifdef DEBUG
@@ -60,6 +96,7 @@ typedef std::map<int, SnapshotInfo> SnapshotInfoMap;
 typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 typedef SnapshotInfoMap::reverse_iterator SnapshotInfoMapIteratorReverse;
 
+#define COMMANDTIMEOFFSETAVERAGESAMPLECOUNT 100
 
 class DemoReader : public DemoReaderBase {
 
@@ -83,6 +120,9 @@ class DemoReader : public DemoReaderBase {
 	int lastKnownPacketWithPlayer[MAX_CLIENTS_MAX];
 	int firstPacketWithPlayerState[MAX_CLIENTS_MAX];
 	int lastKnownPacketWithPlayerState[MAX_CLIENTS_MAX];
+	
+	SnapshotInfo* pastSnapshotQuickLookup[COMMANDTIMEOFFSETAVERAGESAMPLECOUNT]{};
+	RollingAverage<double, COMMANDTIMEOFFSETAVERAGESAMPLECOUNT> rollingAverageCommandTimeOffsets[MAX_CLIENTS_MAX]; // Offsets of command time to server time per player, so we can smooth things out a bit.
 
 	int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
 	int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
