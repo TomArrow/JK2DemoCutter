@@ -12,6 +12,8 @@ For example, enhanceonly didnt properly handle death/alive state and still doesn
 
 Make demo converter. Let it for example fix up names for jomme. Find closest color from the NT mod colors.
 
+detect dbs on rolling ppl
+
 
 
 way to have ET_GRAPPLE to have skins:

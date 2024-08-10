@@ -6097,7 +6097,7 @@ static constexpr auto entityFieldsJKAMBIIV8 { []() constexpr {
 		"userVec2[2], 0\n";
 	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
 }() };
-// 1.8 - 1.9.3.1
+// 1.8 - 1.9.3.1 to 1.10.1
 static constexpr auto entityFieldsJKAMBIIV9 { []() constexpr {
 	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
 	constexpr const char* overrides = 
@@ -6109,6 +6109,38 @@ static constexpr auto entityFieldsJKAMBIIV9 { []() constexpr {
 		"csSounds_Std, 32\n"
 		"csSounds_Combat, 32\n"
 		"eFlags2, 28\n"
+		"userInt1, 32\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), entityStateFieldsJKA);
+}() };
+// R20 +
+static constexpr auto entityFieldsJKAMBIIV10 { []() constexpr {
+	constexpr size_t size = sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]);
+	constexpr const char* overrides = 
+		"eventParm, GENTITYNUM_BITS\n"
+		"powerups, 32\n"
+		"isJediMaster, 32\n"
+		"customRGBA[0], 32\n"
+		"customRGBA[1], 32\n"
+		"customRGBA[2], 32\n"
+		"customRGBA[3], 32\n"
+		"npcSaber1, 32\n"
+		"npcSaber2, 0\n"
+		"csSounds_Std, 32\n"
+		"csSounds_Combat, 32\n"
+		"csSounds_Extra, 32\n"
+		"csSounds_Jedi, 32\n"
+		"eFlags2,32\n"
 		"userInt1, 32\n"
 		"userInt2, 32\n"
 		"userInt3, 32\n"
@@ -6253,7 +6285,7 @@ static constexpr auto playerStateFieldsJKAMBIIV7 { []() constexpr {
 		"userVec2[2], 0\n";
 	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
 }() };
-// 1.8 to 1.9.3.1
+// 1.8 to 1.9.3.1 to 1.10.1
 static constexpr auto playerStateFieldsJKAMBIIV8 { []() constexpr {
 	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
 	constexpr const char* overrides =
@@ -6268,6 +6300,41 @@ static constexpr auto playerStateFieldsJKAMBIIV8 { []() constexpr {
 		"customRGBA[3], 32\n"
 		"eFlags2, 28\n"
 		"userInt1, 10\n"
+		"userInt2, 32\n"
+		"userInt3, 32\n"
+		"userFloat1, 0\n"
+		"userFloat2, 0\n"
+		"userFloat3, 0\n"
+		"userVec1[0], 0\n"
+		"userVec1[1], 0\n"
+		"userVec1[2], 0\n"
+		"userVec2[0], 0\n"
+		"userVec2[1], 0\n"
+		"userVec2[2], 0\n";
+	return netfieldOverride<size>(overrides,sizeof(overrides), playerStateFieldsJKA);
+}() };
+// R20+
+static constexpr auto playerStateFieldsJKAMBIIV9 { []() constexpr {
+	constexpr size_t size = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+	constexpr const char* overrides =
+		"externalEventParm, GENTITYNUM_BITS\n"
+		"eventParms[0], GENTITYNUM_BITS\n"
+		"eventParms[1], GENTITYNUM_BITS\n"
+		"zoomMode, 3\n"
+		"fd.forcePower, 9\n"
+		"fd.sentryDeployed, 16\n"
+		"hasDetPackPlanted, 8\n"
+		"isJediMaster, 32\n"
+		"forceRestricted, 32\n"
+		"trueJedi, 0\n"
+		"trueNonJedi, 0\n"
+		"inAirAnim, 8\n"
+		"customRGBA[0], 32\n"
+		"customRGBA[1], 32\n"
+		"customRGBA[2], 32\n"
+		"customRGBA[3], 32\n"
+		"eFlags2,32\n"
+		"userInt1, 32\n"
 		"userInt2, 32\n"
 		"userInt3, 32\n"
 		"userFloat1, 0\n"
