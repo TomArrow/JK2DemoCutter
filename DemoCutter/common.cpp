@@ -12,6 +12,7 @@
 
 
 constexpr char* postEOFMetadataMarker = "HIDDENMETA";
+constexpr char* postEOFUcmdMarker = "HIDDENUCMD";
 
 // Code is 99%-100% from jomme, from various files.
 // Most of it is likely still the same as in the original Jedi Knight source code releases
@@ -5307,16 +5308,121 @@ const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 		return NULL;
 	}
 
+	int oldbit = msg->bit;
+	int oldreadcount = msg->readcount;
+
 	for (int i = 0; i < metaMarkerLength; i++) {
 		if (msg->cursize < msg->readcount + maxBytePerByteSaved)
 		{
+			msg->bit = oldbit;
+			msg->readcount = oldreadcount;
 			return NULL;
 		}
 		if (MSG_ReadByte(msg) != postEOFMetadataMarker[i]) {
+			msg->bit = oldbit;
+			msg->readcount = oldreadcount;
 			return NULL;
 		}
 	}
 	return MSG_ReadBigString(msg, demoType);
+}
+
+static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType) {
+
+	usercmd_t	nullcmd;
+
+	// Normal demo readers will quit here. For all intents and purposes this demo message is over. But we're gonna put the metadata here now. Since it comes after svc_EOF, nobody will ever be bothered by it 
+	// but we can read it if we want to.
+	constexpr int metaMarkerLength = strlenConstExpr(postEOFUcmdMarker);
+	// This is how the demo huffman operates. Worst case a byte can take almost 2 bytes to save, from what I understand. When reading past the end, we need to detect if we SHOULD read past the end.
+	// For each byte we need to read, thus, the message length must be at least 2 bytes longer still. Hence at the end we will artificially set the message length to be minimum that long.
+	// We will only read x amount of bytes (where x is the length of the meta marker) and see if the meta marker is present. If it is, we then proceeed to read a bigstring.
+	// This same thing is technically not true for the custom compressed types (as their size is always the real size of the data) but we'll just leave it like this to be universal and simple.
+	constexpr int maxBytePerByteSaved = 2; 
+	constexpr int metaMarkerPresenceMinimumByteLengthExtra = metaMarkerLength * maxBytePerByteSaved;
+
+	const int requiredCursize = msg->readcount + metaMarkerPresenceMinimumByteLengthExtra; // We'll just set it to this value at the end if it ends up smaller.
+
+	if (msg->cursize < requiredCursize) {
+		return qfalse;
+	}
+
+	int oldbit = msg->bit;
+	int oldreadcount = msg->readcount;
+
+	for (int i = 0; i < metaMarkerLength; i++) {
+		if (msg->cursize < msg->readcount + maxBytePerByteSaved)
+		{
+			msg->bit = oldbit;
+			msg->readcount = oldreadcount;
+			return qfalse;
+		}
+		if (MSG_ReadByte(msg) != postEOFUcmdMarker[i]) {
+			msg->bit = oldbit;
+			msg->readcount = oldreadcount;
+			return qfalse;
+		}
+	}
+
+	Com_Memset(&nullcmd, 0, sizeof(nullcmd));
+
+	int version = MSG_ReadBits(msg, 16);
+	if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
+		std::cerr << "Found hidden usermessage marker, version " << version << "\n";
+	}
+	usercmd_t cmd, oldcmd;
+	oldcmd = nullcmd;
+	while (MSG_ReadBits(msg,1)) {
+		int clientNum = MSG_ReadByte(msg);
+		if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
+			std::cerr << "New usermessage PRE; readcount " << msg->readcount << "\n";
+		}
+		int serverTimeOffset = MSG_ReadBits(msg, 1) ? MSG_ReadBits(msg, -16) : 0;
+		int ping = MSG_ReadBits(msg, 1) ? MSG_ReadBits(msg, -16) : 0;
+		int droppedPackets = MSG_ReadBits(msg, 1) ? MSG_ReadByte(msg) : 0;
+		if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
+			std::cerr << "New usermessage; readcount " << msg->readcount << "; servertimeoffset  " << serverTimeOffset << ", ping " << ping << ", droppedPackets " << droppedPackets << "\n";
+		}
+
+		if (version == 1) {
+			oldcmd = nullcmd; // first prototype did this on every new msg but its wasteful..
+		}
+		int index = 0;
+		while (MSG_ReadBits(msg, 1)) {
+			MSG_ReadDeltaUsercmdKey(msg, 0, &oldcmd, &cmd);
+			oldcmd = cmd;
+			if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
+				std::cerr << "New usercmd; readcount " << msg->readcount << "; serverTime  " << cmd.serverTime << ", angles[0] " << (int)cmd.angles[0]
+					<< ", angles[1] " << (int)cmd.angles[1]
+					<< ", angles[2] " << (int)cmd.angles[2]
+					<< ", buttons " << (int)cmd.buttons
+					<< ", weapon " << (int)cmd.weapon
+					<< ", forcesel " << (int)cmd.forcesel
+					<< ", invensel " << (int)cmd.invensel
+					<< ", generic_cmd " << (int)cmd.generic_cmd
+					<< ", forwardmove " << (int)cmd.forwardmove
+					<< ", rightmove " << (int)cmd.rightmove
+					<< ", upmove " << (int)cmd.upmove
+					<< "\n";
+				if (index == 0) {
+					std::cerr << "Servertime offset solved: "<< cmd.serverTime << " + " << serverTimeOffset << "  =  " << (cmd.serverTime+serverTimeOffset) << "\n";
+				}
+			}
+			index++;
+		}
+	}
+
+	return qtrue;
+}
+
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool& SEHExceptionCaught) {
+	__TRY{
+		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType);
+	}
+	__EXCEPT{
+		SEHExceptionCaught = true;
+		return qfalse;
+	}
 }
 
 // In cut demos, metadata gets added ___ at the start, but we may still need the value.

@@ -444,6 +444,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			firstCommandByteRead = qtrue;
 			cmd = generalizeGameSVCOp(cmd,demoType);
 			if (cmd == svc_EOF_general) {
+				int testlookahead = MSG_LookaheadByte(&oldMsg);
 				// TODO Check for svc_extension/svc_voip (ioq3/wolfcamql)
 				if (wasFirstCommandByte) {
 					// check for hidden meta content

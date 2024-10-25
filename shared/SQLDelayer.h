@@ -37,6 +37,9 @@ class SQLDelayedValue {
 	std::string* columnNameValue = NULL;
 public:
 
+	std::string* getColumnName() {
+		return columnNameValue;
+	}
 	
 	template<class T>
 	SQLDelayedValue(char* columnName, T valueA) {
@@ -95,7 +98,7 @@ public:
 	}
 
 	~SQLDelayedValue() {
-		if (stringValue) {
+		if (type == SQLVALUE_TYPE_TEXT && stringValue) {
 			delete stringValue;
 		}
 		if (columnNameValue) {
@@ -110,9 +113,22 @@ class SQLDelayedQuery {
 	//void add(SQLDelayedValue* value) {
 	//	values.push_back(value);
 	//}
+	void inline remove(char* name) {
+		size_t valuesCount = values.size();
+		for (size_t i = valuesCount-1; i >= 0; i--) {
+			if (!_stricmp(values[i]->getColumnName()->c_str(), name)) {
+				values.erase(values.begin()+ i);
+			}
+		}
+	}
 public:
 	template<class T>
 	void inline add(char* name, T value) {
+		values.push_back(new SQLDelayedValue(name,value));
+	}
+	template<class T>
+	void inline replace(char* name, T value) {
+		remove(name);
 		values.push_back(new SQLDelayedValue(name,value));
 	}
 	inline void bind(sqlite3_stmt* statement) {

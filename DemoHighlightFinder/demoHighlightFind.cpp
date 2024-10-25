@@ -2194,16 +2194,16 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 	bool wasVisibleOrFollowed = false;
 	if (playerNumber != -1) {
 		if (playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-			wasFollowed = true;
+			wasFollowed = true; // determine outside (because delayed PB/WR info)
 		}
 		if (playerFirstVisible[playerNumber] != -1 && playerFirstVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-			wasVisible = true;
+			wasVisible = true; // determine outside (because delayed PB/WR info)
 		}
 		if (playerFirstFollowedOrVisible[playerNumber] != -1 && playerFirstFollowedOrVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-			wasVisibleOrFollowed = true;
+			wasVisibleOrFollowed = true; // determine outside (because delayed PB/WR info)
 		}
 	}
-	int64_t runStart = demoCurrentTime - totalMilliSeconds;
+	int64_t runStart = demoCurrentTime - totalMilliSeconds;  // determine outside (because delayed PB/WR info)
 
 	std::stringstream formattedTime;
 	formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
@@ -2243,13 +2243,13 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 	}
 	SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
-	SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
-	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
-	SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+	SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);  // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);  // determine outside (because delayed PB/WR info)
 	SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
-	SQLBIND_DELAYED(query, int, "@wasVisible", wasVisible);
-	SQLBIND_DELAYED(query, int, "@wasFollowed", wasFollowed);
-	SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
+	SQLBIND_DELAYED(query, int, "@wasVisible", wasVisible); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@wasFollowed", wasFollowed); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", wasVisibleOrFollowed); // determine outside (because delayed PB/WR info)
 
 	// Do we have strafe deviation info?
 	int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
@@ -4486,6 +4486,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			ocmd = MSG_ReadByte(&oldMsg);
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
+				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,SEHExceptionCaught);
 				break;
 			}
 			// skip all the gamestates until we reach needed
@@ -8900,7 +8901,7 @@ int main(int argcO, char** argvO) {
 	}
 
 	GlobalDebugOutputFlags = 0;
-	if (opts.printDebug) GlobalDebugOutputFlags |= (1 << DEBUG_COMMANDS) | (1 << DEBUG_CONFIGSTRING); // TODO Make this more flexible? Able to specify types of debug output? Merge the stufftext stuff into it too.
+	if (opts.printDebug) GlobalDebugOutputFlags |= (1 << DEBUG_COMMANDS) | (1 << DEBUG_CONFIGSTRING) | (1 << DEBUG_HIDDENUSERCMD); // TODO Make this more flexible? Able to specify types of debug output? Merge the stufftext stuff into it too.
 	if (opts.netAnalysisMode == 1) GlobalDebugOutputFlags |= (1 << DEBUG_NETANALYSIS1);
 
 	highlightSearchMode_t searchMode = SEARCH_INTERESTING;

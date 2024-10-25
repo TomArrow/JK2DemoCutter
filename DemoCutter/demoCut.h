@@ -184,7 +184,8 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 typedef enum globalDebugOutputType_t {
 	DEBUG_CONFIGSTRING,
 	DEBUG_COMMANDS,
-	DEBUG_NETANALYSIS1
+	DEBUG_NETANALYSIS1,
+	DEBUG_HIDDENUSERCMD
 };
 
 
@@ -1781,6 +1782,7 @@ char* MSG_ReadBigString(msg_t* sb, demoType_t demoType);
 char* MSG_ReadStringLine(msg_t* sb);
 float	MSG_ReadAngle16(msg_t* sb);
 void	MSG_ReadData(msg_t* sb, void* buffer, int size);
+int		MSG_LookaheadByte(msg_t* msg);
 
 
 void MSG_WriteDeltaUsercmd(msg_t* msg, struct usercmd_s* from, struct usercmd_s* to);
@@ -1857,6 +1859,9 @@ void	Huff_offsetTransmit(huff_t* huff, int ch, byte* fout, int* offset);
 void	Huff_putBit(int bit, byte* fout, int* offset);
 int		Huff_getBit(byte* fout, int* offset);
 
+// don't use if you don't know what you're doing.
+int		Huff_getBloc(void);
+void	Huff_setBloc(int _bloc);
 
 void Com_Memset(void* dest, const int val, const size_t count);
 void Com_Memcpy(void* dest, const void* src, const size_t count);
@@ -4855,6 +4860,8 @@ void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg,
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool& SEHExceptionCaught);
+
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);

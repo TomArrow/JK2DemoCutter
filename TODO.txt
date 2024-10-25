@@ -57,6 +57,11 @@ maybe 2 and 4 on stats means entering and exiting start/end triggers?
 do some stats. client number average score
 
 
+detect parries from other ppl killing aanother person?
+
+
+almost cap but flag grab related. also for capper.
+
 
 find stuff followed by markme within 5-10 seconds?
 
