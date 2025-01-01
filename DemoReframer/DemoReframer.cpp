@@ -213,7 +213,6 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	// Write demo header
 	if (isMOHAADemo) {
 		demo.cut.Clc.clientNum = reframeClientNum;
-
 	}
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoReader->reader.getDemoType());

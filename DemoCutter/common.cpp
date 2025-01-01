@@ -5375,7 +5375,7 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 	while (MSG_ReadBits(msg,1)) {
 		int clientNum = MSG_ReadByte(msg);
 		if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
-			std::cerr << "New usermessage PRE; readcount " << msg->readcount << "\n";
+			std::cerr << "New usermessage PRE; readcount " << msg->readcount << ", clientnum "<< clientNum <<"\n";
 		}
 		int serverTimeOffset = MSG_ReadBits(msg, 1) ? MSG_ReadBits(msg, -16) : 0;
 		int ping = MSG_ReadBits(msg, 1) ? MSG_ReadBits(msg, -16) : 0;
