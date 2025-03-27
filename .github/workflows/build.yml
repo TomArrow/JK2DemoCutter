@@ -113,7 +113,7 @@ jobs:
 
 
   create-latest:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/everything'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [vs2022]
     runs-on: ubuntu-22.04
     steps:
