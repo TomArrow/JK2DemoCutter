@@ -37,6 +37,10 @@ jobs:
    #   working-directory: ${{github.workspace}}/build/actions
    #   run: cmake $GITHUB_WORKSPACE -A ${{ matrix.arch }} -DBuildPortableVersion=ON
 
+    - uses: thepwrtank18/install-vs-components@v1.1.1
+      with:
+        components: Microsoft.VisualStudio.Component.VC.v141.x86.x64
+        
     - name: Get Win 8.1 SDK
       run: |
         import subprocess
@@ -45,9 +49,6 @@ jobs:
         subprocess.run(["sdksetup.exe", "/q", "/norestart", "/features", "OptionId.WindowsDesktopSoftwareDevelopmentKit", "OptionId.NetFxSoftwareDevelopmentKit"], check=True, capture_output=True)
       shell: python
       
-    - uses: thepwrtank18/install-vs-components@v1
-      with:
-        components: Microsoft.VisualStudio.Component.VC.v141.x86.x64
       
     #- name: Install v141 Toolset
     #  shell: powershell
