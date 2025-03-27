@@ -37,6 +37,14 @@ jobs:
    #   working-directory: ${{github.workspace}}/build/actions
    #   run: cmake $GITHUB_WORKSPACE -A ${{ matrix.arch }} -DBuildPortableVersion=ON
 
+    - name: Get Win 8.1 SDK
+      run: |
+        import subprocess
+        import urllib.request
+        urllib.request.urlretrieve("https://go.microsoft.com/fwlink/p/?LinkId=323507", "sdksetup.exe")
+        subprocess.run(["sdksetup.exe", "/q", "/norestart", "/features", "OptionId.WindowsDesktopSoftwareDevelopmentKit", "OptionId.NetFxSoftwareDevelopmentKit"], check=True, capture_output=True)
+      shell: python
+
     - name: Build
       working-directory: ${{github.workspace}}
       shell: cmd
