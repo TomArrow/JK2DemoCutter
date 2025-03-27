@@ -44,6 +44,13 @@ jobs:
         urllib.request.urlretrieve("https://go.microsoft.com/fwlink/p/?LinkId=323507", "sdksetup.exe")
         subprocess.run(["sdksetup.exe", "/q", "/norestart", "/features", "OptionId.WindowsDesktopSoftwareDevelopmentKit", "OptionId.NetFxSoftwareDevelopmentKit"], check=True, capture_output=True)
       shell: python
+      
+      
+    - name: Install v141 Toolset
+      shell: powershell
+      run: |
+        Set-Location "C:\Program Files (x86)\Microsoft Visual Studio\Installer\"
+        Start-Process -FilePath vs_installer.exe -ArgumentList "modify", "--installPath", "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise", "--add Microsoft.VisualStudio.Component.VC.v141.x86.x64", "--quiet", "--norestart", "--nocache" -Wait -PassThru -WindowStyle Hidden
 
     - name: Build
       working-directory: ${{github.workspace}}
