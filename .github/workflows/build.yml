@@ -46,8 +46,8 @@ jobs:
       shell: python
       
     - uses: thepwrtank18/install-vs-components@v1
-        with:
-          components: Microsoft.VisualStudio.Component.VC.v141.x86.x64
+      with:
+        components: Microsoft.VisualStudio.Component.VC.v141.x86.x64
       
     #- name: Install v141 Toolset
     #  shell: powershell
