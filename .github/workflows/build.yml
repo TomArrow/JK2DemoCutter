@@ -38,7 +38,7 @@ jobs:
    #   run: cmake $GITHUB_WORKSPACE -A ${{ matrix.arch }} -DBuildPortableVersion=ON
 
     - name: Build
-      working-directory: ${{github.workspace}}/build/actions
+      working-directory: ${{github.workspace}}
       shell: cmd
       run: msbuild /m /p:Configuration=${{ matrix.build_type }} DemoCutter/DemoCutter.vcxproj
 
