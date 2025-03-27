@@ -114,7 +114,7 @@ jobs:
 
   create-latest:
     if: github.event_name == 'push' && github.ref == 'refs/heads/everything'
-    needs: [vs2022,vs2019_xp]
+    needs: [vs2022]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
