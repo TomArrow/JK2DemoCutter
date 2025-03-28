@@ -77,15 +77,15 @@ jobs:
     #    path: ${{github.workspace}}/build/actions/out/${{ matrix.build_type }}/*
 
     - name: Collect files
-        run: |
-            ls -l
-            mkdir ${{github.workspace}}/outdir
-            mv ${{github.workspace}}/DemoCutter/Release/*.exe ${{github.workspace}}/outdir
-            mv ${{github.workspace}}/DemoCutter/Release/*.pdb ${{github.workspace}}/outdir
-            mv ${{github.workspace}}/DemoHighlightFinder/Release/*.exe ${{github.workspace}}/outdir
-            mv ${{github.workspace}}/DemoHighlightFinder/Release/*.pdb ${{github.workspace}}/outdir
-            mv ${{github.workspace}}/DemoReframer/Release/*.exe ${{github.workspace}}/outdir
-            mv ${{github.workspace}}/DemoReframer/Release/*.pdb ${{github.workspace}}/outdir
+      run: |
+        ls -l
+        mkdir ${{github.workspace}}/outdir
+        mv ${{github.workspace}}/DemoCutter/Release/*.exe ${{github.workspace}}/outdir
+        mv ${{github.workspace}}/DemoCutter/Release/*.pdb ${{github.workspace}}/outdir
+        mv ${{github.workspace}}/DemoHighlightFinder/Release/*.exe ${{github.workspace}}/outdir
+        mv ${{github.workspace}}/DemoHighlightFinder/Release/*.pdb ${{github.workspace}}/outdir
+        mv ${{github.workspace}}/DemoReframer/Release/*.exe ${{github.workspace}}/outdir
+        mv ${{github.workspace}}/DemoReframer/Release/*.pdb ${{github.workspace}}/outdir
 
     - uses: 'actions/upload-artifact@v4'
       if: ${{ matrix.build_type == 'Release' }}
