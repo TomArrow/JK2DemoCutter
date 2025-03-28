@@ -87,20 +87,19 @@ jobs:
     #    path: ${{github.workspace}}/build/actions/out/${{ matrix.build_type }}/*
 
     - name: Collect files
-      shell: bash
+      shell: cmd
       run: |
-        ls -l
         mkdir ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoCutter/Release/*.exe ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoCutter/Release/*.pdb ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoHighlightFinder/Release/*.exe ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoHighlightFinder/Release/*.pdb ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoReframer/Release/*.exe ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoReframer/Release/*.pdb ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoCompressor/Release/*.exe ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoCompressor/Release/*.pdb ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoMerger/Release/*.exe ${{github.workspace}}/outdir
-        mv ${{github.workspace}}/DemoMerger/Release/*.pdb ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoCutter/Release/*.exe ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoCutter/Release/*.pdb ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoHighlightFinder/Release/*.exe ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoHighlightFinder/Release/*.pdb ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoReframer/Release/*.exe ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoReframer/Release/*.pdb ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoCompressor/Release/*.exe ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoCompressor/Release/*.pdb ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoMerger/Release/*.exe ${{github.workspace}}/outdir
+        move ${{github.workspace}}/DemoMerger/Release/*.pdb ${{github.workspace}}/outdir
 
     - uses: 'actions/upload-artifact@v4'
       if: ${{ matrix.build_type == 'Release' }}
