@@ -76,14 +76,24 @@ jobs:
     #    name: Windows Binaries (Portable), ${{ matrix.build_type }}, ${{ matrix.arch }}
     #    path: ${{github.workspace}}/build/actions/out/${{ matrix.build_type }}/*
 
+    - name: Collect files
+        run: |
+            ls -l
+            mkdir ${{github.workspace}}/outdir
+            mv ${{github.workspace}}/DemoCutter/Release/*.exe ${{github.workspace}}/outdir
+            mv ${{github.workspace}}/DemoCutter/Release/*.pdb ${{github.workspace}}/outdir
+            mv ${{github.workspace}}/DemoHighlightFinder/Release/*.exe ${{github.workspace}}/outdir
+            mv ${{github.workspace}}/DemoHighlightFinder/Release/*.pdb ${{github.workspace}}/outdir
+            mv ${{github.workspace}}/DemoReframer/Release/*.exe ${{github.workspace}}/outdir
+            mv ${{github.workspace}}/DemoReframer/Release/*.pdb ${{github.workspace}}/outdir
+
     - uses: 'actions/upload-artifact@v4'
       if: ${{ matrix.build_type == 'Release' }}
       with:
         name: Windows Package (Portable), ${{ matrix.build_type }}, ${{ matrix.arch }}
         path: |
-          ${{github.workspace}}/DemoCutter/Release/*.exe
-          ${{github.workspace}}/DemoHighlightFinder/Release/*.exe
-          ${{github.workspace}}/DemoReframer/Release/*.exe
+          ${{github.workspace}}/outdir/*.exe
+          ${{github.workspace}}/outdir/*.pdb
 
     # As actions/upload-release-asset seems to demand exact filenames and content types we use a script instead
     - name: Upload Release
