@@ -29,13 +29,6 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
 
-    #- name: Create Build Environment
-     # run: cmake -E make_directory ${{github.workspace}}/build/actions
-
-    #- name: Configure CMake
-    #  shell: bash
-   #   working-directory: ${{github.workspace}}/build/actions
-   #   run: cmake $GITHUB_WORKSPACE -A ${{ matrix.arch }} -DBuildPortableVersion=ON
 
     - uses: thepwrtank18/install-vs-components@v1.1.1
       with:
@@ -50,56 +43,63 @@ jobs:
       shell: python
       
       
-    #- name: Install v141 Toolset
-    #  shell: powershell
-    #  run: |
-   #     Set-Location "C:\Program Files (x86)\Microsoft Visual Studio\Installer\"
-    #    Start-Process -FilePath vs_installer.exe -ArgumentList "modify", "--installPath", "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise", "--add Microsoft.VisualStudio.Component.VC.v141.x86.x64", "--quiet", "--norestart", "--nocache" -Wait -PassThru -WindowStyle Hidden
-
     - name: Build Cutterr
       working-directory: ${{github.workspace}}
       shell: cmd
-      run: msbuild /m /p:Configuration=${{ matrix.build_type }} DemoCutter/DemoCutter.vcxproj
+      run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoCutter/DemoCutter.vcxproj
       
     - name: Build Highlight Finder
       working-directory: ${{github.workspace}}
       shell: cmd
-      run: msbuild /m /p:Configuration=${{ matrix.build_type }} DemoHighlightFinder/DemoHighlightFinder.vcxproj
+      run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoHighlightFinder/DemoHighlightFinder.vcxproj
       
     - name: Build Reframer
       working-directory: ${{github.workspace}}
       shell: cmd
-      run: msbuild /m /p:Configuration=${{ matrix.build_type }} DemoReframer/DemoReframer.vcxproj
+      run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoReframer/DemoReframer.vcxproj
       
     - name: Build Compressor
       working-directory: ${{github.workspace}}
       shell: cmd
-      run: msbuild /m /p:Configuration=${{ matrix.build_type }} DemoCompressor/DemoCompressor.vcxproj
+      run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoCompressor/DemoCompressor.vcxproj
       
     - name: Build Merger
       working-directory: ${{github.workspace}}
       shell: cmd
-      run: msbuild /m /p:Configuration=${{ matrix.build_type }} DemoMerger/DemoMerger.vcxproj
+      run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoMerger/DemoMerger.vcxproj
 
-    #- uses: 'actions/upload-artifact@v4'
-    #  with:
-    #    name: Windows Binaries (Portable), ${{ matrix.build_type }}, ${{ matrix.arch }}
-    #    path: ${{github.workspace}}/build/actions/out/${{ matrix.build_type }}/*
 
     - name: Collect files
+      if: ${{ matrix.build_type == 'Release' &&  matrix.arch == 'x64' }}
       shell: cmd
       run: |
-        mkdir ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoCutter/Release/*.exe ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoCutter/Release/*.pdb ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoHighlightFinder/Release/*.exe ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoHighlightFinder/Release/*.pdb ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoReframer/Release/*.exe ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoReframer/Release/*.pdb ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoCompressor/Release/*.exe ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoCompressor/Release/*.pdb ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoMerger/Release/*.exe ${{github.workspace}}/outdir
-        move ${{github.workspace}}/DemoMerger/Release/*.pdb ${{github.workspace}}/outdir
+        mkdir ${{github.workspace}}\outdir
+        move ${{github.workspace}}\DemoCutter\x64\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoCutter\x64\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoHighlightFinder\x64\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoHighlightFinder\x64\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoReframer\x64\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoReframer\x64\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoCompressor\x64\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoCompressor\x64\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoMerger\x64\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoMerger\x64\Release\*.pdb ${{github.workspace}}\outdir\
+        
+    - name: Collect files
+      if: ${{ matrix.build_type == 'Release' &&  matrix.arch == 'Win32' }}
+      shell: cmd
+      run: |
+        mkdir ${{github.workspace}}\outdir
+        move ${{github.workspace}}\DemoCutter\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoCutter\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoHighlightFinder\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoHighlightFinder\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoReframer\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoReframer\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoCompressor\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoCompressor\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoMerger\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoMerger\Release\*.pdb ${{github.workspace}}\outdir\
 
     - uses: 'actions/upload-artifact@v4'
       if: ${{ matrix.build_type == 'Release' }}
@@ -111,7 +111,7 @@ jobs:
 
     # As actions/upload-release-asset seems to demand exact filenames and content types we use a script instead
     - name: Upload Release
-      if: ${{ github.event_name == 'release' && matrix.build_type == 'RelWithDebInfo' }}
+      if: ${{ github.event_name == 'release' && matrix.build_type == 'Release' }}
       uses: actions/github-script@v6
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
