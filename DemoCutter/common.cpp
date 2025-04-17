@@ -6658,6 +6658,133 @@ int G_GetHitLocation(entityState_t* target, vec3_t ppoint)
 }
 
 
+int G_GetHitQuad(vec3_t entpos, vec3_t entangles, vec3_t hitloc)
+{
+	vec3_t diff, fwdangles = { 0,0,0 }, right;
+	vec3_t clEye;
+	float rightdot;
+	float zdiff;
+	int hitLoc = -1;
+
+	//if (self->client)
+	//{
+	//	VectorCopy(self->client->ps.origin, clEye);
+	//	clEye[2] += self->client->ps.viewheight;
+	//}
+	//else
+	{
+		VectorCopy(entpos, clEye);
+		clEye[2] += 16;
+	}
+
+	VectorSubtract(hitloc, clEye, diff);
+	diff[2] = 0;
+	VectorNormalize(diff);
+
+	//if (self->client)
+	//{
+	//	fwdangles[1] = self->client->ps.viewangles[1];
+	//}
+	//else
+	{
+		fwdangles[1] = entangles[1];
+	}
+	// Ultimately we might care if the shot was ahead or behind, but for now, just quadrant is fine.
+	AngleVectors(fwdangles, NULL, right, NULL);
+
+	rightdot = DotProduct(right, diff);
+	zdiff = hitloc[2] - clEye[2];
+
+	if (zdiff > 0)
+	{
+		if (rightdot > 0.3)
+		{
+			hitLoc = G2_MODELPART_RARM;
+		}
+		else if (rightdot < -0.3)
+		{
+			hitLoc = G2_MODELPART_LARM;
+		}
+		else
+		{
+			hitLoc = G2_MODELPART_HEAD;
+		}
+	}
+	else if (zdiff > -20)
+	{
+		if (rightdot > 0.1)
+		{
+			hitLoc = G2_MODELPART_RARM;
+		}
+		else if (rightdot < -0.1)
+		{
+			hitLoc = G2_MODELPART_LARM;
+		}
+		else
+		{
+			hitLoc = G2_MODELPART_HEAD;
+		}
+	}
+	else
+	{
+		if (rightdot >= 0)
+		{
+			hitLoc = G2_MODELPART_RLEG;
+		}
+		else
+		{
+			hitLoc = G2_MODELPART_LLEG;
+		}
+	}
+
+	return hitLoc;
+}
+
+int	getBodyPartFromHitLoc(vec3_t entpos,vec3_t entangles, int hitLoc, vec3_t roughHitLoc) {
+	int hitLocUse;
+	switch (hitLoc)
+	{
+	case HL_FOOT_RT:
+	case HL_LEG_RT:
+		hitLocUse = G2_MODELPART_RLEG;
+		break;
+	case HL_FOOT_LT:
+	case HL_LEG_LT:
+		hitLocUse = G2_MODELPART_LLEG;
+		break;
+
+	case HL_WAIST:
+		hitLocUse = G2_MODELPART_WAIST;
+		break;
+		/*
+	case HL_BACK_RT:
+	case HL_BACK_LT:
+	case HL_BACK:
+	case HL_CHEST_RT:
+	case HL_CHEST_LT:
+	case HL_CHEST:
+		break;
+		*/
+	case HL_ARM_RT:
+		hitLocUse = G2_MODELPART_RARM;
+		break;
+	case HL_HAND_RT:
+		hitLocUse = G2_MODELPART_RHAND;
+		break;
+	case HL_ARM_LT:
+	case HL_HAND_LT:
+		hitLocUse = G2_MODELPART_LARM;
+		break;
+	case HL_HEAD:
+		hitLocUse = G2_MODELPART_HEAD;
+		break;
+	default:
+		hitLocUse = G_GetHitQuad(entpos, entangles, roughHitLoc);
+		break;
+	}
+	return hitLocUse;
+}
+
 
 
 bool isNumber(const char* str)

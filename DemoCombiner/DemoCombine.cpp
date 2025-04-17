@@ -747,6 +747,107 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 
 					}
+					// Single player dismemberment
+					else if (generalizedEntityType == ET_THINKER_GENERAL && sourceDemoType == DM_14 ) {
+						
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first, SlotManager::sourceDemoMappingType::SDMT_G2);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							SlotManager::sourceDemoMapping* slotInfo = slotManager.getSlotMappingData(targetEntitySlot);
+							if (slotInfo) {
+								if (!slotInfo->meta.bodyPartClientNumPlus1) {
+									// if we don't know who it belongs to, try to find out
+
+									// either we already know or we have to brute force analyze. which only supports NPCs atm
+
+									if (it->second.clientNum) {
+										int npcnum = slotManager.getSlotIfExists(i, it->second.clientNum -1 );
+										if (npcnum != -1) {
+											slotInfo->meta.bodyPartClientNumPlus1 = npcnum + 1;
+										}
+									}
+									else {
+										int closestNPC = -1;
+										float closestNPCDistance = std::numeric_limits<float>::infinity();// 400; // if its further than 400 away, its prolly belonging to sth else or maybe its not a limb at all. //std::numeric_limits<float>::infinity();
+										for (auto itsub = sourceEntitiesAtTime.begin(); itsub != sourceEntitiesAtTime.end(); itsub++) {
+
+											int generalizedEntityTypeSub = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(itsub->second.eType, sourceDemoType);
+											if (generalizedEntityTypeSub == ET_PLAYER_GENERAL && sourceDemoType == DM_14 && itsub->second.number > 0 && (itsub->second.eFlags & EF_NPC_JK2SP) && (itsub->second.eFlags & EF_DEAD)) {
+												// to keep it simple, lets not interpolate npc position here, just take what we got
+												float distanceHere = VectorDistance(itsub->second.pos.trBase, it->second.pos.trBase);
+												if (distanceHere < closestNPCDistance) {
+													closestNPCDistance = distanceHere;
+													closestNPC = itsub->first;
+												}
+											}
+										}
+										if (closestNPC != -1 && closestNPCDistance < 400) {
+											closestNPC = slotManager.getSlotIfExists(i, closestNPC);
+											if (closestNPC != -1) {
+												slotInfo->meta.bodyPartClientNumPlus1 = closestNPC + 1;
+											}
+										}
+										else {
+											std::cerr << "Unable to find base entity for assumed body part\n";
+										}
+									}
+								}
+
+								if (!slotInfo->meta.bodyPart) {
+
+									if (it->second.modelindex3) {
+										vec3_t entpos;
+										vec3_t entangles = {0 };
+										if (it->second.clientNum) {
+											auto foundEnt = sourceEntitiesAtTime.find(it->second.clientNum - 1);
+											if (foundEnt != sourceEntitiesAtTime.end()) {
+												VectorCopy(foundEnt->second.pos.trBase, entpos);
+												VectorCopy(foundEnt->second.apos.trBase, entangles);
+											}
+											else {
+												// we don't know the position of the player, oh well
+												VectorCopy(it->second.pos.trBase, entpos);
+											}
+										}
+										else {
+											// we don't know the position of the player, oh well
+											VectorCopy(it->second.pos.trBase, entpos);
+										}
+										slotInfo->meta.bodyPart = getBodyPartFromHitLoc(entpos,entangles,it->second.modelindex3,it->second.pos.trBase);
+									}
+									else {
+										// just default to this for old demo version
+										slotInfo->meta.bodyPart = G2_MODELPART_HEAD;
+									}
+									slotInfo->meta.bodyPart = MV_VersionMagic_g2ModelParts(slotInfo->meta.bodyPart,demoType); // dm_15 has different values than dm_16, meh
+								}
+
+								if (slotInfo->meta.bodyPart && slotInfo->meta.bodyPartClientNumPlus1) {
+									entityState_t tmpEntity = { 0 };
+									tmpEntity.pos = it->second.pos;
+									tmpEntity.apos = it->second.apos;
+									tmpEntity.pos.trType = (trType_t) VersionMagic_SPtoMPTrType(tmpEntity.pos.trType);
+									tmpEntity.apos.trType = (trType_t) VersionMagic_SPtoMPTrType(tmpEntity.apos.trType);
+									tmpEntity.eType = ET_GENERAL_JK2;
+									tmpEntity.weapon = G2_MODEL_PART;
+									tmpEntity.eFlags = it->second.eFlags;
+									tmpEntity.modelGhoul2 = slotInfo->meta.bodyPart;
+									tmpEntity.g2radius = 200;
+									tmpEntity.number = targetEntitySlot;
+									tmpEntity.modelindex = -1;
+									if (demoType == DM_16) {
+										// one more good reason to use DM_16 for these. got the full GENTITYNUM_BITS for it here
+										tmpEntity.otherEntityNum2 = slotInfo->meta.bodyPartClientNumPlus1 - 1;
+									}
+									else {
+										tmpEntity.modelindex2 = slotInfo->meta.bodyPartClientNumPlus1 - 1;
+									}
+									retimeEntity(&tmpEntity, thisTimeInServerTime, time);
+									targetEntities[targetEntitySlot] = tmpEntity;
+								}
+							}
+						}
+
+					}
 
 					
 					// Players are already handled otherwhere

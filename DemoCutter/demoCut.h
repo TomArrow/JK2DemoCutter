@@ -3831,6 +3831,18 @@ typedef enum
 	HL_MAX
 } HL_t;
 
+typedef enum {
+	G2_MODELPART_HEAD = 10,
+	G2_MODELPART_WAIST,
+	G2_MODELPART_LARM,
+	G2_MODELPART_RARM,
+	G2_MODELPART_RHAND,
+	G2_MODELPART_LLEG,
+	G2_MODELPART_RLEG
+} g2ModelParts_t;
+
+#define G2_MODEL_PART	50
+
 #define	SOLID_BMODEL	0xffffff
 
 
@@ -5273,8 +5285,10 @@ public:
 	bool commandComesFromJKWatcher = false;
 };
 
-bool isNumber(const char* str);
-
+bool	isNumber(const char* str);
+int		getBodyPartFromHitLoc(vec3_t entpos, vec3_t entangles, int hitLoc, vec3_t roughHitLoc);
+#define MV_VersionMagic_g2ModelParts( limbType, demoType ) ( demoType != DM_15 ? limbType : (limbType >= G2_MODELPART_RHAND ? limbType-1 : limbType) )
+#define VersionMagic_SPtoMPTrType( trType ) ( trType > TR_LINEAR_STOP ? trType-1 : trType) 
 
 static const char privateChatBegin[]{ "[" };
 static const char teamChatBegin[]{ "(" };

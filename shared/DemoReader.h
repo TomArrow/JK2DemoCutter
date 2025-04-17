@@ -286,13 +286,19 @@ class SlotManager {
 public:
 	typedef enum sourceDemoMappingType {
 		SDMT_NONE,
-		SDMT_G2
+		SDMT_G2,
+		SDMT_BODYPART
 	};
+	typedef struct mappingMeta {
+		int	bodyPartClientNumPlus1;
+		int	bodyPart;
+	} mappingMeta;
 	struct sourceDemoMapping {
 		int demoIndex;
 		int entityNum;
 		qboolean isModel;
 		sourceDemoMappingType type;
+		mappingMeta meta;
 	};
 private:
 	std::map<int, sourceDemoMapping> mappings;
@@ -345,6 +351,14 @@ public:
 		}
 		// Error: No free slot found
 		return -1;
+	}
+	sourceDemoMapping* getSlotMappingData(int slotNum) {
+		if (mappings.find(slotNum) == mappings.end()) {
+			return NULL;
+		}
+		else {
+			return &mappings[slotNum];
+		}
 	}
 	void setModelDistanceOrigin(vec_t* originA) {
 		VectorCopy(originA, modelDistanceOrigin);
