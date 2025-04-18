@@ -5976,6 +5976,11 @@ std::string makeConfigStringCommand(int index, std::string value) {
 	ss << "cs " << index << " " << value;
 	return ss.str();
 }
+std::string makeEntityConfigStringCommand(int index, std::string value) {
+	std::stringstream ss;
+	ss << "entcs " << index << " " << value;
+	return ss.str();
+}
 
 /*
 ================

@@ -177,6 +177,8 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 }*/
 
 
+
+
 qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
@@ -360,6 +362,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	double fps = 60.0f;
 	std::map<int, entityState_t> targetEntities;
 	std::map<int, entityState_t> targetEntitiesOld;
+	//entityMeta_t	entityMeta[MAX_GENTITIES];
+	entityMeta_t	entityMetaOld[MAX_GENTITIES];
+
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
@@ -373,6 +378,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	//std::map<int, float> blockedEntities; // Entities that are blocked because they had an event in the last EVENT_VALID_MSEC timeframe. The value describes the time they started to be blocked.
 	float blockedEntities[MAX_GENTITIES]; // Entities that are blocked because they had an event in the last EVENT_VALID_MSEC timeframe. The value describes the time they started to be blocked.
 	Com_Memset(blockedEntities, 0,sizeof(blockedEntities));
+	//Com_Memset(entityMeta, 0,sizeof(entityMeta));
+	Com_Memset(entityMetaOld, 0,sizeof(entityMetaOld));
+
+	//for (int i = 0; i < MAX_GENTITIES; i++) {
+		//VectorSet(entityMeta[i].modelScale, 1.0f, 1.0f, 1.0f);
+	//	VectorSet(entityMetaOld[i].modelScale, 1.0f, 1.0f, 1.0f);
+	//}
 
 	while(1){
 		commandsToAdd.clear();
@@ -742,6 +754,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.event = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType, demoType);
 							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.boltInfo,sourceDemoType, demoType);
 							tmpEntity.boltInfo = -1;
+							VectorCopy(tmpEntity.modelScale,tmpEntity.demoToolsData.entityMeta.modelScale);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
@@ -1088,6 +1101,24 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					blockedEntities[e] = time;
 					break;
 				}
+			}
+		}
+
+		for (auto it = targetEntities.begin(); it != targetEntities.end(); it++) {
+			if (it->second.demoToolsData.entityMeta.modelScale[0] != entityMetaOld[it->first].modelScale[0] || it->second.demoToolsData.entityMeta.modelScale[1] != entityMetaOld[it->first].modelScale[1] || it->second.demoToolsData.entityMeta.modelScale[2] != entityMetaOld[it->first].modelScale[2]) {
+				char entcs[MAX_INFO_STRING];
+				entcs[0] = '\0';
+				if (it->second.demoToolsData.entityMeta.modelScale[0]) {
+					Info_SetValueForKey(entcs, sizeof(entcs), "modelScaleX", va("%.5f", it->second.demoToolsData.entityMeta.modelScale[0]), isMOHAADemo);
+				}
+				if (it->second.demoToolsData.entityMeta.modelScale[1]) {
+					Info_SetValueForKey(entcs, sizeof(entcs), "modelScaleY", va("%.5f", it->second.demoToolsData.entityMeta.modelScale[1]), isMOHAADemo);
+				}
+				if (it->second.demoToolsData.entityMeta.modelScale[2]) {
+					Info_SetValueForKey(entcs, sizeof(entcs), "modelScaleZ", va("%.5f", it->second.demoToolsData.entityMeta.modelScale[2]), isMOHAADemo);
+				}
+				commandsToAdd.push_back(makeEntityConfigStringCommand(it->first, entcs));
+				VectorCopy(it->second.demoToolsData.entityMeta.modelScale, entityMetaOld[it->first].modelScale);
 			}
 		}
 

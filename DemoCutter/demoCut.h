@@ -767,6 +767,11 @@ typedef enum entityExtraValues_t {
 	ENTITYEXTRA_COUNT
 };
 
+
+typedef struct entityMeta_s {
+	vec3_t	modelScale;
+} entityMeta_t;
+
 typedef struct demoToolsEntityData_t{
 	int entityExtraValuesBitmask;
 	short entityExtraValues[ENTITYEXTRA_COUNT];
@@ -777,6 +782,7 @@ typedef struct demoToolsEntityData_t{
 	bool isInterpolated;
 	trajectory_t uninterpolatedPos;
 	trajectory_t uninterpolatedAPos;
+	entityMeta_t entityMeta; // for combiner. modelscale etc. to know when to change entcs
 };
 
 
@@ -4885,6 +4891,7 @@ const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* sea
 std::string printRapidJsonValue(rapidjson::Value* value);
 
 std::string makeConfigStringCommand(int index, std::string value);
+std::string makeEntityConfigStringCommand(int index, std::string value);
 int G_FindConfigstringIndex(const char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_SoundIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_ModelIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
