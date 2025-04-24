@@ -3,6 +3,10 @@
 analyzer () {
 	# You can change the analysis parameters here
 	# Note: Remove the ./ before DemoHighlightFinder.exe if the .exe file isn't in the same folder and if it is in PATH instead
+	while [ -f pause ]; do # You can create a file named "pause" in the same directory to pause analysis.
+	  echo "'pause' file found. waiting 10 seconds to retry."
+	  sleep 10s
+	done
 	./DemoHighlightFinder.exe "$1" 10000 ctfreturns
 	if [ $? -eq 139 ]; then
 		>&2 echo "Demo $1 led to segfault!"
