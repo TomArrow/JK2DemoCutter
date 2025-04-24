@@ -148,6 +148,7 @@ public:
 	bool doChatSearch = false;
 	bool doPrintSearch = false;
 	bool doStringSearch = false;
+	bool skipKills = false;
 	std::string chatSearch = "";
 	std::string printSearch = "";
 	std::string stringSearch = "";
@@ -5794,7 +5795,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						
 
 						// Handle kills
-						if (eventNumber == EV_OBITUARY_GENERAL) {
+						if (eventNumber == EV_OBITUARY_GENERAL && !opts.skipKills) {
 							int				target = thisEs->otherEntityNum;
 							int				attacker = thisEs->otherEntityNum2;
 							int				mod = thisEs->eventParm;
@@ -8779,6 +8780,7 @@ int main(int argcO, char** argvO) {
 	auto C = op.add<popl::Value<std::string>>("C", "chat-search", "Searches for a string in chats.");
 	auto P = op.add<popl::Value<std::string>>("P", "print-search", "Searches for a string in prints.");
 	auto T = op.add<popl::Value<std::string>>("T", "text-search", "Searches for a string in general.");
+	auto K = op.add<popl::Value<std::string>>("K", "skip-kills", "Skips searching for kills (e.g. if you want to only search for chats or defrag runs)");
 
 	
 	op.parse(argcO, argvO);
@@ -8826,6 +8828,7 @@ int main(int argcO, char** argvO) {
 	opts.printDebug = p->value();
 	opts.strafeCSVInterpolate = Z->value();
 	opts.playerCSVDump = y->is_set();
+	opts.skipKills = K->is_set();
 	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
 	if (x->is_set()) {
 		int v[6];
