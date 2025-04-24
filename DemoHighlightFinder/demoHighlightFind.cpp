@@ -8780,7 +8780,7 @@ int main(int argcO, char** argvO) {
 	auto C = op.add<popl::Value<std::string>>("C", "chat-search", "Searches for a string in chats.");
 	auto P = op.add<popl::Value<std::string>>("P", "print-search", "Searches for a string in prints.");
 	auto T = op.add<popl::Value<std::string>>("T", "text-search", "Searches for a string in general.");
-	auto K = op.add<popl::Value<std::string>>("K", "skip-kills", "Skips searching for kills (e.g. if you want to only search for chats or defrag runs)");
+	auto K = op.add<popl::Switch>("K", "skip-kills", "Skips searching for kills (e.g. if you want to only search for chats or defrag runs)");
 
 	
 	op.parse(argcO, argvO);
