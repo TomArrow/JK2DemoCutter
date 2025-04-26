@@ -662,7 +662,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 								// This CAN actually happen because we might not have gotten back any playerstate related data at all so we would just end up treating this as normal entitystate data
 
 								// Sanity check.
-								assert(usedSnapIt->second.entities.find(reframeClientNum) != usedSnapIt->second.entities.end()); 
+								assert(usedSnapIt->second->entities.find(reframeClientNum) != usedSnapIt->second->entities.end()); 
 
 								// TODO: Make this actually work somehow?
 								// Problem: Depending on the order in which we get playerstate/entitystate data, we either do the "enhanceonly" thing or we do the EnhancePlayerStateWithBaseState thing, and both lead to inconsistent results, so in cases where we quickly alternate between both methods (like with strobe), we end up with weird inconsistent behavior. Sad but true.
