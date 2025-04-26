@@ -239,8 +239,8 @@ static const netField_t	playerStateFields[] =
 { PSF(fd.forcePower), 8 },
 { PSF(fd.forceSide), 2 }, //so we know if we should apply greyed out shaders to dark/light force enlightenment
 { PSF(fd.sentryDeployed), 1 },
-{ PSF(fd.forcePowerLevel[FP_LEVITATION]), 2 }, //unfortunately we need this for fall damage calculation (client needs to know the distance for the fall noise)
-{ PSF(fd.forcePowerLevel[FP_SEE]), 2 }, //needed for knowing when to display players through walls
+{ PSF(fd.forcePowerLevel_FP_LEVITATION_), 2 }, //unfortunately we need this for fall damage calculation (client needs to know the distance for the fall noise)
+{ PSF(fd.forcePowerLevel_FP_SEE_), 2 }, //needed for knowing when to display players through walls
 { PSF(genericEnemyIndex), 32 }, //NOTE: This isn't just an index all the time, it's often used as a time value, and thus needs 32 bits
 { PSF(activeForcePass), 6 },
 { PSF(hasDetPackPlanted), 1 },
@@ -257,7 +257,7 @@ static const netField_t	playerStateFields[] =
 { PSF(fallingToDeath), 32 },
 { PSF(electrifyTime), 32 },
 
-{ PSF(fd.forcePowerDebounce[FP_LEVITATION]), 32 },
+{ PSF(fd.forcePowerDebounce_FP_LEVITATION_), 32 },
 
 { PSF(saberMove), 32 }, //This value sometimes exceeds the max LS_ value and gets set to a crazy amount, so it needs 32 bits
 { PSF(saberActive), 1 },
@@ -364,8 +364,8 @@ static const netField_t	playerStateFields15[] =
 { PSF(fd.forcePower), 8 },
 { PSF(fd.forceSide), 2 }, //so we know if we should apply greyed out shaders to dark/light force enlightenment
 { PSF(fd.sentryDeployed), 1 },
-{ PSF(fd.forcePowerLevel[FP_LEVITATION]), 2 }, //unfortunately we need this for fall damage calculation (client needs to know the distance for the fall noise)
-{ PSF(fd.forcePowerLevel[FP_SEE]), 2 }, //needed for knowing when to display players through walls
+{ PSF(fd.forcePowerLevel_FP_LEVITATION_), 2 }, //unfortunately we need this for fall damage calculation (client needs to know the distance for the fall noise)
+{ PSF(fd.forcePowerLevel_FP_SEE_), 2 }, //needed for knowing when to display players through walls
 { PSF(genericEnemyIndex), 32 }, //NOTE: This isn't just an index all the time, it's often used as a time value, and thus needs 32 bits
 { PSF(activeForcePass), 6 },
 { PSF(hasDetPackPlanted), 1 },
@@ -379,7 +379,7 @@ static const netField_t	playerStateFields15[] =
 { PSF(fallingToDeath), 32 },
 { PSF(electrifyTime), 32 },
 
-{ PSF(fd.forcePowerDebounce[FP_LEVITATION]), 32 },
+{ PSF(fd.forcePowerDebounce_FP_LEVITATION_), 32 },
 
 { PSF(saberMove), 32 }, //This value sometimes exceeds the max LS_ value and gets set to a crazy amount, so it needs 32 bits
 { PSF(saberActive), 1 },

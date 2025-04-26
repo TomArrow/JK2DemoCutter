@@ -621,34 +621,37 @@ typedef enum {
 #define TRACK_CHANNEL_MAX (NUM_TRACK_CHANNELS-50)
 
 typedef struct forcedata_s {
-	int			forcePowerDebounce[NUM_FORCE_POWERS];	//for effects that must have an interval
+	//NOT_FULLY_NETWORKED//int			forcePowerDebounce[NUM_FORCE_POWERS];	//for effects that must have an interval
+	int			forcePowerDebounce_FP_LEVITATION_;	//for effects that must have an interval
 	int			forcePowersKnown;
 	int			forcePowersActive;
 	int			forcePowerSelected;
-	int			forceButtonNeedRelease;
-	int			forcePowerDuration[NUM_FORCE_POWERS];
+	//NOT_NETWORKED//int			forceButtonNeedRelease;
+	//NOT_NETWORKED//int			forcePowerDuration[NUM_FORCE_POWERS];
 	int			forcePower;
-	int			forcePowerMax;
-	int			forcePowerRegenDebounceTime;
-	int			forcePowerLevel[NUM_FORCE_POWERS];		//so we know the max forceJump power you have
-	int			forcePowerBaseLevel[NUM_FORCE_POWERS];
-	int			forceUsingAdded;
+	//NOT_NETWORKED//int			forcePowerMax;
+	//NOT_NETWORKED//int			forcePowerRegenDebounceTime;
+	//NOT_FULLY_NETWORKED//int			forcePowerLevel[NUM_FORCE_POWERS];		//so we know the max forceJump power you have
+	int			forcePowerLevel_FP_SEE_;
+	int			forcePowerLevel_FP_LEVITATION_;
+	//NOT_NETWORKED//int			forcePowerBaseLevel[NUM_FORCE_POWERS];
+	//NOT_NETWORKED//int			forceUsingAdded;
 	float		forceJumpZStart;					//So when you land, you don't get hurt as much
-	float		forceJumpCharge;					//you're current forceJump charge-up level, increases the longer you hold the force jump button down
-	int			forceJumpSound;
-	int			forceJumpAddTime;
-	int			forceGripEntityNum;					//what entity I'm gripping
-	int			forceGripDamageDebounceTime;		//debounce for grip damage
-	float		forceGripBeingGripped;				//if > level.time then client is in someone's grip
-	int			forceGripCripple;					//if != 0 then make it so this client can't move quickly (he's being gripped)
-	int			forceGripUseTime;					//can't use if > level.time
-	float		forceGripSoundTime;
-	float		forceGripStarted;					//level.time when the grip was activated
-	float		forceSpeedSmash;
-	float		forceSpeedDoDamage;
-	int			forceSpeedHitIndex;					//if we hit another player and got hurt, hurt them too
-	int			forceHealTime;
-	int			forceHealAmount;
+	//NOT_NETWORKED//float		forceJumpCharge;					//you're current forceJump charge-up level, increases the longer you hold the force jump button down
+	//NOT_NETWORKED//int			forceJumpSound;
+	//NOT_NETWORKED//int			forceJumpAddTime;
+	//NOT_NETWORKED//int			forceGripEntityNum;					//what entity I'm gripping
+	//NOT_NETWORKED//int			forceGripDamageDebounceTime;		//debounce for grip damage
+	//NOT_NETWORKED//float		forceGripBeingGripped;				//if > level.time then client is in someone's grip
+	int			forceGripCripple;					//if != 0 then make it so this client can't move quickly (he's being gripped) 
+	//NOT_NETWORKED//int			forceGripUseTime;					//can't use if > level.time
+	//NOT_NETWORKED//float		forceGripSoundTime;
+	//NOT_NETWORKED//float		forceGripStarted;					//level.time when the grip was activated
+	//NOT_NETWORKED//float		forceSpeedSmash;
+	//NOT_NETWORKED//float		forceSpeedDoDamage;
+	//NOT_NETWORKED//int			forceSpeedHitIndex;					//if we hit another player and got hurt, hurt them too
+	//NOT_NETWORKED//int			forceHealTime;
+	//NOT_NETWORKED//int			forceHealAmount;
 
 	//This hurts me somewhat to do, but there's no other real way to allow completely "dynamic" mindtricking.
 	int			forceMindtrickTargetIndex; //0-15
@@ -657,26 +660,26 @@ typedef struct forcedata_s {
 	int			forceMindtrickTargetIndex4; //49-64
 
 	int			forceRageRecoveryTime;
-	int			forceDrainEntNum;
-	float		forceDrainTime;
+	//NOT_NETWORKED//int			forceDrainEntNum;
+	//NOT_NETWORKED//float		forceDrainTime;
 
-	int			forceDoInit;
+	//NOT_NETWORKED//int			forceDoInit;
 
 	int			forceSide;
-	int			forceRank;
+	//NOT_NETWORKED//int			forceRank;
 
-	int			forceDeactivateAll;
+	//NOT_NETWORKED//int			forceDeactivateAll;
 
-	int			killSoundEntIndex[TRACK_CHANNEL_MAX]; //this goes here so it doesn't get wiped over respawn
+	//NOT_NETWORKED//int			killSoundEntIndex[TRACK_CHANNEL_MAX]; //this goes here so it doesn't get wiped over respawn
 
 	qboolean	sentryDeployed;
 
 	int			saberAnimLevel;
 	int			saberDrawAnimLevel;
 
-	int			suicides;
+	//NOT_NETWORKED//int			suicides;
 
-	int			privateDuelTime;
+	//NOT_NETWORKED//int			privateDuelTime;
 } forcedata_t;
 
 
@@ -815,7 +818,7 @@ typedef struct playerState_s {
 	int			weaponChargeSubtractTime;
 	int			basespeed; //used in prediction to know base server g_speed value when modifying speed between updates
 
-	int			useTime;
+	//NOT_NETWORKED//int			useTime;
 
 
 	int			legsTimer;		// don't change low priority animations until this runs out
@@ -852,12 +855,12 @@ typedef struct playerState_s {
 	int			damageCount;
 	int			damageType;
 
-	int			painTime;		// used for both game and client side to process the pain twitch - NOT sent across the network
-	int			painDirection;	// NOT sent across the network
-	float		yawAngle;		// NOT sent across the network
-	qboolean	yawing;			// NOT sent across the network
-	float		pitchAngle;		// NOT sent across the network
-	qboolean	pitching;		// NOT sent across the network
+	//NOT_NETWORKED//int			painTime;		// used for both game and client side to process the pain twitch - NOT sent across the network
+	//NOT_NETWORKED//int			painDirection;	// NOT sent across the network
+	//NOT_NETWORKED//float		yawAngle;		// NOT sent across the network
+	//NOT_NETWORKED//qboolean	yawing;			// NOT sent across the network
+	//NOT_NETWORKED//float		pitchAngle;		// NOT sent across the network
+	//NOT_NETWORKED//qboolean	pitching;		// NOT sent across the network
 
 	int			stats[MAX_STATS];
 	int			persistant[MAX_PERSISTANT];	// stats that aren't cleared on death
@@ -871,99 +874,99 @@ typedef struct playerState_s {
 	int			jumppad_ent;	// jumppad entity hit this frame
 
 	// not communicated over the net at all
-	int			ping;			// server to game info for scoreboard
-	int			pmove_framecount;	// FIXME: don't transmit over the network
-	int			jumppad_frame;
-	int			entityEventSequence;
+	//NOT_NETWORKED//int			ping;			// server to game info for scoreboard
+	//NOT_NETWORKED//int			pmove_framecount;	// FIXME: don't transmit over the network
+	//NOT_NETWORKED//int			jumppad_frame;
+	int			entityEventSequenceNOTNETWORKED;
 
-	int			lastOnGround;	//last time you were on the ground
+	//NOT_NETWORKED//int			lastOnGround;	//last time you were on the ground
 
 	qboolean	saberInFlight;
 	qboolean	saberActive;
 
 	int			saberMove;
-	int			saberBlocking;
+	//NOT_NETWORKED//int			saberBlocking;
 	int			saberBlocked;
 
 	int			saberLockTime;
 	int			saberLockEnemy;
 	int			saberLockFrame; //since we don't actually have the ability to get the current anim frame
-	int			saberLockHits; //every x number of buttons hits, allow one push forward in a saber lock (server only)
+	//NOT_NETWORKED//int			saberLockHits; //every x number of buttons hits, allow one push forward in a saber lock (server only)
 	qboolean	saberLockAdvance; //do an advance (sent across net as 1 bit)
 
 	int			saberEntityNum;
-	float		saberEntityDist;
-	int			saberEntityState;
-	int			saberThrowDelay;
+	//NOT_NETWORKED//float		saberEntityDist;
+	//NOT_NETWORKED//int			saberEntityState;
+	//NOT_NETWORKED//int			saberThrowDelay;
 	qboolean	saberCanThrow;
-	int			saberDidThrowTime;
-	int			saberDamageDebounceTime;
-	int			saberHitWallSoundDebounceTime;
-	int			saberEventFlags;
+	//NOT_NETWORKED//int			saberDidThrowTime;
+	//NOT_NETWORKED//int			saberDamageDebounceTime;
+	//NOT_NETWORKED//int			saberHitWallSoundDebounceTime;
+	//NOT_NETWORKED//int			saberEventFlags;
 
 	int			rocketLockIndex;
-	float		rocketLastValidTime;
+	//NOT_NETWORKED//float		rocketLastValidTime;
 	float		rocketLockTime;
 	float		rocketTargetTime;
 
 	int			emplacedIndex;
-	float		emplacedTime;
+	//NOT_NETWORKED//float		emplacedTime;
 
 	qboolean	isJediMaster;
 	qboolean	forceRestricted;
 	qboolean	trueJedi;
 	qboolean	trueNonJedi;
-	int			saberIndex;
+	//NOT_NETWORKED//int			saberIndex;
 
 	int			genericEnemyIndex;
-	float		droneFireTime;
-	float		droneExistTime;
+	//NOT_NETWORKED//float		droneFireTime;
+	//NOT_NETWORKED//float		droneExistTime;
 
 	int			activeForcePass;
 
 	qboolean	hasDetPackPlanted; //better than taking up an eFlag isn't it?
 
-	float		holocronsCarried[NUM_FORCE_POWERS];
-	int			holocronCantTouch;
-	float		holocronCantTouchTime; //for keeping track of the last holocron that just popped out of me (if any)
+	//NOT_NETWORKED//float		holocronsCarried[NUM_FORCE_POWERS];
+	//NOT_NETWORKED//int			holocronCantTouch;
+	//NOT_NETWORKED//float		holocronCantTouchTime; //for keeping track of the last holocron that just popped out of me (if any)
 	int			holocronBits;
 
-	int			legsAnimExecute;
-	int			torsoAnimExecute;
-	int			fullAnimExecute;
+	//NOT_NETWORKED//int			legsAnimExecute;
+	//NOT_NETWORKED//int			torsoAnimExecute;
+	//NOT_NETWORKED//int			fullAnimExecute;
 
 	int			electrifyTime;
 
-	int			saberAttackSequence;
-	int			saberIdleWound;
-	int			saberAttackWound;
-	int			saberBlockTime;
+	//NOT_NETWORKED//int			saberAttackSequence;
+	//NOT_NETWORKED//int			saberIdleWound;
+	//NOT_NETWORKED//int			saberAttackWound;
+	//NOT_NETWORKED//int			saberBlockTime;
 
-	int			otherKiller;
-	int			otherKillerTime;
-	int			otherKillerDebounceTime;
+	//NOT_NETWORKED//int			otherKiller;
+	//NOT_NETWORKED//int			otherKillerTime;
+	//NOT_NETWORKED//int			otherKillerDebounceTime;
 
 	forcedata_t	fd;
-	qboolean	forceJumpFlip;
+	//NOT_NETWORKED//qboolean	forceJumpFlip;
 	int			forceHandExtend;
-	int			forceHandExtendTime;
+	//NOT_NETWORKED//int			forceHandExtendTime;
 
-	int			forceRageDrainTime;
+	//NOT_NETWORKED//int			forceRageDrainTime;
 
 	int			forceDodgeAnim;
-	qboolean	quickerGetup;
+	//NOT_NETWORKED//qboolean	quickerGetup;
 
-	int			groundTime;		// time when first left ground
+	//NOT_NETWORKED//int			groundTime;		// time when first left ground
 
-	int			footstepTime;
+	//NOT_NETWORKED//int			footstepTime;
 
-	int			otherSoundTime;
-	float		otherSoundLen;
+	//NOT_NETWORKED//int			otherSoundTime;
+	//NOT_NETWORKED//float		otherSoundLen;
 
-	int			forceGripMoveInterval;
-	int			forceGripChangeMovetype;
+	//NOT_NETWORKED//int			forceGripMoveInterval;
+	//NOT_NETWORKED//int			forceGripChangeMovetype;
 
-	int			forceKickFlip;
+	//NOT_NETWORKED//int			forceKickFlip;
 
 	int			duelIndex;
 	int			duelTime;
@@ -975,20 +978,20 @@ typedef struct playerState_s {
 
 	qboolean	usingATST;
 	qboolean	atstAltFire;
-	int			holdMoveTime;
+	//NOT_NETWORKED//int			holdMoveTime;
 
-	int			forceAllowDeactivateTime;
+	//NOT_NETWORKED//int			forceAllowDeactivateTime;
 
 	// zoom key
 	int			zoomMode;		// 0 - not zoomed, 1 - disruptor weapon
 	int			zoomTime;
 	qboolean	zoomLocked;
 	float		zoomFov;
-	int			zoomLockTime;
+	//NOT_NETWORKED//int			zoomLockTime;
 
 	int			fallingToDeath;
 
-	int			useDelay;
+	//NOT_NETWORKED//int			useDelay;
 
 	qboolean	inAirAnim;
 
@@ -4841,28 +4844,17 @@ public:
 	int snapNum;
 	std::map<int, entityState_t> entities;
 	std::map<int, int> playerCommandOrServerTimes;
-	qboolean hasPlayer[MAX_CLIENTS_MAX]{};
-	int mohaaPlayerWeapon[MAX_CLIENTS_MAX]{};
+	bool hasPlayer[MAX_CLIENTS_MAX]{};
+	byte mohaaPlayerWeapon[MAX_CLIENTS_MAX]{};
 	playerState_t playerState;
 	int serverTime;
 	int64_t demoTime;
 	byte areamask[MAX_MAP_AREA_BYTES];
-	qboolean playerStateTeleport;
-	qboolean snapFlagServerCount; // Used for considering teleports for non-playerstate clients
+	bool playerStateTeleport;
+	bool snapFlagServerCount; // Used for considering teleports for non-playerstate clients
 };
 
-inline bool snapshotInfosServerTimeSmallerPredicate(const std::pair<int, SnapshotInfo> &it, const int &serverTime) {
-	return it.second.serverTime < serverTime;
-};
-inline bool snapshotInfosDemoTimeSmallerPredicate(const std::pair<int, SnapshotInfo> &it, const float &demoTime) {
-	return it.second.demoTime < demoTime;
-};
-inline bool snapshotInfosServerTimeGreaterPredicate(const int &serverTime, const std::pair<int, SnapshotInfo>& it) {
-	return serverTime < it.second.serverTime;
-};
-inline bool snapshotInfosSnapNumPredicate(const std::pair<int, SnapshotInfo> &it, const int &snapNum) {
-	return it.second.snapNum < snapNum;
-};
+
 
 //qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader, bool& SEHExceptionCaught);

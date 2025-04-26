@@ -299,7 +299,7 @@ readNext:
 	if (FS_Read(&thisDemo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 		return qfalse;
 	thisDemo.cut.Clc.serverMessageSequence = LittleLong(thisDemo.cut.Clc.serverMessageSequence);
-	maxSequenceNum = std::max(maxSequenceNum, demo.cut.Clc.serverMessageSequence);
+	maxSequenceNum = std::max(maxSequenceNum, thisDemo.cut.Clc.serverMessageSequence);
 	oldSize -= 4;
 	/* Read the message size */
 	if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
@@ -426,7 +426,7 @@ readNext:
 
 					if (thisDemo.cut.Cl.snap.serverTime > 10000) {
 						// This is a non-critical warning, mostly for debugging. It used to be more dangerous.
-						std::cerr << "thisDemo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << originalDemoPath << ")\n";
+						std::cerr << "thisDemo.cut.Cl.snap.serverTime < lastKnownTime && thisDemo.cut.Clc.serverMessageSequence == maxSequenceNum but thisDemo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - thisDemo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << thisDemo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << originalDemoPath << ")\n";
 					}
 
 					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
@@ -436,7 +436,7 @@ readNext:
 			}
 			/*if (thisDemo.cut.Cl.snap.serverTime < lastKnownTime && thisDemo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
 				if (demo.cut.Cl.snap.serverTime > 10000) {
-					std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime but demo.cut.Cl.snap.serverTime > 10000; demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
+					std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime but thisDemo.cut.Cl.snap.serverTime > 10000; demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << thisDemo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
 				}
 				demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
 				demoStartTime = thisDemo.cut.Cl.snap.serverTime;
@@ -610,7 +610,7 @@ readNext:
 				.match();
 
 			for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
-				const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+				const char* info = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 				std::string mapname = Info_ValueForKey(info, "mapname");
 				std::string playername = vec_num[matchNum][1];
 				int minutes = atoi(vec_num[matchNum][2].c_str());
@@ -630,7 +630,7 @@ readNext:
 				int playerNumber = -1;
 				for (int clientNum = 0; clientNum < maxClientsThisDemo; clientNum++) {
 
-					const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
+					const char* playerInfo = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
 					std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");
 					if (playerNameCompare == playername) {
 						playerNumber = clientNum;

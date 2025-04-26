@@ -309,6 +309,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 		lastKnownPacketWithPlayer[i] = -1;
 		firstPacketWithPlayerState[i] = -1;
 		lastKnownPacketWithPlayerState[i] = -1;
+		lastKnownCommandOrServerTimes[i] = -1;
 	}
 
 	Com_Memset(&extraFieldInfo, 0, sizeof(extraFieldInfo));
@@ -327,7 +328,7 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 	maxSequenceNum = -9999;
 	thisDemo.cut.Clc.lastKnownCommandTime = 0;
 	thisDemo.cut.Clc.firstSnapServerTime = -1;
-	lastKnownCommandOrServerTimes.clear();
+	//lastKnownCommandOrServerTimes.clear();
 	messageOffset = 0;
 	lastGottenCommandsTime = 0;
 	lastGottenCommandsServerTime = 0;
@@ -367,11 +368,11 @@ qboolean DemoReader::SeekToPlayerCommandOrServerTime(int clientNum, int serverTi
 	if (lastKnownCommandOrServerTimes[clientNum] < serverTime && endReached) return qfalse;
 	return qtrue;
 }
-qboolean DemoReader::SeekToPlayerInPacket(int clientNum) {
-	while (lastKnownCommandOrServerTimes[clientNum] <= 0 && !endReached) {
+qboolean DemoReader::SeekToPlayerInPacket(int clientNum, int maxMsgNum) {
+	while (lastKnownCommandOrServerTimes[clientNum] <= 0 && !endReached && (!maxMsgNum || maxMsgNum > maxSequenceNum)) {
 		ReadMessage();
 	}
-	if (lastKnownCommandOrServerTimes[clientNum] <= 0 && endReached) return qfalse;
+	if (lastKnownCommandOrServerTimes[clientNum] <= 0 && (endReached || maxMsgNum && maxMsgNum > maxSequenceNum)) return qfalse;
 	return qtrue;
 }
 
@@ -384,20 +385,65 @@ int DemoReader::GetFirstServerTimeAfterServerTime(int serverTime) {
 	if (demoBaseTime) { // Continuity not guaranteed. Do slow linear search
 
 		for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-			if (it->second.serverTime > serverTime) return it->second.serverTime;
+			if (it->second->serverTime > serverTime) return it->second->serverTime;
 		}
 	}
 	else {
 		// Do fast binary search
 		auto upper = std::upper_bound(snapshotInfos.begin(),snapshotInfos.end(),serverTime, snapshotInfosServerTimeGreaterPredicate); // Should be first one that has greater server time.
 		if (upper != snapshotInfos.end() /* && upper->second.serverTime > serverTime*/) {
-			return upper->second.serverTime;
+			return upper->second->serverTime;
 		}
 	}
 	return -1; // Shouldn't happen really but whatever
 }
+void	DemoReader::ClearSnapshotsBeforeIterator(SnapshotInfoMapIterator snapInfoIt) {
+	int msgNum = snapInfoIt->first;
+	for (int i = 0; i < MAX_GENTITIES; i++) {
+		if (lastMessageWithEntity[i] < msgNum) {
+			lastMessageWithEntity.erase(i);
+		}
+	}
+	for (int i = 0; i < maxClientsThisDemo; i++) {
+		if (lastKnownPacketWithPlayer[i] < msgNum) {
+			lastKnownPacketWithPlayer[i] = -1;
+		}
+	}
+	for (int i = 0; i < maxClientsThisDemo; i++) {
+		if (lastKnownPacketWithPlayerState[i] < msgNum) {
+			lastKnownPacketWithPlayerState[i] = -1;
+		}
+	}
+	for (int i = 0; i < maxClientsThisDemo; i++) {
+		if (firstPacketWithPlayer[i] < msgNum) {
+			firstPacketWithPlayer[i] = -1;
+			for (auto it = snapInfoIt; it != snapshotInfos.end() && firstPacketWithPlayer[i] == -1;it++) {
+				if (it->second->hasPlayer[i]) {
+					firstPacketWithPlayer[i] = it->first;
+				}
+			}
+		}
+	}
+	for (int i = 0; i < maxClientsThisDemo; i++) {
+		if (firstPacketWithPlayerState[i] < msgNum) {
+			firstPacketWithPlayerState[i] = -1;
+			for (auto it = snapInfoIt; it != snapshotInfos.end() && firstPacketWithPlayerState[i] == -1;it++) {
+				if (it->second->playerState.clientNum == i) {
+					firstPacketWithPlayerState[i] = it->first;
+				}
+			}
+		}
+	}
+	for (int i = 0; i < maxClientsThisDemo; i++) {
+		if (lastKnownCommandOrServerTimes[i] < snapInfoIt->second->playerCommandOrServerTimes[i]) {
+			lastKnownCommandOrServerTimes[i] = -1; // TODO Double check if I should be doing this...
+		}
+	}
+	snapshotInfos.erase(snapshotInfos.begin(),snapInfoIt);
+}
+
 SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(SnapshotInfoMapIterator oldSnapInfoIt) {
-	int serverTime = oldSnapInfoIt->second.serverTime;
+	int serverTime = oldSnapInfoIt->second->serverTime;
 	while (lastKnownTime <= serverTime && !endReached) {
 		ReadMessage();
 	}
@@ -407,7 +453,7 @@ SnapshotInfoMapIterator DemoReader::GetFirstSnapshotAfterSnapshotIterator(Snapsh
 	while (lastKnownTime <= pastServerTime && !endReached) {
 		ReadMessage();
 	}
-	while (oldSnapInfoIt != snapshotInfos.end() && oldSnapInfoIt->second.serverTime <= pastServerTime) {
+	while (oldSnapInfoIt != snapshotInfos.end() && oldSnapInfoIt->second->serverTime <= pastServerTime) {
 
 		oldSnapInfoIt++;
 	}
@@ -423,15 +469,15 @@ int DemoReader::GetLastServerTimeBeforeServerTime(int serverTime) {
 	if (demoBaseTime) { // Continuity not guaranteed. Do slow linear search
 		int lastServerTime = -1;
 		for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-			if (it->second.serverTime >= serverTime) return lastServerTime;
-			lastServerTime = it->second.serverTime;
+			if (it->second->serverTime >= serverTime) return lastServerTime;
+			lastServerTime = it->second->serverTime;
 		}
 	}
 	else {
 		// Do fast binary search
 		auto lower = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), serverTime, snapshotInfosServerTimeSmallerPredicate); // Should be first one that has greater server time.
 		if (lower != snapshotInfos.end() && lower != snapshotInfos.begin()) {
-			return (--lower)->second.serverTime; // ? untested, but should work? 
+			return (--lower)->second->serverTime; // ? untested, but should work? 
 		}
 	}
 	return -1; // Shouldn't happen really but whatever
@@ -441,7 +487,7 @@ SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtOrBeforeDemoTimeIterator(fl
 	if (SeekToTime(demoTime) || (demoTime < 0.0f && SeekToAnySnapshotIfNotYet() && includeAfterIfFirst)) {
 		auto lower = std::lower_bound(snapshotInfos.begin(), snapshotInfos.end(), demoTime, snapshotInfosDemoTimeSmallerPredicate);
 		if (lower != snapshotInfos.end()) {
-			if (lower->second.demoTime == demoTime) {
+			if (lower->second->demoTime == demoTime) {
 				return lower;
 			}
 			else if (lower != snapshotInfos.begin()) {
@@ -463,12 +509,12 @@ SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtServerTimeIterator(int serv
 	if (SeekToServerTime(serverTime)) {
 		if (demoBaseTime) { // demoBaseTime should be 0 for any regular demo BUT some demos might include a serverTime reset, in which case demoBaseTime is increased. At this point there is no more serverTime regularity guaranteed hence we cannot use binary search and have to do a slow linear search
 			for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-				if (it->second.serverTime == serverTime) return it;
+				if (it->second->serverTime == serverTime) return it;
 			}
 		}
 		else { // Binary search
 			auto lower = std::lower_bound(snapshotInfos.begin(),snapshotInfos.end(),serverTime, snapshotInfosServerTimeSmallerPredicate);
-			if (lower != snapshotInfos.end() && lower->second.serverTime == serverTime) return lower;
+			if (lower != snapshotInfos.end() && lower->second->serverTime == serverTime) return lower;
 		}
 		return snapshotInfos.end(); // Can happen if that particular time's snapshot is missing from the demo.
 	}
@@ -479,11 +525,11 @@ SnapshotInfoMapIterator DemoReader::GetSnapshotInfoAtServerTimeIterator(int serv
 }
 SnapshotInfo* DemoReader::GetSnapshotInfoAtServerTime(int serverTime) {
 	SnapshotInfoMapIterator it = GetSnapshotInfoAtServerTimeIterator(serverTime);
-	return it!= snapshotInfos.end() ? &it->second : NULL;
+	return it!= snapshotInfos.end() ? it->second.get() : NULL;
 }
 SnapshotInfo* DemoReader::GetSnapshotInfoAtOrBeforeDemoTime(float demoTime, qboolean includeAfterIfFirst) {
 	SnapshotInfoMapIterator it = GetSnapshotInfoAtOrBeforeDemoTimeIterator(demoTime, includeAfterIfFirst);
-	return it!= snapshotInfos.end() ? &it->second : NULL;
+	return it!= snapshotInfos.end() ? it->second.get() : NULL;
 }
 
 // Don't call if you're not sure if the snapnum exists.
@@ -497,7 +543,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, int snapNum, Snap
 // playerStateSourceSnap is in case we are creating a playerstate from an entity and we are searching backwards and forwards for a playerState to fill in some info (health, armor)
 // So that will return (if desired) the source snap used for that playerstate fill in info or if we get the playerstate directly from the current snap, it just has the current snap.
 playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, SnapshotInfoMapIterator* playerStateSourceSnap, qboolean detailedPS) {
-	SnapshotInfo* snap = &snapInfoIterator->second;
+	SnapshotInfo* snap = snapInfoIterator->second.get();
 	if (playerStateSourceSnap) *playerStateSourceSnap = snapshotInfos.end();
 	if (snap->playerState.clientNum == clientNum) {
 		if (playerStateSourceSnap) *playerStateSourceSnap = snapInfoIterator;
@@ -533,7 +579,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 
 					auto it = itStart;
 
-					if (lastKnownPacketWithPlayerStateOfThisPlayer < it->second.snapNum) {
+					if (lastKnownPacketWithPlayerStateOfThisPlayer < it->second->snapNum) {
 						it = snapshotInfos.find(lastKnownPacketWithPlayerStateOfThisPlayer);
 					}
 
@@ -541,7 +587,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 
 						//while (pastSnap == -1 && it->first >= firstPacketWithPlayerStateOfThisPlayer) { // To explain the second condition: If we know that the FIRST playerstate ever of this player was snap 2356, there is no need to search snaps 0 to 2355.
 						while (pastSnapIt == nullSnapIt && it->first >= firstPacketWithPlayerStateOfThisPlayer) { // To explain the second condition: If we know that the FIRST playerstate ever of this player was snap 2356, there is no need to search snaps 0 to 2355.
-							if (it->first < itStart->first && it->second.playerState.clientNum == clientNum) {
+							if (it->first < itStart->first && it->second->playerState.clientNum == clientNum) {
 								pastSnapIt = it;
 								break;
 							}
@@ -558,7 +604,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 
 					//while (futureSnap == -1 && it->first <= lastKnownPacketWithPlayerStateOfThisPlayer) { // To explain the second condition: If we know that the LAST KNOWN playerstate ever of this player was snap 2356, there is no need to search snaps 2357+.
 					while (futureSnapIt == nullSnapIt && it->first <= lastKnownPacketWithPlayerStateOfThisPlayer) { // To explain the second condition: If we know that the LAST KNOWN playerstate ever of this player was snap 2356, there is no need to search snaps 2357+.
-						if (it->first > itStart->first && it->second.playerState.clientNum == clientNum) {
+						if (it->first > itStart->first && it->second->playerState.clientNum == clientNum) {
 							futureSnapIt = it;
 							break;
 						}
@@ -631,7 +677,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		entityState_t* thisEntity = &snap->entities[clientNum];
 		// Need to convert the entity.
 		if (baseSnapIt != nullSnapIt && playerStateSourceSnap) *playerStateSourceSnap = baseSnapIt;
-		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second.playerState : &basePlayerStates[clientNum]);
+		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second->playerState : &basePlayerStates[clientNum]);
 
 		if (isMOHAADemo) {
 
@@ -767,18 +813,18 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		//if (it->second.serverTime <= time) {
 		
-		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		if (it->second->playerCommandOrServerTimes.find(clientNum) == it->second->playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 		
 		if (firstPacketWithPlayerInIt == -1) { 
 			firstPacketWithPlayerInItIt = it;
 			firstPacketWithPlayerInIt = it->first; 
 		}
 		
-		if (it->second.playerCommandOrServerTimes[clientNum] <= time) {
+		if (it->second->playerCommandOrServerTimes[clientNum] <= time) {
 			lastPastSnapIt = it;
 			lastPastSnap = it->first;
 			//lastPastSnapCommandTime = it->second.playerState.commandTime;
-			lastPastSnapCommandTime = it->second.playerCommandOrServerTimes[clientNum];
+			lastPastSnapCommandTime = it->second->playerCommandOrServerTimes[clientNum];
 		}
 	}
 	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have with the player in it
@@ -820,8 +866,8 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 		}
 		else {
 
-			if (oldSnap) *oldSnap = &snapshotInfos[lastMessageWithEntity[clientNum]];
-			if (newSnap) *newSnap = &snapshotInfos[lastMessageWithEntity[clientNum]];
+			if (oldSnap) *oldSnap = snapshotInfos[lastMessageWithEntity[clientNum]].get();
+			if (newSnap) *newSnap = snapshotInfos[lastMessageWithEntity[clientNum]].get();
 			//return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
 			return GetPlayerFromSnapshot(clientNum, lastMessageWithEntity[clientNum],NULL,detailedPS);
 		}
@@ -833,22 +879,22 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 	//for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 	for (auto it = lastPastSnapIt; it != snapshotInfos.end(); it++) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
 
-		if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		if (it->second->playerCommandOrServerTimes.find(clientNum) == it->second->playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 
-		if (it->second.playerCommandOrServerTimes[clientNum] > lastPastSnapCommandTime) {
+		if (it->second->playerCommandOrServerTimes[clientNum] > lastPastSnapCommandTime) {
 			firstNextSnap = it->first;
 			firstNextSnapIt = it;
 			break;
 		}
 	}
 
-	if (oldSnap) *oldSnap = &lastPastSnapIt->second;//&snapshotInfos[lastPastSnap];
-	if (newSnap) *newSnap = firstNextSnap == -1 ? NULL : &firstNextSnapIt->second;//&snapshotInfos[firstNextSnap];
+	if (oldSnap) *oldSnap = lastPastSnapIt->second.get();//&snapshotInfos[lastPastSnap];
+	if (newSnap) *newSnap = firstNextSnap == -1 ? NULL : firstNextSnapIt->second.get();//&snapshotInfos[firstNextSnap];
 
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
 	//InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal, detailedPS);
-	InterpolatePlayer(clientNum,time, &lastPastSnapIt->second, firstNextSnap == -1 ? NULL : &firstNextSnapIt->second, &retVal, detailedPS);
-	InterpolatePlayer(clientNum,time, &lastPastSnapIt->second, firstNextSnap == -1 ? NULL : &firstNextSnapIt->second, &retVal, detailedPS);
+	InterpolatePlayer(clientNum,time, lastPastSnapIt->second.get(), firstNextSnap == -1 ? NULL : firstNextSnapIt->second.get(), &retVal, detailedPS);
+	//InterpolatePlayer(clientNum,time, lastPastSnapIt->second.release(), firstNextSnap == -1 ? NULL : firstNextSnapIt->second.release(), &retVal, detailedPS); // i must have had this double by accident right?
 
 	return retVal;
 	
@@ -885,14 +931,14 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		//if (it->second.serverTime <= time) {
 		
-		if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		if (it->second->entities.find(entityNum) == it->second->entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 		
 		if (firstPacketWithPlayerInIt == -1) { 
 			firstPacketWithPlayerInItIt = it;
 			firstPacketWithPlayerInIt = it->first; 
 		}
 		
-		if (it->second.serverTime <= time) {
+		if (it->second->serverTime <= time) {
 			lastPastSnapIt = it;
 			lastPastSnap = it->first;
 		}
@@ -904,7 +950,7 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 			return retVal;
 		}
 		else {
-			return firstPacketWithPlayerInItIt->second.entities[entityNum];
+			return firstPacketWithPlayerInItIt->second->entities[entityNum];
 		}
 	}
 
@@ -928,7 +974,7 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 			//if (oldSnap) *oldSnap = &snapshotInfos[lastMessageWithEntity[entityNum]];
 			//if (newSnap) *newSnap = &snapshotInfos[lastMessageWithEntity[entityNum]];
 			//return GetPlayerFromSnapshot(clientNum, &snapshotInfos[lastMessageWithEntity[clientNum]]);
-			return snapshotInfos[lastMessageWithEntity[entityNum]].entities[entityNum];
+			return snapshotInfos[lastMessageWithEntity[entityNum]]->entities[entityNum];
 		}
 	}
 
@@ -942,19 +988,19 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 	SnapshotInfoMapIterator firstNextDifferentPositionSnapIt = lastPastSnapIt;
 	for (auto it = lastPastSnapIt; it != snapshotInfos.end(); it++) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
 
-		if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+		if (it->second->entities.find(entityNum) == it->second->entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 
-		if (firstNextDifferentAngleSnap == -1 && it->second.serverTime > lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].apos.trBase, lastPastSnapIt->second.entities[entityNum].apos.trBase)) {
+		if (firstNextDifferentAngleSnap == -1 && it->second->serverTime > lastPastSnapIt->second->serverTime && VectorDistance(it->second->entities[entityNum].apos.trBase, lastPastSnapIt->second->entities[entityNum].apos.trBase)) {
 			firstNextDifferentAngleSnap = it->first;
 			firstNextDifferentAngleSnapIt = it;
 		}
 
-		if (firstNextDifferentPositionSnap == -1 && it->second.serverTime > lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].pos.trBase, lastPastSnapIt->second.entities[entityNum].pos.trBase)) {
+		if (firstNextDifferentPositionSnap == -1 && it->second->serverTime > lastPastSnapIt->second->serverTime && VectorDistance(it->second->entities[entityNum].pos.trBase, lastPastSnapIt->second->entities[entityNum].pos.trBase)) {
 			firstNextDifferentPositionSnap = it->first;
 			firstNextDifferentPositionSnapIt = it;
 		}
 
-		if (firstNextDifferentAngleSnap != -1 && firstNextDifferentPositionSnap != -1 || (it->second.serverTime-lastPastSnapIt->second.serverTime) > maxInterpolationDuration) {
+		if (firstNextDifferentAngleSnap != -1 && firstNextDifferentPositionSnap != -1 || (it->second->serverTime-lastPastSnapIt->second->serverTime) > maxInterpolationDuration) {
 			break;
 		}
 	}
@@ -964,7 +1010,7 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 	//if (oldSnap) *oldSnap = &lastPastSnapIt->second;//&snapshotInfos[lastPastSnap];
 	//if (newSnap) *newSnap = firstNextDifferentAngleSnap == -1 ? NULL : &firstNextDifferentAngleSnapIt->second;//&snapshotInfos[firstNextSnap];
 
-	retVal = lastPastSnapIt->second.entities[entityNum];
+	retVal = lastPastSnapIt->second->entities[entityNum];
 
 
 	// We do angles and position separately.
@@ -974,18 +1020,18 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 
 		int interpStartSnap = -1;
 		SnapshotInfoMapIterator interpStartSnapIt= lastPastSnapIt;
-		if((firstNextDifferentAngleSnapIt->second.serverTime - lastPastSnapIt->second.serverTime) < maxInterpolationDuration){
+		if((firstNextDifferentAngleSnapIt->second->serverTime - lastPastSnapIt->second->serverTime) < maxInterpolationDuration){
 			// Ok we have the interpolation end time but we need the start time too. Find the last snap that has identical angles to lastpastsnapit
 			for (SnapshotInfoMapIterator it = lastPastSnapIt, itLast = it; itLast != snapshotInfos.begin(); itLast=it,it--) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
 
-				if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+				if (it->second->entities.find(entityNum) == it->second->entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 
-				if (it->second.serverTime < lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].apos.trBase, lastPastSnapIt->second.entities[entityNum].apos.trBase)) {
+				if (it->second->serverTime < lastPastSnapIt->second->serverTime && VectorDistance(it->second->entities[entityNum].apos.trBase, lastPastSnapIt->second->entities[entityNum].apos.trBase)) {
 					interpStartSnap = itLast->first;
 					interpStartSnapIt = itLast;
 					break;
 				}
-				if ((lastPastSnapIt->second.serverTime - it->second.serverTime) > maxInterpolationDuration) {
+				if ((lastPastSnapIt->second->serverTime - it->second->serverTime) > maxInterpolationDuration) {
 					break;
 				}
 			}
@@ -995,14 +1041,14 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 		}
 		if (interpStartSnap != -1) {
 
-			int interpStartTime = interpStartSnapIt->second.serverTime;
-			if ((firstNextDifferentAngleSnapIt->second.serverTime- interpStartTime) > maxInterpolationDuration) {
-				interpStartTime = firstNextDifferentAngleSnapIt->second.serverTime - maxInterpolationDuration;
+			int interpStartTime = interpStartSnapIt->second->serverTime;
+			if ((firstNextDifferentAngleSnapIt->second->serverTime- interpStartTime) > maxInterpolationDuration) {
+				interpStartTime = firstNextDifferentAngleSnapIt->second->serverTime - maxInterpolationDuration;
 			}
-			float f = ((double)time - (double)interpStartTime) / ((double)firstNextDifferentAngleSnapIt->second.serverTime - (double)interpStartTime);
+			float f = ((double)time - (double)interpStartTime) / ((double)firstNextDifferentAngleSnapIt->second->serverTime - (double)interpStartTime);
 			for (int i = 0; i < 3; i++) {
 				retVal.apos.trBase[i] = LerpAngle(
-					retVal.apos.trBase[i], firstNextDifferentAngleSnapIt->second.entities[entityNum].apos.trBase[i], f);
+					retVal.apos.trBase[i], firstNextDifferentAngleSnapIt->second->entities[entityNum].apos.trBase[i], f);
 			}
 		}
 	}
@@ -1013,18 +1059,18 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 		int interpStartSnap = -1;
 		SnapshotInfoMapIterator interpStartSnapIt = lastPastSnapIt;
 
-		if((firstNextDifferentPositionSnapIt->second.serverTime - lastPastSnapIt->second.serverTime) < maxInterpolationDuration){
+		if((firstNextDifferentPositionSnapIt->second->serverTime - lastPastSnapIt->second->serverTime) < maxInterpolationDuration){
 			// Ok we have the interpolation end time but we need the start time too. Find the last snap that has identical angles to lastpastsnapit
 			for (SnapshotInfoMapIterator it = lastPastSnapIt, itLast = it; itLast != snapshotInfos.begin(); itLast=it,it--) { // change: start directly from last snap. why start from begin()? Or does the iterator become invalid? it shouldn't..
 
-				if (it->second.entities.find(entityNum) == it->second.entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+				if (it->second->entities.find(entityNum) == it->second->entities.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 
-				if (it->second.serverTime < lastPastSnapIt->second.serverTime && VectorDistance(it->second.entities[entityNum].pos.trBase, lastPastSnapIt->second.entities[entityNum].pos.trBase)) {
+				if (it->second->serverTime < lastPastSnapIt->second->serverTime && VectorDistance(it->second->entities[entityNum].pos.trBase, lastPastSnapIt->second->entities[entityNum].pos.trBase)) {
 					interpStartSnap = itLast->first;
 					interpStartSnapIt = itLast;
 					break;
 				}
-				if ((lastPastSnapIt->second.serverTime - it->second.serverTime) > maxInterpolationDuration) {
+				if ((lastPastSnapIt->second->serverTime - it->second->serverTime) > maxInterpolationDuration) {
 					break;
 				}
 			}
@@ -1034,15 +1080,15 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 		}
 		if (interpStartSnap != -1) {
 
-			int interpStartTime = interpStartSnapIt->second.serverTime;
-			if ((firstNextDifferentPositionSnapIt->second.serverTime - interpStartTime) > maxInterpolationDuration) {
-				interpStartTime = firstNextDifferentPositionSnapIt->second.serverTime - maxInterpolationDuration;
+			int interpStartTime = interpStartSnapIt->second->serverTime;
+			if ((firstNextDifferentPositionSnapIt->second->serverTime - interpStartTime) > maxInterpolationDuration) {
+				interpStartTime = firstNextDifferentPositionSnapIt->second->serverTime - maxInterpolationDuration;
 			}
-			float f = ((double)time - (double)interpStartTime) / ((double)firstNextDifferentPositionSnapIt->second.serverTime - (double)interpStartTime);
+			float f = ((double)time - (double)interpStartTime) / ((double)firstNextDifferentPositionSnapIt->second->serverTime - (double)interpStartTime);
 			for (int i = 0; i < 3; i++) {
 
-				retVal.pos.trBase[i] = retVal.pos.trBase[i] + f * (firstNextDifferentPositionSnapIt->second.entities[entityNum].pos.trBase[i] - retVal.pos.trBase[i]);
-				retVal.pos.trDelta[i] = retVal.pos.trDelta[i] + f * (firstNextDifferentPositionSnapIt->second.entities[entityNum].pos.trDelta[i] - retVal.pos.trDelta[i]);
+				retVal.pos.trBase[i] = retVal.pos.trBase[i] + f * (firstNextDifferentPositionSnapIt->second->entities[entityNum].pos.trBase[i] - retVal.pos.trBase[i]);
+				retVal.pos.trDelta[i] = retVal.pos.trDelta[i] + f * (firstNextDifferentPositionSnapIt->second->entities[entityNum].pos.trDelta[i] - retVal.pos.trDelta[i]);
 			}
 		}
 	}/**/
@@ -1055,7 +1101,7 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 // It ignores command times and is based purely on server time.
 // arguments oldSnap and newSnap do nothing atm.
 // Function name seems a misnomer btw. It doesn't really search into the future? Oh wait it does, nvm.
-playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap, SnapshotInfoMapIterator* usedSourcePlayerStateSnap, qboolean detailedPS, const SnapshotInfoMapIterator* referenceSnapIt) {
+playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap, SnapshotInfoMapIterator* usedSourcePlayerStateSnap, qboolean detailedPS, const SnapshotInfoMapIterator* referenceSnapIt, int futureSeekLimit) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
 
@@ -1065,13 +1111,18 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 	SeekToAnySnapshotIfNotYet();
 	SeekToServerTime(serverTime);
 
-	SeekToPlayerInPacket(clientNum);
+	if (futureSeekLimit && !referenceSnapIt) {
+		return retVal; // dont risk blowing out memory if some weirdo thing happened
+	}
+	SeekToPlayerInPacket(clientNum, (futureSeekLimit && referenceSnapIt) ? ((*referenceSnapIt)->first + futureSeekLimit) : 0);
 
 	if (endReached && !anySnapshotParsed) return retVal; // Nothing to do really lol.
 
+	if (lastKnownCommandOrServerTimes[clientNum] <= 0) return retVal; // don't have info on this player
+
 	//  Avoid searching around forever if we already know the player is in this snapshot
 	//if (referenceSnap && referenceSnap->playerCommandOrServerTimes.find(clientNum) != referenceSnap->playerCommandOrServerTimes.end()) {
-	SnapshotInfo* referenceSnap =&(*referenceSnapIt)->second;
+	SnapshotInfo* referenceSnap =(*referenceSnapIt)->second.get();
 	if (referenceSnap && referenceSnap->hasPlayer[clientNum]) {
 		if (usedSourceSnap) *usedSourceSnap = *referenceSnapIt;
 		return GetPlayerFromSnapshot(clientNum, referenceSnap->snapNum, usedSourcePlayerStateSnap, detailedPS);
@@ -1090,29 +1141,29 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 		for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 
 			//if (it->second.playerCommandOrServerTimes.find(clientNum) == it->second.playerCommandOrServerTimes.end()) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
-			if (!it->second.hasPlayer[clientNum]) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
+			if (!it->second->hasPlayer[clientNum]) continue; // This snapshot doesn't have this player. Don't access the player's number in the map or the map will generate a useless value.
 
 			//if (firstPacketWithPlayerInIt == -1) firstPacketWithPlayerInIt = it->first;
 
-			if (it->second.serverTime <= serverTime) {
+			if (it->second->serverTime <= serverTime) {
 				lastPastSnap = it;
-				lastPastSnapServerTime = it->second.serverTime;
+				lastPastSnapServerTime = it->second->serverTime;
 			}
 		}
 	}
 	else {
 		// K let's do this a quicker way. We search in reverse from requested current time which we find via binary search.
 		auto it = *referenceSnapIt;
-		if (lastKnownPacketWithPlayerInIt < it->second.snapNum) {
+		if (lastKnownPacketWithPlayerInIt < it->second->snapNum) {
 			// If it's been very long since we've seen the player, don't backtrack too much, just start directly from there.
 			// This might be a bit slower for short demos but should be faster for very long demos hopefully.
 			it = snapshotInfos.find(lastKnownPacketWithPlayerInIt); 
 		}
 		if (it != snapshotInfos.end()) {
 			while (lastPastSnap == snapshotInfos.end()) {
-				if (it->second.serverTime <= serverTime && it->second.hasPlayer[clientNum]) {
+				if (it->second->serverTime <= serverTime && it->second->hasPlayer[clientNum]) {
 					lastPastSnap = it;
-					lastPastSnapServerTime = it->second.serverTime;
+					lastPastSnapServerTime = it->second->serverTime;
 					break;
 				}
 				if (it == snapshotInfos.begin()) {
@@ -1158,20 +1209,20 @@ std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, i
 	SnapshotInfoMapIterator lastPastSnap = snapshotInfos.end();
 
 	auto it = *referenceSnapIt;
-	while (it != snapshotInfos.end() && it->second.serverTime <= searchEndTime) {
-		if (it->second.serverTime >= serverTime) {
-			for (auto itEnt = it->second.entities.begin(); itEnt != it->second.entities.end(); itEnt++) {
+	while (it != snapshotInfos.end() && it->second->serverTime <= searchEndTime) {
+		if (it->second->serverTime >= serverTime) {
+			for (auto itEnt = it->second->entities.begin(); itEnt != it->second->entities.end(); itEnt++) {
 				if (retVal.find(itEnt->first) == retVal.end()) {
 					entityState_t entState = itEnt->second;
-					entState.demoToolsData.serverTime = it->second.serverTime;
+					entState.demoToolsData.serverTime = it->second->serverTime;
 					retVal[itEnt->first] = entState;
 				}
 			}
-			if (includePlayerStates && retVal.find(it->second.playerState.clientNum) == retVal.end()) {
+			if (includePlayerStates && retVal.find(it->second->playerState.clientNum) == retVal.end()) {
 				entityState_t entState{};
-				BG_PlayerStateToEntityState(&it->second.playerState, &entState,qfalse,demoType,qtrue,qfalse);
-				entState.demoToolsData.serverTime = it->second.serverTime;
-				retVal[it->second.playerState.clientNum] = entState;
+				BG_PlayerStateToEntityState(&it->second->playerState, &entState,qfalse,demoType,qtrue,qfalse);
+				entState.demoToolsData.serverTime = it->second->serverTime;
+				retVal[it->second->playerState.clientNum] = entState;
 			}
 		}
 		it++;
@@ -1193,21 +1244,21 @@ void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bo
 	SnapshotInfoMapIterator lastPastSnap = snapshotInfos.end();
 
 	auto it = *referenceSnapIt;
-	while (it != snapshotInfos.end() && it->second.serverTime <= searchEndTime) {
-		if (it->second.serverTime >= serverTime) {
-			for (auto itEnt = it->second.entities.begin(); itEnt != it->second.entities.end(); itEnt++) {
-				if (mapToEnhance->find(itEnt->first) == mapToEnhance->end() || (*mapToEnhance)[itEnt->first].demoToolsData.serverTime > it->second.serverTime) { // Put it in if we either don't have it yet, or if our version of the entity is less into the future.
+	while (it != snapshotInfos.end() && it->second->serverTime <= searchEndTime) {
+		if (it->second->serverTime >= serverTime) {
+			for (auto itEnt = it->second->entities.begin(); itEnt != it->second->entities.end(); itEnt++) {
+				if (mapToEnhance->find(itEnt->first) == mapToEnhance->end() || (*mapToEnhance)[itEnt->first].demoToolsData.serverTime > it->second->serverTime) { // Put it in if we either don't have it yet, or if our version of the entity is less into the future.
 					entityState_t entState = itEnt->second;
-					entState.demoToolsData.serverTime = it->second.serverTime;
+					entState.demoToolsData.serverTime = it->second->serverTime;
 					(*mapToEnhance)[itEnt->first] = entState;
 				}
 			}
 
-			if (includePlayerStates && mapToEnhance->find(it->second.playerState.clientNum) == mapToEnhance->end()) {
+			if (includePlayerStates && mapToEnhance->find(it->second->playerState.clientNum) == mapToEnhance->end()) {
 				entityState_t entState{};
-				BG_PlayerStateToEntityState(&it->second.playerState, &entState, qfalse, demoType, qtrue, qfalse);
-				entState.demoToolsData.serverTime = it->second.serverTime;
-				(*mapToEnhance)[it->second.playerState.clientNum] = entState;
+				BG_PlayerStateToEntityState(&it->second->playerState, &entState, qfalse, demoType, qtrue, qfalse);
+				entState.demoToolsData.serverTime = it->second->serverTime;
+				(*mapToEnhance)[it->second->playerState.clientNum] = entState;
 			}
 		}
 		it++;
@@ -1304,14 +1355,14 @@ playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 	int lastPastSnapCommandTime = -1;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
 		//if (it->second.serverTime <= time) {
-		if (it->second.playerState.commandTime <= time) {
+		if (it->second->playerState.commandTime <= time) {
 			lastPastSnap = it->first;
-			lastPastSnapCommandTime = it->second.playerState.commandTime;
+			lastPastSnapCommandTime = it->second->playerState.commandTime;
 		}
 	}
 
 	if (lastPastSnap == -1) { // Might be beginning of the demo, nothing in the past yet. Let's just take the first packet we have.
-		retVal = snapshotInfos.begin()->second.playerState;
+		retVal = snapshotInfos.begin()->second->playerState;
 		return retVal;
 	}
 
@@ -1329,14 +1380,14 @@ playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 	// Okay now we want to locate the first snap with a different commandtime than lastPastSnap and then interpolate between the two.
 	int firstNextSnap =-1;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-		if (it->second.playerState.commandTime > lastPastSnapCommandTime) {
+		if (it->second->playerState.commandTime > lastPastSnapCommandTime) {
 			firstNextSnap = it->first;
 			break;
 		}
 	}
 
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
-	InterpolatePlayerState(time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal);
+	InterpolatePlayerState(time, snapshotInfos[lastPastSnap].get(), snapshotInfos[firstNextSnap].get(), &retVal);
 
 	return retVal;
 }
@@ -1349,7 +1400,7 @@ void DemoReader::InterpolatePlayerState(double time,SnapshotInfo* from, Snapshot
 	//snapshot_t* prev, * next;
 	playerState_t* curps = NULL, * nextps = NULL;
 	//qboolean		nextPsTeleport = qfalse;
-	qboolean		nextPsTeleport = to->playerStateTeleport;
+	bool		nextPsTeleport = to->playerStateTeleport;
 	int currentTime = 0, nextTime = 0, currentServerTime = 0, nextServerTime = 0;
 
 	out = outPS;
@@ -1614,9 +1665,9 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * 
 	int lastPastSnap = -1;
 	int lastPastSnapServerTime = -1;
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-		if (it->second.serverTime <= time) {
+		if (it->second->serverTime <= time) {
 			lastPastSnap = it->first;
-			lastPastSnapServerTime = it->second.serverTime;
+			lastPastSnapServerTime = it->second->serverTime;
 		}
 	}
 	
@@ -1624,7 +1675,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * 
 		*sourceSnapNum = lastPastSnap;
 	}
 
-	return snapshotInfos[lastPastSnap].entities;
+	return snapshotInfos[lastPastSnap]->entities;
 }
 
 std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
@@ -1645,21 +1696,21 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
 
 	for (auto it = snapshotInfos.begin(); it != snapshotInfos.end(); it++) {
-		if (it->second.serverTime == time) {
+		if (it->second->serverTime == time) {
 			if (sourceSnapNum) {
 				*sourceSnapNum = it->first;
 			}
 			if (includingPS) {
 
-				std::map<int, entityState_t> retVal = it->second.entities;
+				std::map<int, entityState_t> retVal = it->second->entities;
 				entityState_t psEnt;
 				Com_Memset(&psEnt, 0, sizeof(psEnt));
-				BG_PlayerStateToEntityState(&it->second.playerState, &psEnt,qfalse,demoType,qtrue);
-				retVal[it->second.playerState.clientNum] = psEnt;
+				BG_PlayerStateToEntityState(&it->second->playerState, &psEnt,qfalse,demoType,qtrue);
+				retVal[it->second->playerState.clientNum] = psEnt;
 				return retVal;
 			}
 			else {
-				return it->second.entities;
+				return it->second->entities;
 			}
 		}
 	}
@@ -1795,7 +1846,7 @@ void DemoReader::updateConfigStringRelatedInfo() { // TODO expand this to be tim
 
 int DemoReader::getDemoRecorderClientNum() {
 	SeekToAnySnapshotIfNotYet();
-	return demo.cut.Clc.clientNum;
+	return thisDemo.cut.Clc.clientNum;
 }
 
 qboolean DemoReader::ReadMessageReal() {
@@ -1825,7 +1876,7 @@ readNext:
 		return qfalse;
 	}
 	thisDemo.cut.Clc.serverMessageSequence = LittleLong(thisDemo.cut.Clc.serverMessageSequence);
-	maxSequenceNum = std::max(maxSequenceNum, demo.cut.Clc.serverMessageSequence);
+	maxSequenceNum = std::max(maxSequenceNum, thisDemo.cut.Clc.serverMessageSequence);
 	oldSize -= 4;
 	/* Read the message size */
 	if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4) {
@@ -1955,8 +2006,8 @@ readNext:
 
 			thisSnapshotInfo = NULL;
 			if (thisDemo.cut.Cl.lastSnapshotFinishedParsing) { // it can return true if the last snapshot was invalid too. but then we dont do this.
-				SnapshotInfo snapshotInfo;
-				snapshotInfo.serverTime = thisDemo.cut.Cl.snap.serverTime;
+				std::unique_ptr<SnapshotInfo> snapshotInfo = std::make_unique<SnapshotInfo>();
+				snapshotInfo->serverTime = thisDemo.cut.Cl.snap.serverTime;
 				for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
@@ -2020,7 +2071,7 @@ readNext:
 						}
 					}
 
-					snapshotInfo.entities[thisEntity->number] = *thisEntity;
+					snapshotInfo->entities[thisEntity->number] = *thisEntity;
 
 					lastMessageWithEntity[thisEntity->number] = thisDemo.cut.Cl.snap.messageNum;
 
@@ -2029,12 +2080,12 @@ readNext:
 						if (firstPacketWithPlayer[thisEntity->number] == -1) firstPacketWithPlayer[thisEntity->number] = thisDemo.cut.Cl.snap.messageNum;
 						lastKnownPacketWithPlayer[thisEntity->number] = thisDemo.cut.Cl.snap.messageNum;
 						if (thisEntity->pos.trType == TR_LINEAR_STOP) { // I think this is true when g_smoothclients is true in which case commandtime is saved in trTime
-							snapshotInfo.playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = thisEntity->pos.trTime;
+							snapshotInfo->playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = thisEntity->pos.trTime;
 						}
 						else {
-							snapshotInfo.playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = thisDemo.cut.Cl.snap.serverTime; // Otherwise just use servertime. Lame but oh well. Maybe we could do sth better where we try to detect changes in values or such if we truly need to.
+							snapshotInfo->playerCommandOrServerTimes[thisEntity->number] = lastKnownCommandOrServerTimes[thisEntity->number] = thisDemo.cut.Cl.snap.serverTime; // Otherwise just use servertime. Lame but oh well. Maybe we could do sth better where we try to detect changes in values or such if we truly need to.
 						}
-						snapshotInfo.hasPlayer[thisEntity->number] = qtrue;
+						snapshotInfo->hasPlayer[thisEntity->number] = true;
 					}
 					else if (isMOHAADemo && thisEntity->parent > 0 && thisEntity->parent < maxClientsThisDemo && generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEntity->eType, demoType) == ET_ITEM_GENERAL && (thisEntity->eFlags & EF_SENTIENT_MOH)/* && && (thisEs->eFlags & EF_WEAPON_MOH)*/) { // Don't ask me why weapons have EF_SENTIENT and not EF_WEAPON...
 
@@ -2076,19 +2127,20 @@ readNext:
 						}
 					}
 				}
-				Com_Memcpy(snapshotInfo.areamask, thisDemo.cut.Cl.snap.areamask, sizeof(thisDemo.cut.Cl.snap.areamask));
-				Com_Memcpy(snapshotInfo.mohaaPlayerWeapon, mohaaPlayerWeapon, sizeof(mohaaPlayerWeapon));
-				snapshotInfo.snapNum = thisDemo.cut.Cl.snap.messageNum;
-				snapshotInfo.playerState = thisDemo.cut.Cl.snap.ps;
-				snapshotInfo.playerStateTeleport = PlayerStateIsTeleport(&thisDemo.cut.Cl.oldSnap, &thisDemo.cut.Cl.snap);
-				snapshotInfo.snapFlagServerCount = (qboolean)((thisDemo.cut.Cl.oldSnap.snapFlags ^ thisDemo.cut.Cl.snap.snapFlags) & SNAPFLAG_SERVERCOUNT);
-				snapshotInfo.playerCommandOrServerTimes[thisDemo.cut.Cl.snap.ps.clientNum] = lastKnownCommandOrServerTimes[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.ps.commandTime;
+				Com_Memcpy(snapshotInfo->areamask, thisDemo.cut.Cl.snap.areamask, sizeof(thisDemo.cut.Cl.snap.areamask));
+				Com_Memcpy(snapshotInfo->mohaaPlayerWeapon, mohaaPlayerWeapon, sizeof(mohaaPlayerWeapon));
+				snapshotInfo->snapNum = thisDemo.cut.Cl.snap.messageNum;
+				snapshotInfo->playerState = thisDemo.cut.Cl.snap.ps;
+				snapshotInfo->playerStateTeleport = PlayerStateIsTeleport(&thisDemo.cut.Cl.oldSnap, &thisDemo.cut.Cl.snap);
+				snapshotInfo->snapFlagServerCount = (qboolean)((thisDemo.cut.Cl.oldSnap.snapFlags ^ thisDemo.cut.Cl.snap.snapFlags) & SNAPFLAG_SERVERCOUNT);
+				snapshotInfo->playerCommandOrServerTimes[thisDemo.cut.Cl.snap.ps.clientNum] = lastKnownCommandOrServerTimes[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.ps.commandTime;
 				if (firstPacketWithPlayer[thisDemo.cut.Cl.snap.ps.clientNum] == -1) firstPacketWithPlayer[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.messageNum;
 				lastKnownPacketWithPlayer[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.messageNum;
 				if (firstPacketWithPlayerState[thisDemo.cut.Cl.snap.ps.clientNum] == -1) firstPacketWithPlayerState[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.messageNum;
 				lastKnownPacketWithPlayerState[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.messageNum;
-				snapshotInfo.hasPlayer[thisDemo.cut.Cl.snap.ps.clientNum] = qtrue;
-				thisSnapshotInfo = &(snapshotInfos[thisDemo.cut.Cl.snap.messageNum] = snapshotInfo);
+				snapshotInfo->hasPlayer[thisDemo.cut.Cl.snap.ps.clientNum] = true;
+				snapshotInfos[thisDemo.cut.Cl.snap.messageNum] = std::move(snapshotInfo);
+				thisSnapshotInfo = snapshotInfos[thisDemo.cut.Cl.snap.messageNum].get();
 				anySnapshotParsed = qtrue;// Fix? Well this makes more sense in any case.
 			}
 
@@ -2103,7 +2155,7 @@ readNext:
 
 					if (thisDemo.cut.Cl.snap.serverTime > 10000) {
 						// This is a non-critical warning, mostly for debugging. It used to be more dangerous.
-						std::cerr << "thisDemo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << originalDemoPath << ")\n";
+						std::cerr << "thisDemo.cut.Cl.snap.serverTime < lastKnownTime && thisDemo.cut.Clc.serverMessageSequence == maxSequenceNum but thisDemo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - thisDemo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << thisDemo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << originalDemoPath << ")\n";
 					}
 
 					demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
@@ -2113,7 +2165,7 @@ readNext:
 			}
 			/*if (thisDemo.cut.Cl.snap.serverTime < lastKnownTime  && thisDemo.cut.Cl.snap.serverTime < 10000) { // Assume a servertime reset (new serverTime is under 10 secs). 
 				if (demo.cut.Cl.snap.serverTime > 10000) {
-					std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime but demo.cut.Cl.snap.serverTime > 10000; demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
+					std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime but thisDemo.cut.Cl.snap.serverTime > 10000; demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << thisDemo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
 				}
 				demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
 				demoStartTime = thisDemo.cut.Cl.snap.serverTime;
@@ -2384,7 +2436,7 @@ readNext:
 				.match();
 
 			for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
-				const char* info = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+				const char* info = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 				std::string mapname = Info_ValueForKey(info, "mapname");
 				std::string playername = vec_num[matchNum][1];
 				int minutes = atoi(vec_num[matchNum][2].c_str());
@@ -2404,7 +2456,7 @@ readNext:
 				int playerNumber = -1;
 				for (int clientNum = 0; clientNum < maxClientsThisDemo; clientNum++) {
 
-					const char* playerInfo = demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
+					const char* playerInfo = thisDemo.cut.Cl.gameState.stringData + thisDemo.cut.Cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
 					std::string playerNameCompare = Info_ValueForKey(playerInfo, "n");
 					if (playerNameCompare == playername) {
 						playerNumber = clientNum;

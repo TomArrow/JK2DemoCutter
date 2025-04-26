@@ -254,6 +254,10 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	int64_t entityFramesSkippedDueToDimensionGlobalDimExcept = 0;
 	qboolean dimensionDataDetected = demoReader->reader.containsDimensionData();
 
+	int snapshotsProcessedSinceClear = 0; 
+	SnapshotInfoMapIterator snapshotSafeToClear = nullIt;
+	int snapshotsProcessedSinceSnapshotSafeToClearSet = 0;
+
 	while(1){
 		commandsToAdd.clear();
 		eventsToAdd.clear();
@@ -272,7 +276,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				dimensionDataDetected = demoReader->reader.containsDimensionData();
 
 				sourceSnap = snapInfoHereIt = nextSnapInfoHereIt != nullIt ? nextSnapInfoHereIt : demoReader->reader.GetSnapshotInfoAtServerTimeIterator(time);
-				SnapshotInfo* snapInfoHere = &snapInfoHereIt->second;
+				SnapshotInfo* snapInfoHere = snapInfoHereIt->second.get();
 				//qboolean snapIsInterpolated = qfalse;
 				//if (!snapInfoHere) {
 				//	int thisDemoLastServerTime = demoReader.reader.GetLastServerTimeBeforeServerTime(time);
@@ -303,7 +307,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 				}
 				else if(tmpPS.clientNum != mainPlayerPS.clientNum) {
 
-					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, &sourceSnap,NULL, qtrue,&snapInfoHereIt);
+					mainPlayerPS = demoReader->reader.GetLastOrNextPlayer(reframeClientNum, time, &sourceSnap,NULL, qtrue,&snapInfoHereIt,5000);
 					/*BG_PlayerStateToEntityState(&tmpPS, &tmpES, qfalse);
 					if (playerEntities.find(tmpPS.clientNum) == playerEntities.end() || entityIsInterpolated[tmpPS.clientNum]) { // Prioritize entities that are not interpolated
 						playerEntities[tmpPS.clientNum] = tmpES;
@@ -515,7 +519,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 			byte	areamasHere[MAX_MAP_AREA_BYTES];
 			// We combine tmpPS and source snap playerstate
 			for (int amb = 0; amb < MAX_MAP_AREA_BYTES; amb++) {
-				areamasHere[amb] = sourceSnap->second.areamask[amb] & snapInfoHereIt->second.areamask[amb];
+				areamasHere[amb] = sourceSnap->second->areamask[amb] & snapInfoHereIt->second->areamask[amb];
 			}
 			Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
 		}
@@ -529,6 +533,10 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		}
 
 		framesWritten++;
+		snapshotsProcessedSinceClear++;
+		if (snapshotSafeToClear != nullIt) {
+			snapshotsProcessedSinceSnapshotSafeToClearSet++;
+		}
 
 		int oldTime = time;
 		time = INT_MAX;
@@ -536,7 +544,17 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		int nextTimeThisDemo = -1;
 		nextSnapInfoHereIt = demoReader->reader.GetFirstSnapshotAfterSnapshotIterator(snapInfoHereIt);
 		if (nextSnapInfoHereIt != nullIt) {
-			nextTimeThisDemo = nextSnapInfoHereIt->second.serverTime;
+			if (snapshotsProcessedSinceClear == 10000) { // ok mark this one as the "first one to keep" and then wait 5000 more frames.
+				snapshotSafeToClear = snapInfoHereIt;
+				snapshotsProcessedSinceSnapshotSafeToClearSet = 0;
+			}
+			if (snapshotsProcessedSinceSnapshotSafeToClearSet > 5000) { // this way we have the past 5000 frames too.
+				demoReader->reader.ClearSnapshotsBeforeIterator(snapshotSafeToClear); // memory optimization. get rid of old snapshots so we can reframe larger files
+				snapshotSafeToClear = nullIt;
+				snapshotsProcessedSinceClear = 0;
+				snapshotsProcessedSinceSnapshotSafeToClearSet = 0;
+			}
+			nextTimeThisDemo = nextSnapInfoHereIt->second->serverTime;
 		}
 		if (nextTimeThisDemo != -1) {
 			time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.

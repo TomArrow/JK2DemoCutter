@@ -223,17 +223,17 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	memset(&demo, 0, sizeof(demo));
 
-	std::vector<DemoReaderLight> pingDemoReaders;
-	std::vector<DemoReaderWrapper> demoReaders;
+	std::vector<std::unique_ptr<DemoReaderLight>> pingDemoReaders;
+	std::vector<std::unique_ptr<DemoReaderWrapper>> demoReaders;
 	demoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
 		demoReaders.emplace_back();
 		pingDemoReaders.emplace_back();
-		demoReaders.back().reader.LoadDemo((*inputFiles)[i].demoPath.c_str());
-		demoReaders.back().sourceInfo = &(*inputFiles)[i];
-		demoReaders.back().targetFramesRead = 0;
-		pingDemoReaders.back().LoadDemo((*inputFiles)[i].demoPath.c_str());
+		demoReaders.back()->reader.LoadDemo((*inputFiles)[i].demoPath.c_str());
+		demoReaders.back()->sourceInfo = &(*inputFiles)[i];
+		demoReaders.back()->targetFramesRead = 0;
+		pingDemoReaders.back()->LoadDemo((*inputFiles)[i].demoPath.c_str());
 	}
 
 	demoCutInitClearGamestate(&demo.cut.Clc, &demo.cut.Cl, 1,0,0);
@@ -246,7 +246,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	int maxConfigStrings = getMaxConfigStrings(demoType); // this is NOT a proper integration. We're still relying on hardcoded CS_Players etc. Just consider JKA NOT being possible atm.
 	for (int i = 0; i < maxConfigStrings; i++) {
 		if (i >= CS_PLAYERS && i < (CS_PLAYERS + MAX_CLIENTS)) continue; // Player stuff will be copied manually.
-		tmpConfigString = demoReaders[0].reader.GetConfigString(i, &tmpConfigStringMaxLength);
+		tmpConfigString = demoReaders[0]->reader.GetConfigString(i, &tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString, demoType);
 		}
@@ -261,50 +261,50 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 	// Find correct player numbers and copy configstrings for players
 	for (int i = 0; i < demoReaders.size(); i++) {
-		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, just for whatever's sake. Maybe not necessary? Could help with stuff like DARK Homebase demos, since player configstrings are sent a bit later?
+		if (demoReaders[i]->reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, just for whatever's sake. Maybe not necessary? Could help with stuff like DARK Homebase demos, since player configstrings are sent a bit later?
 			
 			// Get ping info by preparsing entire demo in the lighter demo reader
 			//float	medianPingsHere[MAX_CLIENTS];
 			//float	medianOfLocalAveragePingsHere[MAX_CLIENTS];
 			int	lowestPingsHere[MAX_CLIENTS_MAX];
 			qboolean	playerExistsAsEntity[MAX_CLIENTS_MAX];
-			pingDemoReaders[i].ReadToEnd();
+			pingDemoReaders[i]->ReadToEnd();
 			//pingDemoReaders[i].GetMedianPingData(medianPingsHere);
 			//pingDemoReaders[i].GetMedianOfLocalAveragesPingData(medianOfLocalAveragePingsHere);
-			pingDemoReaders[i].GetLowestPingData(lowestPingsHere);
-			pingDemoReaders[i].GetPlayersSeen(playerExistsAsEntity);
-			pingDemoReaders[i].FreePingData();
+			pingDemoReaders[i]->GetLowestPingData(lowestPingsHere);
+			pingDemoReaders[i]->GetPlayersSeen(playerExistsAsEntity);
+			pingDemoReaders[i]->FreePingData();
 
 			std::set<int> clientNumsUsedHere;
-			for (int p = 0; p < demoReaders[i].sourceInfo->playersToCopy.size(); p++) {
+			for (int p = 0; p < demoReaders[i]->sourceInfo->playersToCopy.size(); p++) {
 
-				std::string* thisPlayer = &demoReaders[i].sourceInfo->playersToCopy[p];
-				//int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i].reader);
-				int clientNumHere = demoReaders[i].reader.getClientNumForDemo(thisPlayer);
+				std::string* thisPlayer = &demoReaders[i]->sourceInfo->playersToCopy[p];
+				//int clientNumHere = getClientNumForDemo(thisPlayer,&demoReaders[i]->reader);
+				int clientNumHere = demoReaders[i]->reader.getClientNumForDemo(thisPlayer);
 				if (clientNumHere != -1) {
 					std::cout << " [median ping:"<< lowestPingsHere[clientNumHere] <<"]" << std::endl;
-					demoReaders[i].playersToCopy.push_back({ clientNumHere,(float)lowestPingsHere[clientNumHere],qfalse });
+					demoReaders[i]->playersToCopy.push_back({ clientNumHere,(float)lowestPingsHere[clientNumHere],qfalse });
 					clientNumsUsedHere.insert(clientNumHere);
 				}
 				else {
 					std::cout << std::endl;
 				}
 			}
-			if (demoReaders[i].sourceInfo->copyAllPlayers || demoReaders[i].sourceInfo->copyRemainingPlayersAsG2AnimEnts) {
-				qboolean asAnimEnts = (qboolean)!demoReaders[i].sourceInfo->copyAllPlayers;
+			if (demoReaders[i]->sourceInfo->copyAllPlayers || demoReaders[i]->sourceInfo->copyRemainingPlayersAsG2AnimEnts) {
+				qboolean asAnimEnts = (qboolean)!demoReaders[i]->sourceInfo->copyAllPlayers;
 				std::cout << "Copying remaining players"<< (asAnimEnts ? " as G2AnimEnts" : "") << std::endl;
 				// We'll also be copying over all other players, either as full players or only as G2 Anim Ents
 				// they won't have clientinfo etc.
-				int maxClientsThisDemo = demoReaders[i].reader.getMaxClients();
+				int maxClientsThisDemo = demoReaders[i]->reader.getMaxClients();
 				for (int p = 0; p < maxClientsThisDemo; p++) {
 					if (clientNumsUsedHere.find(p) != clientNumsUsedHere.end()) continue; // Don't add players twice that are already added.
 					int maxLength;
-					const char* playerCS = demoReaders[i].reader.GetPlayerConfigString(p,&maxLength);
+					const char* playerCS = demoReaders[i]->reader.GetPlayerConfigString(p,&maxLength);
 					const char* playerTeam = Info_ValueForKey(playerCS,maxLength,"t");
-					const char* playerName = Info_ValueForKey(playerCS,maxLength,demoReaders[i].reader.isThisMOHAADemo() ? "name" :"n");
+					const char* playerName = Info_ValueForKey(playerCS,maxLength,demoReaders[i]->reader.isThisMOHAADemo() ? "name" :"n");
 					if (strlen(playerTeam) && atoi(playerTeam) < TEAM_SPECTATOR) { // Don't copy non-existent players and don't copy spectators
 						if (playerExistsAsEntity[p]) {
-							demoReaders[i].playersToCopy.push_back({ p,(float)lowestPingsHere[p],asAnimEnts });
+							demoReaders[i]->playersToCopy.push_back({ p,(float)lowestPingsHere[p],asAnimEnts });
 							std::cout << "Copying " << playerName << " (" << p << ") "<< (asAnimEnts?"as G2AnimEnt ":"") << "[ping adjust:" << lowestPingsHere[p] << "]" << std::endl;
 						}
 						else {
@@ -313,7 +313,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 				}
 			}
-			int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
+			int spectatedClient = demoReaders[i]->reader.GetCurrentPlayerState().clientNum;
 			lastSpectatedClientNums[i] = spectatedClient;
 		}
 	}
@@ -396,20 +396,20 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 		//copiedPlayerIndex = 0;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (sourceTime>= (demoReaders[i].sourceInfo->delay+ demoReaders[i].sourceInfo->showStart) && // Don't start showing stuff from this demo until it starts (controlled by delay & showStart)
-				sourceTime<= (demoReaders[i].sourceInfo->delay+ demoReaders[i].sourceInfo->showEnd) && // Don't show stuff from this demo if we're past showEnd
-				demoReaders[i].reader.SeekToTime(sourceTime-demoReaders[i].sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (sourceTime>= (demoReaders[i]->sourceInfo->delay+ demoReaders[i]->sourceInfo->showStart) && // Don't start showing stuff from this demo until it starts (controlled by delay & showStart)
+				sourceTime<= (demoReaders[i]->sourceInfo->delay+ demoReaders[i]->sourceInfo->showEnd) && // Don't show stuff from this demo if we're past showEnd
+				demoReaders[i]->reader.SeekToTime(sourceTime-demoReaders[i]->sourceInfo->delay)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 
 
-				demoType_t sourceDemoType = demoReaders[i].reader.getDemoType();
-				int maxClientsThisDemo = demoReaders[i].reader.getMaxClients();
+				demoType_t sourceDemoType = demoReaders[i]->reader.getDemoType();
+				int maxClientsThisDemo = demoReaders[i]->reader.getMaxClients();
 				int smallestSnapNumUsed = INT_MAX;
-				for (int c = 0; c < demoReaders[i].playersToCopy.size(); c++) {
+				for (int c = 0; c < demoReaders[i]->playersToCopy.size(); c++) {
 
-					int clientNumHere = demoReaders[i].playersToCopy[c].clientNum;
-					//int medianPlayerPingHere = demoReaders[i].playersToCopy[c].medianPing;
-					double pingCompensationHere = demoReaders[i].playersToCopy[c].pingCompensation;
-					qboolean asG2AnimEnt = demoReaders[i].playersToCopy[c].asG2AnimEnt;
+					int clientNumHere = demoReaders[i]->playersToCopy[c].clientNum;
+					//int medianPlayerPingHere = demoReaders[i]->playersToCopy[c].medianPing;
+					double pingCompensationHere = demoReaders[i]->playersToCopy[c].pingCompensation;
+					qboolean asG2AnimEnt = demoReaders[i]->playersToCopy[c].asG2AnimEnt;
 
 					int targetClientNum = -1;
 					if (asG2AnimEnt) {
@@ -421,14 +421,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						targetClientNum = slotManager.getPlayerSlot(i, clientNumHere, &isNewPlayer);
 						if (isNewPlayer) {
 
-							tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
+							tmpConfigString = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
 
 							if (sourceDemoType == DM_14) {
 								static char copy[MAX_INFO_STRING];
 								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength,sizeof(copy)),tmpConfigString);
-								tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay - pingCompensationHere, NULL,NULL, qfalse, NULL);
+								tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay - pingCompensationHere, NULL,NULL, qfalse, NULL);
 								// DM_14 (jk2sp) stores saber color differently
-								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", tmpPS.saberColor), demoReaders[i].reader.isThisMOHAADemo());
+								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", tmpPS.saberColor), demoReaders[i]->reader.isThisMOHAADemo());
 							}
 
 							if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
@@ -439,18 +439,18 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						}
 					}
 
-					bool thisClientIsTargetPlayerState = !asG2AnimEnt && sourceTime >= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
-						sourceTime <= (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
+					bool thisClientIsTargetPlayerState = !asG2AnimEnt && sourceTime >= (demoReaders[i]->sourceInfo->delay + demoReaders[i]->sourceInfo->playerStateStart) && // Don't use this demo for playerstate unless we're past playerStateStart
+						sourceTime <= (demoReaders[i]->sourceInfo->delay + demoReaders[i]->sourceInfo->playerStateEnd) && // Don't use this demo for playerstate if we're past playerStateEnd
 						thisFrameIndex++ == 0;
 					
-					//std::map<int, entityState_t> hereEntities = demoReaders[i].reader.GetCurrentEntities();
+					//std::map<int, entityState_t> hereEntities = demoReaders[i]->reader.GetCurrentEntities();
 					//tmpPS = demoReaders[i].GetCurrentPlayerState();
-					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayerState(sourceTime+demoReaders[i].sourceInfo->delay);
+					//tmpPS = demoReaders[i]->reader.GetInterpolatedPlayerState(sourceTime+demoReaders[i]->sourceInfo->delay);
 					SnapshotInfo* oldSnap = NULL;
 					SnapshotInfo* newSnap = NULL;
-					//tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
+					//tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay,&oldSnap,&newSnap,(qboolean)(targetClientNum == 0));
 					float translatedTime = 0.0f;
-					tmpPS = demoReaders[i].reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i].sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
+					tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay- pingCompensationHere,&oldSnap,&newSnap,(qboolean)thisClientIsTargetPlayerState,&translatedTime);
 					//int originalPlayerstateClientNum = tmpPS.clientNum;
 					
 					tmpPS.eFlags &= ~EF_CONNECTION; // dont show ppl as lagging, who cares. just gets in the way.
@@ -459,7 +459,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						smallestSnapNumUsed = std::min(smallestSnapNumUsed, oldSnap->snapNum);
 					}
 
-					demoReaders[i].reader.convertPSTo(&tmpPS,demoType);
+					demoReaders[i]->reader.convertPSTo(&tmpPS,demoType);
 
 
 					// Check if oldSnap contains ET_BODY of this client and if so, copy it.
@@ -508,7 +508,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 
 					// Process any changes of the spectated player in the original demo by just updating our configstring and setting teleport bit.
 					/*if (lastSpectatedClientNums[i] != originalPlayerstateClientNum) {
-						tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(originalPlayerstateClientNum);
+						tmpConfigString = demoReaders[i]->reader.GetPlayerConfigString(originalPlayerstateClientNum);
 						if (strlen(tmpConfigString)) {
 							demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + i, tmpConfigString);
 						}
@@ -534,8 +534,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							// We don't have a player model. So instead get a ModelIndex for this playermodel
 							{	// TODO It's kinda wasteful to do this on every frame. Maybe figure out way to do it only when the model changes.
 								int maxLength;
-								//const char* playerInfo = demoReaders[i].reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
-								const char* playerInfo = demoReaders[i].reader.GetPlayerConfigString(clientNumHere, &maxLength);
+								//const char* playerInfo = demoReaders[i]->reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
+								const char* playerInfo = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &maxLength);
 								std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
 								int thisPlayerTeam = atoi(Info_ValueForKey(playerInfo, maxLength, "t"));
 								int thisPlayerColor1 = sourceDemoType == DM_14 ? tmpPS.saberColor : atoi(Info_ValueForKey(playerInfo, maxLength, "c1"));
@@ -578,7 +578,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				int maxLengthTmp;
 				double thisTimeInServerTime;
 				int entitiesSnapNum = -1;
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i].reader.GetEntitiesAtTime(sourceTime - demoReaders[i].sourceInfo->delay,&thisTimeInServerTime ,&entitiesSnapNum);
+				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i]->reader.GetEntitiesAtTime(sourceTime - demoReaders[i]->sourceInfo->delay,&thisTimeInServerTime ,&entitiesSnapNum);
 				
 				smallestSnapNumUsed = std::min(smallestSnapNumUsed,entitiesSnapNum);
 
@@ -630,7 +630,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								tmpEntity.weapon = WP_TRIP_MINE_JK2;
 								tmpEntity.genericenemyindex = ownerSlot >= MAX_CLIENTS? 0: ownerSlot + 1024;
 								tmpEntity.number = targetEntitySlot;
-								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse,demoType);
+								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qtrue,qfalse,demoType);
 								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 								/*if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
@@ -642,8 +642,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					
 					// Sentry
-					//else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetConfigString(CS_MODELS+ it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
-					else if (generalizedEntityType == ET_GENERAL_GENERAL && it->second.modelindex && !strcmp(demoReaders[i].reader.GetModelConfigString(it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
+					//else if (it->second.eType == ET_GENERAL && it->second.modelindex && !strcmp(demoReaders[i]->reader.GetConfigString(CS_MODELS+ it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
+					else if (generalizedEntityType == ET_GENERAL_GENERAL && it->second.modelindex && !strcmp(demoReaders[i]->reader.GetModelConfigString(it->second.modelindex,&maxLengthTmp), "models/items/psgun.glm")) {
 						// It's a sentry
 
 
@@ -660,7 +660,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								tmpEntity.eType = ET_GENERAL_JK2;
 								tmpEntity.owner = ownerSlot;
 								tmpEntity.number = targetEntitySlot;
-								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qtrue,qfalse, demoType);
+								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qtrue,qfalse, demoType);
 								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 								/*if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
@@ -672,7 +672,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					// Flag
 					//else if (it->second.eType == ET_ITEM && it->second.modelindex && bg_itemlist[it->second.modelindex].giType == IT_TEAM && bg_itemlist[it->second.modelindex].giTag >= PW_REDFLAG && bg_itemlist[it->second.modelindex].giTag <= PW_NEUTRALFLAG ) {
-					else if (generalizedEntityType == ET_ITEM_GENERAL && it->second.modelindex && generalizeGameValue<GMAP_ITEMLIST,SAFE>(it->second.modelindex,demoReaders[i].reader.getDemoType()) >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL&& generalizeGameValue<GMAP_ITEMLIST,SAFE>(it->second.modelindex, demoReaders[i].reader.getDemoType()) <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
+					else if (generalizedEntityType == ET_ITEM_GENERAL && it->second.modelindex && generalizeGameValue<GMAP_ITEMLIST,SAFE>(it->second.modelindex,demoReaders[i]->reader.getDemoType()) >= ITEMLIST_TEAM_CTF_REDFLAG_GENERAL&& generalizeGameValue<GMAP_ITEMLIST,SAFE>(it->second.modelindex, demoReaders[i]->reader.getDemoType()) <= ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL) {
 						
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
@@ -680,7 +680,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.eType = ET_ITEM_JK2;
 							tmpEntity.modelindex = convertGameValue<GMAP_ITEMLIST,UNSAFE>(it->second.modelindex, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
-							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse);
+							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
@@ -696,7 +696,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.number = targetEntitySlot;
 							int mappedOwner = slotManager.getNormalPlayerSlotIfExists(i, it->second.owner);
 							tmpEntity.owner = mappedOwner == -1 ? 0 : mappedOwner; // We want force shields always no matter who made them. For now.
-							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse, demoType);
+							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse, demoType);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
@@ -712,7 +712,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.eType = ET_MISSILE_JK2;
 							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
-							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i].reader,&commandsToAdd,qfalse,qfalse, demoType);
+							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse, demoType);
 							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
@@ -724,9 +724,9 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first, SlotManager::sourceDemoMappingType::SDMT_G2);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							//entityState_t tmpEntity = it->second;
-							entityState_t tmpEntity = demoReaders[i].reader.GetInterpolatedNPC(it->first, sourceTime - demoReaders[i].sourceInfo->delay,NULL);
+							entityState_t tmpEntity = demoReaders[i]->reader.GetInterpolatedNPC(it->first, sourceTime - demoReaders[i]->sourceInfo->delay,NULL);
 							tmpEntity.eType = ET_GRAPPLE_JK2;
-							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qtrue, qfalse, demoType);
+							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qtrue, qfalse, demoType);
 							tmpEntity.modelindex = tmpEntity.modelindex ? tmpEntity.modelindex : G_ModelIndex(va("models/players/stormtrooper/model.glm"), &demo.cut.Cl, &commandsToAdd, demoType); // By unmodded default these don't contain a modelIndex as that is sent directly between server and client in SP.
 							bool skinFound = false;
 							int grappleSkinIndex;
@@ -734,7 +734,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								static char model[256];
 								static char skin[256];
 								int csIndex = CS_CHARSKINS_JK2SP +tmpEntity.modelindex2;
-								const char* skinPath = demoReaders[i].reader.GetConfigString(csIndex,NULL);
+								const char* skinPath = demoReaders[i]->reader.GetConfigString(csIndex,NULL);
 								if (getModelAndSkinFromSkinPath(skinPath,model,256,skin,256)) {
 									grappleSkinIndex = G_GrappleSkinIndex(skin, &demo.cut.Cl, &commandsToAdd, demoType);
 									skinFound = true;
@@ -888,7 +888,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommands(sourceTime - demoReaders[i].sourceInfo->delay);
+				std::vector<std::string> newCommandsHere = demoReaders[i]->reader.GetNewCommands(sourceTime - demoReaders[i]->sourceInfo->delay);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
@@ -911,12 +911,12 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 				}
 
 				// Get new events and remember them.
-				if (demoReaders[i].sourceInfo->delay < 0 && demoReaders[i].targetFramesRead == 0) {
+				if (demoReaders[i]->sourceInfo->delay < 0 && demoReaders[i]->targetFramesRead == 0) {
 					// For demos with a negative delay (part of start cut off), discard events that happened longer than 2 frames ago.
-					demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay - 2.0 * 1000.0 / fps);
+					demoReaders[i]->reader.GetNewEvents(sourceTime - demoReaders[i]->sourceInfo->delay - 2.0 * 1000.0 / fps);
 					// Just ignore the return value.
 				}
-				std::vector<Event> newEventsHere = demoReaders[i].reader.GetNewEvents(sourceTime - demoReaders[i].sourceInfo->delay);
+				std::vector<Event> newEventsHere = demoReaders[i]->reader.GetNewEvents(sourceTime - demoReaders[i]->sourceInfo->delay);
 				std::map<int, entityState_t> entitiesHere;
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
 				int preciseEntitiesSnapNum = -1;
@@ -926,7 +926,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					qboolean addThisEvent = qfalse;
 					if (eventNumber == EV_PLAYER_TELEPORT_IN_JK2 || eventNumber == EV_PLAYER_TELEPORT_OUT_JK2) {
 						//if (thisEvent->theEvent.clientNum == originalPlayerstateClientNum) {
-						//if (std::find(demoReaders[i].playersToCopy.begin(), demoReaders[i].playersToCopy.end(), thisEvent->theEvent.clientNum) != demoReaders[i].playersToCopy.end()) {
+						//if (std::find(demoReaders[i]->playersToCopy.begin(), demoReaders[i]->playersToCopy.end(), thisEvent->theEvent.clientNum) != demoReaders[i]->playersToCopy.end()) {
 						//	thisEvent->theEvent.clientNum = i;
 						//	addThisEvent = qtrue;
 						//}
@@ -977,14 +977,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							int soundSourceEntity = slotManager.getSlotIfExists(i, thisEvent->theEvent.trickedentindex); // TODO Siwtch to getNormalPlayerSlotIfExists?
 							if (soundSourceEntity != -1) {
 								thisEvent->theEvent.trickedentindex = soundSourceEntity;
-								remapConfigStrings(eventNumber,&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
+								remapConfigStrings(eventNumber,&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qfalse, qfalse, demoType);
 								addThisEvent = qtrue;
 							}
 						}
 						else {
 							// Not a player. could be a sentry. Who knows.
 							// We cannot know if we need it, so let's just take it.
-							remapConfigStrings(eventNumber,&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i].reader, &commandsToAdd, qfalse, qfalse, demoType);
+							remapConfigStrings(eventNumber,&thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qfalse, qfalse, demoType);
 							addThisEvent = qtrue;
 						}
 					}
@@ -1002,7 +1002,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					}
 					else if (eventNumber == EV_SABER_HIT_JK2 || eventNumber == EV_SABER_BLOCK_JK2) { // How to get rid of hits with no corresponding player copied? Check distance?
 
-						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i].reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue,&preciseEntitiesSnapNum);
+						if (!entitiesAlreadyRead) entitiesHere = demoReaders[i]->reader.GetEntitiesAtPreciseTime(thisEvent->demoTime,qtrue,&preciseEntitiesSnapNum);
 
 						smallestSnapNumUsed = std::min(smallestSnapNumUsed, preciseEntitiesSnapNum);
 
@@ -1051,23 +1051,23 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 					if (addThisEvent) eventsToAdd.push_back(*thisEvent);
 				}
 
-				demoReaders[i].targetFramesRead++;
+				demoReaders[i]->targetFramesRead++;
 
 
-				demoReaders[i].reader.purgeSnapsBefore(smallestSnapNumUsed);
+				demoReaders[i]->reader.purgeSnapsBefore(smallestSnapNumUsed);
 			}
 			/*else {
 				// We reached the end of this demo.
 				slotManager.freeSlots(i);
 			}
-			if (!demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay)) {
+			if (!demoReaders[i]->reader.EndReachedAtTime(sourceTime - demoReaders[i]->sourceInfo->delay)) {
 				allSourceDemosFinished = qfalse;
 			}*/
 			qboolean endReached = qfalse, showEndReached=qfalse;
-			if ((endReached= demoReaders[i].reader.EndReachedAtTime(sourceTime - demoReaders[i].sourceInfo->delay))
-					|| (showEndReached = (qboolean)(sourceTime > (demoReaders[i].sourceInfo->delay + demoReaders[i].sourceInfo->showEnd)))) {
-				if (!demoReaders[i].sourceInfo->isFinished) {
-					std::cout << "Demo " << i << " has ended at " << sourceTime << " (" << demoReaders[i].reader.getCurrentDemoTime() << "). Demo had a delay of " << demoReaders[i].sourceInfo->delay << ". endReached: " << endReached << ", showEndReached: " << showEndReached << std::endl;
+			if ((endReached= demoReaders[i]->reader.EndReachedAtTime(sourceTime - demoReaders[i]->sourceInfo->delay))
+					|| (showEndReached = (qboolean)(sourceTime > (demoReaders[i]->sourceInfo->delay + demoReaders[i]->sourceInfo->showEnd)))) {
+				if (!demoReaders[i]->sourceInfo->isFinished) {
+					std::cout << "Demo " << i << " has ended at " << sourceTime << " (" << demoReaders[i]->reader.getCurrentDemoTime() << "). Demo had a delay of " << demoReaders[i]->sourceInfo->delay << ". endReached: " << endReached << ", showEndReached: " << showEndReached << std::endl;
 					// We reached the end of this demo.
 					std::vector<std::tuple<int,SlotManager::sourceDemoMapping>> erasedSlots = slotManager.freeSlots(i);
 					for (int sl = 0; sl < erasedSlots.size(); sl++) {
@@ -1083,7 +1083,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							commandsToAdd.push_back(va("kg2 %d", slotNum)); // Send kg2 for every erased slot that used ghoul2.
 						}
 					}
-					demoReaders[i].sourceInfo->isFinished = qtrue;
+					demoReaders[i]->sourceInfo->isFinished = qtrue;
 				}
 			}
 			else {
@@ -1125,7 +1125,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
+		clSnapshot_t mainPlayerSnapshot = demoReaders[0]->reader.GetCurrentSnap();
 		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 		Com_Memset(demo.cut.Cl.snap.areamask,0,sizeof(demo.cut.Cl.snap.areamask));
 

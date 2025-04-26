@@ -1579,7 +1579,7 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	else if (clientSideStyleEventConversion) {
 		int		entityEventSequenceReal, seq;
 
-		entityEventSequenceReal = ps->entityEventSequence - 1;
+		entityEventSequenceReal = ps->entityEventSequenceNOTNETWORKED - 1;
 		if (entityEventSequenceReal < ps->eventSequence - MAX_PS_EVENTS) {
 			entityEventSequenceReal = ps->eventSequence - MAX_PS_EVENTS;
 		}
@@ -1587,16 +1587,16 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 		s->event = ps->events[seq] | ((entityEventSequenceReal & 3) << 8);
 		s->eventParm = ps->eventParms[seq];
 	}
-	else if (ps->entityEventSequence < ps->eventSequence) {
+	else if (ps->entityEventSequenceNOTNETWORKED < ps->eventSequence) {
 		int		seq;
 
-		if (ps->entityEventSequence < ps->eventSequence - MAX_PS_EVENTS) {
-			ps->entityEventSequence = ps->eventSequence - MAX_PS_EVENTS;
+		if (ps->entityEventSequenceNOTNETWORKED < ps->eventSequence - MAX_PS_EVENTS) {
+			ps->entityEventSequenceNOTNETWORKED = ps->eventSequence - MAX_PS_EVENTS;
 		}
-		seq = ps->entityEventSequence & (MAX_PS_EVENTS - 1);
-		s->event = ps->events[seq] | ((ps->entityEventSequence & 3) << 8);
+		seq = ps->entityEventSequenceNOTNETWORKED & (MAX_PS_EVENTS - 1);
+		s->event = ps->events[seq] | ((ps->entityEventSequenceNOTNETWORKED & 3) << 8);
 		s->eventParm = ps->eventParms[seq];
-		ps->entityEventSequence++;
+		ps->entityEventSequenceNOTNETWORKED++;
 	}
 
 

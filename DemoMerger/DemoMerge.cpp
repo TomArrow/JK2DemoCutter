@@ -164,7 +164,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	memset(&demo, 0, sizeof(demo));
 	memset(&playerEventData, 0, sizeof(playerEventData));
 
-	std::vector<DemoReaderTrackingWrapper> demoReaders;
+	std::vector<std::unique_ptr<DemoReaderTrackingWrapper>> demoReaders;
 	std::cout << "loading up demos...";
 	int startTime = INT_MAX;
 	demoReaders.reserve(inputFiles->size()); // This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
@@ -172,25 +172,25 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
 		demoReaders.emplace_back();
-		if (!demoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str())) {
+		if (!demoReaders.back()->reader.LoadDemo((*inputFiles)[i].c_str())) {
 			std::cerr << "Failed to open " << (*inputFiles)[i] << ". Aborting.\n";
 			return qfalse;
 		}
-		needPrePass = (qboolean)(needPrePass || demoReaders.back().reader.GetMetaEventCount());
-		demoReaders.back().currentSnapIt = demoReaders.back().nextSnapIt = demoReaders.back().nullIt = demoReaders.back().reader.SnapNullIt();
-		startTime = std::min(startTime, demoReaders.back().reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
+		needPrePass = (qboolean)(needPrePass || demoReaders.back()->reader.GetMetaEventCount());
+		demoReaders.back()->currentSnapIt = demoReaders.back()->nextSnapIt = demoReaders.back()->nullIt = demoReaders.back()->reader.SnapNullIt();
+		startTime = std::min(startTime, demoReaders.back()->reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
 	}
 	std::vector<MetaEventItemAbsolute> newMetaEvents;
 	std::stringstream metaEventString;
 	if (needPrePass) {
 		std::cout << "... meta events found, doing prepass ...";
-		std::vector<DemoReaderLightTrackingWrapper> pingDemoReaders;
+		std::vector<std::unique_ptr<DemoReaderLightTrackingWrapper>> pingDemoReaders;
 		pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 		for (int i = 0; i < inputFiles->size(); i++) {
 			pingDemoReaders.emplace_back();
-			pingDemoReaders.back().reader.LoadDemo((*inputFiles)[i].c_str());
-			pingDemoReaders.back().reader.ReadToEnd();
-			pingDemoReaders.back().currentSnapIt = pingDemoReaders.back().nextSnapIt = pingDemoReaders.back().nullIt = pingDemoReaders.back().reader.SnapNullIt();
+			pingDemoReaders.back()->reader.LoadDemo((*inputFiles)[i].c_str());
+			pingDemoReaders.back()->reader.ReadToEnd();
+			pingDemoReaders.back()->currentSnapIt = pingDemoReaders.back()->nextSnapIt = pingDemoReaders.back()->nullIt = pingDemoReaders.back()->reader.SnapNullIt();
 		}
 		int prePassTime = startTime;
 
@@ -205,45 +205,45 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 			// Assemble the entities etc
 			for (int i = 0; i < pingDemoReaders.size(); i++) {
-				if (pingDemoReaders[i].reader.SeekToServerTime(prePassTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+				if (pingDemoReaders[i]->reader.SeekToServerTime(prePassTime)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 
-					SnapshotTimesIterator snapInfoHereIterator = pingDemoReaders[i].nullIt;
-					if (pingDemoReaders[i].nextSnapIt != pingDemoReaders[i].nullIt) {
-						if (*pingDemoReaders[i].nextSnapIt== prePassTime) {
-							snapInfoHereIterator = pingDemoReaders[i].nextSnapIt;
+					SnapshotTimesIterator snapInfoHereIterator = pingDemoReaders[i]->nullIt;
+					if (pingDemoReaders[i]->nextSnapIt != pingDemoReaders[i]->nullIt) {
+						if (*pingDemoReaders[i]->nextSnapIt== prePassTime) {
+							snapInfoHereIterator = pingDemoReaders[i]->nextSnapIt;
 						}
 					}
 					else {
-						snapInfoHereIterator = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(prePassTime);
+						snapInfoHereIterator = pingDemoReaders[i]->reader.GetSnapshotTimeAtServerTimeIterator(prePassTime);
 					}
-					int serverTimeHere = snapInfoHereIterator == pingDemoReaders[i].nullIt ? -1 : *snapInfoHereIterator;
+					int serverTimeHere = snapInfoHereIterator == pingDemoReaders[i]->nullIt ? -1 : *snapInfoHereIterator;
 					qboolean snapIsInterpolated = qfalse;
 					if (serverTimeHere == -1) {
-						SnapshotTimesIterator thisDemoLastSnapshotIt = pingDemoReaders[i].nullIt;
-						SnapshotTimesIterator thisDemoNextSnapshotIt = pingDemoReaders[i].nullIt;
+						SnapshotTimesIterator thisDemoLastSnapshotIt = pingDemoReaders[i]->nullIt;
+						SnapshotTimesIterator thisDemoNextSnapshotIt = pingDemoReaders[i]->nullIt;
 
 						// Find last
-						if (pingDemoReaders[i].currentSnapIt != pingDemoReaders[i].nullIt) {
-							thisDemoLastSnapshotIt = pingDemoReaders[i].currentSnapIt;
+						if (pingDemoReaders[i]->currentSnapIt != pingDemoReaders[i]->nullIt) {
+							thisDemoLastSnapshotIt = pingDemoReaders[i]->currentSnapIt;
 						}
 						else {
 
-							int thisDemoLastServerTime = pingDemoReaders[i].reader.GetLastServerTimeBeforeServerTime(prePassTime);
-							thisDemoLastSnapshotIt = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(thisDemoLastServerTime);
+							int thisDemoLastServerTime = pingDemoReaders[i]->reader.GetLastServerTimeBeforeServerTime(prePassTime);
+							thisDemoLastSnapshotIt = pingDemoReaders[i]->reader.GetSnapshotTimeAtServerTimeIterator(thisDemoLastServerTime);
 						}
 
 						// Find next
-						if (pingDemoReaders[i].nextSnapIt != pingDemoReaders[i].nullIt) {
-							thisDemoNextSnapshotIt = pingDemoReaders[i].nextSnapIt;
+						if (pingDemoReaders[i]->nextSnapIt != pingDemoReaders[i]->nullIt) {
+							thisDemoNextSnapshotIt = pingDemoReaders[i]->nextSnapIt;
 						}
 						else {
 
-							int thisDemoNextServerTime = pingDemoReaders[i].reader.GetFirstServerTimeAfterServerTime(prePassTime);
-							thisDemoNextSnapshotIt = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(thisDemoNextServerTime);
+							int thisDemoNextServerTime = pingDemoReaders[i]->reader.GetFirstServerTimeAfterServerTime(prePassTime);
+							thisDemoNextSnapshotIt = pingDemoReaders[i]->reader.GetSnapshotTimeAtServerTimeIterator(thisDemoNextServerTime);
 						}
 
 
-						if (thisDemoLastSnapshotIt == pingDemoReaders[i].nullIt || thisDemoNextSnapshotIt == pingDemoReaders[i].nullIt) continue;
+						if (thisDemoLastSnapshotIt == pingDemoReaders[i]->nullIt || thisDemoNextSnapshotIt == pingDemoReaders[i]->nullIt) continue;
 
 						snapInfoHereIterator = thisDemoLastSnapshotIt;
 						serverTimeHere = *thisDemoLastSnapshotIt;
@@ -251,20 +251,20 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 						snapIsInterpolated = qtrue;
 					}
 					else {
-						pingDemoReaders[i].currentSnapIt = snapInfoHereIterator;
+						pingDemoReaders[i]->currentSnapIt = snapInfoHereIterator;
 					}
 
 
 					// Get new commands
-					std::vector<MetaEventItemAbsolute> newMetaEventsHere = pingDemoReaders[i].reader.GetNewMetaEventsAtServerTime(prePassTime);
+					std::vector<MetaEventItemAbsolute> newMetaEventsHere = pingDemoReaders[i]->reader.GetNewMetaEventsAtServerTime(prePassTime);
 					for (int c = 0; c < newMetaEventsHere.size(); c++) {
 
 						// New handling to avoid dupes
 						qboolean isADupe = qfalse;
-						for (int sc = 0; sc < pingDemoReaders[i].metaEventDupesToFilter.size(); sc++) {
-							if (pingDemoReaders[i].metaEventDupesToFilter[sc].type == newMetaEventsHere[c].type) {
+						for (int sc = 0; sc < pingDemoReaders[i]->metaEventDupesToFilter.size(); sc++) {
+							if (pingDemoReaders[i]->metaEventDupesToFilter[sc].type == newMetaEventsHere[c].type) {
 								isADupe = qtrue;
-								pingDemoReaders[i].metaEventDupesToFilter.erase(pingDemoReaders[i].metaEventDupesToFilter.begin() + sc);
+								pingDemoReaders[i]->metaEventDupesToFilter.erase(pingDemoReaders[i]->metaEventDupesToFilter.begin() + sc);
 								break;
 							}
 						}
@@ -273,7 +273,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 							metaEventsToAdd.push_back(newMetaEventsHere[c].type);
 							for (int sd = 0; sd < pingDemoReaders.size(); sd++) {
 								if (sd != i) {
-									pingDemoReaders[sd].metaEventDupesToFilter.push_back(newMetaEventsHere[c]);
+									pingDemoReaders[sd]->metaEventDupesToFilter.push_back(newMetaEventsHere[c]);
 								}
 							}
 						}
@@ -281,12 +281,12 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 					if (!snapIsInterpolated) { // We already parsed this. If we didn't find a dupe of an older command now, we won't find it later either. (and it might be stuff that was only sent to some of the clients, like team chat)
 
-						pingDemoReaders[i].metaEventDupesToFilter.clear();
+						pingDemoReaders[i]->metaEventDupesToFilter.clear();
 					}
 
 
 				}
-				if (!pingDemoReaders[i].reader.EndReachedAtServerTime(prePassTime)) {
+				if (!pingDemoReaders[i]->reader.EndReachedAtServerTime(prePassTime)) {
 					allSourceDemosFinished = qfalse;
 				}
 			}
@@ -309,17 +309,17 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 			int oldTime = prePassTime;
 			prePassTime = INT_MAX;
 			for (int i = 0; i < pingDemoReaders.size(); i++) {
-				if (pingDemoReaders[i].currentSnapIt != pingDemoReaders[i].nullIt) {
+				if (pingDemoReaders[i]->currentSnapIt != pingDemoReaders[i]->nullIt) {
 
-					pingDemoReaders[i].nextSnapIt = pingDemoReaders[i].reader.GetFirstSnapshotTimeAfterSnapshotTimeIterator(pingDemoReaders[i].currentSnapIt, oldTime);
+					pingDemoReaders[i]->nextSnapIt = pingDemoReaders[i]->reader.GetFirstSnapshotTimeAfterSnapshotTimeIterator(pingDemoReaders[i]->currentSnapIt, oldTime);
 				}
-				else if (pingDemoReaders[i].nextSnapIt == pingDemoReaders[i].nullIt || *pingDemoReaders[i].nextSnapIt <= oldTime) {
-					int thisDemoNextServerTime = pingDemoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
-					pingDemoReaders[i].nextSnapIt = pingDemoReaders[i].reader.GetSnapshotTimeAtServerTimeIterator(thisDemoNextServerTime);
+				else if (pingDemoReaders[i]->nextSnapIt == pingDemoReaders[i]->nullIt || *pingDemoReaders[i]->nextSnapIt <= oldTime) {
+					int thisDemoNextServerTime = pingDemoReaders[i]->reader.GetFirstServerTimeAfterServerTime(oldTime);
+					pingDemoReaders[i]->nextSnapIt = pingDemoReaders[i]->reader.GetSnapshotTimeAtServerTimeIterator(thisDemoNextServerTime);
 				}
-				if (pingDemoReaders[i].nextSnapIt != pingDemoReaders[i].nullIt) {
+				if (pingDemoReaders[i]->nextSnapIt != pingDemoReaders[i]->nullIt) {
 
-					int nextTimeThisDemo = *pingDemoReaders[i].nextSnapIt;
+					int nextTimeThisDemo = *pingDemoReaders[i]->nextSnapIt;
 					prePassTime = std::min(prePassTime, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 				}
 			}
@@ -351,7 +351,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	//int maxAllowedConfigString = demoType == DM_26 ? MAX_CONFIGSTRINGS_JKA : MAX_CONFIGSTRINGS;
 	int maxAllowedConfigString = getMaxConfigStrings(demoType);
 	for (int i = 0; i < maxAllowedConfigString; i++) {
-		tmpConfigString = demoReaders[0].reader.GetConfigString(i,&tmpConfigStringMaxLength);
+		tmpConfigString = demoReaders[0]->reader.GetConfigString(i,&tmpConfigStringMaxLength);
 		if (strlen(tmpConfigString)) {
 			demoCutConfigstringModifiedManual(&demo.cut.Cl, i, tmpConfigString,demoType);
 		}
@@ -367,16 +367,16 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		std::cout << "\n";
 	}
 	for (int i = 0; i < demoReaders.size(); i++) {
-		if (demoReaders[i].reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
-			//int spectatedClient = demoReaders[i].reader.GetCurrentPlayerState().clientNum;
+		if (demoReaders[i]->reader.SeekToAnySnapshotIfNotYet()) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			//int spectatedClient = demoReaders[i]->reader.GetCurrentPlayerState().clientNum;
 			//lastSpectatedClientNums[i] = spectatedClient;			
 			//if (i >= MAX_CLIENTS) continue; // We don't have names/configstrings for players > 32
-			//tmpConfigString = demoReaders[i].reader.GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
+			//tmpConfigString = demoReaders[i]->reader.GetPlayerConfigString(spectatedClient,&tmpConfigStringMaxLength);
 			//if (strlen(tmpConfigString)) {
 				//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS+i, tmpConfigString);
 			//}
 			if (reframeSearchString) {
-				int reframeClientNumHere = demoReaders[i].reader.getClientNumForDemo(reframeSearchString);
+				int reframeClientNumHere = demoReaders[i]->reader.getClientNumForDemo(reframeSearchString);
 				std::cout << "\n";
 				if (reframeClientNumHere != -1 && reframeClientNum != -1 && reframeClientNumHere != reframeClientNum) {
 					std::cout << "Reframe clientnum mismatch: " << reframeClientNum << " vs " << reframeClientNumHere << ". Discarding latter.\n";
@@ -428,7 +428,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		jsonMetaDocument->AddMember("fd", true, jsonMetaDocument->GetAllocator()); // fake demo
 
 		for (int i = 0; i < demoReaders.size();i++) {
-			demoReaders[i].reader.copyMetadataTo(jsonMetaDocument,qfalse);
+			demoReaders[i]->reader.copyMetadataTo(jsonMetaDocument,qfalse);
 		}
 		const char* noteName = jsonGetRealMetadataKeyName(jsonMetaDocument,"note");
 		if (noteName && _stricmp(noteName,"note")) {
@@ -507,54 +507,54 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 		// Assemble the entities etc
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
+			if (demoReaders[i]->reader.SeekToServerTime(time)) { // Make sure we actually have a snapshot parsed, otherwise we can't get the info about the currently spectated player.
 				
-				SnapshotInfoMapIterator snapInfoHereIterator = demoReaders[i].nullIt;
-				if (demoReaders[i].nextSnapIt != demoReaders[i].nullIt){
-					if (demoReaders[i].nextSnapIt->second.serverTime == time) {
-						snapInfoHereIterator = demoReaders[i].nextSnapIt;
+				SnapshotInfoMapIterator snapInfoHereIterator = demoReaders[i]->nullIt;
+				if (demoReaders[i]->nextSnapIt != demoReaders[i]->nullIt){
+					if (demoReaders[i]->nextSnapIt->second->serverTime == time) {
+						snapInfoHereIterator = demoReaders[i]->nextSnapIt;
 					}
 				}
 				else {
-					snapInfoHereIterator = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(time);
+					snapInfoHereIterator = demoReaders[i]->reader.GetSnapshotInfoAtServerTimeIterator(time);
 				}
-				SnapshotInfo* snapInfoHere = snapInfoHereIterator == demoReaders[i].nullIt ? NULL : &snapInfoHereIterator->second;
+				SnapshotInfo* snapInfoHere = snapInfoHereIterator == demoReaders[i]->nullIt ? NULL : snapInfoHereIterator->second.get();
 				qboolean snapIsInterpolated = qfalse;
 				if (!snapInfoHere) {
-					SnapshotInfoMapIterator thisDemoLastSnapshotIt = demoReaders[i].nullIt;
-					SnapshotInfoMapIterator thisDemoNextSnapshotIt = demoReaders[i].nullIt;
+					SnapshotInfoMapIterator thisDemoLastSnapshotIt = demoReaders[i]->nullIt;
+					SnapshotInfoMapIterator thisDemoNextSnapshotIt = demoReaders[i]->nullIt;
 
 					// Find last
-					if (demoReaders[i].currentSnapIt != demoReaders[i].nullIt) {
-						thisDemoLastSnapshotIt = demoReaders[i].currentSnapIt;
+					if (demoReaders[i]->currentSnapIt != demoReaders[i]->nullIt) {
+						thisDemoLastSnapshotIt = demoReaders[i]->currentSnapIt;
 					}
 					else {
 
-						int thisDemoLastServerTime = demoReaders[i].reader.GetLastServerTimeBeforeServerTime(time);
-						thisDemoLastSnapshotIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoLastServerTime);
+						int thisDemoLastServerTime = demoReaders[i]->reader.GetLastServerTimeBeforeServerTime(time);
+						thisDemoLastSnapshotIt = demoReaders[i]->reader.GetSnapshotInfoAtServerTimeIterator(thisDemoLastServerTime);
 					}
 
 					// Find next
-					if (demoReaders[i].nextSnapIt != demoReaders[i].nullIt) {
-						thisDemoNextSnapshotIt = demoReaders[i].nextSnapIt;
+					if (demoReaders[i]->nextSnapIt != demoReaders[i]->nullIt) {
+						thisDemoNextSnapshotIt = demoReaders[i]->nextSnapIt;
 					}
 					else {
 
-						int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(time);
-						thisDemoNextSnapshotIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
+						int thisDemoNextServerTime = demoReaders[i]->reader.GetFirstServerTimeAfterServerTime(time);
+						thisDemoNextSnapshotIt = demoReaders[i]->reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
 					}
 
 					
-					if (thisDemoLastSnapshotIt == demoReaders[i].nullIt || thisDemoNextSnapshotIt == demoReaders[i].nullIt) continue;
+					if (thisDemoLastSnapshotIt == demoReaders[i]->nullIt || thisDemoNextSnapshotIt == demoReaders[i]->nullIt) continue;
 
 					snapInfoHereIterator = thisDemoLastSnapshotIt;
-					snapInfoHere = &thisDemoLastSnapshotIt->second;
+					snapInfoHere = thisDemoLastSnapshotIt->second.get();
 					// TODO Do actual interpolation instead of just copying last one. Don't copy entities that are in previous but not in next.
 					snapIsInterpolated = qtrue;
 				}
 				else {
-					demoReaders[i].packetsUsed++;
-					demoReaders[i].currentSnapIt = snapInfoHereIterator;
+					demoReaders[i]->packetsUsed++;
+					demoReaders[i]->currentSnapIt = snapInfoHereIterator;
 				}
 				//std::map<int, entityState_t> hereEntities = demoReaders[i].GetCurrentEntities();
 				//tmpPS = demoReaders[i].GetCurrentPlayerState();
@@ -622,40 +622,40 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 						}
 						else {
 							// Get creative...
-							SnapshotInfoMapIterator usedSnapIt = demoReaders[i].nullIt;
-							SnapshotInfoMapIterator usedPlayerStateSnapIt = demoReaders[i].nullIt;
-							tmpPS2 = demoReaders[i].reader.GetLastOrNextPlayer(reframeClientNum, time, &usedSnapIt,&usedPlayerStateSnapIt, qtrue, &snapInfoHereIterator);
+							SnapshotInfoMapIterator usedSnapIt = demoReaders[i]->nullIt;
+							SnapshotInfoMapIterator usedPlayerStateSnapIt = demoReaders[i]->nullIt;
+							tmpPS2 = demoReaders[i]->reader.GetLastOrNextPlayer(reframeClientNum, time, &usedSnapIt,&usedPlayerStateSnapIt, qtrue, &snapInfoHereIterator);
 
 							// All that is visible in the main player source snap should be visible in final demo
-							if (usedSnapIt != demoReaders[i].nullIt) {
+							if (usedSnapIt != demoReaders[i]->nullIt) {
 								for (int amb = 0; amb < MAX_MAP_AREA_BYTES; amb++) {
-									areamasHere[amb] = areamasHere[amb] & usedSnapIt->second.areamask[amb];
+									areamasHere[amb] = areamasHere[amb] & usedSnapIt->second->areamask[amb];
 								}
 							}
 
-							bool isBetterOrEqualEntityStateData = usedSnapIt != demoReaders[i].nullIt && IsBetterOrEqualTime(time, mainPlayerServerTime, usedSnapIt->second.serverTime);
-							bool isBetterOrEqualPlayerStateData = usedPlayerStateSnapIt != demoReaders[i].nullIt && IsBetterOrEqualTime(time, mainPlayerRealPSPartsServerTime, usedPlayerStateSnapIt->second.serverTime);
+							bool isBetterOrEqualEntityStateData = usedSnapIt != demoReaders[i]->nullIt && IsBetterOrEqualTime(time, mainPlayerServerTime, usedSnapIt->second->serverTime);
+							bool isBetterOrEqualPlayerStateData = usedPlayerStateSnapIt != demoReaders[i]->nullIt && IsBetterOrEqualTime(time, mainPlayerRealPSPartsServerTime, usedPlayerStateSnapIt->second->serverTime);
 
-							bool isBetterEntityStateData = usedSnapIt != demoReaders[i].nullIt && IsBetterTime(time, mainPlayerServerTime, usedSnapIt->second.serverTime);
-							bool isBetterPlayerStateData = usedPlayerStateSnapIt != demoReaders[i].nullIt && IsBetterTime(time, mainPlayerRealPSPartsServerTime, usedPlayerStateSnapIt->second.serverTime);
+							bool isBetterEntityStateData = usedSnapIt != demoReaders[i]->nullIt && IsBetterTime(time, mainPlayerServerTime, usedSnapIt->second->serverTime);
+							bool isBetterPlayerStateData = usedPlayerStateSnapIt != demoReaders[i]->nullIt && IsBetterTime(time, mainPlayerRealPSPartsServerTime, usedPlayerStateSnapIt->second->serverTime);
 
 							//mainPlayerPSSourceES;
 							if (isBetterPlayerStateData && isBetterEntityStateData) { // Uh. Can this actually happen? :thonk: Idk, let's just pretend it can for now.
 								mainPlayerPS = tmpPS2;
-								mainPlayerServerTime = usedSnapIt->second.serverTime;
-								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime;
+								mainPlayerServerTime = usedSnapIt->second->serverTime;
+								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second->serverTime;
 							}
 							else if (isBetterOrEqualEntityStateData && isBetterOrEqualPlayerStateData && usedSnapIt== usedPlayerStateSnapIt) {
 								// Equally good is only acceptable if it's a nice united playerstate and not some frankensstein monstser// Equally good is only acceptable if it's a nice united playerstate and not some frankensstein monstser
 								// TODO Tbh this condition/option might be a bit illogical/unnecessary given all the other code. Haven't thought it through fully.
 								mainPlayerPS = tmpPS2;
-								mainPlayerServerTime = usedSnapIt->second.serverTime;
-								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime;
+								mainPlayerServerTime = usedSnapIt->second->serverTime;
+								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second->serverTime;
 							}
 							else if (isBetterPlayerStateData) {
 								// Upgrade playerstate data only if it's actually better
 								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS2, demoType); // Just update health/armor and stuff like that. Not a godlike solution but eh.
-								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second.serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
+								mainPlayerRealPSPartsServerTime = usedPlayerStateSnapIt->second->serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
 							}
 							else if (isBetterEntityStateData) {
 								// Upgrade entitystate related data if its actually better.
@@ -670,10 +670,10 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 								
 								// Sad way of doing it but best we got for now for consistency :(
 								tmpPS3 = mainPlayerPS;
-								CG_EntityStateToPlayerState(&usedSnapIt->second.entities[reframeClientNum], &mainPlayerPS, demoType, qtrue, NULL, qfalse);
+								CG_EntityStateToPlayerState(&usedSnapIt->second->entities[reframeClientNum], &mainPlayerPS, demoType, qtrue, NULL, qfalse);
 								EnhancePlayerStateWithBaseState(&mainPlayerPS, &tmpPS3, demoType); // Just update health/armor and stuff like that. Not a godlike solution but eh.
 
-								mainPlayerServerTime = usedSnapIt->second.serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
+								mainPlayerServerTime = usedSnapIt->second->serverTime; // If this happens multiple times we try to always get the most up to date version of the PS parts.
 							}
 						}
 					}
@@ -748,15 +748,15 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 
 				// Get new commands
-				std::vector<std::string> newCommandsHere = demoReaders[i].reader.GetNewCommandsAtServerTime(time);
+				std::vector<std::string> newCommandsHere = demoReaders[i]->reader.GetNewCommandsAtServerTime(time);
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 					
 					// New handling to avoid dupes
 					qboolean isADupe = qfalse;
-					for (int sc = 0; sc < demoReaders[i].commandDupesToFilter.size(); sc++) {
-						if (demoReaders[i].commandDupesToFilter[sc] == newCommandsHere[c]) {
+					for (int sc = 0; sc < demoReaders[i]->commandDupesToFilter.size(); sc++) {
+						if (demoReaders[i]->commandDupesToFilter[sc] == newCommandsHere[c]) {
 							isADupe = qtrue;
-							demoReaders[i].commandDupesToFilter.erase(demoReaders[i].commandDupesToFilter.begin()+sc);
+							demoReaders[i]->commandDupesToFilter.erase(demoReaders[i]->commandDupesToFilter.begin()+sc);
 							break;
 						}
 					}
@@ -765,7 +765,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 						commandsToAdd.push_back(newCommandsHere[c]);
 						for (int sd = 0; sd < demoReaders.size(); sd++) {
 							if (sd != i) {
-								demoReaders[sd].commandDupesToFilter.push_back(newCommandsHere[c]);
+								demoReaders[sd]->commandDupesToFilter.push_back(newCommandsHere[c]);
 							}
 						}
 					}
@@ -792,12 +792,12 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 				if (!snapIsInterpolated) { // We already parsed this. If we didn't find a dupe of an older command now, we won't find it later either. (and it might be stuff that was only sent to some of the clients, like team chat)
 
-					demoReaders[i].commandDupesToFilter.clear();
+					demoReaders[i]->commandDupesToFilter.clear();
 				}
 
 				// Ok now... redo all events for players do avoid inconsistencies. This is unelegant af but I see no realistic way of doing it properly without making it
 				// incredibly complicated, hard to read and possibly even more unelegant in places
-				std::vector<Event> newEvents = demoReaders[i].reader.GetNewEventsAtServerTime(time,EK_ALL);
+				std::vector<Event> newEvents = demoReaders[i]->reader.GetNewEventsAtServerTime(time,EK_ALL);
 				for (int e = 0; e < newEvents.size(); e++) {
 
 					//if (!newEvents[e].eventNumber) {
@@ -854,11 +854,11 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 				}
 
 				if (opts.persistEntitiesMaxDelay) {
-					demoReaders[i].reader.GetFutureEntityStates(time, opts.persistEntitiesMaxDelay, true, &futureEntityStates, &snapInfoHereIterator);
+					demoReaders[i]->reader.GetFutureEntityStates(time, opts.persistEntitiesMaxDelay, true, &futureEntityStates, &snapInfoHereIterator);
 				}
 
 			}
-			if (!demoReaders[i].reader.EndReachedAtServerTime(time)) {
+			if (!demoReaders[i]->reader.EndReachedAtServerTime(time)) {
 				allSourceDemosFinished = qfalse;
 			}
 		}
@@ -1124,7 +1124,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		demo.cut.Cl.snap.serverTime = time;
 		demo.cut.Cl.snap.ps = mainPlayerPS;
 
-		clSnapshot_t mainPlayerSnapshot = demoReaders[0].reader.GetCurrentSnap();
+		clSnapshot_t mainPlayerSnapshot = demoReaders[0]->reader.GetCurrentSnap();
 
 		if (opts.visAll) {
 			Com_Memset(demo.cut.Cl.snap.areamask, 0, sizeof(demo.cut.Cl.snap.areamask));
@@ -1165,17 +1165,17 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		int oldTime = time;
 		time = INT_MAX;
 		for (int i = 0; i < demoReaders.size(); i++) {
-			if (demoReaders[i].currentSnapIt != demoReaders[i].nullIt) {
+			if (demoReaders[i]->currentSnapIt != demoReaders[i]->nullIt) {
 
-				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetFirstSnapshotAfterSnapshotIterator(demoReaders[i].currentSnapIt,oldTime);
+				demoReaders[i]->nextSnapIt = demoReaders[i]->reader.GetFirstSnapshotAfterSnapshotIterator(demoReaders[i]->currentSnapIt,oldTime);
 			}
-			else if(demoReaders[i].nextSnapIt == demoReaders[i].nullIt || demoReaders[i].nextSnapIt->second.serverTime <= oldTime) {
-				int thisDemoNextServerTime = demoReaders[i].reader.GetFirstServerTimeAfterServerTime(oldTime);
-				demoReaders[i].nextSnapIt = demoReaders[i].reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
+			else if(demoReaders[i]->nextSnapIt == demoReaders[i]->nullIt || demoReaders[i]->nextSnapIt->second->serverTime <= oldTime) {
+				int thisDemoNextServerTime = demoReaders[i]->reader.GetFirstServerTimeAfterServerTime(oldTime);
+				demoReaders[i]->nextSnapIt = demoReaders[i]->reader.GetSnapshotInfoAtServerTimeIterator(thisDemoNextServerTime);
 			}
-			if (demoReaders[i].nextSnapIt != demoReaders[i].nullIt) {
+			if (demoReaders[i]->nextSnapIt != demoReaders[i]->nullIt) {
 
-				int nextTimeThisDemo = demoReaders[i].nextSnapIt->second.serverTime;
+				int nextTimeThisDemo = demoReaders[i]->nextSnapIt->second->serverTime;
 				time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 			}
 		}
@@ -1223,7 +1223,7 @@ cuterror:
 		std::cout << "Total main player dead frames skipped: " << framesSkippedDeadFrames << "\n";
 	}
 	for (int i = 0; i < demoReaders.size(); i++) {
-		std::cout << "Frames from demo " << i << ": " << demoReaders[i].packetsUsed << " (" << (demoReaders[i].packetsUsed*100/framesWritten) << "%)\n";
+		std::cout << "Frames from demo " << i << ": " << demoReaders[i]->packetsUsed << " (" << (demoReaders[i]->packetsUsed*100/framesWritten) << "%)\n";
 	}
 
 	return ret;

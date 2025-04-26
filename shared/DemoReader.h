@@ -92,9 +92,22 @@ public:
 	int clientNum;
 };
 
-typedef std::map<int, SnapshotInfo> SnapshotInfoMap;
+typedef std::map<int, std::unique_ptr<SnapshotInfo>> SnapshotInfoMap;
 typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 typedef SnapshotInfoMap::reverse_iterator SnapshotInfoMapIteratorReverse;
+
+inline bool snapshotInfosServerTimeSmallerPredicate(const std::pair<const int, std::unique_ptr<SnapshotInfo>>& it, const int& serverTime) {
+	return it.second->serverTime < serverTime;
+};
+inline bool snapshotInfosDemoTimeSmallerPredicate(const std::pair<const int, std::unique_ptr<SnapshotInfo>>& it, const float& demoTime) {
+	return it.second->demoTime < demoTime;
+};
+inline bool snapshotInfosServerTimeGreaterPredicate(const int& serverTime, const std::pair<const int, std::unique_ptr<SnapshotInfo>>& it) {
+	return serverTime < it.second->serverTime;
+};
+inline bool snapshotInfosSnapNumPredicate(const std::pair<const int, std::unique_ptr<SnapshotInfo>>& it, const int& snapNum) {
+	return it.second->snapNum < snapNum;
+};
 
 #define COMMANDTIMEOFFSETAVERAGESAMPLECOUNT 100
 
@@ -126,14 +139,14 @@ class DemoReader : public DemoReaderBase {
 
 	int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
 	int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
-	int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
+	byte mohaaPlayerWeapon[MAX_CLIENTS_MAX];
 
 
 	SnapshotInfoMap snapshotInfos;
 	std::vector<Command> readCommands;
 	std::vector<Event> readEvents;
 
-	std::map<int,int>	lastKnownCommandOrServerTimes; // For each clientnum
+	int					lastKnownCommandOrServerTimes[MAX_CLIENTS_MAX]; // For each clientnum
 	std::map<int,int>	lastMessageWithEntity; 
 
 	playerState_t	oldPS[MAX_CLIENTS_MAX];
@@ -208,12 +221,13 @@ public:
 	SnapshotInfoMapIterator GetSnapshotInfoAtOrBeforeDemoTimeIterator(float demoTime, qboolean includeAfterIfFirst = qtrue);
 	SnapshotInfo* GetSnapshotInfoAtServerTime(int serverTime);
 	SnapshotInfoMapIterator GetSnapshotInfoAtServerTimeIterator(int serverTime);
-	qboolean SeekToPlayerInPacket(int clientNum); // Seek until we get a packet with this player
+	qboolean SeekToPlayerInPacket(int clientNum, int maxMsgNum=0); // Seek until we get a packet with this player
 	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
+	void	ClearSnapshotsBeforeIterator(SnapshotInfoMapIterator snapInfoIt);
 
 	
 	playerState_t GetInterpolatedPlayerState(double time);
-	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL);
+	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL, int futureSeekLimit=0);
 	std::map<int, entityState_t> GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnap = NULL);
 	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
