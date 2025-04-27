@@ -79,7 +79,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
-		demoReaders.emplace_back();
+		demoReaders.emplace_back(std::make_unique<DemoReaderWrapper>());
 		demoReaders.back()->reader.LoadDemo((*inputFiles)[i].c_str());
 		demoReaders.back()->sourceInfo = new DemoSource(); // yeah i guess we'll leak it. screw it, who cares. its a fake demosource entry thingie to track delay.
 		pingDemoReaders.emplace_back();

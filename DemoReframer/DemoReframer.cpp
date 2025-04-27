@@ -533,17 +533,17 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 		}
 
 		framesWritten++;
-		snapshotsProcessedSinceClear++;
-		if (snapshotSafeToClear != nullIt) {
-			snapshotsProcessedSinceSnapshotSafeToClearSet++;
-		}
 
 		int oldTime = time;
 		time = INT_MAX;
 		//int nextTimeThisDemo = demoReader->reader.GetFirstServerTimeAfterServerTime(oldTime);
 		int nextTimeThisDemo = -1;
 		nextSnapInfoHereIt = demoReader->reader.GetFirstSnapshotAfterSnapshotIterator(snapInfoHereIt);
-		if (nextSnapInfoHereIt != nullIt) {
+		if (nextSnapInfoHereIt != nullIt && snapInfoHereIt != nullIt) {
+			snapshotsProcessedSinceClear++;
+			if (snapshotSafeToClear != nullIt) {
+				snapshotsProcessedSinceSnapshotSafeToClearSet++;
+			}
 			if (snapshotsProcessedSinceClear == 10000) { // ok mark this one as the "first one to keep" and then wait 5000 more frames.
 				snapshotSafeToClear = snapInfoHereIt;
 				snapshotsProcessedSinceSnapshotSafeToClearSet = 0;

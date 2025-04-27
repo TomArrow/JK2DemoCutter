@@ -1237,7 +1237,7 @@ void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bo
 	int searchEndTime = serverTime + maxTimeIntoFuture;
 
 	SeekToAnySnapshotIfNotYet();
-	SeekToServerTime(serverTime+ searchEndTime);
+	SeekToServerTime(searchEndTime);
 
 	if (endReached && !anySnapshotParsed) return; // Nothing to do really lol.
 

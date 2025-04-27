@@ -72,7 +72,9 @@ public:
 	DemoReader reader;
 	int packetsUsed = 0;
 	std::vector<std::string> commandDupesToFilter;
-	SnapshotInfoMapIterator currentSnapIt, nextSnapIt, nullIt;
+	SnapshotInfoMapIterator currentSnapIt, nextSnapIt, nullIt, snapshotSafeToClear;
+	int snapshotsProcessedSinceClear = 0;
+	int snapshotsProcessedSinceSnapshotSafeToClearSet = 0;
 };
 
 class DemoReaderLightTrackingWrapper {
@@ -171,13 +173,13 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	qboolean needPrePass = qfalse;
 	for (int i = 0; i < inputFiles->size(); i++) {
 		std::cout << i<<"...";
-		demoReaders.emplace_back();
+		demoReaders.emplace_back(std::make_unique<DemoReaderTrackingWrapper>());
 		if (!demoReaders.back()->reader.LoadDemo((*inputFiles)[i].c_str())) {
 			std::cerr << "Failed to open " << (*inputFiles)[i] << ". Aborting.\n";
 			return qfalse;
 		}
 		needPrePass = (qboolean)(needPrePass || demoReaders.back()->reader.GetMetaEventCount());
-		demoReaders.back()->currentSnapIt = demoReaders.back()->nextSnapIt = demoReaders.back()->nullIt = demoReaders.back()->reader.SnapNullIt();
+		demoReaders.back()->snapshotSafeToClear = demoReaders.back()->currentSnapIt = demoReaders.back()->nextSnapIt = demoReaders.back()->nullIt = demoReaders.back()->reader.SnapNullIt();
 		startTime = std::min(startTime, demoReaders.back()->reader.GetFirstSnapServerTime()); // Find earliest serverTime from all source demos and start there.
 	}
 	std::vector<MetaEventItemAbsolute> newMetaEvents;
@@ -624,7 +626,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 							// Get creative...
 							SnapshotInfoMapIterator usedSnapIt = demoReaders[i]->nullIt;
 							SnapshotInfoMapIterator usedPlayerStateSnapIt = demoReaders[i]->nullIt;
-							tmpPS2 = demoReaders[i]->reader.GetLastOrNextPlayer(reframeClientNum, time, &usedSnapIt,&usedPlayerStateSnapIt, qtrue, &snapInfoHereIterator);
+							tmpPS2 = demoReaders[i]->reader.GetLastOrNextPlayer(reframeClientNum, time, &usedSnapIt,&usedPlayerStateSnapIt, qtrue, &snapInfoHereIterator, 5000);
 
 							// All that is visible in the main player source snap should be visible in final demo
 							if (usedSnapIt != demoReaders[i]->nullIt) {
@@ -1175,6 +1177,22 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 			}
 			if (demoReaders[i]->nextSnapIt != demoReaders[i]->nullIt) {
 
+				if (demoReaders[i]->nextSnapIt != demoReaders[i]->currentSnapIt && demoReaders[i]->currentSnapIt != demoReaders[i]->nullIt) {
+					demoReaders[i]->snapshotsProcessedSinceClear++;
+					if (demoReaders[i]->snapshotSafeToClear != demoReaders[i]->nullIt) {
+						demoReaders[i]->snapshotsProcessedSinceSnapshotSafeToClearSet++;
+					}
+					if (demoReaders[i]->snapshotsProcessedSinceClear == 10000) { // ok mark this one as the "first one to keep" and then wait 5000 more frames.
+						demoReaders[i]->snapshotSafeToClear = demoReaders[i]->currentSnapIt;
+						demoReaders[i]->snapshotsProcessedSinceSnapshotSafeToClearSet = 0;
+					}
+					if (demoReaders[i]->snapshotsProcessedSinceSnapshotSafeToClearSet > 5000) { // this way we have the past 5000 frames too.
+						demoReaders[i]->reader.ClearSnapshotsBeforeIterator(demoReaders[i]->snapshotSafeToClear); // memory optimization. get rid of old snapshots so we can reframe larger files
+						demoReaders[i]->snapshotSafeToClear = demoReaders[i]->nullIt;
+						demoReaders[i]->snapshotsProcessedSinceClear = 0;
+						demoReaders[i]->snapshotsProcessedSinceSnapshotSafeToClearSet = 0;
+					}
+				}
 				int nextTimeThisDemo = demoReaders[i]->nextSnapIt->second->serverTime;
 				time = std::min(time, nextTimeThisDemo); // Find nearest serverTime of all the demos.
 			}
