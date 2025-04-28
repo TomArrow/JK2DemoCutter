@@ -538,6 +538,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
 					goto cuterror;
 				}
+				//if(readGamestate > 0 ) mapRestartCounter++; // we might still get snaps with the old serverTime. so do it at the serverTime reset. idk maybe find a better way in the future but otherwise it makes cutting precisely in later games difficult.
 				// Only open if none opened yet.
 				if (!newHandle) {
 					{int dupeIterator = 0;
@@ -588,6 +589,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 						demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
 						demoStartTime = demo.cut.Cl.snap.serverTime;
+						mapRestartCounter++;
 					}
 					lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}
