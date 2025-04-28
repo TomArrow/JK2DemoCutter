@@ -189,7 +189,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 		std::vector<std::unique_ptr<DemoReaderLightTrackingWrapper>> pingDemoReaders;
 		pingDemoReaders.reserve(inputFiles->size());// This is needed because really strange stuff happens when vectors are resized. It calls destructors on objects and iterators inside the object and whatnot. I don't get it but this ought to solve it.
 		for (int i = 0; i < inputFiles->size(); i++) {
-			pingDemoReaders.emplace_back();
+			pingDemoReaders.emplace_back(std::make_unique<DemoReaderLightTrackingWrapper>());
 			pingDemoReaders.back()->reader.LoadDemo((*inputFiles)[i].c_str());
 			pingDemoReaders.back()->reader.ReadToEnd();
 			pingDemoReaders.back()->currentSnapIt = pingDemoReaders.back()->nextSnapIt = pingDemoReaders.back()->nullIt = pingDemoReaders.back()->reader.SnapNullIt();
