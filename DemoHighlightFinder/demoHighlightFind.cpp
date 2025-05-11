@@ -75,6 +75,11 @@ struct ioHandles_t {
 	sqlite3* demoStatsDb;
 	sqlite3_stmt* insertPacketStatsStatement;
 
+	// Chats (optional)
+	sqlite3* chatsUniqueDb;
+	sqlite3_stmt* insertChatUniqueStatement;
+	sqlite3_stmt* updateChatUniqueCountStatement;
+
 	// Entity to DB (optional)
 	sqlite3* entityDataDb;
 	sqlite3_stmt* insertEntityDataStatement;
@@ -97,6 +102,7 @@ struct ioHandles_t {
 	queryCollection* frameInfoVieWModelQueries;
 	queryCollection* frameInfoVieWModelSimpleQueries;
 	queryCollection* packetStatsQueries;
+	queryCollection* chatsUniqueQueries;
 
 	// Output bat files
 	std::ostream* outputBatHandle;
@@ -160,6 +166,8 @@ public:
 	int teleportAnalysisMinTimeFastForward = 1000;
 	float teleportAnalysisMaxDistanceHorizontal = 100; 
 	float teleportAnalysisMaxDistanceVertical = 40; 
+	bool writeChatsUnique = false;
+	bool writeChatsCategorized = false; // Not currently implemented
 };
 
 
@@ -2944,6 +2952,36 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		io.insertPacketStatsStatement = NULL;
 	}
 
+	if (opts.writeChatsUnique) {
+
+		while ((sqlResult = sqlite3_open("chatsUnique.db", &io.chatsUniqueDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.chatsUniqueDb, "main"))) {
+			std::cerr << DPrintFLocation << ":" << "error opening chatsUnique.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.chatsUniqueDb) << ". Trying again in 1000ms." << "\n";
+			sqlite3_close(io.chatsUniqueDb);
+			io.chatsUniqueDb = NULL;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
+
+		sqlite3_exec(io.chatsUniqueDb, "CREATE TABLE chatsUnique ("
+			"chat TEXT NOT NULL COLLATE BINARY,"
+			"countFound INTEGER NOT NULL,"
+			"PRIMARY KEY (chat COLLATE BINARY)"
+			"); ",
+			NULL, NULL, NULL);
+
+		preparedStatementText = "INSERT OR IGNORE INTO chatsUnique (chat,countFound) VALUES (@chat,0);";
+		sqlite3_prepare_v2(io.chatsUniqueDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertChatUniqueStatement, NULL);
+
+		preparedStatementText = "UPDATE chatsUnique SET countFound = countFound + 1 WHERE chat=@chat;"; // TODO make this dynamic? not a million queries for dupes?
+		sqlite3_prepare_v2(io.chatsUniqueDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateChatUniqueCountStatement, NULL);
+
+		sqlite3_exec(io.chatsUniqueDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	}
+	else {
+		io.chatsUniqueDb = NULL;
+		io.insertChatUniqueStatement = NULL;
+		io.updateChatUniqueCountStatement = NULL;
+	}
+
 
 	if (opts.entityDataToDb) {
 		while ((sqlResult = sqlite3_open("entityDataDb.db", &io.entityDataDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.entityDataDb, "main"))) {
@@ -3279,6 +3317,26 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 	}
 
+	// Chats
+	if (opts.writeChatsUnique) {
+		for (auto it = io.chatsUniqueQueries->begin(); it != io.chatsUniqueQueries->end(); it++) {
+			(*it)->query.bind(io.insertChatUniqueStatement);
+			(*it)->query.bind(io.updateChatUniqueCountStatement);
+			//wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertChatUniqueStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cerr << "Error inserting unique chat into database: " << queryResult << ":" << sqlite3_errmsg(io.chatsUniqueDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			sqlite3_reset(io.insertChatUniqueStatement);
+			queryResult = sqlite3_step(io.updateChatUniqueCountStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cerr << "Error updating unique chat count in database: " << queryResult << ":" << sqlite3_errmsg(io.chatsUniqueDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			sqlite3_reset(io.updateChatUniqueCountStatement);
+			//wasDoingSQLiteExecution = false;
+		}
+	}
+
 	// Player model
 	for (auto it = io.playerModelQueries->begin(); it != io.playerModelQueries->end(); it++) {
 		(*it)->query.bind(io.insertPlayerModelStatement);
@@ -3357,6 +3415,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.frameInfoVieWModelQueries = new queryCollection();
 	io.frameInfoVieWModelSimpleQueries = new queryCollection();
 	io.packetStatsQueries = new queryCollection();
+	io.chatsUniqueQueries = new queryCollection();
 
 
 
@@ -3509,6 +3568,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			sqlite3_exec(io.demoStatsDb, "COMMIT;", NULL, NULL, NULL);
 			sqlite3_finalize(io.insertPacketStatsStatement);
 			sqlite3_close(io.demoStatsDb);
+		}
+		if (opts.writeChatsUnique) {
+			sqlite3_exec(io.chatsUniqueDb, "COMMIT;", NULL, NULL, NULL);
+			sqlite3_finalize(io.insertChatUniqueStatement);
+			sqlite3_finalize(io.updateChatUniqueCountStatement);
+			sqlite3_close(io.chatsUniqueDb);
 		}
 		if (opts.entityDataToDb) {
 			sqlite3_exec(io.entityDataDb, "COMMIT;", NULL, NULL, NULL);
@@ -8221,6 +8286,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						logSpecialThing("CHATSEARCH", msgInfo.isValid ? msgInfo.message : opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
 					}
 				}
+				if (opts.writeChatsUnique) {
+					parsedChatMessage_t msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
+					
+					if (msgInfo.message.length() > 0) {
+
+						SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+						SQLDelayedQuery* query = &queryWrapper->query;
+
+						SQLBIND_DELAYED_TEXT(query, "@chat", msgInfo.message.c_str());
+
+						io.chatsUniqueQueries->push_back(queryWrapper);
+					}
+				}
 
 				// Detect a laugh
 				jp::VecNum vec_num, vec_num2;
@@ -8781,6 +8859,7 @@ int main(int argcO, char** argvO) {
 	auto P = op.add<popl::Value<std::string>>("P", "print-search", "Searches for a string in prints.");
 	auto T = op.add<popl::Value<std::string>>("T", "text-search", "Searches for a string in general.");
 	auto K = op.add<popl::Switch>("K", "skip-kills", "Skips searching for kills (e.g. if you want to only search for chats or defrag runs)");
+	auto L = op.add<popl::Implicit<int>>("L", "log-chats", "Writes database with chats. 1 = unique chats database (every unique chat only once). 2 = categorized chats (not currently implemented)", 1);
 
 	
 	op.parse(argcO, argvO);
@@ -8830,6 +8909,8 @@ int main(int argcO, char** argvO) {
 	opts.playerCSVDump = y->is_set();
 	opts.skipKills = K->is_set();
 	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
+	opts.writeChatsUnique = L->is_set() ? (L->value() & 1) : false;
+	opts.writeChatsCategorized = L->is_set() ? (L->value() & 2) : false;
 	if (x->is_set()) {
 		int v[6];
 		int countfound = sscanf(x->value().c_str(),"%d %d %d %d %d %d",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5]);
