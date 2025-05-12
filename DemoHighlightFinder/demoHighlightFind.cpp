@@ -168,6 +168,8 @@ public:
 	float teleportAnalysisMaxDistanceVertical = 40; 
 	bool writeChatsUnique = false;
 	bool writeChatsCategorized = false; // Not currently implemented
+	bool doStatsDb = false;
+	bool doStrafeDeviation = false;
 };
 
 
@@ -1201,7 +1203,7 @@ qboolean clientNameIsDuplicate[MAX_CLIENTS_MAX];
 
 // This also updates the playerNamesToClientNums trie
 template<unsigned int max_clients>
-void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
+void updatePlayerDemoStatsArrayPointers(demoType_t demoType, const ExtraSearchOptions& opts) {
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
@@ -1236,8 +1238,10 @@ void updatePlayerDemoStatsArrayPointers(demoType_t demoType) {
 			}
 		}
 
-		playerDemoStatsMapKey_t mapPointer(mapname, playerName, i); // We can think of this as something of a soft (not really hard enforced in database) primary key to distinguish players.
-		playerDemoStatsPointers[i] = &playerDemoStatsMap[mapPointer];
+		if (opts.doStatsDb) {
+			playerDemoStatsMapKey_t mapPointer(mapname, playerName, i); // We can think of this as something of a soft (not really hard enforced in database) primary key to distinguish players.
+			playerDemoStatsPointers[i] = &playerDemoStatsMap[mapPointer];
+		}
 	}
 }
 
@@ -1848,7 +1852,7 @@ void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 }
 
 template<unsigned int max_clients>
-void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t demoType,bool& wasDoingSQLiteExecution) {
+void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t demoType,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
 
 
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -1866,7 +1870,9 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 		std::string modelName = Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "model");
 		if (modelName != lastPlayerModel[i]) {
 			lastPlayerModel[i] = modelName;
-			modelsToAdd.push_back(modelName);
+			if (opts.doStatsDb) {
+				modelsToAdd.push_back(modelName);
+			}
 		}
 	}
 
@@ -2468,11 +2474,16 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 
-	while ((sqlResult = sqlite3_open("statistics.db", &io.statsDb)) != SQLITE_OK || (readonlyResult=sqlite3_db_readonly(io.statsDb, "main"))) {
-		std::cerr << DPrintFLocation << ":" << "error opening stats.db for read/write ("<< sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb) << ". Trying again in 1000ms." << "\n";
-		sqlite3_close(io.statsDb);
+	if (opts.doStatsDb) {
+		while ((sqlResult = sqlite3_open("statistics.db", &io.statsDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.statsDb, "main"))) {
+			std::cerr << DPrintFLocation << ":" << "error opening stats.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb) << ". Trying again in 1000ms." << "\n";
+			sqlite3_close(io.statsDb);
+			io.statsDb = NULL;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
+	}
+	else {
 		io.statsDb = NULL;
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
 		"hash	TEXT,"
@@ -2774,35 +2785,38 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//"PRIMARY KEY(hash)"
 		"); ",
 		NULL, NULL, NULL);
-	sqlite3_exec(io.statsDb, "CREATE TABLE playerModels ("
-		"map	TEXT NOT NULL,"
-		"baseModel	TEXT NOT NULL,"
-		"variant	TEXT,"
-		"countFound INTEGER NOT NULL,"
-		"PRIMARY KEY(map,baseModel,variant)"
-		"); ",
-		NULL, NULL, NULL);
-	sqlite3_exec(io.statsDb, "CREATE TABLE playerDemoStats ("
-		"map	TEXT NOT NULL,"
-		"playerName TEXT NOT NULL,"
-		"playerNameStripped TEXT NOT NULL,"
-		"clientNum INT NOT NULL,"
-		"averageStrafeDeviation REAL,"
-		"averageStrafeDeviationBucketsJSON TEXT,"
-		"strafeSampleCount INTEGER NOT NULL,"
-		"averageStrafeDeviationNoSaberMove REAL,"
-		"averageStrafeDeviationNoSaberMoveBucketsJSON TEXT,"
-		"strafeNoSaberMoveSampleCount INTEGER NOT NULL,"
-		"hitBySaberCount INTEGER NOT NULL,"
-		"hitBySaberBlockableCount INTEGER NOT NULL,"
-		"parryCount INTEGER NOT NULL,"
-		"attackFromParryCount INTEGER NOT NULL,"
-		"demoName TEXT NOT NULL,"
-		"demoPath TEXT NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL"//,"
-		//"PRIMARY KEY(playerName,clientNum,map,demoPath)"
-		"); ",
-		NULL, NULL, NULL);
+	if (opts.doStatsDb) {
+
+		sqlite3_exec(io.statsDb, "CREATE TABLE playerModels ("
+			"map	TEXT NOT NULL,"
+			"baseModel	TEXT NOT NULL,"
+			"variant	TEXT,"
+			"countFound INTEGER NOT NULL,"
+			"PRIMARY KEY(map,baseModel,variant)"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.statsDb, "CREATE TABLE playerDemoStats ("
+			"map	TEXT NOT NULL,"
+			"playerName TEXT NOT NULL,"
+			"playerNameStripped TEXT NOT NULL,"
+			"clientNum INT NOT NULL,"
+			"averageStrafeDeviation REAL,"
+			"averageStrafeDeviationBucketsJSON TEXT,"
+			"strafeSampleCount INTEGER NOT NULL,"
+			"averageStrafeDeviationNoSaberMove REAL,"
+			"averageStrafeDeviationNoSaberMoveBucketsJSON TEXT,"
+			"strafeNoSaberMoveSampleCount INTEGER NOT NULL,"
+			"hitBySaberCount INTEGER NOT NULL,"
+			"hitBySaberBlockableCount INTEGER NOT NULL,"
+			"parryCount INTEGER NOT NULL,"
+			"attackFromParryCount INTEGER NOT NULL,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"//,"
+			//"PRIMARY KEY(playerName,clientNum,map,demoPath)"
+			"); ",
+			NULL, NULL, NULL);
+	}
 
 	sqlite3_exec(io.killDb, "CREATE TABLE demoDatabaseProperties ("
 		"propertyName	TEXT NOT NULL,"
@@ -2878,27 +2892,38 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime )";
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDemoMeta, NULL);
 
-	preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
-
-	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerModelStatement, NULL);
-	preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
-
-	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
 	preparedStatementText = "SELECT last_insert_rowid();";
 
 	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectLastInsertRowIdStatement, NULL);
-	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectStatsLastInsertRowIdStatement, NULL);
 
-	preparedStatementText = "INSERT INTO playerDemoStats "
-		"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
-		" VALUES "
-		"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
+	if(opts.doStatsDb){
+		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectStatsLastInsertRowIdStatement, NULL);
 
-	sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
+		preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
 
+		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerModelStatement, NULL);
+		preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
+
+		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
+
+		preparedStatementText = "INSERT INTO playerDemoStats "
+			"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
+			" VALUES "
+			"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
+
+		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
+	}
+	else {
+		io.selectStatsLastInsertRowIdStatement = NULL;
+		io.insertPlayerModelStatement = NULL;
+		io.updatePlayerModelCountStatement = NULL;
+		io.insertPlayerDemoStatsStatement = NULL;
+	}
 
 	sqlite3_exec(io.killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-	sqlite3_exec(io.statsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	if (opts.doStatsDb) {
+		sqlite3_exec(io.statsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	}
 
 	sqlite3_exec(io.killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillAngles','1');", NULL, NULL, NULL);
 	sqlite3_exec(io.killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillSpree','1');", NULL, NULL, NULL);
@@ -2963,15 +2988,16 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_exec(io.chatsUniqueDb, "CREATE TABLE chatsUnique ("
 			"chat TEXT NOT NULL COLLATE BINARY,"
+			"demoType INTEGER NOT NULL,"
 			"countFound INTEGER NOT NULL,"
-			"PRIMARY KEY (chat COLLATE BINARY)"
+			"PRIMARY KEY (demoType,chat COLLATE BINARY)"
 			"); ",
 			NULL, NULL, NULL);
 
-		preparedStatementText = "INSERT OR IGNORE INTO chatsUnique (chat,countFound) VALUES (@chat,0);";
+		preparedStatementText = "INSERT OR IGNORE INTO chatsUnique (chat, demoType, countFound) VALUES (@chat, @demoType,0);";
 		sqlite3_prepare_v2(io.chatsUniqueDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertChatUniqueStatement, NULL);
 
-		preparedStatementText = "UPDATE chatsUnique SET countFound = countFound + 1 WHERE chat=@chat;"; // TODO make this dynamic? not a million queries for dupes?
+		preparedStatementText = "UPDATE chatsUnique SET countFound = countFound + 1 WHERE chat=@chat AND demoType=@demoType;"; // TODO make this dynamic? not a million queries for dupes?
 		sqlite3_prepare_v2(io.chatsUniqueDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateChatUniqueCountStatement, NULL);
 
 		sqlite3_exec(io.chatsUniqueDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
@@ -3291,16 +3317,18 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	}
 
 	// Player demo stats
-	for (auto it = io.playerDemoStatsQueries->begin(); it != io.playerDemoStatsQueries->end(); it++) {
-		(*it)->query.bind(io.insertPlayerDemoStatsStatement);
+	if (opts.doStatsDb) {
+		for (auto it = io.playerDemoStatsQueries->begin(); it != io.playerDemoStatsQueries->end(); it++) {
+			(*it)->query.bind(io.insertPlayerDemoStatsStatement);
 
-		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
-		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting player demo stats into database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+			//wasDoingSQLiteExecution = true;
+			int queryResult = sqlite3_step(io.insertPlayerDemoStatsStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cerr << "Error inserting player demo stats into database: " << queryResult << ":" << sqlite3_errmsg(io.statsDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			sqlite3_reset(io.insertPlayerDemoStatsStatement);
+			//wasDoingSQLiteExecution = false;
 		}
-		sqlite3_reset(io.insertPlayerDemoStatsStatement);
-		//wasDoingSQLiteExecution = false;
 	}
 
 	// Packet stats
@@ -3452,7 +3480,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 	qboolean successStatisticsSave = qfalse;
 	if (!SEHExceptionCaught || !wasDoingSQLiteExecution) { // this... kinda old with how it was previously. can prolly simplify. todo.
-		successStatisticsSave = saveStatisticsToDb(io, wasDoingSQLiteExecution, sharedVars,SEHExceptionCaught); // This will only return false if there's an exception.
+		if (opts.doStatsDb) {
+			successStatisticsSave = saveStatisticsToDb(io, wasDoingSQLiteExecution, sharedVars, SEHExceptionCaught); // This will only return false if there's an exception.
+		}
+		else {
+			successStatisticsSave = qtrue;
+		}
 	}
 
 
@@ -3547,7 +3580,9 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 
 		sqlite3_exec(io.killDb, "COMMIT;", NULL, NULL, NULL);
-		sqlite3_exec(io.statsDb, "COMMIT;", NULL, NULL, NULL);
+		if (opts.doStatsDb) {
+			sqlite3_exec(io.statsDb, "COMMIT;", NULL, NULL, NULL);
+		}
 		sqlite3_finalize(io.insertLaughsStatement);
 		sqlite3_finalize(io.insertDefragRunStatement);
 		sqlite3_finalize(io.insertCaptureStatement);
@@ -3562,7 +3597,9 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		sqlite3_finalize(io.selectStatsLastInsertRowIdStatement);
 		sqlite3_finalize(io.insertPlayerDemoStatsStatement);
 		sqlite3_close(io.killDb);
-		sqlite3_close(io.statsDb);
+		if (opts.doStatsDb) {
+			sqlite3_close(io.statsDb);
+		}
 
 		if (opts.writeDemoPacketStats) {
 			sqlite3_exec(io.demoStatsDb, "COMMIT;", NULL, NULL, NULL);
@@ -4692,7 +4729,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
-				CheckForNameChanges<max_clients>(&demo.cut.Cl,io,demoType,wasDoingSQLiteExecution);
+				CheckForNameChanges<max_clients>(&demo.cut.Cl,io,demoType,wasDoingSQLiteExecution,opts);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				updateForcePowersInfo(&demo.cut.Cl);
 				updateGameInfo(&demo.cut.Cl, demoType);
@@ -4700,7 +4737,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
 					goto cutcomplete;
 				}
-				updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
+				updatePlayerDemoStatsArrayPointers<max_clients>(demoType, opts);
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
 				//if (!newHandle) {
@@ -4849,7 +4886,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						// Strafe precision
 						qboolean strafeApplicable = qfalse;
-						float strafeDeviation = calculateStrafeDeviation(thisEs, &strafeApplicable);
+						float strafeDeviation = opts.doStrafeDeviation ? calculateStrafeDeviation(thisEs, &strafeApplicable) : std::numeric_limits<float>::infinity();
 						if (strafeApplicable) {
 							//strafeDeviations[thisEs->number].averageHelper.sum += strafeDeviation; // Not really needed because we have no way to reliably reset it (since no "Timer started" info). But maybe we can use it in the futuer some time
 							//strafeDeviations[thisEs->number].averageHelper.divisor++;
@@ -5142,7 +5179,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					float speed = VectorLength(demo.cut.Cl.snap.ps.velocity);
 
-					playerStateStrafeDeviationThisFrame = calculateStrafeDeviation(&demo.cut.Cl.snap.ps, &strafeApplicablePlayerStateThisFrame);
+					playerStateStrafeDeviationThisFrame = opts.doStrafeDeviation ? calculateStrafeDeviation(&demo.cut.Cl.snap.ps, &strafeApplicablePlayerStateThisFrame) : std::numeric_limits<float>::infinity();
 					if (strafeApplicablePlayerStateThisFrame) {
 						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor++;
 						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum += playerStateStrafeDeviationThisFrame;
@@ -8295,6 +8332,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						SQLDelayedQuery* query = &queryWrapper->query;
 
 						SQLBIND_DELAYED_TEXT(query, "@chat", msgInfo.message.c_str());
+						SQLBIND_DELAYED(query, int, "@demoType", demoType);
 
 						io.chatsUniqueQueries->push_back(queryWrapper);
 					}
@@ -8646,7 +8684,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 
 		if (hadConfigStringCommands) {
-			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution);
+			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution,opts);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			updateForcePowersInfo(&demo.cut.Cl);
 			updateGameInfo(&demo.cut.Cl,demoType);
@@ -8654,7 +8692,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
 				goto cutcomplete;
 			}
-			updatePlayerDemoStatsArrayPointers<max_clients>(demoType);
+			updatePlayerDemoStatsArrayPointers<max_clients>(demoType, opts);
 		}
 
 
@@ -8860,6 +8898,7 @@ int main(int argcO, char** argvO) {
 	auto T = op.add<popl::Value<std::string>>("T", "text-search", "Searches for a string in general.");
 	auto K = op.add<popl::Switch>("K", "skip-kills", "Skips searching for kills (e.g. if you want to only search for chats or defrag runs)");
 	auto L = op.add<popl::Implicit<int>>("L", "log-chats", "Writes database with chats. 1 = unique chats database (every unique chat only once). 2 = categorized chats (not currently implemented)", 1);
+	auto Q = op.add<popl::Implicit<int>>("Q", "skip-stats", "1 = Avoids creating the statistics db, 2 = avoids strafe deviation calculation. Bitmask. Can combine.",1);
 
 	
 	op.parse(argcO, argvO);
@@ -8911,6 +8950,8 @@ int main(int argcO, char** argvO) {
 	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
 	opts.writeChatsUnique = L->is_set() ? (L->value() & 1) : false;
 	opts.writeChatsCategorized = L->is_set() ? (L->value() & 2) : false;
+	opts.doStatsDb = Q->is_set() ? !(Q->value() & 1) : true;
+	opts.doStrafeDeviation = Q->is_set() ? !(Q->value() & 2) : true;
 	if (x->is_set()) {
 		int v[6];
 		int countfound = sscanf(x->value().c_str(),"%d %d %d %d %d %d",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5]);
