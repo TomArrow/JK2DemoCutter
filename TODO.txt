@@ -16,6 +16,10 @@ Make demo converter. Let it for example fix up names for jomme. Find closest col
 
 detect dbs on rolling ppl
 
+try some fuzzing?
+
+make some kind of display for acceleration/speed over course of a run to compare quality of runs
+
 
 
 way to have ET_GRAPPLE to have skins:
