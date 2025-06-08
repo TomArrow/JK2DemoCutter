@@ -247,8 +247,10 @@ typedef struct _iobuf
 } FILE;
 #endif
 
+// this will need adjusting if demo tools should work on big endian
 #define LittleLong
 #define LittleShort
+#define LittleFloat
 
 #define MAX_CLIENTS			32
 #define MAX_CLIENTS_MAX		64 // Highest of any game
@@ -546,10 +548,21 @@ typedef vec_t vec3_t[3];
 typedef vec_t vec4_t[4];
 typedef vec_t vec5_t[5];
 
+#define Square(x) ((x)*(x))
 
 vec_t VectorLength(const vec3_t v);
 vec_t VectorLength2(const vec2_t v);
-vec_t VectorNormalize(vec3_t v);
+vec_t VectorNormalize(vec3_t v); 
+vec_t VectorNormalize2(const vec3_t v, vec3_t out);
+void VectorInverse(vec3_t v);
+vec_t VectorLengthSquared(const vec3_t v);
+void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross);
+
+typedef union {
+	float f;
+	int i;
+	unsigned int ui;
+} floatint_t;
 
 inline int VectorCompare(const vec3_t v1, const vec3_t v2) {
 	if (v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2]) {
@@ -557,6 +570,63 @@ inline int VectorCompare(const vec3_t v1, const vec3_t v2) {
 	}
 	return 1;
 }
+
+typedef struct {
+	float		normal[3];
+	float		dist;
+} dplane_t;
+
+
+// plane_t structure
+// !!! if this is changed, it must be changed in asm code too !!!
+typedef struct cplane_s {
+	vec3_t	normal;
+	float	dist;
+	byte	type;			// for fast side tests: 0,1,2 = axial, 3 = nonaxial
+	byte	signbits;		// signx + (signy<<1) + (signz<<2), used as lookup during collision
+	byte	pad[2];
+} cplane_t;
+#define MAX_G2_COLLISIONS 16
+
+/*
+Ghoul2 Insert Start
+*/
+typedef struct
+{
+	float		mDistance;
+	int			mEntityNum;
+	int			mModelIndex;
+	int			mPolyIndex;
+	int			mSurfaceIndex;
+	vec3_t		mCollisionPosition;
+	vec3_t		mCollisionNormal;
+	int			mFlags;
+	int			mMaterial;
+	int			mLocation;
+	float		mBarycentricI; // two barycentic coodinates for the hit point
+	float		mBarycentricJ; // K = 1-I-J
+} CollisionRecord_t;
+
+// a trace is returned when a box is swept through the world
+typedef struct {
+	qboolean	allsolid;	// if true, plane is not valid
+	qboolean	startsolid;	// if true, the initial point was in a solid area
+	float		fraction;	// time completed, 1.0 = didn't hit anything
+	vec3_t		endpos;		// final position
+	cplane_t	plane;		// surface normal at impact, transformed to world space
+	int			surfaceFlags;	// surface hit
+	int			contents;	// contents on other side of surface hit
+	int			entityNum;	// entity the contacted sirface is a part of
+/*
+Ghoul2 Insert Start
+*/
+	CollisionRecord_t G2CollisionMap[MAX_G2_COLLISIONS];	// map that describes all of the parts of ghoul2 models that got hit
+/*
+Ghoul2 Insert End
+*/
+} trace_t;
+
+typedef int		clipHandle_t;
 
 typedef enum {
 	AXIS_SIDE,
