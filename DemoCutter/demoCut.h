@@ -848,6 +848,7 @@ typedef struct entityMeta_s {
 typedef enum demoToolsEntityFlags_s {
 	DTFLAG_MINMAXSET = (1<<0),
 	DTFLAG_ISLIMB = (1<<1), // used for jk2sp bouncing related stuff
+	DTFLAG_JK2MP_ITEMBOUNCE = (1<<2),
 }demoToolsEntityFlags_s;
 
 typedef struct demoToolsEntityData_t{

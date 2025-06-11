@@ -1109,6 +1109,9 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 								entityServerTime[it->first] = it->second.demoToolsData.serverTime;
 							}
 							else {
+								if (specializeGameValue<GMAP_ENTITYTYPE, UNSAFE>(ET_ITEM_GENERAL, demoType) == it->second.eType) {
+									entState.demoToolsData.flags |= DTFLAG_JK2MP_ITEMBOUNCE; // TODO is this same for other games?
+								}
 								retimeEntity(&entState, time, time, demoType);
 								playerEntities[it->first] = entState;
 								entityServerTime[it->first] = it->second.demoToolsData.serverTime;

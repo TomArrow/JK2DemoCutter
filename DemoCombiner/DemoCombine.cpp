@@ -701,6 +701,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
 							entityState_t tmpEntity = it->second;
 							tmpEntity.eType = ET_ITEM_JK2;
+							tmpEntity.demoToolsData.flags |= DTFLAG_JK2MP_ITEMBOUNCE;
 							tmpEntity.modelindex = convertGameValue<GMAP_ITEMLIST,UNSAFE>(it->second.modelindex, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
 							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse);

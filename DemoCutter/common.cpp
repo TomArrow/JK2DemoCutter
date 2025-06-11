@@ -6137,7 +6137,7 @@ void G_SetOrigin(entityState_t* entity, vec3_t origin) {
 }
 
 
-static void bounceEntity(entityState_t* entity, double newServerTime, double newDemoTime, demoType_t demoType, trace_t* trace) {
+static void bounceEntity(entityState_t* entity, double newServerTime, demoType_t demoType, trace_t* trace) {
 	vec3_t	velocity;
 	float	dot;
 	int		hitTime;
@@ -6205,10 +6205,31 @@ static void bounceEntity(entityState_t* entity, double newServerTime, double new
 		}
 
 	}
+	else if(entity->demoToolsData.flags & DTFLAG_JK2MP_ITEMBOUNCE){
+
+		VectorScale(entity->pos.trDelta, 0.5, entity->pos.trDelta);
+		// check for stop
+		if (trace->plane.normal[2] > 0 && entity->pos.trDelta[2] < 40) {
+			trace->endpos[2] += 1.0;	// make sure it is off ground
+			SnapVector(trace->endpos);
+			G_SetOrigin(entity, trace->endpos);
+			entity->groundEntityNum = trace->entityNum;
+			return;
+		}
+		G_SetOrigin(entity, trace->endpos);
+		return;
+	}
+	else {
+
+		VectorClear(entity->pos.trDelta);
+		G_SetOrigin(entity, trace->endpos);
+		return;
+	}
 
 	if (demoType != DM_14) {
 		VectorAdd(entity->pos.trBase, trace->plane.normal, entity->pos.trBase);
-		entity->pos.trTime = newDemoTime;
+		entity->pos.trTime = newServerTime;
+		entity->apos.trTime = newServerTime;
 		return;
 	}
 
@@ -6224,8 +6245,6 @@ static void bounceEntity(entityState_t* entity, double newServerTime, double new
 		entity->pos.trTime = hitTime - 10; // this is kinda dumb hacking, but it pushes the missile away from the impact plane a bit
 	}
 
-	entity->pos.trTime = (double)entity->pos.trTime - newServerTime + newDemoTime;
-
 	//VectorCopy(trace->plane.normal, ent->pos1); // ??
 
 	//if (ententity->weapon != WP_SABER
@@ -6236,8 +6255,6 @@ static void bounceEntity(entityState_t* entity, double newServerTime, double new
 	//	//now you can damage the guy you came from
 	//	ent->owner = NULL;
 	//}
-
-	return;
 
 	if (( entity->demoToolsData.flags & DTFLAG_ISLIMB) && entity->pos.trType == TR_STATIONARY) // for limbs
 	{//stopped, stop spinning
@@ -6300,19 +6317,18 @@ static void bounceEntity(entityState_t* entity, double newServerTime, double new
 		{
 			entity->apos.trDelta[i] = AngleNormalize180(entity->apos.trDelta[i]);
 		}
-		entity->apos.trTime = newDemoTime;
+		entity->apos.trTime = newServerTime;
 		entity->apos.trDuration = 1000;
 		entity->apos.trType = TR_LINEAR_STOP;
 		//VectorClear( entity->apos.trDelta );
 	}
+	else {
+		entity->apos.trTime = newServerTime;
+	}
 
 }
 
-#if USE_CMODEL
 void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t demoType, CModel* cm) {
-#else
-void retimeEntity(entityState_t * entity, double newServerTime, demoType_t demoType) {
-#endif
 
 	vec3_t newPos;
 	// angles
@@ -6356,24 +6372,25 @@ void retimeEntity(entityState_t * entity, double newServerTime, demoType_t demoT
 
 			VectorCopy(trace.endpos, entity->pos.trBase);
 
-			VectorClear(entity->pos.trDelta);
-			VectorClear(entity->apos.trDelta);
-			entity->pos.trType = TR_STATIONARY;
-			entity->apos.trType = TR_STATIONARY;
+			//VectorClear(entity->pos.trDelta);
+			//VectorClear(entity->apos.trDelta);
+			//entity->pos.trType = TR_STATIONARY;
+			//entity->apos.trType = TR_STATIONARY;
 		}
 		else {
 
 			VectorCopy(newPos, entity->pos.trBase);
+			BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
+			VectorCopy(newPos, entity->pos.trDelta);
+
+			entity->pos.trTime = newServerTime;
+			entity->apos.trTime = newServerTime;
+			return;
 		}
 
-		BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
-		VectorCopy(newPos, entity->pos.trDelta);
-
-		entity->pos.trTime = newServerTime;
-		entity->apos.trTime = newServerTime;
 
 		// bounce
-		//bounceEntity(entity,newServerTime,newDemoTime, demoType, &trace);
+		bounceEntity(entity,newServerTime, demoType, &trace);
 	}
 	else
 #endif
@@ -6398,11 +6415,12 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 
 
 	double currentTime = std::max(entity->pos.trTime, entity->apos.trTime); // they can be different. i think if we start at the lower one it could cause weirdness.. so start at a common max
-	double nextTime;
+	double baseStep,nextTime;
 
 
 	while (currentTime < newServerTime) {
-		nextTime = (entity->pos.trType > TR_INTERPOLATE || entity->apos.trType > TR_INTERPOLATE) ? std::min((double)newServerTime, currentTime + 100.0) : newServerTime;
+		baseStep = (newServerTime - currentTime) > 1000 ? (newServerTime - currentTime - 1000) : 100; // in case of some weirdness, skip up to 1 second before here.
+		nextTime = ((entity->pos.trType > TR_INTERPOLATE || entity->apos.trType > TR_INTERPOLATE) && cm) ? std::min((double)newServerTime, currentTime + baseStep) : newServerTime;
 
 		// we need to go in steps because bouncing uses a trace to see how far the entity can get when tracing to the evaluated trajectory
 		// however the gravity pull doesn't rersult in a linear line movement, rather a curve, so the "impact" point changes as the delta in time moves forward,
