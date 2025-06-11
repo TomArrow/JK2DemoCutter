@@ -1109,7 +1109,7 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 								entityServerTime[it->first] = it->second.demoToolsData.serverTime;
 							}
 							else {
-								retimeEntity(&entState, time, time);
+								retimeEntity(&entState, time, time, demoType);
 								playerEntities[it->first] = entState;
 								entityServerTime[it->first] = it->second.demoToolsData.serverTime;
 							}

@@ -1,4 +1,5 @@
 #include "demoCut.h"
+#include "CModel.h"
 #include "DemoReader.h"
 #include "DemoReaderLight.h"
 #include "ini.h"
@@ -8,6 +9,7 @@
 #include <chrono>
 #include <jk2spStuff.h>
 
+#include <include/popl.hpp>
 // TODO attach amount of dropped frames in filename.
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -179,7 +181,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 
 
 
-qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
+qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, std::vector<std::string>* bspDirectories) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -328,6 +330,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	strcpy_s(infoCopy, isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy, demoType);
+
+	char mapname[MAX_STRING_CHARS_MAX];
+	Q_strncpyz(mapname, sizeof(mapname), Info_ValueForKey(infoCopy, sizeof(infoCopy), "mapname"),sizeof(mapname));
+
 	infoCopy[0] = 0;
 	strcpy_s(infoCopy, isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING, demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[1]);
 	Info_SetValueForKey_Big(infoCopy, sizeof(infoCopy), "g_demoCombinerFields", "1");
@@ -350,6 +356,23 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 	if (!newHandle) {
 		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
+	}
+
+	CModel* cm = NULL;
+	if (mapname[0]) {
+		int mapnameLen = strlen(mapname);
+		if (mapnameLen+4 < sizeof(mapname)) {
+			mapname[mapnameLen] = '.';
+			mapname[mapnameLen+1] = 'b';
+			mapname[mapnameLen+2] = 's';
+			mapname[mapnameLen+3] = 'p';
+			mapname[mapnameLen+4] = '\0';
+
+			std::string mappath = CModel::GetMapPath(mapname, bspDirectories);
+			if (mappath.size() > 0) {
+				cm = new CModel(mappath.c_str());
+			}
+		}
 	}
 
 	// Write demo header
@@ -487,7 +510,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 											tmpEntity.eType = ET_BODY_JK2;
 											tmpEntity.clientNum = targetClientNum;
 											tmpEntity.number = targetEntitySlot;
-											retimeEntity(&tmpEntity, realTranslatedTime, time);
+											retimeEntity(&tmpEntity, realTranslatedTime, time, sourceDemoType, cm);
 											//tmpEntity.pos.trTime = time;
 											if (EV_BODY_QUEUE_COPY_GENERAL == (generalizeGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event,sourceDemoType) & ~EV_EVENT_BITS)) {
 												tmpEntity.eventParm = convertGameValue<GMAP_EVENTS, UNSAFE>(tmpEntity.event & ~EV_EVENT_BITS,sourceDemoType, demoType);
@@ -631,7 +654,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								tmpEntity.genericenemyindex = ownerSlot >= MAX_CLIENTS? 0: ownerSlot + 1024;
 								tmpEntity.number = targetEntitySlot;
 								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qtrue,qfalse,demoType);
-								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+								retimeEntity(&tmpEntity, thisTimeInServerTime,time, sourceDemoType, cm);
 								/*if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
 								}*/
@@ -661,7 +684,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 								tmpEntity.owner = ownerSlot;
 								tmpEntity.number = targetEntitySlot;
 								remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qtrue,qfalse, demoType);
-								retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+								retimeEntity(&tmpEntity, thisTimeInServerTime,time, sourceDemoType, cm);
 								/*if (EV_GENERAL_SOUND == (tmpEntity.event & ~EV_EVENT_BITS)) {
 									//tmpEntity.eventParm = targetPlayerSlot;
 								}*/
@@ -681,7 +704,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.modelindex = convertGameValue<GMAP_ITEMLIST,UNSAFE>(it->second.modelindex, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
 							//remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse);
-							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time, sourceDemoType, cm);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
 
@@ -697,7 +720,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							int mappedOwner = slotManager.getNormalPlayerSlotIfExists(i, it->second.owner);
 							tmpEntity.owner = mappedOwner == -1 ? 0 : mappedOwner; // We want force shields always no matter who made them. For now.
 							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse, demoType);
-							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time, sourceDemoType, cm);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
 
@@ -713,7 +736,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
 							remapConfigStrings(&tmpEntity,&demo.cut.Cl,&demoReaders[i]->reader,&commandsToAdd,qfalse,qfalse, demoType);
-							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time, sourceDemoType, cm);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
 
@@ -755,13 +778,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 							tmpEntity.saberMove = convertGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(tmpEntity.boltInfo,sourceDemoType, demoType);
 							tmpEntity.boltInfo = -1;
 							VectorCopy(tmpEntity.modelScale,tmpEntity.demoToolsData.entityMeta.modelScale);
-							retimeEntity(&tmpEntity, thisTimeInServerTime,time);
+							retimeEntity(&tmpEntity, thisTimeInServerTime,time, sourceDemoType, cm);
 							targetEntities[targetEntitySlot] = tmpEntity;
 						}
 
 					}
 					// Single player dismemberment
-					else if (generalizedEntityType == ET_THINKER_GENERAL && sourceDemoType == DM_14 ) {
+					else if (generalizedEntityType == ET_THINKER_GENERAL && sourceDemoType == DM_14 && ((it->second.eFlags & EF_BOUNCE_HALF) || (it->second.eFlags & EF_BOUNCE_SHRAPNEL_JK2SP)) ) {
 						
 						int targetEntitySlot = slotManager.getEntitySlot(i, it->first, SlotManager::sourceDemoMappingType::SDMT_G2);
 						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
@@ -846,6 +869,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 									tmpEntity.modelGhoul2 = slotInfo->meta.bodyPart;
 									tmpEntity.g2radius = 200;
 									tmpEntity.number = targetEntitySlot;
+									VectorSet(tmpEntity.demoToolsData.mins, -3.0f, -3.0f, -6.0f);
+									VectorSet(tmpEntity.demoToolsData.maxs, 3.0f, 3.0f, 6.0f);
+									tmpEntity.demoToolsData.flags |= DTFLAG_MINMAXSET;
+									tmpEntity.demoToolsData.flags |= DTFLAG_ISLIMB;
 									tmpEntity.modelindex = -1;
 									if (demoType == DM_16) {
 										// one more good reason to use DM_16 for these. got the full GENTITYNUM_BITS for it here
@@ -854,7 +881,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles) {
 									else {
 										tmpEntity.modelindex2 = slotInfo->meta.bodyPartClientNumPlus1 - 1;
 									}
-									retimeEntity(&tmpEntity, thisTimeInServerTime, time);
+									retimeEntity(&tmpEntity, thisTimeInServerTime, time, sourceDemoType,cm);
 									targetEntities[targetEntitySlot] = tmpEntity;
 								}
 							}
@@ -1160,6 +1187,9 @@ cutcomplete:
 	}
 cuterror:
 	FS_FCloseFile(newHandle);
+	if (cm) {
+		delete cm;
+	}
 	return ret;
 }
 
@@ -1194,29 +1224,52 @@ cuterror:
 
 
 
-int main(int argc, char** argv) {
-	if (argc <3) {
-		std::cout << "need 2 arguments: outputname, scriptname";
+int main(int argcO, char** argvO) {
+
+
+	popl::OptionParser op("Allowed options");
+	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
+	auto h = op.add<popl::Switch>("h", "help", "Show help");
+	op.parse(argcO, argvO);
+	auto args = op.non_option_args();
+
+	if (args.size() <2) {
+		std::cout << "need 2 arguments: outputname, scriptname\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
 		return 1;
 	}
+	else if (h->is_set()) {
+		std::cout << "need 2 arguments: outputname, scriptname\n";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
+		return 0;
+	}
 	initializeGameInfos();
-	char* scriptName = NULL;
-	char* outputName = NULL;
+	const char* scriptName = NULL;
+	const char* outputName = NULL;
 
-	outputName = argv[1];
+	outputName = args[0].c_str();
 	char* filteredOutputName = new char[strlen(outputName) + 1];
 	sanitizeFilename(outputName, filteredOutputName,qtrue);
-	strcpy(outputName, filteredOutputName);
-	delete[] filteredOutputName;
 
 	// Read the script
-	scriptName = argv[2];
+	scriptName = args[1].c_str();
 	//std::vector<std::string> inputFiles;
 	mINI::INIFile file(scriptName);
 	mINI::INIStructure ini;
 	file.read(ini);
 
 	std::vector<DemoSource> demoSources;
+	std::vector<std::string> bspDirectories;
+
+	if (b->is_set()) {
+		for (int i = 0; i < b->count(); i++) {
+			std::string dir = b->value(i);
+			dir = dir.erase(dir.find_last_not_of("/\\\"") + 1); // " also because uh ... someone might do -b "path\" .. xd
+			bspDirectories.push_back(dir);
+		}
+	}
 
 	for (auto const& it : ini)
 	{
@@ -1307,7 +1360,7 @@ int main(int argc, char** argv) {
 	}
 	*/
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
-	if (demoCut(outputName,&demoSources)) {
+	if (demoCut(filteredOutputName,&demoSources, &bspDirectories)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully combined in %.5f seconds \n", scriptName, seconds);
@@ -1315,6 +1368,9 @@ int main(int argc, char** argv) {
 	else {
 		Com_DPrintf("Demo %s has failed to get combined or combined with errors\n", scriptName);
 	}
+
+	delete[] filteredOutputName;
+
 #ifdef DEBUG
 	std::cin.get();
 #endif

@@ -301,7 +301,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 							tmpEntity.weapon = convertGameValue<GMAP_WEAPONS, SAFE>(tmpEntity.weapon, sourceDemoType, demoType);
 							tmpEntity.number = targetEntitySlot;
 							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qfalse, qfalse, demoType);
-							retimeEntity(&tmpEntity, thisTimeInServerTime, time);
+							retimeEntity(&tmpEntity, thisTimeInServerTime, time, sourceDemoType);
 							playerEntities[targetEntitySlot] = tmpEntity;
 						}
 					}

@@ -845,6 +845,11 @@ typedef struct entityMeta_s {
 	vec3_t	modelScale;
 } entityMeta_t;
 
+typedef enum demoToolsEntityFlags_s {
+	DTFLAG_MINMAXSET = (1<<0),
+	DTFLAG_ISLIMB = (1<<1), // used for jk2sp bouncing related stuff
+}demoToolsEntityFlags_s;
+
 typedef struct demoToolsEntityData_t{
 	int entityExtraValuesBitmask;
 	short entityExtraValues[ENTITYEXTRA_COUNT];
@@ -856,6 +861,8 @@ typedef struct demoToolsEntityData_t{
 	trajectory_t uninterpolatedPos;
 	trajectory_t uninterpolatedAPos;
 	entityMeta_t entityMeta; // for combiner. modelscale etc. to know when to change entcs
+	vec3_t mins, maxs;
+	int flags; // demoToolsEntityFlags_s
 };
 
 
@@ -4959,8 +4966,13 @@ int G_SoundIndex(const char* name, clientActive_t* clCut, std::vector<std::strin
 int G_ModelIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_GrappleSkinIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_ModelIndex_NoAdd(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
-void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime);
 
+#if USE_CMODEL
+class CModel;
+void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime, demoType_t demoType, CModel* cm = NULL);
+#else
+void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime, demoType_t demoType);
+#endif
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut = NULL);
 int64_t demoCutGetDemoNameTruncationOffset(const char* demoName);
 
@@ -5585,4 +5597,12 @@ struct MetaEventItem {
 	metaEventType_t type;
 };
 
+
+
+
+#include "whereami.h" // cringe but cba adding it to every project just to get a stupid path. thanks for the neat library tho
+
+
 #endif
+
+

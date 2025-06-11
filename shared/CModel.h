@@ -263,6 +263,16 @@ typedef struct {
 #define	SURF_NODLIGHT			0x00800000u	// don't dlight even if solid (solid lava, skies)
 #define	SURF_NOMISCENTS			0x01000000u	// no client models allowed on this surface
 
+// content masks
+#define	MASK_ALL				(-1)
+#define	MASK_SOLID				(CONTENTS_SOLID)
+#define	MASK_PLAYERSOLID		(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY)
+#define	MASK_DEADSOLID			(CONTENTS_SOLID|CONTENTS_PLAYERCLIP)
+#define	MASK_WATER				(CONTENTS_WATER|CONTENTS_LAVA|CONTENTS_SLIME)
+#define	MASK_OPAQUE				(CONTENTS_SOLID|CONTENTS_SLIME|CONTENTS_LAVA)
+#define	MASK_SHOT				(CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE)
+
+
 typedef struct {
 	cplane_t	*plane;
 	int			children[2];		// negative numbers are leafs
@@ -543,18 +553,12 @@ class CModel {
 	std::vector<void*> stuffToFree;
 	inline void* Hunk_Alloc(int size, ha_pref preference) {
 		if (size < 1) {
-			throw std::exception("Super fake Hunk_Alloc: Can't alloc less than 1 byte.");
+			return NULL; // i read there's some weirdo compilers/oses that will have VERY strange behavior when you call calloc (or was it malloc) with size 0, that can lead to security vulnerabilities.
+			//throw std::exception("Super fake Hunk_Alloc: Can't alloc less than 1 byte.");
 		}
 		void* ptr = calloc(1, size);
 		stuffToFree.push_back(ptr);
 		return ptr;
-	}
-	~CModel() { // meh. LOL
-		for (auto it = stuffToFree.begin(); it != stuffToFree.end(); it++) {
-			free(*it);
-		}
-		stuffToFree.clear();
-		CM_ClearMap();
 	}
 
 	int BoxOnPlaneSide(vec3_t emins, vec3_t emaxs, struct cplane_s* p);
@@ -670,7 +674,6 @@ class CModel {
 
 	void CM_Trace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, const vec3_t origin, int brushmask, qboolean capsule, sphere_t* sphere);
 
-	void CM_BoxTrace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, qboolean capsule);
 
 	void CM_TransformedBoxTrace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, const vec3_t origin, const vec3_t angles, qboolean capsule);
 
@@ -710,6 +713,71 @@ class CModel {
 
 	void CM_TraceThroughLeaf(traceWork_t* tw, cLeaf_t* leaf);
 
+public:
+
+	static std::string GetMapPath(const char* filename, std::vector<std::string>* bspPaths = NULL) {
+
+		const char* pathRelativeToDir;
+		if (bspPaths) {
+			for (auto it = bspPaths->begin(); it != bspPaths->end(); it++) {
+
+				pathRelativeToDir = va("%s/%s", it->c_str(), filename);
+				if (FS_FileExists(pathRelativeToDir)) {
+					return pathRelativeToDir;
+				}
+			}
+
+		}
+
+		if (FS_FileExists(filename)) {
+
+			return filename;
+		}
+
+		int pathLen = wai_getExecutablePath(NULL, 0, NULL);
+		char* path = new char[pathLen + 1];
+		int dirlen = 0;
+		wai_getExecutablePath(path, pathLen, &dirlen);
+		path[dirlen] = '\0';
+
+		pathRelativeToDir = va("%s/%s", path, filename);
+		if (FS_FileExists(pathRelativeToDir)) {
+			delete[] path;
+			return pathRelativeToDir;
+		}
+
+		pathRelativeToDir = va("%s/maps/%s", path, filename);
+		if (FS_FileExists(pathRelativeToDir)) {
+			delete[] path;
+			return pathRelativeToDir;
+		}
+
+		delete[] path;
+		return "";
+	}
+	CModel(const char* filename) {
+		int checksum = 0;
+
+		if (FS_FileExists(filename)) {
+
+			CM_LoadMap(filename, qfalse, &checksum);
+			return;
+		}
+
+		throw new std::exception("CModel constructor: Map file not found.");
+
+	}
+	~CModel() { // meh. LOL
+		for (auto it = stuffToFree.begin(); it != stuffToFree.end(); it++) {
+			free(*it);
+		}
+		stuffToFree.clear();
+		CM_ClearMap();
+	}
+
+
+
+	void CM_BoxTrace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, qboolean capsule);
 
 };
 

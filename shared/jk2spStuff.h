@@ -12,6 +12,7 @@
 
 #define EF_MISSILE_STICK_JK2SP		0x00000040	// missiles that stick to the wall.
 #define	EF_NPC_JK2SP					0x00000002	// An NPC
+#define	EF_BOUNCE_SHRAPNEL_JK2SP					0x1000 // An NPC
 
 static const int jk2spEntityTypeToGeneral[] {
 	ET_GENERAL_GENERAL,

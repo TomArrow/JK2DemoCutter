@@ -868,7 +868,7 @@ CMod_LoadEntityString
 =================
 */
 void CModel::CMod_LoadEntityString( lump_t *l, const char *name ) {
-	char			entName[MAX_QPATH];
+	char			entName[MAX_OSPATH];
 	fileHandle_t	entHandle;
 	int				entLen;
 

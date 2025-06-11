@@ -7,6 +7,7 @@
 #include "jk2spStuff.h"
 #include <stateFields.h>
 #include <sstream>
+#include "CModel.h"
 
 #include "include/rapidjson/document.h"
 
@@ -6083,18 +6084,337 @@ int G_ModelIndex_NoAdd(const char* name, clientActive_t* clCut, std::vector<std:
 
 
 
-void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime) {
+/*
+=================
+AngleNormalize360
+
+returns angle normalized to the range [0 <= angle < 360]
+=================
+*/
+inline float AngleNormalize360(float angle) {
+	return (360.0 / 65536) * ((int)(angle * (65536 / 360.0)) & 65535);
+}
+
+/*
+=================
+AngleNormalize180
+
+returns angle normalized to the range [-180 < angle <= 180]
+=================
+*/
+inline float AngleNormalize180(float angle) {
+	angle = AngleNormalize360(angle);
+	if (angle > 180.0) {
+		angle -= 360.0;
+	}
+	return angle;
+}
+
+/*
+=================
+AngleDelta
+
+returns the normalized delta from angle1 to angle2
+=================
+*/
+inline float AngleDelta(float angle1, float angle2) {
+	return AngleNormalize180(angle1 - angle2);
+}
+
+/*
+================
+G_SetOrigin
+
+Sets the pos trajectory for a fixed position
+================
+*/
+void G_SetOrigin(entityState_t* entity, vec3_t origin) {
+	VectorCopy(origin, entity->pos.trBase);
+	entity->pos.trType = TR_STATIONARY;
+	entity->pos.trTime = 0;
+	entity->pos.trDuration = 0;
+	VectorClear(entity->pos.trDelta);
+}
+
+
+static void bounceEntity(entityState_t* entity, double newServerTime, double newDemoTime, demoType_t demoType, trace_t* trace) {
+	vec3_t	velocity;
+	float	dot;
+	int		hitTime;
+	int		EF_BOUNCE_SHRAPNEL_REAL = EF_BOUNCE_SHRAPNEL;
+
+	switch (demoType) {
+	case DM_14:
+		EF_BOUNCE_SHRAPNEL_REAL = EF_BOUNCE_SHRAPNEL_JK2SP;
+		break;
+	}
+
+	// reflect the velocity on the trace plane
+	hitTime = entity->pos.trTime + (newServerTime - entity->pos.trTime) * trace->fraction;
+	BG_EvaluateTrajectoryDelta(&entity->pos, hitTime, velocity);
+	dot = DotProduct(velocity, trace->plane.normal);
+	VectorMA(velocity, -2 * dot, trace->plane.normal, entity->pos.trDelta);
+
+	if (entity->eFlags & EF_BOUNCE_SHRAPNEL_REAL && (demoType < DM_66 || demoType > DM_68)) // q3 doesnt have this. others may not either? idk might need better condition, but lazy rn
+	{
+		VectorScale(entity->pos.trDelta, 0.25f, entity->pos.trDelta);
+		entity->pos.trType = TR_GRAVITY;
+
+		// check for stop
+		if (trace->plane.normal[2] > 0.7 && entity->pos.trDelta[2] < 40) //this can happen even on very slightly sloped walls, so changed it from > 0 to > 0.7
+		{
+			G_SetOrigin(entity, trace->endpos);
+			//ent->nextthink = level.time + 100;
+			return;
+		}
+	}
+	else if (entity->eFlags & EF_BOUNCE_HALF  )
+	{
+		if (demoType == DM_14) {
+			VectorScale(entity->pos.trDelta, 0.5, entity->pos.trDelta);
+
+			// check for stop
+			if (trace->plane.normal[2] > 0.7 && entity->pos.trDelta[2] < 40) //this can happen even on very slightly sloped walls, so changed it from > 0 to > 0.7
+			{
+				if (generalizeGameValue<GMAP_WEAPONS,UNSAFE>(entity->weapon,demoType) == WP_THERMAL_GENERAL)
+				{//roll when you "stop"
+					entity->pos.trType = TR_INTERPOLATE;
+				}
+				//else
+				{
+					G_SetOrigin(entity, trace->endpos);
+					//ent->nextthink = level.time + 500;
+					return;
+				}
+			}
+
+			//if (generalizeGameValue<GMAP_WEAPONS, UNSAFE>(entity->weapon, demoType) == WP_THERMAL_GENERAL)
+			//{//roll when you "stop"
+			//
+			//	ent->has_bounced = qtrue;
+			//}
+		}
+		else {
+			VectorScale(entity->pos.trDelta, 0.65, entity->pos.trDelta);
+			// check for stop
+			if (trace->plane.normal[2] > 0.2 && VectorLength(entity->pos.trDelta) < 40)
+			{
+				G_SetOrigin(entity, trace->endpos);
+				return;
+			}
+		}
+
+	}
+
+	if (demoType != DM_14) {
+		VectorAdd(entity->pos.trBase, trace->plane.normal, entity->pos.trBase);
+		entity->pos.trTime = newDemoTime;
+		return;
+	}
+
+	// NEW--It would seem that we want to set our trBase to the trace endpos
+	//	and set the trTime to the actual time of impact....
+	VectorAdd(trace->endpos, trace->plane.normal, entity->pos.trBase);
+	if (hitTime >= newServerTime)
+	{//trace fraction must have been 1
+		entity->pos.trTime = newServerTime - 10;
+	}
+	else
+	{
+		entity->pos.trTime = hitTime - 10; // this is kinda dumb hacking, but it pushes the missile away from the impact plane a bit
+	}
+
+	entity->pos.trTime = (double)entity->pos.trTime - newServerTime + newDemoTime;
+
+	//VectorCopy(trace->plane.normal, ent->pos1); // ??
+
+	//if (ententity->weapon != WP_SABER
+	//	&& ententity->weapon != WP_THERMAL
+	//	&& ent->e_clThinkFunc != clThinkF_CG_Limb
+	//	&& ent->e_ThinkFunc != thinkF_LimbThink)
+	//{//not a saber, bouncing thermal or limb
+	//	//now you can damage the guy you came from
+	//	ent->owner = NULL;
+	//}
+
+	return;
+
+	if (( entity->demoToolsData.flags & DTFLAG_ISLIMB) && entity->pos.trType == TR_STATIONARY) // for limbs
+	{//stopped, stop spinning
+		//lay flat
+		//pitch
+		//VectorCopy(ent->currentAngles, entity->apos.trBase);
+		vec3_t	flatAngles;
+		if (entity->angles2[0] == -1)
+		{//any pitch is okay
+			flatAngles[0] = entity->apos.trBase[0];
+		}
+		else
+		{//lay flat
+			//if (ent->owner
+			//	&& ent->owner->client
+			//	&& ent->owner->client->NPC_class == CLASS_PROTOCOL
+			//	&& ent->count == BOTH_DISMEMBER_TORSO1)
+			//{
+			//	if (ent->currentAngles[0] > 0 || ent->currentAngles[0] < -180)
+			//	{
+			//		flatAngles[0] = -90;
+			//	}
+			//	else
+			//	{
+			//		flatAngles[0] = 90;
+			//	}
+			//}
+			//else
+			{
+				if (entity->apos.trBase[0] > 90 || entity->apos.trBase[0] < -90)
+				{
+					flatAngles[0] = 180;
+				}
+				else
+				{
+					flatAngles[0] = 0;
+				}
+			}
+		}
+		//yaw
+		flatAngles[1] = entity->apos.trBase[1];
+		//roll
+		if (entity->angles2[2] == -1)
+		{//any roll is okay
+			flatAngles[2] = entity->apos.trBase[2];
+		}
+		else
+		{
+			if (entity->apos.trBase[2] > 90 || entity->apos.trBase[2] < -90)
+			{
+				flatAngles[2] = 180;
+			}
+			else
+			{
+				flatAngles[2] = 0;
+			}
+		}
+		VectorSubtract(flatAngles, entity->apos.trBase, entity->apos.trDelta);
+		for (int i = 0; i < 3; i++)
+		{
+			entity->apos.trDelta[i] = AngleNormalize180(entity->apos.trDelta[i]);
+		}
+		entity->apos.trTime = newDemoTime;
+		entity->apos.trDuration = 1000;
+		entity->apos.trType = TR_LINEAR_STOP;
+		//VectorClear( entity->apos.trDelta );
+	}
+
+}
+
+#if USE_CMODEL
+void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t demoType, CModel* cm) {
+#else
+void retimeEntity(entityState_t * entity, double newServerTime, demoType_t demoType) {
+#endif
+
 	vec3_t newPos;
-	BG_EvaluateTrajectory(&entity->pos, newServerTime, newPos);
-	VectorCopy(newPos, entity->pos.trBase);
-	BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
-	VectorCopy(newPos, entity->pos.trDelta);
+	// angles
 	BG_EvaluateTrajectory(&entity->apos, newServerTime, newPos);
 	VectorCopy(newPos, entity->apos.trBase);
+	// angle delta
 	BG_EvaluateTrajectoryDelta(&entity->apos, newServerTime, newPos);
 	VectorCopy(newPos, entity->apos.trDelta);
-	entity->pos.trTime = newDemoTime;
-	entity->apos.trTime = newDemoTime;
+
+	// pos
+	BG_EvaluateTrajectory(&entity->pos, newServerTime, newPos);
+#if USE_CMODEL
+	if (cm && entity->pos.trType > TR_INTERPOLATE) {
+		trace_t trace;
+		int mask;
+		vec3_t mins, maxs;
+		// make sure we dont fall into floors.
+
+		if (entity->demoToolsData.flags & DTFLAG_MINMAXSET) {
+			VectorCopy(entity->demoToolsData.mins, mins);
+			VectorCopy(entity->demoToolsData.maxs, maxs);
+		}
+		else {
+			IntegerToBoundingBox(entity->solid, mins, maxs);
+		}
+
+		// trace a line from the previous position to the current position
+		//if (ent->clipmask) {
+		//	mask = ent->clipmask;
+		//}
+		//else 
+		{
+			mask = MASK_PLAYERSOLID & ~CONTENTS_BODY;//MASK_SOLID;
+		}
+		cm->CM_BoxTrace(&trace, entity->pos.trBase, newPos, mins, maxs, 0, mask, qfalse); // for now we dont trace against any entities. might do later. just make sure it doesnt go into floor or wall
+		//JP_Trace(&tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, origin,
+		//	ent->r.ownerNum, mask);
+
+
+		if (trace.fraction < 1.0f) {
+
+			VectorCopy(trace.endpos, entity->pos.trBase);
+
+			VectorClear(entity->pos.trDelta);
+			VectorClear(entity->apos.trDelta);
+			entity->pos.trType = TR_STATIONARY;
+			entity->apos.trType = TR_STATIONARY;
+		}
+		else {
+
+			VectorCopy(newPos, entity->pos.trBase);
+		}
+
+		BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
+		VectorCopy(newPos, entity->pos.trDelta);
+
+		entity->pos.trTime = newServerTime;
+		entity->apos.trTime = newServerTime;
+
+		// bounce
+		//bounceEntity(entity,newServerTime,newDemoTime, demoType, &trace);
+	}
+	else
+#endif
+	{
+		// pos delta
+		VectorCopy(newPos, entity->pos.trBase);
+		BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
+		VectorCopy(newPos, entity->pos.trDelta);
+		entity->pos.trTime = newServerTime;
+		entity->apos.trTime = newServerTime;
+	}
+
+
+}
+
+#if USE_CMODEL
+void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime, demoType_t demoType, CModel* cm) {
+#else
+void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTime, demoType_t demoType) {
+	CModel* cm = NULL;
+#endif
+
+
+	double currentTime = std::max(entity->pos.trTime, entity->apos.trTime); // they can be different. i think if we start at the lower one it could cause weirdness.. so start at a common max
+	double nextTime;
+
+
+	while (currentTime < newServerTime) {
+		nextTime = (entity->pos.trType > TR_INTERPOLATE || entity->apos.trType > TR_INTERPOLATE) ? std::min((double)newServerTime, currentTime + 100.0) : newServerTime;
+
+		// we need to go in steps because bouncing uses a trace to see how far the entity can get when tracing to the evaluated trajectory
+		// however the gravity pull doesn't rersult in a linear line movement, rather a curve, so the "impact" point changes as the delta in time moves forward,
+		// leading to stutttering in bounce situations
+
+		retimeEntityStep(entity, nextTime, demoType, cm);
+		currentTime = nextTime;
+	}
+	
+
+	entity->pos.trTime += newDemoTime - newServerTime;
+	entity->apos.trTime += newDemoTime - newServerTime;
 }
 
 
@@ -7792,4 +8112,7 @@ const char* metaEventKeyNames[METAEVENT_COUNT] = {
 	"l",
 	//"hl" // not really used, internal for democutter toools
 };
+
+
+#include <whereami.c> // cringe but cba adding it to every project just to get a stupid path. thanks for the neat library tho
 
