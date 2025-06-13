@@ -11,22 +11,22 @@
 #define NONETWORK_FORCEPOWERLEVEL(ps,fp) ((ps)->fd.forcePowerLevel[(fp)])
 #endif
 
-const int animOverrideNums[] = {
-	BOTH_FORCEWALLREBOUND_BACK_GENERAL,
-	BOTH_FORCEWALLREBOUND_FORWARD_GENERAL,
-	BOTH_FORCEWALLREBOUND_LEFT_GENERAL,
-	BOTH_FORCEWALLREBOUND_RIGHT_GENERAL,
-
-	BOTH_FORCEWALLHOLD_BACK_GENERAL,
-	BOTH_FORCEWALLHOLD_FORWARD_GENERAL,
-	BOTH_FORCEWALLHOLD_LEFT_GENERAL,
-	BOTH_FORCEWALLHOLD_RIGHT_GENERAL,
-
-	BOTH_FORCEWALLRELEASE_BACK_GENERAL,
-	BOTH_FORCEWALLRELEASE_FORWARD_GENERAL,
-	BOTH_FORCEWALLRELEASE_LEFT_GENERAL,
-	BOTH_FORCEWALLRELEASE_RIGHT_GENERAL,
-};
+//const int animOverrideNums[] = {
+//	BOTH_FORCEWALLREBOUND_BACK_GENERAL,
+//	BOTH_FORCEWALLREBOUND_FORWARD_GENERAL,
+//	BOTH_FORCEWALLREBOUND_LEFT_GENERAL,
+//	BOTH_FORCEWALLREBOUND_RIGHT_GENERAL,
+//
+//	BOTH_FORCEWALLHOLD_BACK_GENERAL,
+//	BOTH_FORCEWALLHOLD_FORWARD_GENERAL,
+//	BOTH_FORCEWALLHOLD_LEFT_GENERAL,
+//	BOTH_FORCEWALLHOLD_RIGHT_GENERAL,
+//
+//	BOTH_FORCEWALLRELEASE_BACK_GENERAL,
+//	BOTH_FORCEWALLRELEASE_FORWARD_GENERAL,
+//	BOTH_FORCEWALLRELEASE_LEFT_GENERAL,
+//	BOTH_FORCEWALLRELEASE_RIGHT_GENERAL,
+//};
 
 void Sys_SnapVector(vec3_t vec) {
 	// non-asm version. hope its correct?
@@ -35,16 +35,16 @@ void Sys_SnapVector(vec3_t vec) {
 	vec[2] = (float)(int)(roundf(vec[2]) + 0.5f);
 }
 
+//
+//#define ENUM2STRING(arg)   {#arg,arg}
+//typedef struct stringID_table_s
+//{
+//	char* name;
+//	int		id;
+//} stringID_table_t;
 
-#define ENUM2STRING(arg)   {#arg,arg}
-typedef struct stringID_table_s
-{
-	char* name;
-	int		id;
-} stringID_table_t;
-
-int  GetIDForString(stringID_table_t* table, const char* string);
-const char* GetStringForID(stringID_table_t* table, int id);
+//int  GetIDForString(stringID_table_t* table, const char* string);
+//const char* GetStringForID(stringID_table_t* table, int id);
 
 int		 Q_rand(int* seed) {
 	*seed = (69069 * *seed + 1);
@@ -55,268 +55,9 @@ float	 Q_random(int* seed) {
 	return (Q_rand(seed) & 0xffff) / (float)0x10000;
 }
 
-const int animOverrideCount = sizeof(animOverrideNums) / sizeof(animOverrideNums[0]);
+//const int animOverrideCount = sizeof(animOverrideNums) / sizeof(animOverrideNums[0]);
 //stringID_table_t animTable[MAX_ANIMATIONS_GENERAL + 1]; 
 
-
-weaponData_t weaponData[WP_NUM_WEAPONS_GENERAL] = // only jk2 1.02, rest of weps will be nulled, and values will be wrong for 1.04 etc
-{
-	{	// WP_NONE
-//		"No Weapon",			//	char	classname[32];		// Spawning name
-		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
-		0,						//	int		ammoLow;			// Count when ammo is low
-		0,						//	int		energyPerShot;		// Amount of energy used per shot
-		0,						//	int		fireTime;			// Amount of time between firings
-		0,						//	int		range;				// Range of weapon
-		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		0,						//	int		altFireTime;		// Amount of time between alt-firings
-		0,						//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_STUN_BATON
-//		"Stun Baton",			//	char	classname[32];		// Spawning name
-		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		0,						//	int		energyPerShot;		// Amount of energy used per shot
-		400,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		400,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_SABER,
-//		"Lightsaber",			//	char	classname[32];		// Spawning name
-		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		0,						//	int		energyPerShot;		// Amount of energy used per shot
-		100,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		100,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_BRYAR_PISTOL,
-//		"Bryar Pistol",			//	char	classname[32];		// Spawning name
-		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
-		15,						//	int		ammoLow;			// Count when ammo is low
-		2,						//	int		energyPerShot;		// Amount of energy used per shot
-		400,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		400,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		200,					//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		1,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		1500					//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_BLASTER
-//		"E11 Blaster Rifle",	//	char	classname[32];		// Spawning name
-		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		2,						//	int		energyPerShot;		// Amount of energy used per shot
-		350,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		3,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		150,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_DISRUPTOR
-//		"Tenloss Disruptor Rifle",//	char	classname[32];		// Spawning name
-		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		5,						//	int		energyPerShot;		// Amount of energy used per shot
-		600,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		1300,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		200,					//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		3,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		1700					//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_BOWCASTER
-//		"Wookiee Bowcaster",		//	char	classname[32];		// Spawning name
-		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		5,						//	int		energyPerShot;		// Amount of energy used per shot
-		1000,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		5,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		750,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		400,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,					//	int		altChargeSubTime;	// above for secondary
-		5,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		1700,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0					//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_REPEATER
-//		"Imperial Heavy Repeater",//	char	classname[32];		// Spawning name
-		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		1,						//	int		energyPerShot;		// Amount of energy used per shot
-		100,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		8,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		800,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_DEMP2
-//		"DEMP2",				//	char	classname[32];		// Spawning name
-		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		8,						//	int		energyPerShot;		// Amount of energy used per shot
-		500,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		900,						//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		250,					//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		3,						//	int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		2100					//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_FLECHETTE
-//		"Golan Arms Flechette",	//	char	classname[32];		// Spawning name
-		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		10,						//	int		energyPerShot;		// Amount of energy used per shot
-		700,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		15,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		800,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_ROCKET_LAUNCHER
-//		"Merr-Sonn Missile System",	//	char	classname[32];		// Spawning name
-		AMMO_ROCKETS,			//	int		ammoIndex;			// Index to proper ammo slot
-		5,						//	int		ammoLow;			// Count when ammo is low
-		1,						//	int		energyPerShot;		// Amount of energy used per shot
-		900,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		1200,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_THERMAL
-//		"Thermal Detonator",	//	char	classname[32];		// Spawning name
-		AMMO_THERMAL,				//	int		ammoIndex;			// Index to proper ammo slot
-		0,						//	int		ammoLow;			// Count when ammo is low
-		1,						//	int		energyPerShot;		// Amount of energy used per shot
-		800,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		400,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_TRIP_MINE
-//		"Trip Mine",			//	char	classname[32];		// Spawning name
-		AMMO_TRIPMINE,				//	int		ammoIndex;			// Index to proper ammo slot
-		0,						//	int		ammoLow;			// Count when ammo is low
-		1,						//	int		energyPerShot;		// Amount of energy used per shot
-		800,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		400,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_DET_PACK
-//		"Det Pack",				//	char	classname[32];		// Spawning name
-		AMMO_DETPACK,				//	int		ammoIndex;			// Index to proper ammo slot
-		0,						//	int		ammoLow;			// Count when ammo is low
-		1,						//	int		energyPerShot;		// Amount of energy used per shot
-		800,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		400,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	},
-	{	// WP_EMPLCACED_GUN
-//		"Emplaced Gun",			//	char	classname[32];		// Spawning name
-		/*AMMO_BLASTER*/0,			//	int		ammoIndex;			// Index to proper ammo slot
-		/*5*/0,						//	int		ammoLow;			// Count when ammo is low
-		/*2*/0,						//	int		energyPerShot;		// Amount of energy used per shot
-		100,					//	int		fireTime;			// Amount of time between firings
-		8192,					//	int		range;				// Range of weapon
-		/*3*/0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
-		100,					//	int		altFireTime;		// Amount of time between alt-firings
-		8192,					//	int		altRange;			// Range of alt-fire
-		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
-		0,						//	int		altChargeSubTime;	// above for secondary
-		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
-		0,						//int		altChargeSub;		// above for secondary
-		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
-		0						//	int		altMaxCharge;		// above for secondary
-	}
-};
 
 
 
@@ -1604,9 +1345,2045 @@ models/players/visor/animation.cfg, etc
 
 ======================
 */
-char		BGPAFtext[40000];
-qboolean	BGPAFtextLoaded = qfalse;
-animation_t	bgGlobalAnimations[MAX_TOTALANIMATIONS_GENERAL];
+//char		BGPAFtext[40000];
+//qboolean	BGPAFtextLoaded = qfalse;
+animation_t	bgGlobalAnimations[MAX_TOTALANIMATIONS_GENERAL] = {
+{ 0 , 2 , -1 , 35 , 35 , 0 , 0 } , // BOTH_1CRUFTFORGIL
+{ 8 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_TALK0
+{ 17268 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_TALK1
+{ 17270 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_TALK2
+{ 17272 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_TALK3
+{ 17274 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_TALK4
+{ 17260 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_ALERT
+{ 17266 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_SMILE
+{ 17264 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_FROWN
+{ 17262 , 2 , -1 , 1000 , 1000 , 0 , 0 } , // FACE_DEAD
+{ 3625 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH1
+{ 4511 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH2
+{ 4798 , 68 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH3
+{ 4866 , 39 , -1 , 34 , 34 , 0 , 0 } , // BOTH_DEATH4
+{ 4905 , 41 , -1 , 34 , 34 , 0 , 0 } , // BOTH_DEATH5
+{ 4946 , 53 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH6
+{ 4999 , 68 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH7
+{ 5067 , 39 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH8
+{ 5106 , 61 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH9
+{ 3666 , 61 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH10
+{ 3727 , 61 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH11
+{ 3788 , 53 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH12
+{ 3841 , 55 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH13
+{ 3896 , 50 , -1 , 25 , 25 , 0 , 0 } , // BOTH_DEATH14
+{ 4092 , 61 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH15
+{ 4153 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH16
+{ 4194 , 125 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH17
+{ 4319 , 96 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH18
+{ 4415 , 96 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH19
+{ 4540 , 64 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH20
+{ 4604 , 64 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH21
+{ 4668 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH22
+{ 4699 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH23
+{ 4730 , 34 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH24
+{ 4764 , 34 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH25
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEATHFORWARD1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEATHFORWARD2
+{ 5238 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATHFORWARD3
+{ 5167 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATHBACKWARD1
+{ 5208 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATHBACKWARD2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEATH1IDLE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LYINGDEATH1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STUMBLEDEATH1
+{ 6036 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FALLDEATH1
+{ 6062 , 17 , 0 , 50 , 50 , 0 , 0 } , // BOTH_FALLDEATH1INAIR
+{ 6079 , 32 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FALLDEATH1LAND
+{ 4866 , 39 , -1 , 34 , 34 , 0 , 0 } , // BOTH_DEATH_ROLL
+{ 4866 , 39 , -1 , 34 , 34 , 0 , 0 } , // BOTH_DEATH_FLIP
+{ 4949 , 50 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_SPIN_90_R
+{ 3790 , 51 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_SPIN_90_L
+{ 3792 , 49 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_SPIN_180
+{ 3614 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_LYING_UP
+{ 3603 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_LYING_DN
+{ 3711 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_FALLING_DN
+{ 4518 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_FALLING_UP
+{ 4232 , 85 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH_CROUCHED
+{ 3665 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD1
+{ 4539 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD2
+{ 4865 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD3
+{ 4904 , 1 , -1 , 34 , 34 , 0 , 0 } , // BOTH_DEAD4
+{ 4945 , 1 , -1 , 34 , 34 , 0 , 0 } , // BOTH_DEAD5
+{ 4998 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD6
+{ 5066 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD7
+{ 5105 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD8
+{ 5166 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD9
+{ 3726 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD10
+{ 3787 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD11
+{ 3840 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD12
+{ 3895 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD13
+{ 3945 , 1 , -1 , 25 , 25 , 0 , 0 } , // BOTH_DEAD14
+{ 4152 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD15
+{ 4193 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD16
+{ 4318 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD17
+{ 4414 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD18
+{ 4510 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD19
+{ 4603 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD20
+{ 4667 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD21
+{ 4698 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD22
+{ 4729 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD23
+{ 4763 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD24
+{ 4797 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEAD25
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFORWARD1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFORWARD2
+{ 5207 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEADBACKWARD1
+{ 5237 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEADBACKWARD2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LYINGDEAD1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STUMBLEDEAD1
+{ 6110 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FALLDEAD1LAND
+{ 3603 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEADFLOP1
+{ 3614 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEADFLOP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFLOP3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFLOP4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFLOP5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFORWARD1_FLOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADFORWARD2_FLOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADBACKWARD1_FLOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEADBACKWARD2_FLOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LYINGDEAD1_FLOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STUMBLEDEAD1_FLOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FALLDEAD1_FLOP
+{ 5330 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DISMEMBER_HEAD1
+{ 5340 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DISMEMBER_TORSO1
+{ 5334 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DISMEMBER_LLEG
+{ 5338 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DISMEMBER_RLEG
+{ 5336 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DISMEMBER_RARM
+{ 5332 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DISMEMBER_LARM
+{ 9344 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN1
+{ 9401 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PAIN2
+{ 9420 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PAIN3
+{ 9439 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN4
+{ 9445 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN5
+{ 9451 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN6
+{ 9457 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN7
+{ 9462 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN8
+{ 9468 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN9
+{ 9350 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN10
+{ 9356 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN11
+{ 9362 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN12
+{ 9367 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN13
+{ 9372 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN14
+{ 9378 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN15
+{ 9383 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN16
+{ 9389 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN17
+{ 10482 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN18
+{ 9395 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN19
+{ 4194 , 10 , 0 , 50 , 50 , 0 , 0 } , // BOTH_PAIN20
+{ 86 , 28 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ATTACK1
+{ 532 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ATTACK2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ATTACK2IDLE1
+{ 538 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ATTACK3
+{ 544 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ATTACK4
+{ 270 , 36 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ATTACK5
+{ 306 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ATTACK6
+{ 328 , 90 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ATTACK7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ATTACK8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ATTACK9
+{ 512 , 20 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ATTACK10
+{ 1561 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ATTACK11
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ATTACK12
+{ 9285 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_MELEE1
+{ 9293 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_MELEE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_MELEE3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_MELEE4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_MELEE5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_MELEE6
+{ 512 , 4 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THERMAL_READY
+{ 516 , 12 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THERMAL_THROW
+{ 26 , 8 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A1_T__B_
+{ 34 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A1__L__R
+{ 40 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A1__R__L
+{ 14 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A1_TL_BR
+{ 8 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A1_BR_TL
+{ 2 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A1_BL_TR
+{ 20 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A1_TR_BL
+{ 13389 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BR__R
+{ 13346 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BR_TL
+{ 13376 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BR__L
+{ 13333 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BR_BL
+{ 13524 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__R_TR
+{ 13514 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__R_TL
+{ 13535 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__R__L
+{ 13501 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__R_BL
+{ 13359 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_TR_BR
+{ 13413 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_TR_TL
+{ 13440 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TR__L
+{ 13424 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TR_BL
+{ 13366 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_T__BR
+{ 13528 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_T___R
+{ 13436 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_T__TR
+{ 13460 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_T__TL
+{ 13464 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_T___L
+{ 13450 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_T__BL
+{ 13400 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TL_BR
+{ 13393 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TL_BL
+{ 13475 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__L_BR
+{ 13488 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__L__R
+{ 13420 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1__L_TL
+{ 13294 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BL_BR
+{ 13320 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BL__R
+{ 13307 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BL_TR
+{ 13471 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_BL__L
+{ 13359 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BR_TR
+{ 13366 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_BR_T_
+{ 13389 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1__R_BR
+{ 13528 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__R_T_
+{ 13524 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_TR__R
+{ 13436 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TR_T_
+{ 13514 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_TL__R
+{ 13413 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TL_TR
+{ 13460 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_TL_T_
+{ 13420 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1_TL__L
+{ 13440 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1__L_TR
+{ 13464 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1__L_T_
+{ 13471 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T1__L_BL
+{ 13450 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_BL_T_
+{ 13393 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T1_BL_TL
+{ 10813 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1_T_
+{ 10819 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1__L
+{ 10823 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1__R
+{ 10798 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1_TL
+{ 10792 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1_BR
+{ 10787 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1_BL
+{ 10806 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S1_TR
+{ 9579 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R1_B__S1
+{ 9599 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R1__L_S1
+{ 9605 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R1__R_S1
+{ 9584 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R1_TL_S1
+{ 9573 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R1_BR_S1
+{ 9567 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R1_BL_S1
+{ 9591 , 8 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R1_TR_S1
+{ 8 , 1 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1_BR___
+{ 40 , 2 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1__R___
+{ 20 , 1 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1_TR___
+{ 26 , 2 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1_T____
+{ 14 , 1 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1_TL___
+{ 34 , 2 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1__L___
+{ 2 , 1 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B1_BL___
+{ 19 , 1 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D1_BR___
+{ 38 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D1__R___
+{ 7 , 1 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D1_TR___
+{ 13 , 1 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D1_TL___
+{ 45 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D1__L___
+{ 25 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D1_BL___
+{ 32 , 2 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D1_B____
+{ 155 , 11 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2_T__B_
+{ 166 , 17 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2__L__R
+{ 183 , 16 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2__R__L
+{ 117 , 19 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2_TL_BR
+{ 63 , 13 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2_BR_TL
+{ 47 , 16 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2_BL_TR
+{ 136 , 19 , -1 , 20 , 20 , 0 , 0 } , // BOTH_A2_TR_BL
+{ 13676 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BR__R
+{ 13634 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BR_TL
+{ 13656 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BR__L
+{ 13614 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BR_BL
+{ 13818 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__R_TR
+{ 13809 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__R_TL
+{ 13831 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__R__L
+{ 13789 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__R_BL
+{ 13716 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TR_BR
+{ 13723 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TR_TL
+{ 13736 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TR__L
+{ 13704 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TR_BL
+{ 13647 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_T__BR
+{ 13824 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_T___R
+{ 13730 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_T__TR
+{ 13698 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_T__TL
+{ 13770 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_T___L
+{ 13580 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_T__BL
+{ 13687 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TL_BR
+{ 13682 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TL_BL
+{ 13745 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__L_BR
+{ 13777 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__L__R
+{ 13765 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__L_TL
+{ 13548 , 21 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BL_BR
+{ 13594 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BL__R
+{ 13569 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BL_TR
+{ 13589 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BL__L
+{ 13716 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_BR_TR
+{ 13647 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BR_T_
+{ 13676 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2__R_BR
+{ 13824 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__R_T_
+{ 13818 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_TR__R
+{ 13730 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TR_T_
+{ 13809 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_TL__R
+{ 13723 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_TL_TR
+{ 13698 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_TL_T_
+{ 13765 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_TL__L
+{ 13736 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2__L_TR
+{ 13770 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2__L_T_
+{ 13589 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2__L_BL
+{ 13580 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T2_BL_T_
+{ 13682 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T2_BL_TL
+{ 10904 , 13 , -1 , 20 , 20 , 0 , 0 } , // BOTH_S2_S1_T_
+{ 10917 , 22 , -1 , 12 , 12 , 0 , 0 } , // BOTH_S2_S1__L
+{ 10939 , 19 , -1 , 14 , 14 , 0 , 0 } , // BOTH_S2_S1__R
+{ 10862 , 33 , -1 , 8 , 8 , 0 , 0 } , // BOTH_S2_S1_TL
+{ 10851 , 11 , -1 , 23 , 23 , 0 , 0 } , // BOTH_S2_S1_BR
+{ 10829 , 22 , -1 , 12 , 12 , 0 , 0 } , // BOTH_S2_S1_BL
+{ 10895 , 9 , -1 , 28 , 28 , 0 , 0 } , // BOTH_S2_S1_TR
+{ 9660 , 62 , -1 , 13 , 13 , 0 , 0 } , // BOTH_R2_B__S1
+{ 9765 , 13 , -1 , 25 , 25 , 0 , 0 } , // BOTH_R2__L_S1
+{ 9778 , 15 , -1 , 25 , 25 , 0 , 0 } , // BOTH_R2__R_S1
+{ 9722 , 20 , -1 , 25 , 25 , 0 , 0 } , // BOTH_R2_TL_S1
+{ 9633 , 27 , -1 , 25 , 25 , 0 , 0 } , // BOTH_R2_BR_S1
+{ 9614 , 19 , -1 , 25 , 25 , 0 , 0 } , // BOTH_R2_BL_S1
+{ 9742 , 23 , -1 , 25 , 25 , 0 , 0 } , // BOTH_R2_TR_S1
+{ 63 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2_BR___
+{ 183 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2__R___
+{ 136 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2_TR___
+{ 155 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2_T____
+{ 117 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2_TL___
+{ 166 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2__L___
+{ 47 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B2_BL___
+{ 132 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2_BR___
+{ 179 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2__R___
+{ 59 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2_TR___
+{ 72 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2_TL___
+{ 195 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2__L___
+{ 151 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2_BL___
+{ 162 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D2_B____
+{ 246 , 27 , -1 , 25 , 25 , 0 , 0 } , // BOTH_A3_T__B_
+{ 273 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A3__L__R
+{ 286 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A3__R__L
+{ 223 , 14 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A3_TL_BR
+{ 211 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A3_BR_TL
+{ 199 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A3_BL_TR
+{ 237 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A3_TR_BL
+{ 13971 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BR__R
+{ 13929 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BR_TL
+{ 13951 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BR__L
+{ 13909 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BR_BL
+{ 14113 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__R_TR
+{ 14104 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__R_TL
+{ 14126 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__R__L
+{ 14084 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__R_BL
+{ 14011 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TR_BR
+{ 14018 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TR_TL
+{ 14031 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TR__L
+{ 13999 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TR_BL
+{ 13942 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_T__BR
+{ 14119 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_T___R
+{ 14025 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_T__TR
+{ 13993 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_T__TL
+{ 14065 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_T___L
+{ 13875 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_T__BL
+{ 13982 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TL_BR
+{ 13977 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TL_BL
+{ 14040 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__L_BR
+{ 14072 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__L__R
+{ 14060 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__L_TL
+{ 13843 , 21 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BL_BR
+{ 13889 , 20 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BL__R
+{ 13864 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BL_TR
+{ 13884 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BL__L
+{ 14011 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_BR_TR
+{ 13942 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BR_T_
+{ 13971 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3__R_BR
+{ 14119 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__R_T_
+{ 14113 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_TR__R
+{ 14025 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TR_T_
+{ 14104 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_TL__R
+{ 14018 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_TL_TR
+{ 13993 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_TL_T_
+{ 14060 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_TL__L
+{ 14031 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3__L_TR
+{ 14065 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3__L_T_
+{ 13884 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3__L_BL
+{ 13875 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T3_BL_T_
+{ 13977 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T3_BL_TL
+{ 11036 , 45 , -1 , 17 , 17 , 0 , 0 } , // BOTH_S3_S1_T_
+{ 11081 , 26 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S3_S1__L
+{ 11107 , 23 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S3_S1__R
+{ 10998 , 23 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S3_S1_TL
+{ 10980 , 18 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S3_S1_BR
+{ 10958 , 22 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S3_S1_BL
+{ 11021 , 15 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S3_S1_TR
+{ 9863 , 49 , -1 , 17 , 17 , 0 , 0 } , // BOTH_R3_B__S1
+{ 9993 , 39 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R3__L_S1
+{ 10032 , 29 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R3__R_S1
+{ 9912 , 44 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R3_TL_S1
+{ 9830 , 33 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R3_BR_S1
+{ 9793 , 37 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R3_BL_S1
+{ 9956 , 37 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R3_TR_S1
+{ 211 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3_BR___
+{ 286 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3__R___
+{ 237 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3_TR___
+{ 246 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3_T____
+{ 223 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3_TL___
+{ 273 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3__L___
+{ 199 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B3_BL___
+{ 231 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D3_BR___
+{ 282 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D3__R___
+{ 207 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D3_TR___
+{ 219 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D3_TL___
+{ 291 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D3__L___
+{ 241 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D3_BL___
+{ 269 , 4 , -1 , 25 , 25 , 0 , 0 } , // BOTH_D3_B____
+{ 331 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A4_T__B_
+{ 338 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A4__L__R
+{ 346 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A4__R__L
+{ 313 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A4_TL_BR
+{ 304 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A4_BR_TL
+{ 295 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A4_BL_TR
+{ 322 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A4_TR_BL
+{ 14237 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_BR__R
+{ 14202 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_BR_TL
+{ 14224 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T4_BR__L
+{ 14189 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T4_BR_BL
+{ 14379 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__R_TR
+{ 14370 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__R_TL
+{ 14392 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__R__L
+{ 14357 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T4__R_BL
+{ 14277 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TR_BR
+{ 14284 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TR_TL
+{ 14297 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TR__L
+{ 14265 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TR_BL
+{ 14215 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_T__BR
+{ 14385 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_T___R
+{ 14291 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_T__TR
+{ 14259 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_T__TL
+{ 14324 , 21 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_T___L
+{ 14162 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_T__BL
+{ 14248 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TL_BR
+{ 14243 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TL_BL
+{ 14306 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T4__L_BR
+{ 14345 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__L__R
+{ 14319 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__L_TL
+{ 14138 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T4_BL_BR
+{ 14176 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T4_BL__R
+{ 14151 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_BL_TR
+{ 14171 , 5 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_BL__L
+{ 14277 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_BR_TR
+{ 14215 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_BR_T_
+{ 14237 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4__R_BR
+{ 14385 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__R_T_
+{ 14379 , 6 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_TR__R
+{ 14291 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TR_T_
+{ 14370 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_TL__R
+{ 14284 , 7 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_TL_TR
+{ 14259 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_TL_T_
+{ 14319 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_TL__L
+{ 14297 , 9 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4__L_TR
+{ 14324 , 21 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4__L_T_
+{ 14171 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4__L_BL
+{ 14162 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_T4_BL_T_
+{ 14243 , 5 , -1 , -34 , 34 , 0 , 0 } , // BOTH_T4_BL_TL
+{ 11164 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_S4_S1_T_
+{ 11176 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S4_S1__L
+{ 11187 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S4_S1__R
+{ 11145 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S4_S1_TL
+{ 11139 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S4_S1_BR
+{ 11130 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S4_S1_BL
+{ 11154 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S4_S1_TR
+{ 10085 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R4_B__S1
+{ 10124 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R4__L_S1
+{ 10135 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R4__R_S1
+{ 10098 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R4_TL_S1
+{ 10075 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R4_BR_S1
+{ 10061 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R4_BL_S1
+{ 10113 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R4_TR_S1
+{ 304 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4_BR___
+{ 346 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4__R___
+{ 322 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4_TR___
+{ 331 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4_T____
+{ 313 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4_TL___
+{ 338 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4__L___
+{ 295 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B4_BL___
+{ 318 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D4_BR___
+{ 342 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D4__R___
+{ 300 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D4_TR___
+{ 309 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D4_TL___
+{ 351 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D4__L___
+{ 327 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D4_BL___
+{ 334 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D4_B____
+{ 390 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5_T__B_
+{ 401 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5__L__R
+{ 408 , 7 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5__R__L
+{ 376 , 6 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5_TL_BR
+{ 364 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5_BR_TL
+{ 355 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5_BL_TR
+{ 382 , 8 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A5_TR_BL
+{ 14499 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BR__R
+{ 14456 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BR_TL
+{ 14486 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BR__L
+{ 14443 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BR_BL
+{ 14634 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__R_TR
+{ 14624 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__R_TL
+{ 14645 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__R__L
+{ 14611 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__R_BL
+{ 14469 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_TR_BR
+{ 14523 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_TR_TL
+{ 14550 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TR__L
+{ 14534 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TR_BL
+{ 14476 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_T__BR
+{ 14638 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_T___R
+{ 14546 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_T__TR
+{ 14570 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_T__TL
+{ 14574 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_T___L
+{ 14560 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_T__BL
+{ 14510 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TL_BR
+{ 14503 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TL_BL
+{ 14585 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__L_BR
+{ 14598 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__L__R
+{ 14530 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5__L_TL
+{ 14404 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BL_BR
+{ 14430 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BL__R
+{ 14417 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BL_TR
+{ 14581 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_BL__L
+{ 14469 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BR_TR
+{ 14476 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_BR_T_
+{ 14499 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5__R_BR
+{ 14638 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__R_T_
+{ 14634 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_TR__R
+{ 14546 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TR_T_
+{ 14624 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_TL__R
+{ 14523 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TL_TR
+{ 14570 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_TL_T_
+{ 14530 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5_TL__L
+{ 14550 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5__L_TR
+{ 14574 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5__L_T_
+{ 14581 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T5__L_BL
+{ 14560 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_BL_T_
+{ 14503 , 7 , -1 , -50 , 50 , 0 , 0 } , // BOTH_T5_BL_TL
+{ 11228 , 7 , -1 , 15 , 15 , 0 , 0 } , // BOTH_S5_S1_T_
+{ 11235 , 8 , -1 , 13 , 13 , 0 , 0 } , // BOTH_S5_S1__L
+{ 11243 , 11 , -1 , 10 , 10 , 0 , 0 } , // BOTH_S5_S1__R
+{ 11210 , 9 , -1 , 12 , 12 , 0 , 0 } , // BOTH_S5_S1_TL
+{ 11206 , 4 , -1 , 25 , 25 , 0 , 0 } , // BOTH_S5_S1_BR
+{ 11199 , 7 , -1 , 15 , 15 , 0 , 0 } , // BOTH_S5_S1_BL
+{ 11219 , 9 , -1 , 12 , 12 , 0 , 0 } , // BOTH_S5_S1_TR
+{ 10174 , 9 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5_B__S1
+{ 10209 , 11 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5__L_S1
+{ 10220 , 14 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5__R_S1
+{ 10183 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5_TL_S1
+{ 10161 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5_BR_S1
+{ 10147 , 14 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5_BL_S1
+{ 10196 , 13 , -1 , 34 , 34 , 0 , 0 } , // BOTH_R5_TR_S1
+{ 364 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5_BR___
+{ 408 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5__R___
+{ 382 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5_TR___
+{ 390 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5_T____
+{ 376 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5_TL___
+{ 401 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5__L___
+{ 355 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B5_BL___
+{ 378 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5_BR___
+{ 404 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5__R___
+{ 360 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5_TR___
+{ 372 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5_TL___
+{ 411 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5__L___
+{ 386 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5_BL___
+{ 397 , 4 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D5_B____
+{ 745 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_T__B_
+{ 752 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6__L__R
+{ 759 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6__R__L
+{ 730 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_TL_BR
+{ 600 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_BR_TL
+{ 593 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_BL_TR
+{ 738 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_TR_BL
+{ 17697 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BR__R
+{ 17657 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BR_TL
+{ 17684 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BR__L
+{ 17644 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BR_BL
+{ 17964 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__R_TR
+{ 17951 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__R_TL
+{ 17976 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__R__L
+{ 17930 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__R_BL
+{ 17772 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TR_BR
+{ 17776 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TR_TL
+{ 17797 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TR__L
+{ 17760 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TR_BL
+{ 17830 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_T__BR
+{ 17863 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_T___R
+{ 17850 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_T__TR
+{ 17837 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_T__TL
+{ 17854 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_T___L
+{ 17817 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_T__BL
+{ 17706 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TL_BR
+{ 17701 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TL_BL
+{ 17874 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__L_BR
+{ 17917 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__L__R
+{ 17887 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__L_TL
+{ 17581 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BL_BR
+{ 17631 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BL__R
+{ 17601 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BL_TR
+{ 17627 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BL__L
+{ 17670 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BR_TR
+{ 17676 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BR_T_
+{ 17943 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__R_BR
+{ 17968 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__R_T_
+{ 17810 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TR__R
+{ 17789 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TR_T_
+{ 17747 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TL__R
+{ 17719 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TL_TR
+{ 17732 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TL_T_
+{ 17741 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_TL__L
+{ 17891 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__L_TR
+{ 17904 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__L_T_
+{ 17870 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6__L_BL
+{ 17614 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BL_T_
+{ 17594 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T6_BL_TL
+{ 12981 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6_T_
+{ 12987 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6__L
+{ 12993 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6__R
+{ 12969 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6_TL
+{ 12962 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6_BR
+{ 12956 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6_BL
+{ 12975 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S6_S6_TR
+{ 11786 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6_B__S6
+{ 11810 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6__L_S6
+{ 11818 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6__R_S6
+{ 11794 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6_TL_S6
+{ 11779 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6_BR_S6
+{ 11771 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6_BL_S6
+{ 11802 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R6_TR_S6
+{ 600 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6_BR___
+{ 759 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6__R___
+{ 738 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6_TR___
+{ 745 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6_T____
+{ 730 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6_TL___
+{ 752 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6__L___
+{ 593 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B6_BL___
+{ 735 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6_BR___
+{ 756 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6__R___
+{ 597 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6_TR___
+{ 604 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6_TL___
+{ 763 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6__L___
+{ 742 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6_BL___
+{ 749 , 3 , -1 , 34 , 34 , 0 , 0 } , // BOTH_D6_B____
+{ 1136 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_T__B_
+{ 1143 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7__L__R
+{ 1150 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7__R__L
+{ 1122 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_TL_BR
+{ 773 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_BR_TL
+{ 766 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_BL_TR
+{ 1129 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_TR_BL
+{ 18091 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BR__R
+{ 18054 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BR_TL
+{ 18078 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BR__L
+{ 18041 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BR_BL
+{ 18318 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__R_TR
+{ 18309 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__R_TL
+{ 18329 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__R__L
+{ 18292 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__R_BL
+{ 18155 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TR_BR
+{ 18159 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TR_TL
+{ 18175 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TR__L
+{ 18146 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TR_BL
+{ 18196 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_T__BR
+{ 18227 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_T___R
+{ 18213 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_T__TR
+{ 18209 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_T__TL
+{ 18222 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_T___L
+{ 18191 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_T__BL
+{ 18098 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TL_BR
+{ 18094 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TL_BL
+{ 18246 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__L_BR
+{ 18279 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__L__R
+{ 18259 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__L_TL
+{ 17989 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BL_BR
+{ 18028 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BL__R
+{ 18006 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BL_TR
+{ 18024 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BL__L
+{ 18067 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BR_TR
+{ 18070 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BR_T_
+{ 18305 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__R_BR
+{ 18321 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__R_T_
+{ 18188 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TR__R
+{ 18166 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TR_T_
+{ 18133 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TL__R
+{ 18113 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TL_TR
+{ 18126 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TL_T_
+{ 18129 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_TL__L
+{ 18262 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__L_TR
+{ 18275 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__L_T_
+{ 18242 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7__L_BL
+{ 18019 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BL_T_
+{ 18002 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_T7_BL_TL
+{ 13029 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7_T_
+{ 13038 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7__L
+{ 13044 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7__R
+{ 13017 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7_TL
+{ 13011 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7_BR
+{ 13005 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7_BL
+{ 13023 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S7_S7_TR
+{ 11840 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7_B__S7
+{ 11862 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7__L_S7
+{ 11870 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7__R_S7
+{ 11846 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7_TL_S7
+{ 11832 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7_BR_S7
+{ 11824 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7_BL_S7
+{ 11854 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_R7_TR_S7
+{ 773 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7_BR___
+{ 1150 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7__R___
+{ 1129 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7_TR___
+{ 1136 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7_T____
+{ 1122 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7_TL___
+{ 1143 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7__L___
+{ 766 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_B7_BL___
+{ 1126 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7_BR___
+{ 1147 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7__R___
+{ 770 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7_TR___
+{ 777 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7_TL___
+{ 1153 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7__L___
+{ 1133 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7_BL___
+{ 1140 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_D7_B____
+{ 9342 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P1_S1_T_
+{ 9340 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P1_S1_TR
+{ 9338 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P1_S1_TL
+{ 9334 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P1_S1_BL
+{ 9336 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P1_S1_BR
+{ 8433 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K1_S1_T_
+{ 8419 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K1_S1_TR
+{ 8406 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K1_S1_TL
+{ 8371 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K1_S1_BL
+{ 8391 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K1_S1_B_
+{ 8381 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K1_S1_BR
+{ 8394 , 12 , -1 , 100 , 100 , 0 , 0 } , // BOTH_V1_BR_S1
+{ 7736 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V1__R_S1
+{ 8423 , 10 , -1 , 100 , 100 , 0 , 0 } , // BOTH_V1_TR_S1
+{ 8437 , 9 , -1 , 100 , 100 , 0 , 0 } , // BOTH_V1_T__S1
+{ 8409 , 10 , -1 , 100 , 100 , 0 , 0 } , // BOTH_V1_TL_S1
+{ 193 , 6 , -1 , 40 , 40 , 0 , 0 } , // BOTH_V1__L_S1
+{ 8376 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_V1_BL_S1
+{ 1443 , 10 , -1 , 67 , 67 , 0 , 0 } , // BOTH_V1_B__S1
+{ 7780 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H1_S1_T_
+{ 7756 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H1_S1_TR
+{ 7732 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H1_S1_TL
+{ 7660 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H1_S1_BL
+{ 7708 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H1_S1_B_
+{ 7684 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H1_S1_BR
+{ 10419 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P6_S6_T_
+{ 10417 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P6_S6_TR
+{ 10415 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P6_S6_TL
+{ 10411 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P6_S6_BL
+{ 10413 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P6_S6_BR
+{ 8274 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K6_S6_T_
+{ 8259 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K6_S6_TR
+{ 8251 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K6_S6_TL
+{ 8221 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K6_S6_BL
+{ 8240 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K6_S6_B_
+{ 8232 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K6_S6_BR
+{ 18840 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6_BR_S6
+{ 18900 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6__R_S6
+{ 18870 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6_TR_S6
+{ 18880 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6_T__S6
+{ 18860 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6_TL_S6
+{ 18890 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6__L_S6
+{ 18830 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6_BL_S6
+{ 18850 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V6_B__S6
+{ 7507 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H6_S6_T_
+{ 7499 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H6_S6_TR
+{ 7491 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H6_S6_TL
+{ 7467 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H6_S6_BL
+{ 7483 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H6_S6_B_
+{ 7475 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H6_S6_BR
+{ 10429 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P7_S7_T_
+{ 10427 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P7_S7_TR
+{ 10425 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P7_S7_TL
+{ 10421 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P7_S7_BL
+{ 10423 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_P7_S7_BR
+{ 8353 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K7_S7_T_
+{ 8339 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K7_S7_TR
+{ 8325 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K7_S7_TL
+{ 8286 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K7_S7_BL
+{ 8314 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K7_S7_B_
+{ 8300 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_K7_S7_BR
+{ 18923 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7_BR_S7
+{ 18996 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7__R_S7
+{ 18960 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7_TR_S7
+{ 18973 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7_T__S7
+{ 18948 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7_TL_S7
+{ 18984 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7__L_S7
+{ 18910 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7_BL_S7
+{ 18935 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_V7_B__S7
+{ 7577 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H7_S7_T_
+{ 7565 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H7_S7_TR
+{ 7553 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H7_S7_TL
+{ 7517 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H7_S7_BL
+{ 7541 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H7_S7_B_
+{ 7529 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_H7_S7_BR
+{ 9920 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_DL_S_B_1_L
+{ 9926 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_DL_S_B_1_W
+{ 9932 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_DL_S_L_1
+{ 9963 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_DL_S_SB_1_L
+{ 9973 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_DL_S_SB_1_W
+{ 10004 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_DL_T_B_1_L
+{ 10010 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_DL_T_B_1_W
+{ 10016 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_DL_T_L_1
+{ 10047 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_DL_T_SB_1_L
+{ 10072 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_DL_T_SB_1_W
+{ 10103 , 9 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_ST_S_B_1_L
+{ 10112 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_ST_S_B_1_W
+{ 10118 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_ST_S_L_1
+{ 10149 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_ST_S_SB_1_L
+{ 10160 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_ST_S_SB_1_W
+{ 10176 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_ST_T_B_1_L
+{ 10182 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_ST_T_B_1_W
+{ 10188 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_ST_T_L_1
+{ 10219 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_ST_T_SB_1_L
+{ 10225 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_ST_T_SB_1_W
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_S_S_B_1_L
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_S_S_B_1_W
+{ 3090 , 31 , -1 , 34 , 34 , 0 , 0 } , // BOTH_LK_S_S_S_L_1
+{ 10241 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_S_S_SB_1_L
+{ 9973 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_S_S_SB_1_W
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_S_T_B_1_L
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_S_S_T_B_1_W
+{ 1807 , 45 , -1 , 34 , 34 , 0 , 0 } , // BOTH_LK_S_S_T_L_1
+{ 10252 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_S_T_SB_1_L
+{ 10225 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_S_S_T_SB_1_W
+{ 9376 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_DL_S_B_1_L
+{ 9382 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_DL_S_B_1_W
+{ 9388 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_S_L_1
+{ 9091 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_S_SB_1_L
+{ 9187 , 38 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_S_SB_1_W
+{ 9461 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_DL_T_B_1_L
+{ 9467 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_DL_T_B_1_W
+{ 9473 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_T_L_1
+{ 9115 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_T_SB_1_L
+{ 9231 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_DL_T_SB_1_W
+{ 9131 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_ST_S_B_1_L
+{ 9137 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_ST_S_B_1_W
+{ 9143 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_ST_S_L_1
+{ 9174 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_ST_S_SB_1_L
+{ 9187 , 38 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_ST_S_SB_1_W
+{ 9225 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_ST_T_B_1_L
+{ 9231 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_ST_T_B_1_W
+{ 9237 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_ST_T_L_1
+{ 9268 , 71 , -1 , 35 , 35 , 0 , 0 } , // BOTH_LK_DL_ST_T_SB_1_L
+{ 9339 , 37 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_ST_T_SB_1_W
+{ 9376 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_S_S_B_1_L
+{ 9382 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_S_S_B_1_W
+{ 9388 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_S_S_L_1
+{ 9419 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_S_S_SB_1_L
+{ 9430 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_S_S_SB_1_W
+{ 9461 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_S_T_B_1_L
+{ 9467 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_DL_S_T_B_1_W
+{ 9473 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_S_T_L_1
+{ 9504 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_S_T_SB_1_L
+{ 9517 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_S_T_SB_1_W
+{ 9553 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_DL_S_B_1_L
+{ 9559 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_DL_S_B_1_W
+{ 9565 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_DL_S_L_1
+{ 9596 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_DL_S_SB_1_L
+{ 9617 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_DL_S_SB_1_W
+{ 9627 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_DL_T_B_1_L
+{ 9633 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_DL_T_B_1_W
+{ 9639 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_DL_T_L_1
+{ 9670 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_DL_T_SB_1_L
+{ 9689 , 33 , -1 , 35 , 35 , 0 , 0 } , // BOTH_LK_ST_DL_T_SB_1_W
+{ 9779 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_ST_S_B_1_L
+{ 9722 , 9 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_ST_S_B_1_W
+{ 9565 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_S_L_1
+{ 9731 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_S_SB_1_L
+{ 9829 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_S_SB_1_W
+{ 9860 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_ST_T_B_1_L
+{ 9866 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_ST_T_B_1_W
+{ 9742 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_T_L_1
+{ 9773 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_T_SB_1_L
+{ 9914 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_T_SB_1_W
+{ 9779 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_S_S_B_1_L
+{ 9785 , 9 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_S_S_B_1_W
+{ 9794 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_S_S_L_1
+{ 9825 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_S_S_SB_1_L
+{ 9829 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_S_S_SB_1_W
+{ 9860 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_S_T_B_1_L
+{ 9866 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LK_ST_S_T_B_1_W
+{ 9872 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_S_T_L_1
+{ 9903 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_S_T_SB_1_L
+{ 9914 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_S_T_SB_1_W
+{ 2250 , 31 , -1 , 34 , 34 , 0 , 0 } , // BOTH_LK_S_S_S_L_2
+{ 1702 , 45 , -1 , 34 , 34 , 0 , 0 } , // BOTH_LK_S_S_T_L_2
+{ 9388 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_S_L_2
+{ 9473 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_DL_DL_T_L_2
+{ 9565 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_S_L_2
+{ 9742 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LK_ST_ST_T_L_2
+{ 1100 , 12 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BF2RETURN
+{ 1017 , 38 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BF2BREAK
+{ 1055 , 45 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BF2LOCK
+{ 995 , 22 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BF1RETURN
+{ 922 , 28 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BF1BREAK
+{ 950 , 45 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BF1LOCK
+{ 3576 , 27 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CWCIRCLE_R2__R_S1
+{ 1499 , 27 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CCWCIRCLE_R2__L_S1
+{ 3561 , 15 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CWCIRCLE_A2__L__R
+{ 1484 , 15 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CCWCIRCLE_A2__R__L
+{ 3520 , 10 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CWCIRCLEBREAK
+{ 1443 , 10 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CCWCIRCLEBREAK
+{ 3530 , 31 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CWCIRCLELOCK
+{ 1453 , 31 , -1 , 34 , 34 , 0 , 0 } , // BOTH_CCWCIRCLELOCK
+{ 11254 , 2 , -1 , 17 , 17 , 0 , 0 } , // BOTH_SABERFAST_STANCE
+{ 11325 , 2 , -1 , 17 , 17 , 0 , 0 } , // BOTH_SABERSLOW_STANCE
+{ 13050 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERDUAL_STANCE
+{ 13125 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERSTAFF_STANCE
+{ 76 , 41 , -1 , 34 , 34 , 0 , 0 } , // BOTH_A2_STABBACK1
+{ 550 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ATTACK_BACK
+{ 8253 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_JUMPFLIPSLASHDOWN1
+{ 8293 , 59 , -1 , 34 , 34 , 0 , 0 } , // BOTH_JUMPFLIPSTABDOWN
+{ 6904 , 45 , -1 , 34 , 34 , 0 , 0 } , // BOTH_FORCELEAP2_T__B_
+{ 9261 , 24 , -1 , 34 , 34 , 0 , 0 } , // BOTH_LUNGE2_B__T_
+{ 3479 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CROUCHATTACKBACK1
+{ 7959 , 42 , -1 , 50 , 50 , 0 , 0 } , // BOTH_JUMPATTACK6
+{ 8001 , 18 , -1 , 100 , 100 , 0 , 0 } , // BOTH_JUMPATTACK7
+{ 14358 , 41 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SPINATTACK6
+{ 14399 , 46 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SPINATTACK7
+{ 12495 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S6
+{ 12945 , 11 , -1 , 112 , 112 , 0 , 0 } , // BOTH_S6_S1
+{ 12506 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_S1_S7
+{ 12999 , 6 , -1 , 200 , 200 , 0 , 0 } , // BOTH_S7_S1
+{ 5932 , 53 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELONGLEAP_START
+{ 5893 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELONGLEAP_ATTACK
+{ 5914 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELONGLEAP_LAND
+{ 6096 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRUNFLIP_START
+{ 6077 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRUNFLIP_END
+{ 6058 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRUNFLIP_ALT
+{ 6022 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLREBOUND_FORWARD
+{ 6034 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLREBOUND_LEFT
+{ 6010 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLREBOUND_BACK
+{ 6046 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLREBOUND_RIGHT
+{ 6027 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLHOLD_FORWARD
+{ 6039 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLHOLD_LEFT
+{ 6015 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLHOLD_BACK
+{ 6051 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLHOLD_RIGHT
+{ 6028 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRELEASE_FORWARD
+{ 6040 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRELEASE_LEFT
+{ 6016 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRELEASE_BACK
+{ 6052 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEWALLRELEASE_RIGHT
+{ 907 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_F
+{ 809 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_B
+{ 965 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_R
+{ 936 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_L
+{ 1008 , 34 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_S
+{ 823 , 48 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_BF
+{ 871 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_BF_STOP
+{ 979 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_RL
+{ 921 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_F_AIR
+{ 892 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_B_AIR
+{ 993 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_R_AIR
+{ 950 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_KICK_L_AIR
+{ 5335 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_ATTACK7
+{ 5429 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_HOLD7
+{ 5486 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_LAND
+{ 11042 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PULL_IMPALE_STAB
+{ 11073 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PULL_IMPALE_SWING
+{ 11012 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PULLED_INAIR_B
+{ 11027 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PULLED_INAIR_F
+{ 14445 , 35 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STABDOWN
+{ 14515 , 35 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STABDOWN_STAFF
+{ 14480 , 35 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STABDOWN_DUAL
+{ 649 , 81 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_SABERPROTECT
+{ 1042 , 80 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_SOULCAL
+{ 30 , 57 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A1_SPECIAL
+{ 149 , 56 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A2_SPECIAL
+{ 352 , 49 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A3_SPECIAL
+{ 12225 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ROLL_STAB
+{ 12257 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_STAND1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND1_RANDOM1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND1_RANDOM2
+{ 12259 , 150 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND1IDLE1
+{ 12446 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_STAND2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND2_RANDOM1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND2_RANDOM2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND2_RANDOM3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND2_RANDOM4
+{ 12448 , 151 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND2IDLE1
+{ 12599 , 75 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND2IDLE2
+{ 12674 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_STAND3
+{ 15298 , 151 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND3IDLE1
+{ 12676 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND4IDLE1
+{ 12684 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_STAND5
+{ 12686 , 150 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5IDLE1
+{ 9285 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND6
+{ 14894 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_STAND7
+{ 13029 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND1TO3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND3TO1
+{ 12409 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND1TO2
+{ 12409 , 16 , -1 , -67 , 67 , 0 , 0 } , // BOTH_STAND2TO1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND2TO4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STAND4TO2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STANDTOWALK1
+{ 12678 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND4TOATTACK2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STANDUP1
+{ 13107 , 65 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STANDUP2
+{ 12928 , 101 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5TOSIT3
+{ 12444 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_STAND1_REELO
+{ 13089 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5_REELO
+{ 12425 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND1TOSTAND5
+{ 12425 , 19 , -1 , -50 , 50 , 0 , 0 } , // BOTH_STAND5TOSTAND1
+{ 12907 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5TOAIM
+{ 12887 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5STARTLEDLOOKLEFT
+{ 13172 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STARTLEDLOOKLEFTTOSTAND5
+{ 13029 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5TOSTAND8
+{ 13091 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND7TOSTAND8
+{ 13029 , 40 , -1 , -50 , 50 , 0 , 0 } , // BOTH_STAND8TOSTAND5
+{ 15878 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND9
+{ 15880 , 150 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND9IDLE1
+{ 12852 , 35 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5SHIFTWEIGHT
+{ 12852 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5SHIFTWEIGHTSTART
+{ 12865 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5SHIFTWEIGHTSTOP
+{ 13069 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5TURNLEFTSTART
+{ 13069 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_STAND5TURNLEFTSTOP
+{ 13079 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5TURNRIGHTSTART
+{ 13079 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_STAND5TURNRIGHTSTOP
+{ 12836 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND5LOOK180LEFTSTART
+{ 12836 , 16 , -1 , -50 , 50 , 0 , 0 } , // BOTH_STAND5LOOK180LEFTSTOP
+{ 3068 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSOLE1START
+{ 2988 , 80 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CONSOLE1
+{ 3087 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSOLE1STOP
+{ 3384 , 3 , -1 , -200 , 200 , 0 , 0 } , // BOTH_CONSOLE2START
+{ 3384 , 3 , -1 , -200 , 200 , 0 , 0 } , // BOTH_CONSOLE2
+{ 3384 , 3 , -1 , -200 , 200 , 0 , 0 } , // BOTH_CONSOLE2STOP
+{ 3167 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSOLE2HOLDCOMSTART
+{ 3167 , 10 , -1 , -50 , 50 , 0 , 0 } , // BOTH_CONSOLE2HOLDCOMSTOP
+{ 2425 , 91 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GUARD_LOOKAROUND1
+{ 3384 , 3 , -1 , -200 , 200 , 0 , 0 } , // BOTH_GUARD_IDLE1
+{ 0 , 86 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALERT1
+{ 3388 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GESTURE1
+{ 305 , 44 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GESTURE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_GESTURE3
+{ 16708 , 28 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK1TALKCOMM1
+{ 14658 , 59 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALK1
+{ 370 , 179 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TALK2
+{ 14717 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKCOMM1START
+{ 14733 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TALKCOMM1
+{ 14733 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKCOMM1STOP
+{ 14745 , 61 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE1
+{ 15751 , 39 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE2
+{ 15941 , 48 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE3
+{ 16150 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE4START
+{ 15989 , 161 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE4
+{ 16171 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE4STOP
+{ 16192 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE5START
+{ 16192 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE5
+{ 16192 , 25 , -1 , -50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE5STOP
+{ 16217 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE6START
+{ 16258 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE6
+{ 16258 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE6STOP
+{ 16303 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE7START
+{ 16271 , 32 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE7
+{ 16303 , 29 , -1 , -50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE7STOP
+{ 16332 , 45 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE8START
+{ 16376 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE8
+{ 16332 , 45 , -1 , -50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE8STOP
+{ 16377 , 43 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE9
+{ 14806 , 39 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE10
+{ 14845 , 33 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE11START
+{ 14878 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE11STOP
+{ 14894 , 169 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE12
+{ 15183 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE13START
+{ 15063 , 120 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE13
+{ 15202 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE13STOP
+{ 15222 , 59 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE14
+{ 15391 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE15START
+{ 15281 , 110 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE15
+{ 15406 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE15STOP
+{ 15416 , 54 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE16
+{ 15470 , 51 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE17
+{ 15521 , 161 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE18
+{ 15682 , 45 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE19START
+{ 15727 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE19STOP
+{ 15790 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE20START
+{ 15821 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE21
+{ 15840 , 33 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE22
+{ 15873 , 68 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TALKGESTURE23
+{ 3388 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PAUSE1START
+{ 3388 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PAUSE1STOP
+{ 3388 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HEADTILTLSTART
+{ 3384 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_HEADTILTLSTOP
+{ 3384 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_HEADTILTRSTART
+{ 3384 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_HEADTILTRSTOP
+{ 3384 , 3 , -1 , -100 , 100 , 0 , 0 } , // BOTH_HEADNOD
+{ 7883 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HEADSHAKE
+{ 7923 , 39 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HEADSHAKE1_REELO
+{ 11769 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SITHEADTILTLSTART
+{ 11779 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SITHEADTILTLSTOP
+{ 11788 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SITHEADTILTRSTART
+{ 11798 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SITHEADTILTRSTOP
+{ 11698 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SITHEADNOD
+{ 11729 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SITHEADSHAKE
+{ 11577 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT2HEADTILTLSTART
+{ 11577 , 5 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SIT2HEADTILTLSTOP
+{ 10234 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_REACH1START
+{ 10259 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_REACH1STOP
+{ 5654 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE1START
+{ 5493 , 161 , 0 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE1
+{ 5675 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE1STOP
+{ 5916 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE2START
+{ 5706 , 210 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE2
+{ 5937 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE2STOP
+{ 5997 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE3START
+{ 5953 , 44 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE3
+{ 6017 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_EXAMINE3STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THROW1START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THROW1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THROW1STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THROW2START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THROW2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_THROW3
+{ 9163 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LEANLEFT2START
+{ 9185 , 17 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LEANLEFT2STOP
+{ 9202 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LEANRIGHT3START
+{ 9232 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_LEANRIGHT3
+{ 9232 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LEANRIGHT3STOP
+{ 6488 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEFOUNTAIN1_START
+{ 6462 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEFOUNTAIN1_MIDDLE
+{ 6431 , 31 , 0 , 50 , 50 , 0 , 0 } , // BOTH_FORCEFOUNTAIN1_LOOP
+{ 6519 , 116 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEFOUNTAIN1_STOP
+{ 16456 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_THUMBING1
+{ 2952 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COME_ON1
+{ 13187 , 21 , -1 , 34 , 34 , 0 , 0 } , // BOTH_STEADYSELF1
+{ 13187 , 21 , -1 , -34 , 34 , 0 , 0 } , // BOTH_STEADYSELF1END
+{ 11544 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SILENCEGESTURE1
+{ 10284 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_REACHFORSABER1
+{ 9526 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PUNCHER1
+{ 3312 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINER1HOLD
+{ 3221 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINEE1HOLD
+{ 3312 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINER1STAND
+{ 3221 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINEE1STAND
+{ 3343 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINER1WALK
+{ 3252 , 41 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINEE1WALK
+{ 3293 , 19 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINER1LOOP
+{ 3202 , 19 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CONSTRAINEE1LOOP
+{ 11287 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERKILLER1
+{ 11256 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERKILLEE1
+{ 7841 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANDSHAKER1START
+{ 7828 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANDSHAKER1LOOP
+{ 7817 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANDSHAKEE1START
+{ 7804 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANDSHAKEE1LOOP
+{ 9054 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LAUGH1START
+{ 9072 , 91 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LAUGH1STOP
+{ 5425 , 39 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ESCAPEPOD_LEAVE1
+{ 5464 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ESCAPEPOD_LEAVE2
+{ 8178 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HUGGER1
+{ 8199 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HUGGERSTOP1
+{ 8215 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HUGGERSTOP2
+{ 8128 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HUGGEE1
+{ 8149 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HUGGEESTOP1
+{ 8165 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HUGGEESTOP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_KISSER1
+{ 8655 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSER1START1
+{ 8674 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSER1START2
+{ 8604 , 51 , 0 , 50 , 50 , 0 , 0 } , // BOTH_KISSER1LOOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_KISSER1STOP
+{ 8700 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSER1STOP1
+{ 8731 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSER1STOP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_KISSEE1
+{ 8497 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSEE1START1
+{ 8516 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSEE1START2
+{ 8446 , 51 , 0 , 50 , 50 , 0 , 0 } , // BOTH_KISSEE1LOOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_KISSEE1STOP
+{ 8542 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSEE1STOP1
+{ 8573 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KISSEE1STOP2
+{ 636 , 201 , 0 , 50 , 50 , 0 , 0 } , // BOTH_BARTENDER_IDLE1
+{ 837 , 61 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BARTENDER_THROW1
+{ 619 , 17 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BARTENDER_COWERSTART
+{ 579 , 40 , 0 , 50 , 50 , 0 , 0 } , // BOTH_BARTENDER_COWERLOOP
+{ 579 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BARTENDER_COWER
+{ 16420 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_THREATEN1_START
+{ 16420 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_THREATEN1
+{ 532 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RADIO_ONOFF
+{ 598 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TRIUMPHANT1START
+{ 607 , 30 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TRIUMPHANT1STARTGESTURE
+{ 598 , 9 , -1 , -50 , 50 , 0 , 0 } , // BOTH_TRIUMPHANT1STOP
+{ 11327 , 53 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERTHROW1START
+{ 11380 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERTHROW1STOP
+{ 11409 , 96 , -1 , 25 , 25 , 0 , 0 } , // BOTH_SABERTHROW2START
+{ 11505 , 39 , -1 , 25 , 25 , 0 , 0 } , // BOTH_SABERTHROW2STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COVERUP1_LOOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COVERUP1_START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COVERUP1_END
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED4TO5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT1STAND
+{ 11573 , 2 , 0 , 17 , 17 , 0 , 0 } , // BOTH_SIT1
+{ 11575 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SIT2
+{ 11659 , 2 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SIT3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT2TO3
+{ 11603 , 56 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT2TOSTAND5
+{ 11603 , 56 , -1 , -50 , 50 , 0 , 0 } , // BOTH_STAND5TOSIT2
+{ 11582 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT2TOSIT4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT3TO1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT3TO2
+{ 11661 , 37 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT3TOSTAND5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT4TO5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT4TO6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT5TO4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT5TO6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT6TO4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT6TO5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SIT7TOSTAND1
+{ 3384 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CROUCH1
+{ 3388 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CROUCH1IDLE
+{ 3390 , 24 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CROUCH1WALK
+{ 3414 , 20 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CROUCH1WALKBACK
+{ 3384 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_UNCROUCH1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CROUCH2IDLE
+{ 37 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CROUCH2TOSTAND1
+{ 3434 , 45 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CROUCH3
+{ 3434 , 45 , -1 , -50 , 50 , 0 , 0 } , // BOTH_UNCROUCH3
+{ 3384 , 4 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CROUCH4
+{ 3384 , 4 , -1 , -100 , 100 , 0 , 0 } , // BOTH_UNCROUCH4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_GET_UP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_GET_UP2
+{ 1745 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_SIT
+{ 7657 , 3 , -1 , 17 , 17 , 0 , 0 } , // BOTH_GUNSIT1
+{ 19802 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNT_L
+{ 19453 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_DISMOUNT_L
+{ 19828 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNT_R
+{ 19479 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_DISMOUNT_R
+{ 19634 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNTJUMP_L
+{ 19658 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNTTHROW
+{ 19718 , 42 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNTTHROW_L
+{ 19760 , 42 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNTTHROW_R
+{ 19689 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_MOUNTTHROWEE
+{ 19630 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LOOKLEFT
+{ 19632 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LOOKRIGHT
+{ 19856 , 23 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_TURBO
+{ 19854 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_REV
+{ 19382 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_AIR
+{ 19384 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_AIR_G
+{ 19386 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_AIR_SL
+{ 19388 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_AIR_SR
+{ 19570 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LAND
+{ 19581 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LAND_G
+{ 19592 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LAND_SL
+{ 19603 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LAND_SR
+{ 19505 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_IDLE
+{ 19536 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_IDLE_G
+{ 19566 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_IDLE_SL
+{ 19568 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_IDLE_SR
+{ 19614 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANL
+{ 19616 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANL_G
+{ 19618 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANL_SL
+{ 19620 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANL_SR
+{ 19622 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANR
+{ 19624 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANR_G
+{ 19626 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANR_SL
+{ 19628 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_LEANR_SR
+{ 19404 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATL_S
+{ 19432 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATR_S
+{ 19446 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATR_TO_L_S
+{ 19418 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATL_TO_R_S
+{ 19425 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATR_G
+{ 19397 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATL_G
+{ 19390 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VS_ATF_G
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VS_PAIN1
+{ 20099 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_MOUNT_L
+{ 20139 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_MOUNT_R
+{ 20072 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_MOUNT_B
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VT_DISMOUNT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VT_DISMOUNT_L
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VT_DISMOUNT_R
+{ 20312 , 32 , 0 , 50 , 50 , 0 , 0 } , // BOTH_VT_WALK_FWD
+{ 20406 , 32 , 0 , 50 , 50 , 0 , 0 } , // BOTH_VT_WALK_REV
+{ 20344 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_WALK_FWD_L
+{ 20375 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_WALK_FWD_R
+{ 20179 , 39 , 0 , 50 , 50 , 0 , 0 } , // BOTH_VT_RUN_FWD
+{ 3419 , 32 , 0 , 50 , 50 , 0 , 0 } , // BOTH_VT_RUN_REV
+{ 20218 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_RUN_FWD_L
+{ 20240 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_RUN_FWD_R
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VT_SLIDEF
+{ 19879 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_AIR
+{ 2623 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATB
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VT_PAIN1
+{ 2262 , 72 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_DEATH1
+{ 20262 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_STAND
+{ 19962 , 38 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_BUCK
+{ 154 , 11 , 0 , 50 , 50 , 0 , 0 } , // BOTH_VT_LAND
+{ 20298 , 14 , 0 , 50 , 50 , 0 , 0 } , // BOTH_VT_TURBO
+{ 20038 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_IDLE_SL
+{ 20068 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_IDLE_SR
+{ 20262 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_IDLE
+{ 20000 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_IDLE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_VT_IDLE_S
+{ 20036 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_IDLE_G
+{ 20070 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_IDLE_T
+{ 19895 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATL_S
+{ 19932 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATR_S
+{ 19951 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATR_TO_L_S
+{ 19914 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATL_TO_R_S
+{ 19925 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATR_G
+{ 19888 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATL_G
+{ 19881 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VT_ATF_G
+{ 3 , 17 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GEARS_OPEN
+{ 3 , 17 , -1 , -50 , 50 , 0 , 0 } , // BOTH_GEARS_CLOSE
+{ 20 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WINGS_OPEN
+{ 20 , 21 , -1 , -50 , 50 , 0 , 0 } , // BOTH_WINGS_CLOSE
+{ 3986 , 106 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH14_UNGRIP
+{ 3946 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEATH14_SITUP
+{ 8762 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNEES1
+{ 8802 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNEES2
+{ 8842 , 39 , -1 , 100 , 100 , 0 , 0 } , // BOTH_KNEES2TO1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STRUGGLE1START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STRUGGLE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STRUGGLE1STOP
+{ 10650 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RUMMAGE1START
+{ 10575 , 75 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUMMAGE1
+{ 10680 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RUMMAGE1STOP
+{ 8066 , 2 , 0 , 34 , 34 , 0 , 0 } , // BOTH_HOLDGLASS1
+{ 12156 , 76 , -1 , 34 , 34 , 0 , 0 } , // BOTH_SLIDEGLASS1
+{ 11807 , 71 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SLAMSABERDOWN
+{ 16653 , 26 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK1
+{ 16736 , 24 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WALK3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WALK4
+{ 20739 , 14 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK_STAFF
+{ 20739 , 12 , 0 , -50 , 50 , 0 , 0 } , // BOTH_WALKBACK_STAFF
+{ 20725 , 14 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK_DUAL
+{ 20696 , 29 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALKBACK_DUAL
+{ 16760 , 80 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALK5
+{ 16840 , 51 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK6
+{ 16891 , 20 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK7
+{ 16911 , 28 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK8
+{ 16939 , 28 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK9
+{ 16679 , 29 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALK10
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WALKTORUN1
+{ 10699 , 26 , 0 , 25 , 25 , 0 , 0 } , // BOTH_RUN1
+{ 4 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RUN1START
+{ 11 , 23 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RUN1STOP
+{ 10725 , 26 , 0 , 25 , 25 , 0 , 0 } , // BOTH_RUN2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_RUNINJURED1
+{ 533 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RUN1TORUN2
+{ 558 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RUN2TORUN1
+{ 12357 , 10 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUN4
+{ 12439 , 14 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUN_STAFF
+{ 12377 , 10 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUNBACK_STAFF
+{ 12413 , 26 , 0 , 25 , 25 , 0 , 0 } , // BOTH_RUN_DUAL
+{ 12413 , 14 , 0 , -50 , 50 , 0 , 0 } , // BOTH_RUNBACK_DUAL
+{ 13208 , 13 , 0 , 100 , 100 , 0 , 0 } , // BOTH_STRAFE_LEFT1
+{ 13221 , 13 , 0 , 100 , 100 , 0 , 0 } , // BOTH_STRAFE_RIGHT1
+{ 10761 , 13 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUNSTRAFE_LEFT1
+{ 10774 , 13 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUNSTRAFE_RIGHT1
+{ 130 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TURN_LEFT1
+{ 94 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TURN_RIGHT1
+{ 16593 , 12 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TURNSTAND1
+{ 16605 , 12 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TURNSTAND2
+{ 16617 , 12 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TURNSTAND3
+{ 16629 , 12 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TURNSTAND4
+{ 16641 , 12 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TURNSTAND5
+{ 16581 , 12 , 0 , 50 , 50 , 0 , 0 } , // BOTH_TURNCROUCH1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_RUNAWAY1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SWIM1
+{ 16967 , 29 , 0 , 50 , 50 , 0 , 0 } , // BOTH_WALKBACK1
+{ 16967 , 15 , 0 , 100 , 100 , 0 , 0 } , // BOTH_WALKBACK2
+{ 10751 , 10 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUNBACK1
+{ 10751 , 10 , 0 , 50 , 50 , 0 , 0 } , // BOTH_RUNBACK2
+{ 8236 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_JUMP1
+{ 8228 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_INAIR1
+{ 9011 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LAND1
+{ 9016 , 23 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LAND2
+{ 8244 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_JUMPBACK1
+{ 8230 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_INAIRBACK1
+{ 9039 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LANDBACK1
+{ 8352 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_JUMPLEFT1
+{ 8232 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_INAIRLEFT1
+{ 9045 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LANDLEFT1
+{ 8361 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_JUMPRIGHT1
+{ 8234 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_INAIRRIGHT1
+{ 9049 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LANDRIGHT1
+{ 6767 , 17 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEJUMP1
+{ 6759 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEINAIR1
+{ 6858 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELAND1
+{ 6784 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEJUMPBACK1
+{ 6761 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEINAIRBACK1
+{ 6872 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELANDBACK1
+{ 6802 , 28 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEJUMPLEFT1
+{ 6763 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEINAIRLEFT1
+{ 6882 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELANDLEFT1
+{ 6830 , 28 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEJUMPRIGHT1
+{ 6765 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEINAIRRIGHT1
+{ 6893 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELANDRIGHT1
+{ 6366 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_F
+{ 6303 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_B
+{ 6377 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_L
+{ 6415 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_R
+{ 10490 , 30 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ROLL_F
+{ 10452 , 38 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ROLL_B
+{ 10520 , 27 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ROLL_L
+{ 10547 , 28 , -1 , 34 , 34 , 0 , 0 } , // BOTH_ROLL_R
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ROLL_FR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ROLL_FL
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ROLL_BR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ROLL_BL
+{ 8081 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOP_F
+{ 8068 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOP_B
+{ 8095 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOP_L
+{ 8111 , 17 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOP_R
+{ 5362 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_FL
+{ 5372 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_FR
+{ 5342 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_BL
+{ 5352 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_BR
+{ 5382 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_L
+{ 5392 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_R
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DIVE1
+{ 4906 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_HOLD_FL
+{ 4916 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_HOLD_FR
+{ 4886 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_HOLD_BL
+{ 4896 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_HOLD_BR
+{ 4926 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_HOLD_L
+{ 4936 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DODGE_HOLD_R
+{ 5402 , 23 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ENGAGETAUNT
+{ 1864 , 45 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BOW
+{ 10310 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_MEDITATE
+{ 10341 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_MEDITATE_END
+{ 13433 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SHOWOFF_FAST
+{ 13448 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SHOWOFF_MEDIUM
+{ 13497 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SHOWOFF_STRONG
+{ 13414 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SHOWOFF_DUAL
+{ 13468 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SHOWOFF_STAFF
+{ 19089 , 51 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VICTORY_FAST
+{ 19140 , 66 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VICTORY_MEDIUM
+{ 19309 , 73 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VICTORY_STRONG
+{ 19008 , 81 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VICTORY_DUAL
+{ 19206 , 103 , -1 , 50 , 50 , 0 , 0 } , // BOTH_VICTORY_STAFF
+{ 460 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ARIAL_LEFT
+{ 486 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ARIAL_RIGHT
+{ 1406 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CARTWHEEL_LEFT
+{ 1425 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CARTWHEEL_RIGHT
+{ 6393 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_LEFT
+{ 6314 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_BACK1
+{ 6329 , 17 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_BACK2
+{ 6346 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FLIP_BACK3
+{ 1224 , 46 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BUTTERFLY_LEFT
+{ 1270 , 56 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BUTTERFLY_RIGHT
+{ 17137 , 37 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALL_RUN_RIGHT
+{ 17079 , 21 , -1 , 34 , 34 , 0 , 0 } , // BOTH_WALL_RUN_RIGHT_FLIP
+{ 17158 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALL_RUN_RIGHT_STOP
+{ 17100 , 37 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALL_RUN_LEFT
+{ 17054 , 21 , -1 , 34 , 34 , 0 , 0 } , // BOTH_WALL_RUN_LEFT_FLIP
+{ 17121 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALL_RUN_LEFT_STOP
+{ 17075 , 25 , -1 , 34 , 34 , 0 , 0 } , // BOTH_WALL_FLIP_RIGHT
+{ 17050 , 25 , -1 , 34 , 34 , 0 , 0 } , // BOTH_WALL_FLIP_LEFT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WALL_FLIP_FWD
+{ 8881 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNOCKDOWN1
+{ 8906 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNOCKDOWN2
+{ 8936 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNOCKDOWN3
+{ 8966 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNOCKDOWN4
+{ 8981 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KNOCKDOWN5
+{ 7460 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP1
+{ 7491 , 33 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP2
+{ 7524 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP3
+{ 7550 , 50 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP4
+{ 7524 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP5
+{ 7631 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_CROUCH_F1
+{ 7600 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_CROUCH_B1
+{ 7244 , 37 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_F1
+{ 7281 , 49 , -1 , 34 , 34 , 0 , 0 } , // BOTH_FORCE_GETUP_F2
+{ 6993 , 39 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_B1
+{ 7032 , 44 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_B2
+{ 7076 , 35 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_B3
+{ 7111 , 28 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_B4
+{ 7139 , 51 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_B5
+{ 7190 , 54 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FORCE_GETUP_B6
+{ 7035 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_BROLL_B
+{ 7061 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_BROLL_F
+{ 7087 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_BROLL_L
+{ 7113 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_BROLL_R
+{ 7196 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_FROLL_B
+{ 7223 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_FROLL_F
+{ 7250 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_FROLL_L
+{ 7276 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GETUP_FROLL_R
+{ 16996 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALL_FLIP_BACK1
+{ 17023 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_WALL_FLIP_BACK2
+{ 12232 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SPIN1
+{ 6773 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CEILING_CLING
+{ 6774 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CEILING_DROP
+{ 6207 , 96 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FJSS_TR_BL
+{ 6111 , 96 , -1 , 25 , 25 , 0 , 0 } , // BOTH_FJSS_TL_BR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEATHFROMBACKSLASH
+{ 10321 , 131 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RIGHTHANDCHOPPEDOFF
+{ 5267 , 63 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DEFLECTSLASH__R__L_FIN
+{ 898 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BASHED1
+{ 415 , 45 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ARIAL_F1
+{ 1168 , 56 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BUTTERFLY_FR1
+{ 1112 , 56 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BUTTERFLY_FL1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_POSE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_POSE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_POSE3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_POSE4
+{ 1624 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BACK_FLIP_UP
+{ 10258 , 28 , -1 , 50 , 50 , 0 , 0 } , // BOTH_LOSE_SABER
+{ 14550 , 101 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAFF_TAUNT
+{ 4944 , 101 , -1 , 50 , 50 , 0 , 0 } , // BOTH_DUAL_TAUNT
+{ 607 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_FB
+{ 628 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A6_LR
+{ 780 , 29 , -1 , 50 , 50 , 0 , 0 } , // BOTH_A7_HILT
+{ 1241 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_SPIN
+{ 1157 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_FLIP_1
+{ 1179 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_FLIP_2
+{ 1199 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_FLIP_3
+{ 1219 , 22 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_FLIP_B
+{ 1292 , 51 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_SPIN_THROW
+{ 1249 , 43 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_SPIN_SLASH
+{ 1343 , 101 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ALORA_TAUNT
+{ 12274 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ROSH_PAIN
+{ 12243 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_ROSH_HEAL
+{ 18429 , 55 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TAVION_SCEPTERGROUND
+{ 18484 , 81 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TAVION_SWORDPOWER
+{ 13384 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SCEPTER_START
+{ 13344 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SCEPTER_HOLD
+{ 13404 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SCEPTER_STOP
+{ 8613 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KYLE_GRAB
+{ 8626 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_KYLE_MISS
+{ 8640 , 121 , -1 , 35 , 35 , 0 , 0 } , // BOTH_KYLE_PA_1
+{ 10561 , 86 , -1 , 35 , 35 , 0 , 0 } , // BOTH_PLAYER_PA_1
+{ 8761 , 121 , -1 , 35 , 35 , 0 , 0 } , // BOTH_KYLE_PA_2
+{ 10647 , 197 , -1 , 35 , 35 , 0 , 0 } , // BOTH_PLAYER_PA_2
+{ 11010 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PLAYER_PA_FLY
+{ 8882 , 166 , -1 , 35 , 35 , 0 , 0 } , // BOTH_KYLE_PA_3
+{ 10844 , 145 , -1 , 35 , 35 , 0 , 0 } , // BOTH_PLAYER_PA_3
+{ 10989 , 21 , -1 , 35 , 35 , 0 , 0 } , // BOTH_PLAYER_PA_3_FLY
+{ 761 , 41 , -1 , 34 , 34 , 0 , 0 } , // BOTH_BUCK_RIDER
+{ 423 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_START
+{ 367 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_MISS
+{ 603 , 40 , 0 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_IDLE
+{ 349 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_END
+{ 71 , 46 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_ATTACK
+{ 2542 , 81 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_SNIFF
+{ 2516 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HOLD_DROP
+{ 7302 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_GRABBED
+{ 11944 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RELEASED
+{ 7617 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANG_IDLE
+{ 7589 , 28 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANG_ATTACK
+{ 7619 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HANG_PAIN
+{ 8000 , 66 , -1 , 50 , 50 , 0 , 0 } , // BOTH_HIT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LADDER_UP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LADDER_DWN1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LADDER_IDLE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ONLADDER_BOT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_OFFLADDER_BOT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_ONLADDER_TOP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_OFFLADDER_TOP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LIFT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_STEP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_HITWALL1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_AMBUSHLAND1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_BIRTH1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLY_IDLE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLY_IDLE2
+{ 4 , 6 , -1 , -100 , 100 , 0 , 0 } , // BOTH_FLY_SHIELDED
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLY_START1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLY_STOP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLY_LOOP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLOAT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLOAT2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FLOATCONSOLE1
+{ 13264 , 30 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SWIM_IDLE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SWIMFORWARDSTART
+{ 13234 , 30 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SWIMFORWARD
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SWIMFORWARDSTOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SWIMBACKWARDSTART
+{ 691 , 71 , 0 , 34 , 34 , 0 , 0 } , // BOTH_SWIMBACKWARD
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SWIMBACKWARDSTOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LIE_DOWN1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LIE_DOWN2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LIE_DOWN3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PAIN2WRITHE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PRONE2RLEG
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_PRONE2LLEG
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WRITHING1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WRITHING1RLEG
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WRITHING1LLEG
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_WRITHING2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED6ATTACKSTART
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED6ATTACKSTOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED6COMBADGE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJURED6POINT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_INJUREDTOSTAND1
+{ 9499 , 27 , -1 , 50 , 50 , 0 , 0 } , // BOTH_PROPUP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CRAWLBACK1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SITWALL1
+{ 11878 , 1 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SLEEP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP5
+{ 11967 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SLEEP6START
+{ 12007 , 149 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SLEEP6STOP
+{ 11878 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SLEEP1GETUP
+{ 11918 , 49 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SLEEP1GETUP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP2GETUP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP3GETUP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP3DEATH
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP3DEAD
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP_IDLE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP_IDLE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP_IDLE3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP_IDLE4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP1_NOSE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SLEEP2_SHIFT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_RESTRAINED1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_RESTRAINED1POINT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_LIFTED1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CARRIED1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CARRIED2
+{ 1595 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CHOKE1START
+{ 1614 , 1 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CHOKE1STARTHOLD
+{ 1526 , 69 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CHOKE1
+{ 1615 , 60 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CHOKE2
+{ 1675 , 70 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CHOKE3
+{ 4 , 6 , -1 , 100 , 100 , 0 , 0 } , // BOTH_POWERUP1
+{ 561 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TURNON
+{ 549 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TURNOFF
+{ 1326 , 51 , -1 , 50 , 50 , 0 , 0 } , // BOTH_BUTTON1
+{ 1377 , 29 , -1 , 25 , 25 , 0 , 0 } , // BOTH_BUTTON2
+{ 1377 , 14 , -1 , 25 , 25 , 0 , 0 } , // BOTH_BUTTON_HOLD
+{ 1391 , 15 , -1 , 25 , 25 , 0 , 0 } , // BOTH_BUTTON_RELEASE
+{ 10300 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_RESISTPUSH
+{ 6980 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEPUSH
+{ 6968 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEPULL
+{ 9306 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_MINDTRICK1
+{ 9320 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_MINDTRICK2
+{ 6949 , 19 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELIGHTNING
+{ 6949 , 3 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELIGHTNING_START
+{ 6952 , 7 , 0 , 50 , 50 , 0 , 0 } , // BOTH_FORCELIGHTNING_HOLD
+{ 6960 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCELIGHTNING_RELEASE
+{ 6726 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEHEAL_START
+{ 6746 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEHEAL_STOP
+{ 6710 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEHEAL_QUICK
+{ 11318 , 7 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SABERPULL
+{ 6635 , 13 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEGRIP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_FORCEGRIP2
+{ 6648 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEGRIP3
+{ 6679 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEGRIP3THROW
+{ 6635 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEGRIP_HOLD
+{ 6640 , 8 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCEGRIP_RELEASE
+{ 16492 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TOSS1
+{ 16522 , 59 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TOSS2
+{ 6708 , 57 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_RAGE
+{ 6123 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_2HANDEDLIGHTNING
+{ 6123 , 5 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_2HANDEDLIGHTNING_START
+{ 6128 , 15 , 0 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_2HANDEDLIGHTNING_HOLD
+{ 6143 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_2HANDEDLIGHTNING_RELEASE
+{ 6178 , 52 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN
+{ 6178 , 6 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_START
+{ 6184 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_HOLD
+{ 6204 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_RELEASE
+{ 6278 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_GRAB_START
+{ 6263 , 15 , 0 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_GRAB_HOLD
+{ 6245 , 18 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_GRAB_END
+{ 6230 , 15 , 0 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_DRAIN_GRABBED
+{ 6154 , 24 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_ABSORB
+{ 6154 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_ABSORB_START
+{ 6166 , 12 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_ABSORB_END
+{ 6630 , 47 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_PROTECT
+{ 6677 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_FORCE_PROTECT_FAST
+{ 2933 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKR1START
+{ 2943 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKR1STARTTOMID
+{ 2938 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKR1MIDTOSTART
+{ 2943 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKR1STOP
+{ 2933 , 4 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKR1STOPTOMID
+{ 2948 , 4 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKR1MIDTOSTOP
+{ 2833 , 100 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKR1
+{ 2814 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKL1START
+{ 2824 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKL1STARTTOMID
+{ 2819 , 5 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKL1MIDTOSTART
+{ 2824 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKL1STOP
+{ 2814 , 4 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKL1STOPTOMID
+{ 2829 , 4 , -1 , 100 , 100 , 0 , 0 } , // BOTH_COCKPIT_TALKL1MIDTOSTOP
+{ 2714 , 100 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKL1
+{ 1745 , 259 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_CONSOLE1
+{ 2004 , 259 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_CONSOLE2
+{ 2204 , 59 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_CONSOLE2_PARTIAL
+{ 2263 , 31 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_HEADNOD
+{ 2294 , 39 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_HEADSHAKE
+{ 2333 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_HEADTILTLSTART
+{ 2343 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_HEADTILTLSTOP
+{ 2352 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_HEADTILTRSTART
+{ 2362 , 9 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_HEADTILTRSTOP
+{ 2629 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKGESTURE7START
+{ 2629 , 40 , -1 , -50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKGESTURE7STOP
+{ 2669 , 45 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKGESTURE8START
+{ 2669 , 45 , -1 , -50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKGESTURE8STOP
+{ 2580 , 33 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKGESTURE11START
+{ 2613 , 16 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COCKPIT_TALKGESTURE11STOP
+{ 2371 , 35 , -1 , 17 , 17 , 0 , 0 } , // BOTH_COCKPIT_SLEEP6START
+{ 2406 , 174 , -1 , 17 , 17 , 0 , 0 } , // BOTH_COCKPIT_SLEEP6STOP
+{ 20973 , 10 , -1 , 200 , 200 , 0 , 0 } , // BOTH_WIND
+{ 2944 , 4 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND_TO_KNEEL
+{ 2944 , 4 , -1 , -50 , 50 , 0 , 0 } , // BOTH_KNEEL_TO_STAND
+{ 18726 , 15 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TUSKENATTACK1
+{ 18741 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TUSKENATTACK2
+{ 18755 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TUSKENATTACK3
+{ 18769 , 14 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TUSKENLUNGE1
+{ 18783 , 47 , -1 , 50 , 50 , 0 , 0 } , // BOTH_TUSKENTAUNT1
+{ 2884 , 11 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COWER1_START
+{ 2792 , 92 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COWER1
+{ 2895 , 49 , -1 , 50 , 50 , 0 , 0 } , // BOTH_COWER1_STOP
+{ 14323 , 10 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SONICPAIN_START
+{ 14258 , 65 , 0 , 50 , 50 , 0 , 0 } , // BOTH_SONICPAIN_HOLD
+{ 14193 , 65 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SONICPAIN_END
+{ 14653 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND10
+{ 14718 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND10_TALK1
+{ 14758 , 35 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND10_TALK2
+{ 14693 , 25 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND10TOSTAND1
+{ 14978 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND1_TALK1
+{ 15008 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND1_TALK2
+{ 15038 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_STAND1_TALK3
+{ 13672 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT4
+{ 13712 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT5
+{ 13752 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT5_TALK1
+{ 13772 , 33 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT5_TALK2
+{ 13805 , 30 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT5_TALK3
+{ 13835 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT6
+{ 13875 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_SIT7
+{ 17174 , 4 , -1 , 50 , 50 , 0 , 0 } , // TORSO_DROPWEAP1
+{ 694 , 15 , -1 , 34 , 34 , 0 , 0 } , // TORSO_DROPWEAP2
+{ 709 , 16 , -1 , 34 , 34 , 0 , 0 } , // TORSO_DROPWEAP3
+{ 17178 , 4 , -1 , 50 , 50 , 0 , 0 } , // TORSO_DROPWEAP4
+{ 17182 , 5 , -1 , 50 , 50 , 0 , 0 } , // TORSO_RAISEWEAP1
+{ 736 , 61 , -1 , 34 , 34 , 0 , 0 } , // TORSO_RAISEWEAP2
+{ 797 , 10 , -1 , 34 , 34 , 0 , 0 } , // TORSO_RAISEWEAP3
+{ 17187 , 5 , -1 , 50 , 50 , 0 , 0 } , // TORSO_RAISEWEAP4
+{ 86 , 1 , -1 , 34 , 34 , 0 , 0 } , // TORSO_WEAPONREADY1
+{ 12683 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONREADY2
+{ 539 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONREADY3
+{ 549 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONREADY4
+{ 305 , 1 , -1 , 34 , 34 , 0 , 0 } , // TORSO_WEAPONREADY5
+{ 327 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONREADY6
+{ 417 , 1 , -1 , 34 , 34 , 0 , 0 } , // TORSO_WEAPONREADY7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONREADY8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONREADY9
+{ 527 , 1 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONREADY10
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONREADY11
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONREADY12
+{ 113 , 1 , -1 , 34 , 34 , 0 , 0 } , // TORSO_WEAPONIDLE1
+{ 12683 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONIDLE2
+{ 12674 , 2 , 0 , 17 , 17 , 0 , 0 } , // TORSO_WEAPONIDLE3
+{ 544 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONIDLE4
+{ 270 , 1 , -1 , 34 , 34 , 0 , 0 } , // TORSO_WEAPONIDLE5
+{ 306 , 1 , -1 , 50 , 50 , 0 , 0 } , // TORSO_WEAPONIDLE6
+{ 328 , 1 , -1 , 34 , 34 , 0 , 0 } , // TORSO_WEAPONIDLE7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONIDLE8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONIDLE9
+{ 512 , 1 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONIDLE10
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONIDLE11
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_WEAPONIDLE12
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKR1START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKR1HOLD
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKR1STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKR1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKL1START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKL1HOLD
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKL1STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_TALKL1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKL1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKR1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKR2START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKR2STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKR2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKL2START
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKL2STOP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_LOOKL2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDGESTURE1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDGESTURE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDGESTURE3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDGESTURE4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDEXTEND1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDRETRACT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_DROPHELMET1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RAISEHELMET1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_REACHHELMET1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GRABLBACKL
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GRABUBACKL
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GRABLBACKR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GRABUBACKR
+{ 17192 , 8 , -1 , 50 , 50 , 0 , 0 } , // TORSO_SURRENDER_START
+{ 17192 , 8 , -1 , -50 , 50 , 0 , 0 } , // TORSO_SURRENDER_STOP
+{ 4260 , 57 , 0 , 50 , 50 , 0 , 0 } , // TORSO_CHOKING1
+{ 20991 , 56 , -1 , 50 , 50 , 0 , 0 } , // TORSO_HANDSIGNAL1
+{ 21047 , 73 , -1 , 50 , 50 , 0 , 0 } , // TORSO_HANDSIGNAL2
+{ 21120 , 61 , -1 , 50 , 50 , 0 , 0 } , // TORSO_HANDSIGNAL3
+{ 21181 , 36 , -1 , 50 , 50 , 0 , 0 } , // TORSO_HANDSIGNAL4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_HANDSIGNAL5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GESTURE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_ATTACK
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_ATTACK2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_DROP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RAISE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GETFLAG
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GUARDBASE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_PATROL
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_FOLLOWME
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_AFFIRMATIVE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_NEGATIVE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEAD1_WATER
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEAD2_WATER
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_DEAD3_WATER
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CLIMB
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CLIMB_DOWN
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_CLIMB_DISMOUNT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_SALUTE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_GRAB_GRENADE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA9
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA10
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA11
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA12
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA13
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA14
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA15
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA16
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA17
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA18
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA19
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOTH_EXTRA20
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GESTURE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GESTURE3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_GESTURE4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND_ALT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND_ALT2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_READY
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELAX
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RAISE2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND2_ALT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND2_ALT2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_READY2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELAX2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RAISE3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_ATTACK3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND3_ALT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND3_ALT2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_READY3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELAX3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RAISE4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_ATTACK4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND4_ALT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND4_ALT2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_READY4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELAX4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RAISE5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_ATTACK5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_ATTACK5B
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND5_ALT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_STAND5_ALT2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_READY5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELAX5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELOAD1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELOAD2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELOAD3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_RELOAD4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_MG42
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_MOVE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_MOVE_ALT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA9
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // TORSO_EXTRA10
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_WALKCR_BACK
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_SWIM_IDLE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_IDLE_ALT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_BOOT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA9
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_EXTRA10
+{ 4 , 39 , 0 , -50 , 50 , 0 , 0 } , // LEGS_WALKBACK1
+{ 4 , 39 , 0 , -50 , 50 , 0 , 0 } , // LEGS_WALKBACK2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_RUNBACK1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_RUNBACK2
+{ 524 , 19 , -1 , 50 , 50 , 0 , 0 } , // LEGS_TURN1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_TURN2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_LEAN_LEFT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_LEAN_RIGHT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_KNEELDOWN1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_KNEELUP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_CRLEAN_LEFT1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_CRLEAN_RIGHT1
+{ 8236 , 1 , 0 , 50 , 50 , 0 , 0 } , // LEGS_CHOKING1
+{ 17200 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_LEFTUP1
+{ 17202 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_LEFTUP2
+{ 17204 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_LEFTUP3
+{ 17206 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_LEFTUP4
+{ 17208 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_LEFTUP5
+{ 17210 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_RIGHTUP1
+{ 17212 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_RIGHTUP2
+{ 17214 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_RIGHTUP3
+{ 17216 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_RIGHTUP4
+{ 17218 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_RIGHTUP5
+{ 17220 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_LUP1
+{ 17222 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_LUP2
+{ 17224 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_LUP3
+{ 17226 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_LUP4
+{ 17228 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_LUP5
+{ 17230 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_RUP1
+{ 17232 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_RUP2
+{ 17234 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_RUP3
+{ 17236 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_RUP4
+{ 17238 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S1_RUP5
+{ 17240 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_LUP1
+{ 17242 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_LUP2
+{ 17244 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_LUP3
+{ 17246 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_LUP4
+{ 17248 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_LUP5
+{ 17250 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_RUP1
+{ 17252 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_RUP2
+{ 17254 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_RUP3
+{ 17256 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_RUP4
+{ 17258 , 2 , -1 , 17 , 17 , 0 , 0 } , // LEGS_S3_RUP5
+{ 21295 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_LUP1
+{ 21297 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_LUP2
+{ 21299 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_LUP3
+{ 21301 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_LUP4
+{ 21303 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_LUP5
+{ 21305 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_RUP1
+{ 21307 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_RUP2
+{ 21309 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_RUP3
+{ 21311 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_RUP4
+{ 21313 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S4_RUP5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_LUP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_LUP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_LUP3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_LUP4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_LUP5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_RUP1
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_RUP2
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_RUP3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_RUP4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_S5_RUP5
+{ 21315 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_LUP1
+{ 21317 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_LUP2
+{ 21319 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_LUP3
+{ 21321 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_LUP4
+{ 21323 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_LUP5
+{ 21325 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_RUP1
+{ 21327 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_RUP2
+{ 21329 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_RUP3
+{ 21331 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_RUP4
+{ 21333 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S6_RUP5
+{ 21335 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_LUP1
+{ 21337 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_LUP2
+{ 21339 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_LUP3
+{ 21341 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_LUP4
+{ 21343 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_LUP5
+{ 21345 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_RUP1
+{ 21347 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_RUP2
+{ 21349 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_RUP3
+{ 21351 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_RUP4
+{ 21353 , 2 , -1 , 50 , 50 , 0 , 0 } , // LEGS_S7_RUP5
+{ 21355 , 19 , -1 , 50 , 50 , 0 , 0 } , // LEGS_TURN180
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_WALKCR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_WALK
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_RUN
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_BACK
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_SWIM
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_JUMP
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_LAND
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_JUMPB
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_LANDB
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_IDLE
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_IDLECR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_TURN
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_BACKCR
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // LEGS_BACKWALK
+{ 18 , 24 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CIN_1
+{ 262 , 40 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CIN_2
+{ 302 , 81 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_3
+{ 383 , 40 , 0 , 50 , 50 , 0 , 0 } , // BOTH_CIN_4
+{ 423 , 91 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_5
+{ 514 , 86 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_6
+{ 600 , 116 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_7
+{ 716 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_8
+{ 752 , 20 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_9
+{ 42 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_10
+{ 82 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_11
+{ 103 , 40 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_12
+{ 143 , 21 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_13
+{ 164 , 26 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_14
+{ 190 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_15
+{ 226 , 36 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_16
+{ 262 , 28 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_17
+{ 290 , 51 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_18
+{ 341 , 71 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_19
+{ 421 , 46 , -1 , 35 , 35 , 0 , 0 } , // BOTH_CIN_20
+{ 467 , 46 , -1 , 35 , 35 , 0 , 0 } , // BOTH_CIN_21
+{ 513 , 46 , -1 , 35 , 35 , 0 , 0 } , // BOTH_CIN_22
+{ 559 , 130 , -1 , 35 , 35 , 0 , 0 } , // BOTH_CIN_23
+{ 689 , 56 , -1 , 35 , 35 , 0 , 0 } , // BOTH_CIN_24
+{ 745 , 71 , -1 , 35 , 35 , 0 , 0 } , // BOTH_CIN_25
+{ 8722 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_26
+{ 8724 , 797 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_27
+{ 9521 , 502 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_28
+{ 10023 , 594 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_29
+{ 11264 , 671 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_30
+{ 11935 , 671 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_31
+{ 12606 , 321 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_32
+{ 12927 , 380 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_33
+{ 13307 , 380 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_34
+{ 13687 , 380 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_35
+{ 14067 , 320 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_36
+{ 14387 , 320 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_37
+{ 14707 , 320 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_38
+{ 15027 , 691 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_39
+{ 16163 , 691 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_40
+{ 16854 , 691 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_41
+{ 17545 , 691 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_42
+{ 18236 , 610 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_43
+{ 18846 , 610 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_44
+{ 19456 , 610 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_45
+{ 20066 , 610 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_46
+{ 20676 , 701 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_47
+{ 21377 , 80 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_48
+{ 21457 , 80 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_49
+{ 22542 , 2 , -1 , 50 , 50 , 0 , 0 } , // BOTH_CIN_50
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_BLOCK_DIAG_LEFT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_BLOCK_DIAG_RIGHT
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED3
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED4
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED5
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED6
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED7
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED8
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED9
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED10
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED11
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED12
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED13
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED14
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED15
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // BOOT_UNUSED16
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // FLAG_RUN
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // FLAG_STAND
+{ 0 , 0 , -1 , 100 , 100 , 0 , 0 } , // FLAG_STAND2RUN
+};
 
 //#define CONVENIENT_ANIMATION_FILE_DEBUG_THING
 
@@ -1636,7 +3413,7 @@ void SpewDebugStuffToFile()
 }
 #endif
 
-
+/*
 void BG_AnimationOverrides() {
 	int i, animNum;
 	float fps;
@@ -1690,7 +3467,7 @@ void BG_AnimationOverrides() {
 
 		bgGlobalAnimations[animNum].initialLerp = ceil(1000.0f / fabs(fps));
 	}
-}
+}*/
 /* TODO bring it back later without needing file parsing
 qboolean  PMove::BG_ParseAnimationFile(const char *filename) 
 {
@@ -3212,7 +4989,6 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 	}
 }
 
-extern qboolean ValidAnimFileIndex ( int index );
 void  PMove::PM_SaberLocked( void )
 {
 	int	remaining = 0;
@@ -5028,7 +6804,6 @@ void  PMove::PM_Q2StepSlideMove(qboolean gravity)
 }
 
 
-extern void PM_JumpForDir(void);
 void  PMove::PM_CheckBounceJump(vec3_t normal, vec3_t velocity) {
 
 	int JUMP_VELOCITY_NEW = JUMP_VELOCITY;
@@ -5695,43 +7470,782 @@ void  PMove::PM_StepSlideMove( qboolean gravity ) {
 //extern vec3_t flatNormal;
 
 
-pmove_t		*pm;
-pml_t		pml;
+weaponData_t weaponData_1_02_pm[WP_NUM_WEAPONS_GENERAL] =
+{
+	{	// WP_NONE
+//		"No Weapon",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		0,						//	int		fireTime;			// Amount of time between firings
+		0,						//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		0,						//	int		altFireTime;		// Amount of time between alt-firings
+		0,						//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_STUN_BATON
+//		"Stun Baton",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		400,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_SABER,
+//		"Lightsaber",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		100,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BRYAR_PISTOL,
+//		"Bryar Pistol",			//	char	classname[32];		// Spawning name
+		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
+		15,						//	int		ammoLow;			// Count when ammo is low
+		2,						//	int		energyPerShot;		// Amount of energy used per shot
+		400,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		200,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		1,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		1500					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BLASTER
+//		"E11 Blaster Rifle",	//	char	classname[32];		// Spawning name
+		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		2,						//	int		energyPerShot;		// Amount of energy used per shot
+		350,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		3,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		150,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DISRUPTOR
+//		"Tenloss Disruptor Rifle",//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		5,						//	int		energyPerShot;		// Amount of energy used per shot
+		600,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		1300,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		200,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		3,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		1700					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BOWCASTER
+//		"Wookiee Bowcaster",		//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		5,						//	int		energyPerShot;		// Amount of energy used per shot
+		1000,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		5,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		750,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		400,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,					//	int		altChargeSubTime;	// above for secondary
+		5,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		1700,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_REPEATER
+//		"Imperial Heavy Repeater",//	char	classname[32];		// Spawning name
+		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		8,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		800,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DEMP2
+//		"DEMP2",				//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		8,						//	int		energyPerShot;		// Amount of energy used per shot
+		500,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		900,						//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		250,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		3,						//	int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		2100					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_FLECHETTE
+//		"Golan Arms Flechette",	//	char	classname[32];		// Spawning name
+		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		10,						//	int		energyPerShot;		// Amount of energy used per shot
+		700,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		15,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		800,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_ROCKET_LAUNCHER
+//		"Merr-Sonn Missile System",	//	char	classname[32];		// Spawning name
+		AMMO_ROCKETS,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		900,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		1200,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_THERMAL
+//		"Thermal Detonator",	//	char	classname[32];		// Spawning name
+		AMMO_THERMAL,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_TRIP_MINE
+//		"Trip Mine",			//	char	classname[32];		// Spawning name
+		AMMO_TRIPMINE,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DET_PACK
+//		"Det Pack",				//	char	classname[32];		// Spawning name
+		AMMO_DETPACK,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_EMPLCACED_GUN
+//		"Emplaced Gun",			//	char	classname[32];		// Spawning name
+		/*AMMO_BLASTER*/0,			//	int		ammoIndex;			// Index to proper ammo slot
+		/*5*/0,						//	int		ammoLow;			// Count when ammo is low
+		/*2*/0,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		/*3*/0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		100,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	}
+};
 
-qboolean gPMDoSlowFall = qfalse;
+weaponData_t weaponData_1_03_pm[WP_NUM_WEAPONS_GENERAL] =
+{
+	{	// WP_NONE
+//		"No Weapon",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		0,						//	int		fireTime;			// Amount of time between firings
+		0,						//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		0,						//	int		altFireTime;		// Amount of time between alt-firings
+		0,						//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_STUN_BATON
+//		"Stun Baton",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		400,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_SABER,
+//		"Lightsaber",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		100,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BRYAR_PISTOL,
+//		"Bryar Pistol",			//	char	classname[32];		// Spawning name
+		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
+		15,						//	int		ammoLow;			// Count when ammo is low
+		2,						//	int		energyPerShot;		// Amount of energy used per shot
+		400,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		200,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		1,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		1500					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BLASTER
+//		"E11 Blaster Rifle",	//	char	classname[32];		// Spawning name
+		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		2,						//	int		energyPerShot;		// Amount of energy used per shot
+		350,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		3,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		150,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DISRUPTOR
+//		"Tenloss Disruptor Rifle",//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		5,						//	int		energyPerShot;		// Amount of energy used per shot
+		600,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		1300,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		200,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		3,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		1700					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BOWCASTER
+//		"Wookiee Bowcaster",		//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		5,						//	int		energyPerShot;		// Amount of energy used per shot
+		1000,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		5,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		750,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		400,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,					//	int		altChargeSubTime;	// above for secondary
+		5,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		1700,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_REPEATER
+//		"Imperial Heavy Repeater",//	char	classname[32];		// Spawning name
+		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		25,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		800,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DEMP2
+//		"DEMP2",				//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		8,						//	int		energyPerShot;		// Amount of energy used per shot
+		500,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		900,						//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		250,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		3,						//	int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		2100					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_FLECHETTE
+//		"Golan Arms Flechette",	//	char	classname[32];		// Spawning name
+		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		10,						//	int		energyPerShot;		// Amount of energy used per shot
+		700,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		25,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		800,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_ROCKET_LAUNCHER
+//		"Merr-Sonn Missile System",	//	char	classname[32];		// Spawning name
+		AMMO_ROCKETS,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		900,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		1200,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_THERMAL
+//		"Thermal Detonator",	//	char	classname[32];		// Spawning name
+		AMMO_THERMAL,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_TRIP_MINE
+//		"Trip Mine",			//	char	classname[32];		// Spawning name
+		AMMO_TRIPMINE,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DET_PACK
+//		"Det Pack",				//	char	classname[32];		// Spawning name
+		AMMO_DETPACK,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_EMPLCACED_GUN
+//		"Emplaced Gun",			//	char	classname[32];		// Spawning name
+		/*AMMO_BLASTER*/0,			//	int		ammoIndex;			// Index to proper ammo slot
+		/*5*/0,						//	int		ammoLow;			// Count when ammo is low
+		/*2*/0,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		/*3*/0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		100,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	}
+};
 
-// movement parameters
-float	pm_stopspeed = 100.0f;
-float	pm_duckScale = 0.50f;
-float	pm_swimScale = 0.50f;
-float	pm_wadeScale = 0.70f;
-
-float	pm_accelerate = 10.0f;
-float	pm_airaccelerate = 1.0f;
-float	pm_wateraccelerate = 4.0f;
-float	pm_flyaccelerate = 8.0f;
-
-float	pm_friction = 6.0f;
-float	pm_waterfriction = 1.0f;
-float	pm_flightfriction = 3.0f;
-float	pm_spectatorfriction = 5.0f;
-
-//japro/dfmania movement parameters
-const float pm_vq3_duckScale = 0.25f;
-const float pm_vq3_friction = 8.0f;
-
-const float	pm_cpm_accelerate = 15.0f;
-const float	pm_cpm_airaccelerate = 1.0f;
-const float	pm_cpm_airstopaccelerate = 2.5f;
-const float	pm_cpm_airstrafeaccelerate = 70.0f;
-const float	pm_cpm_airstrafewishspeed = 30.0f;
-
-const float	pm_sp_accelerate = 12.0f;
-const float	pm_sp_airaccelerate = 4.0f; 
-const float	pm_sp_frictionModifier = 3.0f;	//Used for "careful" mode (when pressing use)
-const float pm_sp_airDecelRate = 1.35f;	//Used for air decelleration away from current movement velocity
-
-int		c_pmove = 0;
+weaponData_t weaponData_1_04_pm[WP_NUM_WEAPONS_GENERAL] =
+{
+	{	// WP_NONE
+//		"No Weapon",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		0,						//	int		fireTime;			// Amount of time between firings
+		0,						//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		0,						//	int		altFireTime;		// Amount of time between alt-firings
+		0,						//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_STUN_BATON
+//		"Stun Baton",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		400,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_SABER,
+//		"Lightsaber",			//	char	classname[32];		// Spawning name
+		AMMO_NONE,				//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		0,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		100,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BRYAR_PISTOL,
+//		"Bryar Pistol",			//	char	classname[32];		// Spawning name
+		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
+		15,						//	int		ammoLow;			// Count when ammo is low
+		2,						//	int		energyPerShot;		// Amount of energy used per shot
+		400,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		200,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		1,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		1500					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BLASTER
+//		"E11 Blaster Rifle",	//	char	classname[32];		// Spawning name
+		AMMO_BLASTER,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		2,						//	int		energyPerShot;		// Amount of energy used per shot
+		350,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		3,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		150,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DISRUPTOR
+//		"Tenloss Disruptor Rifle",//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		5,						//	int		energyPerShot;		// Amount of energy used per shot
+		600,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		1300,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		200,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		3,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		1700					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_BOWCASTER
+//		"Wookiee Bowcaster",		//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		5,						//	int		energyPerShot;		// Amount of energy used per shot
+		1000,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		5,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		750,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		400,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,					//	int		altChargeSubTime;	// above for secondary
+		5,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		1700,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_REPEATER
+//		"Imperial Heavy Repeater",//	char	classname[32];		// Spawning name
+		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		15,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		800,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DEMP2
+//		"DEMP2",				//	char	classname[32];		// Spawning name
+		AMMO_POWERCELL,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		8,						//	int		energyPerShot;		// Amount of energy used per shot
+		500,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		6,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		900,						//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		250,					//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		3,						//	int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		2100					//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_FLECHETTE
+//		"Golan Arms Flechette",	//	char	classname[32];		// Spawning name
+		AMMO_METAL_BOLTS,		//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		10,						//	int		energyPerShot;		// Amount of energy used per shot
+		700,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		15,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		800,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_ROCKET_LAUNCHER
+//		"Merr-Sonn Missile System",	//	char	classname[32];		// Spawning name
+		AMMO_ROCKETS,			//	int		ammoIndex;			// Index to proper ammo slot
+		5,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		900,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		2,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		1200,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_THERMAL
+//		"Thermal Detonator",	//	char	classname[32];		// Spawning name
+		AMMO_THERMAL,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_TRIP_MINE
+//		"Trip Mine",			//	char	classname[32];		// Spawning name
+		AMMO_TRIPMINE,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		1,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_DET_PACK
+//		"Det Pack",				//	char	classname[32];		// Spawning name
+		AMMO_DETPACK,				//	int		ammoIndex;			// Index to proper ammo slot
+		0,						//	int		ammoLow;			// Count when ammo is low
+		1,						//	int		energyPerShot;		// Amount of energy used per shot
+		800,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		400,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	},
+	{	// WP_EMPLCACED_GUN
+//		"Emplaced Gun",			//	char	classname[32];		// Spawning name
+		/*AMMO_BLASTER*/0,			//	int		ammoIndex;			// Index to proper ammo slot
+		/*5*/0,						//	int		ammoLow;			// Count when ammo is low
+		/*2*/0,						//	int		energyPerShot;		// Amount of energy used per shot
+		100,					//	int		fireTime;			// Amount of time between firings
+		8192,					//	int		range;				// Range of weapon
+		/*3*/0,						//	int		altEnergyPerShot;	// Amount of energy used for alt-fire
+		100,					//	int		altFireTime;		// Amount of time between alt-firings
+		8192,					//	int		altRange;			// Range of alt-fire
+		0,						//	int		chargeSubTime;		// ms interval for subtracting ammo during charge
+		0,						//	int		altChargeSubTime;	// above for secondary
+		0,						//	int		chargeSub;			// amount to subtract during charge on each interval
+		0,						//int		altChargeSub;		// above for secondary
+		0,						//	int		maxCharge;			// stop subtracting once charged for this many ms
+		0						//	int		altMaxCharge;		// above for secondary
+	}
+};
 
 float forceSpeedLevels[4] = 
 {
@@ -5741,7 +8255,7 @@ float forceSpeedLevels[4] =
 	1.75
 };
 
-int forcePowerNeeded_1_04[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] = 
+int forcePowerNeeded_1_04_pm[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] =
 {
 	{ //nothing should be usable at rank 0..
 		999,//FP_HEAL,//instant
@@ -5829,7 +8343,7 @@ int forcePowerNeeded_1_04[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] =
 	}
 };
 
-int forcePowerNeeded_1_02[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] = 
+int forcePowerNeeded_1_02_pm[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] =
 {
 	{ //nothing should be usable at rank 0..
 		999,//FP_HEAL,//instant
@@ -5917,8 +8431,6 @@ int forcePowerNeeded_1_02[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS] =
 	}
 };
 
-int (*forcePowerNeeded)[NUM_FORCE_POWERS] = forcePowerNeeded_1_04;
-
 float forceJumpHeightMax[NUM_FORCE_POWER_LEVELS] =
 {
 	66,//normal jump (32+stepheight(18)+crouchdiff(24) = 74)
@@ -5927,13 +8439,13 @@ float forceJumpHeightMax[NUM_FORCE_POWER_LEVELS] =
 	418//(384+stepheight(18)+crouchdiff(24) = 426)
 };
 
-static void PM_UpdateAntiLoop() {
+void PMove::PM_UpdateAntiLoop() {
 	DF_AntiLoop_NewAngle(&pm->antiLoop, pm->lastAntiLoopVelocity, pm->ps->velocity, pm->ps->basespeed, (qboolean)(pm->modParms.raceMode && pm->ps->duelTime));
 	VectorCopy(pm->ps->velocity, pm->lastAntiLoopVelocity);
 }
 
 //rww - Get a pointer to the bgEntity by the index
-bgEntity_t* PM_BGEntForNum(int num)
+bgEntity_t* PMove::PM_BGEntForNum(int num)
 {
 	bgEntity_t* ent;
 
@@ -7922,7 +10434,7 @@ qboolean  PMove::PM_ForcePowerUsable(forcePowers_t forcePower)
 
 #define PM_FORCE_JUMP_CHARGE_TIME 1000.0f
 //#define PM_FORCE_JUMP_CHARGE_TIME_SEGMENTSLEGACY (PM_FORCE_JUMP_CHARGE_TIME/100.0f)
-void PM_ForceJumpCharge()
+void PMove::PM_ForceJumpCharge()
 {
 	float baseJumpStrength = forceJumpStrength[0];
 	float jumpStrengthChargeSpeedBase = forceJumpStrength[pm->ps->fd.forcePowerLevel_FP_LEVITATION_];
@@ -9346,7 +11858,6 @@ The ground trace didn't hit a surface, so we are in freefall
 }
 
 
-extern void PM_LimitedClipVelocity2(vec3_t in, vec3_t normal, vec3_t out, float overbounce, float maxSpeedNormal);
 /*
 =============
 PM_GroundTrace

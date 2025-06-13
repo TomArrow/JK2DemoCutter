@@ -526,7 +526,6 @@ typedef struct {
 	qboolean		highFpsFix;
 } pmove_t;
 
-extern	pmove_t		*pm;
 
 #define SETANIM_TORSO 1
 #define SETANIM_LEGS  2
@@ -964,12 +963,11 @@ extern	float	pm_flightfriction;
 
 extern	int		c_pmove;
 
-extern int forcePowerNeeded_1_02[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS];
-extern int forcePowerNeeded_1_04[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS];
-extern int (*forcePowerNeeded)[NUM_FORCE_POWERS];
-
-
-
+extern int forcePowerNeeded_1_02_pm[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS];
+extern int forcePowerNeeded_1_04_pm[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS];
+extern weaponData_t weaponData_1_02_pm[WP_NUM_WEAPONS_GENERAL];
+extern weaponData_t weaponData_1_03_pm[WP_NUM_WEAPONS_GENERAL];
+extern weaponData_t weaponData_1_04_pm[WP_NUM_WEAPONS_GENERAL];
 
 typedef enum {
 	VERSION_UNDEF = 0,
@@ -985,10 +983,70 @@ class PMove {
 	pmove_t* pm;
 	pml_t		pml;
 
+	int(*forcePowerNeeded)[NUM_FORCE_POWERS] = NULL;
+	weaponData_t* weaponData = NULL;
+
+	qboolean gPMDoSlowFall = qfalse;
+
+	// movement parameters
+	float	pm_stopspeed = 100.0f;
+	float	pm_duckScale = 0.50f;
+	float	pm_swimScale = 0.50f;
+	float	pm_wadeScale = 0.70f;
+
+	float	pm_accelerate = 10.0f;
+	float	pm_airaccelerate = 1.0f;
+	float	pm_wateraccelerate = 4.0f;
+	float	pm_flyaccelerate = 8.0f;
+
+	float	pm_friction = 6.0f;
+	float	pm_waterfriction = 1.0f;
+	float	pm_flightfriction = 3.0f;
+	float	pm_spectatorfriction = 5.0f;
+
+	//japro/dfmania movement parameters
+	const float pm_vq3_duckScale = 0.25f;
+	const float pm_vq3_friction = 8.0f;
+
+	const float	pm_cpm_accelerate = 15.0f;
+	const float	pm_cpm_airaccelerate = 1.0f;
+	const float	pm_cpm_airstopaccelerate = 2.5f;
+	const float	pm_cpm_airstrafeaccelerate = 70.0f;
+	const float	pm_cpm_airstrafewishspeed = 30.0f;
+
+	const float	pm_sp_accelerate = 12.0f;
+	const float	pm_sp_airaccelerate = 4.0f;
+	const float	pm_sp_frictionModifier = 3.0f;	//Used for "careful" mode (when pressing use)
+	const float pm_sp_airDecelRate = 1.35f;	//Used for air decelleration away from current movement velocity
+
+	int		c_pmove = 0;
 
 public:
-	PMove() {
+	PMove(demoType_t demoType) {
 		srand(time(NULL));
+		switch (demoType)
+		{
+		case DM_15:
+			jk2gameplay = VERSION_1_02;
+			weaponData = weaponData_1_02_pm;
+			forcePowerNeeded = forcePowerNeeded_1_02_pm;
+			jk2gameplay = VERSION_1_02;
+			break;
+		case DM_15_1_03:
+			jk2gameplay = VERSION_1_03;
+			weaponData = weaponData_1_03_pm;
+			forcePowerNeeded = forcePowerNeeded_1_04_pm;
+			jk2gameplay = VERSION_1_03;
+			break;
+		default:
+		case DM_14:
+		case DM_16:
+			jk2gameplay = VERSION_1_04;
+			weaponData = weaponData_1_04_pm;
+			forcePowerNeeded = forcePowerNeeded_1_04_pm;
+			jk2gameplay = VERSION_1_04;
+			break;
+		}
 		//mysrand(time(NULL)); // On linux rand() behaves different than on Winodws or in a qvm, ...
 	}
 private:
@@ -1172,6 +1230,9 @@ private:
 	void PM_CheckRollEnd();
 	void PmoveSingle(pmove_t* pmove);
 	void Pmove(pmove_t* pmove);
+	void PM_ForceJumpCharge();
+	bgEntity_t* PM_BGEntForNum(int num);
+	void PM_UpdateAntiLoop();
 };
 
 
