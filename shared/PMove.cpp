@@ -56,7 +56,7 @@ float	 Q_random(int* seed) {
 }
 
 const int animOverrideCount = sizeof(animOverrideNums) / sizeof(animOverrideNums[0]);
-stringID_table_t animTable[MAX_ANIMATIONS_GENERAL + 1]; 
+//stringID_table_t animTable[MAX_ANIMATIONS_GENERAL + 1]; 
 
 
 weaponData_t weaponData[WP_NUM_WEAPONS_GENERAL] = // only jk2 1.02, rest of weps will be nulled, and values will be wrong for 1.04 etc
@@ -1577,18 +1577,18 @@ int  PMove::PM_AnimLength( int index, animNumberGeneral_t anim )
 	return pm->animations[anim].numFrames * abs(pm->animations[anim].frameLerp);
 }
 
-void  PMove::PM_DebugLegsAnim(int anim)
-{
-	int oldAnim = (pm->ps->legsAnim & ~ANIM_TOGGLEBIT);
-	int newAnim = (anim & ~ANIM_TOGGLEBIT);
-
-	if (oldAnim < MAX_TOTALANIMATIONS_GENERAL && oldAnim >= BOTH_DEATH1_GENERAL &&
-		newAnim < MAX_TOTALANIMATIONS_GENERAL && newAnim >= BOTH_DEATH1_GENERAL)
-	{
-		Com_Printf("OLD: %s\n", animTable[oldAnim].name);
-		Com_Printf("NEW: %s\n", animTable[newAnim].name);
-	}
-}
+//void  PMove::PM_DebugLegsAnim(int anim)
+//{
+//	int oldAnim = (pm->ps->legsAnim & ~ANIM_TOGGLEBIT);
+//	int newAnim = (anim & ~ANIM_TOGGLEBIT);
+//
+//	if (oldAnim < MAX_TOTALANIMATIONS_GENERAL && oldAnim >= BOTH_DEATH1_GENERAL &&
+//		newAnim < MAX_TOTALANIMATIONS_GENERAL && newAnim >= BOTH_DEATH1_GENERAL)
+//	{
+//		Com_Printf("OLD: %s\n", animTable[oldAnim].name);
+//		Com_Printf("NEW: %s\n", animTable[newAnim].name);
+//	}
+//}
 /*
 ==============================================================================
 END: Animation utility functions (sequence checking)

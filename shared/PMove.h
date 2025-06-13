@@ -1028,8 +1028,6 @@ private:
 	qboolean PM_InOnGroundAnim(int anim);
 	qboolean PM_InRollComplete(playerState_t * ps, int anim);
 	int PM_AnimLength(int index, animNumberGeneral_t anim);
-	void PM_DebugLegsAnim(int anim);
-	qboolean BG_ParseAnimationFile(const char* filename);
 	void PM_ContinueLegsAnim(int anim);
 	void PM_ForceLegsAnim(int anim);
 	void PM_StartTorsoAnim(int anim);
@@ -1110,19 +1108,14 @@ private:
 	//PM anim utility functions:
 
 
-	void BG_CycleInven(playerState_t* ps, int direction);
+	//void BG_CycleInven(playerState_t* ps, int direction);
 
 
 
 	
-	qboolean BG_LegalizedForcePowers(char *powerOut, int powerOutSize, int maxRank, qboolean freeSaber, int teamForce, int gametype, int fpDisabled);
-
 	//BG anim utility functions:
 	qboolean PM_CheckJump(void);
 
-
-	void	BG_EvaluateTrajectory( const trajectory_t *tr, int atTime, vec3_t result );
-	void	BG_EvaluateTrajectoryDelta( const trajectory_t *tr, int atTime, vec3_t result );
 
 	void	BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerState_t *ps );
 
@@ -1136,29 +1129,14 @@ private:
 	void	BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad, int msecCompensate, int referenceMsec, movementStyle_e style);
 	void	BG_TouchJumpPadVelocity(playerState_t* ps, entityState_t* jumppad, int msecCompensate, int referenceMsec, movementStyle_e style);
 
-	void	BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean snap );
-	void	BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s, int time, qboolean snap );
-	//void	BG_G2PlayerAngles( vec3_t startAngles, vec3_t legs[3], vec3_t legsAngles, int painTime, int painDirection, int currentTime,
-	//					   qboolean *torso_yawing, float *torso_yawAngle, qboolean *torso_pitching, float *torso_pitchAngle, qboolean *legs_yawing, float *legs_yawAngle,
-	//					   int frameTime, vec3_t velocity, int legsAnim, int torsoAnim, qboolean dead, float movementDir, void *ghoul2, qhandle_t *modelList, int weapon); // From 1.03, probably not required. // FIXME
-
-	qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTime );
 
 
-	int BG_GetItemIndexByTag(int tag, itemType_t type);
 
 	qboolean BG_HasYsalamiri(int gametype, playerState_t *ps);
 	qboolean BG_CanUseFPNow(int gametype, playerState_t *ps, int time, forcePowers_t power);
 	void PM_ChargeForceJump();
 	void PM_CheckChargeJump(void);
 
-	void *BG_Alloc ( int size );
-	void *BG_AllocUnaligned ( int size );
-	void *BG_TempAlloc( int size );
-	void *BG_TempAllocTry( int size );
-	void BG_TempFree( int size );
-	char *BG_StringAlloc ( const char *source );
-	qboolean BG_OutOfMemory ( void );
 	void PM_StartLegsAnim(int anim);
 	void PM_Friction(void);
 	void PM_Accelerate(vec3_t wishdir, float wishspeed, float accel);
@@ -1192,8 +1170,8 @@ private:
 	void PM_DropTimers(void);
 	void PM_SetAnimAfterQ2(vec3_t oldVel);
 	void PM_CheckRollEnd();
-	void  PmoveSingle(pmove_t* pmove);
-	void  Pmove(pmove_t* pmove);
+	void PmoveSingle(pmove_t* pmove);
+	void Pmove(pmove_t* pmove);
 };
 
 
