@@ -474,6 +474,27 @@ typedef enum {
 } pmtype_t;
 // player_state->stats[] indexes
 // NOTE: may not have more than 16
+//typedef enum {
+//	STAT_HEALTH,
+//	STAT_HOLDABLE_ITEM,
+//	STAT_HOLDABLE_ITEMS,
+//	STAT_PERSISTANT_POWERUP,
+//	STAT_WEAPONS,					// 16 bit fields
+//	STAT_ARMOR,
+//	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
+//	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
+//	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
+//	STAT_DASHTIME,
+//	STAT_LASTJUMPSPEED,
+//	STAT_RACEMODE,
+//	STAT_ONLYBHOP,
+//	STAT_MOVEMENTSTYLE,
+//	STAT_JUMPTIME,
+//	STAT_WJTIME
+//} statIndex_t;
+
+// player_state->stats[] indexes
+// NOTE: may not have more than 16
 typedef enum {
 	STAT_HEALTH,
 	STAT_HOLDABLE_ITEM,
@@ -484,13 +505,14 @@ typedef enum {
 	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
 	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
-	STAT_DASHTIME,
-	STAT_LASTJUMPSPEED,
+	STAT_BOUNCEPOWER,//STAT_DASHTIME,  // 9 bits for current bounce power (up to 500ms), 7 bits for regenerate timer (100 ms timeout to regen 10ms)
+	STAT_LASTJUMPSPEED,//STAT_LASTJUMPSPEED, 
 	STAT_RACEMODE,
-	STAT_ONLYBHOP,
+	STAT_MSECRESTRICT,//STAT_ONLYBHOP, // 0= no restriction. otherwise msec value thats required for movement. in racemode its the msec value of racestyle. otherwise accepted physicsfps value
 	STAT_MOVEMENTSTYLE,
-	STAT_JUMPTIME,
-	STAT_WJTIME
+	STAT_RUNFLAGS,//STAT_JUMPTIME, 
+	STAT_PLACEHOLDER4,//STAT_WJTIME // unused rn
+	STAT_CHARGEJUMPDATA = STAT_BOUNCEPOWER, // used in chargejumpmode ( reuses STAT_BOUNCEPOWER ). we just set some flags here for example
 } statIndex_t;
 
 
@@ -556,7 +578,13 @@ vec_t VectorNormalize(vec3_t v);
 vec_t VectorNormalize2(const vec3_t v, vec3_t out);
 void VectorInverse(vec3_t v);
 vec_t VectorLengthSquared(const vec3_t v);
+vec_t Distance(const vec3_t p1, const vec3_t p2);
+vec_t DistanceSquared(const vec3_t p1, const vec3_t p2);
 void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross);
+
+inline float AngleDelta(float angle1, float angle2);
+inline float AngleNormalize180(float angle);
+inline float AngleNormalize360(float angle);
 
 typedef union {
 	float f;
@@ -750,6 +778,11 @@ typedef struct forcedata_s {
 	//NOT_NETWORKED//int			suicides;
 
 	//NOT_NETWORKED//int			privateDuelTime;
+
+	// not networked but used in pmove:
+	float		forceSpeedSmash;
+	float		forceJumpCharge;
+	int			forcePowerDuration_FP_LEVITATION_;
 } forcedata_t;
 
 
@@ -1259,7 +1292,12 @@ typedef struct playerState_s {
 		};
 	};
 
-	
+	// non-networked but needed for pmove: (but maybe not? maybe hide behind a #define someday)
+	int			pmove_framecount;	// FIXME: don't transmit over the network
+	int			forceHandExtendTime;
+	int			saberAttackSequence;
+	int			forceJumpFlip;
+	int			groundTime;
 
 	// Demo Tools specific values, only used internally
 	// Not exactly a super elegant way of doing it but eh,
@@ -4524,6 +4562,7 @@ void ByteToDir(int b, vec3_t dir);
 void vectoangles(const vec3_t value1, vec3_t angles);
 
 void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
+float vectoyaw(const vec3_t vec);
 
 void AnglesSubtract(vec3_t v1, vec3_t v2, vec3_t v3); 
 float	AngleSubtract(float a1, float a2);
@@ -4976,6 +5015,8 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 #endif
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut = NULL);
 int64_t demoCutGetDemoNameTruncationOffset(const char* demoName);
+
+int Q_irand(int value1, int value2, qboolean useDefault, int defaultValue);
 
 int strNumLen(const char* s);
 int atoiWhileNumber(const char* s);

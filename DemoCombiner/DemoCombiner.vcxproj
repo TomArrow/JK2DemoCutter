@@ -74,6 +74,7 @@
     <ClCompile Include="..\shared\lzmaSDK\XzDec.c" />
     <ClCompile Include="..\shared\lzmaSDK\XzEnc.c" />
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c" />
+    <ClCompile Include="..\shared\PMove.cpp" />
     <ClCompile Include="..\shared\zlib\adler32.c" />
     <ClCompile Include="..\shared\zlib\compress.c" />
     <ClCompile Include="..\shared\zlib\crc32.c" />
@@ -107,6 +108,7 @@
     <ClInclude Include="..\shared\jk2spStuff.h" />
     <ClInclude Include="..\shared\otherGameStuff.h" />
     <ClInclude Include="..\shared\otherGameStuff2.h" />
+    <ClInclude Include="..\shared\PMove.h" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />
     <ClInclude Include="..\shared\stateFields.h" />
     <ClInclude Include="..\shared\zlib\crc32.h" />

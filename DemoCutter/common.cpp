@@ -48,6 +48,20 @@ vec_t VectorLengthSquared(const vec3_t v) {
 	return (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 }
 
+vec_t Distance(const vec3_t p1, const vec3_t p2) {
+	vec3_t	v;
+
+	VectorSubtract(p2, p1, v);
+	return VectorLength(v);
+}
+
+vec_t DistanceSquared(const vec3_t p1, const vec3_t p2) {
+	vec3_t	v;
+
+	VectorSubtract(p2, p1, v);
+	return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+}
+
 vec_t VectorNormalize(vec3_t v) {
 	float	length, ilength;
 
@@ -3713,7 +3727,26 @@ void vectoangles(const vec3_t value1, vec3_t angles) {
 	angles[YAW] = yaw;
 	angles[ROLL] = 0;
 }
+float vectoyaw( const vec3_t vec ) {
+	float	yaw;
+	
+	if (vec[YAW] == 0 && vec[PITCH] == 0) {
+		yaw = 0;
+	} else {
+		if (vec[PITCH]) {
+			yaw = ( atan2( vec[YAW], vec[PITCH]) * 180 / M_PI );
+		} else if (vec[YAW] > 0) {
+			yaw = 90;
+		} else {
+			yaw = 270;
+		}
+		if (yaw < 0) {
+			yaw += 360;
+		}
+	}
 
+	return yaw;
+}
 
 void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up) {
 	float		angle;
@@ -6437,6 +6470,33 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 
 
 
+
+
+
+
+
+
+
+//rww - convience function..
+int Q_irand(int value1, int value2, qboolean useDefault, int defaultValue)
+{
+	int r;
+
+	//#ifdef DEBUG
+	//	// find bad calls: rand\s*\([^,]+,\s*([^,\s]+)\s*,[^,]+,\s*\1\s*\)
+	//	if (defaultValue >= value2 || defaultValue < value1) {
+	//		Com_Printf("Q_irand(%d,%d,%d,%d), bad call", value1, value2, useDefault, defaultValue);
+	//	}
+	//#endif
+	if (useDefault) {
+		return defaultValue;
+	}
+
+	r = rand() % value2;
+	r += value1;
+
+	return r;
+}
 
 
 

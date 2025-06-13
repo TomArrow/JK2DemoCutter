@@ -1,4 +1,6 @@
 
+#ifndef CMODEL_H
+#define CMODEL_H
 #include "demoCut.h"
 
 
@@ -781,3 +783,4 @@ public:
 
 };
 
+#endif
