@@ -576,8 +576,6 @@ class CModel {
 	int  CM_PointLeafnum_r(const vec3_t p, int num);
 	int  CM_PointLeafnum(const vec3_t p);
 	int	 CM_BoxLeafnums(const vec3_t mins, const vec3_t maxs, int* list, int listsize, int* lastLeaf);
-	int  CM_PointContents(const vec3_t p, clipHandle_t model);
-	int	 CM_TransformedPointContents(const vec3_t p, clipHandle_t model, const vec3_t origin, const vec3_t angles);
 	byte* CM_ClusterPVS(int cluster);
 	void  CM_FloodArea_r(int areaNum, int floodnum);
 	void	 CM_FloodAreaConnections(void);
@@ -677,9 +675,6 @@ class CModel {
 	void CM_Trace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, const vec3_t origin, int brushmask, qboolean capsule, sphere_t* sphere);
 
 
-	void CM_TransformedBoxTrace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, const vec3_t origin, const vec3_t angles, qboolean capsule);
-
-	clipHandle_t CM_TempBoxModel(const vec3_t mins, const vec3_t maxs, qboolean capsule);
 
 	void CM_ModelBounds(clipHandle_t model, vec3_t mins, vec3_t maxs);
 
@@ -714,6 +709,10 @@ class CModel {
 	void CM_TestInLeaf(traceWork_t* tw, cLeaf_t* leaf);
 
 	void CM_TraceThroughLeaf(traceWork_t* tw, cLeaf_t* leaf);
+
+
+	bool simpleHeightMode = false;
+	vec3_t groundPos = { 0,0,0 };
 
 public:
 
@@ -769,6 +768,21 @@ public:
 		throw new std::exception("CModel constructor: Map file not found.");
 
 	}
+	
+	CModel() {
+		// no map available. we're just gonna use last known ground height
+		simpleHeightMode = true;
+	}
+	void SetGroundPos(vec3_t ground, bool playerPos) {
+		//if (!simpleHeightMode) {
+
+		//	throw new std::exception("CModel constructor: Map file not found.");
+		//}
+		VectorCopy(ground, groundPos);
+		if (playerPos) {
+			groundPos[2] -= MINS_Z;
+		}
+	}
 	~CModel() { // meh. LOL
 		for (auto it = stuffToFree.begin(); it != stuffToFree.end(); it++) {
 			free(*it);
@@ -778,8 +792,49 @@ public:
 	}
 
 
+	int  CM_PointContents(const vec3_t p, clipHandle_t model);
+	int	 CM_TransformedPointContents(const vec3_t p, clipHandle_t model, const vec3_t origin, const vec3_t angles);
 
 	void CM_BoxTrace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, qboolean capsule);
+
+	void CM_TransformedBoxTrace(trace_t* results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, const vec3_t origin, const vec3_t angles, qboolean capsule);
+
+	clipHandle_t CM_TempBoxModel(const vec3_t mins, const vec3_t maxs, qboolean capsule);
+
+	void CM_TraceWrap(trace_t* results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask) {
+		if (simpleHeightMode) {
+			vec3_t minsG, maxsG;
+			VectorCopy(groundPos, minsG);
+			VectorCopy(groundPos, maxsG);
+			minsG[0] -= 10000;
+			minsG[1] -= 10000;
+			minsG[2] -= 1;
+			maxsG[0] += 10000;
+			maxsG[1] += 10000;
+			clipHandle_t tmp = CM_TempBoxModel(minsG, maxsG, qfalse);
+			CM_TransformedBoxTrace(results,start,end,mins,maxs,tmp,contentMask,vec3_origin,vec3_origin,qfalse);
+		}
+		else {
+			CM_BoxTrace(results,start,end,mins,maxs,0,contentMask,qfalse);
+		}
+	}
+	int CM_PointContentsWrap(vec3_t point, int passEntityNum) {
+		if (simpleHeightMode) {
+			vec3_t minsG, maxsG;
+			VectorCopy(groundPos, minsG);
+			VectorCopy(groundPos, maxsG);
+			minsG[0] -= 10000;
+			minsG[1] -= 10000;
+			minsG[2] -= 1;
+			maxsG[0] += 10000;
+			maxsG[1] += 10000;
+			clipHandle_t tmp = CM_TempBoxModel(minsG, maxsG, qfalse);
+			return CM_TransformedPointContents(point,tmp,vec3_origin,vec3_origin);
+		}
+		else {
+			return CM_PointContents(point, 0);
+		}
+	}
 
 };
 

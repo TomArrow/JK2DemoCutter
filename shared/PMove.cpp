@@ -5163,7 +5163,11 @@ qboolean  PMove::PM_CanBackstab(void)
 	back[1] = pm->ps->origin[1] - fwd[1]*BACK_STAB_DISTANCE;
 	back[2] = pm->ps->origin[2] - fwd[2]*BACK_STAB_DISTANCE;
 
+#if CLIENTSIDEONLY
+	PM_Trace(&tr, pm->ps->origin, trmins, trmaxs, back, pm->ps->clientNum, MASK_PLAYERSOLID);
+#else
 	pm->rawtrace(&tr, pm->ps->origin, trmins, trmaxs, back, pm->ps->clientNum, MASK_PLAYERSOLID);
+#endif
 
 	if (tr.fraction != 1.0 && tr.entityNum >= 0 && tr.entityNum < MAX_CLIENTS)
 	{ //We don't have real entity access here so we can't do an indepth check. But if it's a client and it's behind us, I guess that's reason enough to stab backward
@@ -5248,7 +5252,7 @@ qboolean  PMove::PM_SomeoneInFront(trace_t *tr)
 	back[1] = pm->ps->origin[1] + fwd[1]*FLIPHACK_DISTANCE;
 	back[2] = pm->ps->origin[2] + fwd[2]*FLIPHACK_DISTANCE;
 
-	pm->trace(tr, pm->ps->origin, trmins, trmaxs, back, pm->ps->clientNum, MASK_PLAYERSOLID);
+	PM_Trace(tr, pm->ps->origin, trmins, trmaxs, back, pm->ps->clientNum, MASK_PLAYERSOLID);
 
 	if (tr->fraction != 1.0 && tr->entityNum >= 0 && tr->entityNum < MAX_CLIENTS)
 	{
@@ -5304,7 +5308,7 @@ float  PMove::PM_GroundDistance(void)
 
 	down[2] -= 4096;
 
-	pm->trace(&tr, pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, MASK_SOLID);
+	PM_Trace(&tr, pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, MASK_SOLID);
 
 	VectorSubtract(pm->ps->origin, tr.endpos, down);
 
@@ -6372,7 +6376,6 @@ output: origin, velocity, impacts, stairup boolean
 
 */
 
-extern float MovementOverbounceFactor(int moveStyle, playerState_t* ps, usercmd_t* ucmd);
 vec3_t flatNormal = {0,0,1};
 
 qboolean  PMove::PM_GroundSlideOkay(float zNormal)
@@ -6554,7 +6557,7 @@ void  PMove::PM_Q2StepSlideMove_(void)
 		for (i = 0; i < 3; i++)
 			end[i] = pm->ps->origin[i] + time_left * pm->ps->velocity[i];
 
-		pm->trace(&trace,pm->ps->origin, pm->mins, pm->maxs, end, pm->ps->clientNum, pm->tracemask);
+		PM_Trace(&trace,pm->ps->origin, pm->mins, pm->maxs, end, pm->ps->clientNum, pm->tracemask);
 
 		if (trace.allsolid)
 		{	// entity is trapped in another solid
@@ -6757,7 +6760,7 @@ void  PMove::PM_Q2StepSlideMove(qboolean gravity)
 	VectorCopy(start_o, up);
 	up[2] += STEPSIZE;
 
-	pm->trace(&trace,up, pm->mins, pm->maxs, up, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace,up, pm->mins, pm->maxs, up, pm->ps->clientNum, pm->tracemask);
 	if (trace.allsolid)
 		return;		// can't step up
 
@@ -6770,7 +6773,7 @@ void  PMove::PM_Q2StepSlideMove(qboolean gravity)
 	// push down the final amount
 	VectorCopy(pm->ps->origin, down);
 	down[2] -= STEPSIZE;
-	pm->trace(&trace,pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace,pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
 	if (!trace.allsolid)
 	{
 		VectorCopy(trace.endpos, pm->ps->origin);
@@ -6952,7 +6955,7 @@ qboolean	 PMove::PM_SlideMove( qboolean gravity ) {
 		VectorMA( pm->ps->origin, time_left, pm->ps->velocity, end );
 
 		// see if we can make it there
-		pm->trace ( &trace, pm->ps->origin, pm->mins, pm->maxs, end, pm->ps->clientNum, pm->tracemask);
+		PM_Trace( &trace, pm->ps->origin, pm->mins, pm->maxs, end, pm->ps->clientNum, pm->tracemask);
 
 		if (trace.allsolid) {
 			// entity is completely trapped in another solid
@@ -7139,7 +7142,7 @@ qboolean  PMove::PM_PredictDeadRamp(qboolean gravity) {
 	VectorMA(pm->ps->origin, pml.frametime, testVelocity, end);
 
 	// see if we can make it there
-	pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, end, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, end, pm->ps->clientNum, pm->tracemask);
 
 
 	if (trace.fraction == 1) {
@@ -7149,7 +7152,7 @@ qboolean  PMove::PM_PredictDeadRamp(qboolean gravity) {
 		point[1] = newPos[1];
 		point[2] = newPos[2] - 0.25;
 
-		pm->trace(&trace, newPos, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+		PM_Trace(&trace, newPos, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 
 		// do something corrective if the trace starts in a solid...
 		if (trace.allsolid) {
@@ -7161,13 +7164,13 @@ qboolean  PMove::PM_PredictDeadRamp(qboolean gravity) {
 						point[0] += (float)i;
 						point[1] += (float)j;
 						point[2] += (float)k;
-						pm->trace(&trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+						PM_Trace(&trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 						if (!trace.allsolid) {
 							point[0] = newPos[0];
 							point[1] = newPos[1];
 							point[2] = newPos[2] - 0.25;
 
-							pm->trace(&trace, newPos, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+							PM_Trace(&trace, newPos, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 							i = j = k = 2; // Stupid way to end the loop lol.
 						}
 					}
@@ -7259,7 +7262,7 @@ void  PMove::PM_StepSlideMove( qboolean gravity ) {
 
 	VectorCopy(start_o, down);
 	down[2] -= NEW_STEPSIZE;
-	pm->trace (&trace, start_o, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace, start_o, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
 	VectorSet(up, 0, 0, 1);
 	// never step up when you still have up velocity
 	if ( pm->ps->velocity[2] > 0 && (trace.fraction == 1.0 ||
@@ -7278,7 +7281,7 @@ void  PMove::PM_StepSlideMove( qboolean gravity ) {
 	up[2] += NEW_STEPSIZE;
 
 	// test the player position if they were a stepheight higher
-	pm->trace (&trace, start_o, pm->mins, pm->maxs, up, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace, start_o, pm->mins, pm->maxs, up, pm->ps->clientNum, pm->tracemask);
 	if ( trace.allsolid ) {
 		if ( pm->debugLevel ) {
 			Com_Printf("%i:bend can't step\n", c_pmove);
@@ -7390,7 +7393,7 @@ void  PMove::PM_StepSlideMove( qboolean gravity ) {
 	// push down the final amount
 	VectorCopy (pm->ps->origin, down);
 	down[2] -= stepSize;
-	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
 	if ( !trace.allsolid ) {
 		VectorCopy (trace.endpos, pm->ps->origin);
 	}
@@ -7404,7 +7407,7 @@ void  PMove::PM_StepSlideMove( qboolean gravity ) {
 
 #if 0
 	// if the down trace can trace back to the original position directly, don't step
-	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, start_o, pm->ps->clientNum, pm->tracemask);
+	PM_Trace( &trace, pm->ps->origin, pm->mins, pm->maxs, start_o, pm->ps->clientNum, pm->tracemask);
 	if ( trace.fraction == 1.0 ) {
 		// use the original move
 		VectorCopy (down_o, pm->ps->origin);
@@ -8454,7 +8457,17 @@ bgEntity_t* PMove::PM_BGEntForNum(int num)
 		assert(!"You cannot call PM_BGEntForNum outside of pm functions!");
 		return NULL;
 	}
+#if CLIENTSIDEONLY
+	if (!pm->getEnt)
+	{
+		assert(!"getEnt address not set");
+		return NULL;
+	}
 
+	assert(num >= 0 && num < MAX_GENTITIES);
+
+	ent = pm->getEnt(num,getEntReference);
+#else
 	if (!pm->baseEnt)
 	{
 		assert(!"Base entity address not set");
@@ -8470,6 +8483,7 @@ bgEntity_t* PMove::PM_BGEntForNum(int num)
 	assert(num >= 0 && num < MAX_GENTITIES);
 
 	ent = (bgEntity_t*)((byte*)pm->baseEnt + pm->entSize * (num));
+#endif
 
 	return ent;
 }
@@ -9216,7 +9230,7 @@ qboolean  PMove::PM_AdjustAngleForWallRun( playerState_t *ps, usercmd_t *ucmd, q
 		}
 		VectorMA( ps->origin, dist, rt, traceTo );
 		
-		pm->trace( &trace, ps->origin, mins, maxs, traceTo, ps->clientNum, MASK_PLAYERSOLID );
+		PM_Trace( &trace, ps->origin, mins, maxs, traceTo, ps->clientNum, MASK_PLAYERSOLID );
 
 		if ( trace.fraction < 1.0f )
 		{//still a wall there
@@ -9363,7 +9377,7 @@ qboolean  PMove::PM_AdjustAngleForWallJump(playerState_t* ps, usercmd_t* ucmd, q
 		}
 		//[JAPRO - Serverside + Clientside - Physics - Change g_debugmelee 1 so that it has kungfu moves but keeps normal wallgrab.  Create g_debugmelee 2 for kung fu moves and infinite wallgrab - End]
 		VectorMA(ps->origin, dist, checkDir, traceTo);
-		pm->trace(&trace, ps->origin, mins, maxs, traceTo, ps->clientNum, MASK_PLAYERSOLID);
+		PM_Trace(&trace, ps->origin, mins, maxs, traceTo, ps->clientNum, MASK_PLAYERSOLID);
 		if ( //ucmd->upmove <= 0 && 
 			ps->legsTimer > 100 &&
 			trace.fraction < 1.0f &&
@@ -9796,7 +9810,7 @@ qboolean PMove::PM_CheckJump( void )
 		if(!onlyWallGrab){
 			AngleVectors( pm->ps->viewangles, forward, NULL, NULL );
 			VectorMA( pm->ps->origin, -8, forward, back );
-			pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, back, pm->ps->clientNum, pm->tracemask );
+			PM_Trace( &trace, pm->ps->origin, pm->mins, pm->maxs, back, pm->ps->clientNum, pm->tracemask );
 
 			if ( trace.fraction <= 1.0f )
 			{
@@ -9898,7 +9912,7 @@ qboolean PMove::PM_CheckJump( void )
 
 				if ( doTrace )
 				{
-					pm->trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, contents );
+					PM_Trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, contents );
 					VectorSubtract( pm->ps->origin, traceto, idealNormal );
 					VectorNormalize( idealNormal );
 				}
@@ -10011,7 +10025,7 @@ qboolean PMove::PM_CheckJump( void )
 				}
 				if ( anim != -1 )
 				{
-					pm->trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID|CONTENTS_BODY );
+					PM_Trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID|CONTENTS_BODY );
 					if ( trace.fraction < 1.0f )
 					{//flip off wall
 						int parts = 0;
@@ -10062,7 +10076,7 @@ qboolean PMove::PM_CheckJump( void )
 				AngleVectors( fwdAngles, fwd, NULL, NULL );
 				VectorMA( pm->ps->origin, 32, fwd, traceto );
 
-				pm->trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, MASK_PLAYERSOLID );//FIXME: clip brushes too?
+				PM_Trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, MASK_PLAYERSOLID );//FIXME: clip brushes too?
 				VectorSubtract( pm->ps->origin, traceto, idealNormal );
 				VectorNormalize( idealNormal );
 				
@@ -10161,7 +10175,7 @@ qboolean PMove::PM_CheckJump( void )
 						bgEntity_t *traceEnt;
 
 						VectorMA( pm->ps->origin, 8, checkDir, traceto );
-						pm->trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID );//FIXME: clip brushes too?
+						PM_Trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID );//FIXME: clip brushes too?
 						VectorSubtract( pm->ps->origin, traceto, idealNormal );
 						VectorNormalize( idealNormal );
 						traceEnt = PM_BGEntForNum(trace.entityNum);
@@ -10305,13 +10319,13 @@ PM_CheckWaterJump
 
 	VectorMA (pm->ps->origin, 30, flatforward, spot);
 	spot[2] += 4;
-	cont = pm->pointcontents (spot, pm->ps->clientNum );
+	cont = PM_PointContents(spot, pm->ps->clientNum );
 	if ( !(cont & CONTENTS_SOLID) ) {
 		return qfalse;
 	}
 
 	spot[2] += 16;
-	cont = pm->pointcontents (spot, pm->ps->clientNum );
+	cont = PM_PointContents(spot, pm->ps->clientNum );
 	if ( cont ) {
 		return qfalse;
 	}
@@ -11508,7 +11522,7 @@ Returns an event number apropriate for the groundsurface
 
 	if ( anim != -1 )
 	{ //We want to roll. Perform a trace to see if we can, and if so, send us into one.
-		pm->trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID );
+		PM_Trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID );
 		if ( trace.fraction >= 1.0f )
 		{
 			pm->ps->saberMove = LS_NONE_GENERAL;
@@ -11754,13 +11768,13 @@ PM_CorrectAllSolid
 				point[0] += (float) i;
 				point[1] += (float) j;
 				point[2] += (float) k;
-				pm->trace (trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+				PM_Trace(trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 				if ( !trace->allsolid ) {
 					point[0] = pm->ps->origin[0];
 					point[1] = pm->ps->origin[1];
 					point[2] = pm->ps->origin[2] - 0.25;
 
-					pm->trace (trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+					PM_Trace(trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 					pml.groundTrace = *trace;
 					return qtrue;
 				}
@@ -11810,7 +11824,7 @@ The ground trace didn't hit a surface, so we are in freefall
 		VectorCopy( pm->ps->origin, point );
 		point[2] -= 64;
 
-		pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+		PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 		if ( trace.fraction == 1.0 || pm->ps->pm_type == PM_FLOAT ) {
 			if ( pm->ps->velocity[2] <= 0 && !(pm->ps->pm_flags&PMF_JUMP_HELD))
 			{
@@ -11838,7 +11852,7 @@ The ground trace didn't hit a surface, so we are in freefall
 		VectorCopy( pm->ps->origin, point );
 		point[2] -= 64;
 
-		pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+		PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 		if ( trace.fraction == 1.0 || pm->ps->pm_type == PM_FLOAT )
 		{
 			pm->ps->inAirAnim = qtrue;
@@ -11882,7 +11896,7 @@ PM_GroundTrace
 		return;
 	}
 
-	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+	PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 	pml.groundTrace = trace;
 
 	// do something corrective if the trace starts in a solid...
@@ -12061,7 +12075,7 @@ PM_SetWaterLevel
 	point[0] = pm->ps->origin[0];
 	point[1] = pm->ps->origin[1];
 	point[2] = pm->ps->origin[2] + MINS_Z + 1;	
-	cont = pm->pointcontents( point, pm->ps->clientNum );
+	cont = PM_PointContents( point, pm->ps->clientNum );
 
 	if ( cont & MASK_WATER ) {
 		sample2 = pm->ps->viewheight - MINS_Z;
@@ -12070,11 +12084,11 @@ PM_SetWaterLevel
 		pm->watertype = cont;
 		pm->waterlevel = 1;
 		point[2] = pm->ps->origin[2] + MINS_Z + sample1;
-		cont = pm->pointcontents (point, pm->ps->clientNum );
+		cont = PM_PointContents(point, pm->ps->clientNum );
 		if ( cont & MASK_WATER ) {
 			pm->waterlevel = 2;
 			point[2] = pm->ps->origin[2] + MINS_Z + sample2;
-			cont = pm->pointcontents (point, pm->ps->clientNum );
+			cont = PM_PointContents(point, pm->ps->clientNum );
 			if ( cont & MASK_WATER ){
 				pm->waterlevel = 3;
 			}
@@ -12129,7 +12143,7 @@ Sets mins, maxs, and pm->ps->viewheight
 	{
 		// try to stand up
 		pm->maxs[2] = DEFAULT_MAXS_2;
-		pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
+		PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
 		if (!trace.allsolid)
 			pm->ps->pm_flags &= ~PMF_ROLLING;
 	}
@@ -12144,7 +12158,7 @@ Sets mins, maxs, and pm->ps->viewheight
 		{
 			// try to stand up
 			pm->maxs[2] = DEFAULT_MAXS_2;
-			pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
+			PM_Trace(&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
 			if (!trace.allsolid)
 				pm->ps->pm_flags &= ~PMF_DUCKED;
 		}
@@ -12647,7 +12661,7 @@ void  PMove::PM_FinishWeaponChange( void ) {
 			ang[1] = muzzlePoint[1] + ang[1]*2048;
 			ang[2] = muzzlePoint[2] + ang[2]*2048;
 
-			pm->trace(&tr, muzzlePoint, NULL, NULL, ang, pm->ps->clientNum, MASK_PLAYERSOLID);
+			PM_Trace(&tr, muzzlePoint, NULL, NULL, ang, pm->ps->clientNum, MASK_PLAYERSOLID);
 
 			if (tr.fraction != 1 && tr.entityNum < MAX_CLIENTS && tr.entityNum != pm->ps->clientNum)
 			{
@@ -12912,7 +12926,7 @@ int  PMove::PM_ItemUsable(playerState_t *ps, int forcedUse)
 		trtest[1] = fwdorg[1] + fwd[1]*16;
 		trtest[2] = fwdorg[2] + fwd[2]*16;
 
-		pm->trace(&tr, ps->origin, mins, maxs, trtest, ps->clientNum, MASK_PLAYERSOLID);
+		PM_Trace(&tr, ps->origin, mins, maxs, trtest, ps->clientNum, MASK_PLAYERSOLID);
 
 		if ((tr.fraction != 1 && tr.entityNum != ps->clientNum) || tr.startsolid || tr.allsolid)
 		{
@@ -12933,12 +12947,12 @@ int  PMove::PM_ItemUsable(playerState_t *ps, int forcedUse)
 		AngleVectors (ps->viewangles, fwd, NULL, NULL);
 		fwd[2] = 0;
 		VectorMA(ps->origin, 64, fwd, dest);
-		pm->trace(&tr, ps->origin, mins, maxs, dest, ps->clientNum, MASK_SHOT );
+		PM_Trace(&tr, ps->origin, mins, maxs, dest, ps->clientNum, MASK_SHOT );
 		if (tr.fraction > 0.9 && !tr.startsolid && !tr.allsolid)
 		{
 			VectorCopy(tr.endpos, pos);
 			VectorSet( dest, pos[0], pos[1], pos[2] - 4096 );
-			pm->trace( &tr, pos, mins, maxs, dest, ps->clientNum, MASK_SOLID );
+			PM_Trace( &tr, pos, mins, maxs, dest, ps->clientNum, MASK_SOLID );
 			if ( !tr.startsolid && !tr.allsolid )
 			{
 				return 1;

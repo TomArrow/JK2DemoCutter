@@ -2,9 +2,12 @@
 #ifndef PMOVE_H
 #define PMOVE_H
 #include "demoCut.h"
+#include "CModel.h"
 #include <time.h>
 
 #define CLIENTSIDEONLY 1
+
+
 
 //anims.h
 
@@ -371,6 +374,7 @@ typedef struct animation_s {
 
 //extern qboolean			BGPAFtextLoaded;
 //extern animation_t		bgGlobalAnimations[MAX_TOTALANIMATIONS];
+extern animation_t	bgGlobalAnimations[MAX_TOTALANIMATIONS_GENERAL];
 
 // flip the togglebit every time an animation
 // changes so a restart of the same anim can be detected
@@ -434,6 +438,8 @@ typedef struct bgEntity_s
 } bgEntity_t;
 //#endif
 
+typedef bgEntity_t* (*getEntFunc_t)(int entNum, void* reference);
+
 typedef enum serverModType_s {
 	SVMOD_NONE_UNKNOWN,
 	SVMOD_JK2PRO,
@@ -446,6 +452,8 @@ typedef struct pmoveModMovement_s {
 	int msecRestrict;
 	qboolean raceMode;
 } pmoveModMovement_t;
+
+class PMove;
 
 typedef struct {
 	// state (in / out)
@@ -492,9 +500,9 @@ typedef struct {
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
-	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
-	void		(*q2trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
-	int			(*pointcontents)( const vec3_t point, int passEntityNum );
+	//void		(PMove::*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
+	//void		(*q2trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
+	//int			(PMove::*pointcontents)( const vec3_t point, int passEntityNum );
 	int			q2TraceStyle;
 	int			q2Skims;
 
@@ -508,11 +516,15 @@ typedef struct {
 	qboolean	isSpecialPredict; // not a real predict, just for image smoothing
 
 	//rww - bg entitystate access method
+#if CLIENTSIDEONLY
+	getEntFunc_t	getEnt;
+#else
 	bgEntity_t* baseEnt; //base address of the entity array (g_entities or cg_entities)
 	int			entSize; //size of the struct (gentity_t or centity_t) so things can be dynamic
+#endif
 
 	// raw trace that ignores racemode considerations and such. allow us to dbs anyone even in racemode as a meme.
-	void		(*rawtrace)(trace_t* results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask);
+	//void		(*rawtrace)(trace_t* results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask);
 
 	rollState_t		roll;
 	antiLoopState_t antiLoop;
@@ -537,10 +549,6 @@ typedef struct {
 #define SETANIM_FLAG_RESTART	4//Allow restarting the anim if playing the same one (weapon fires)
 #define SETANIM_FLAG_HOLDLESS	8//Set the new timer
 
-
-// if a full pmove isn't done on the client, you can just update the angles
-void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd );
-void Pmove (pmove_t *pmove);
 
 //===================================================================================
 
@@ -874,22 +882,22 @@ typedef enum {
 
 #define INFO_HASH_SIZE		1024
 
-typedef struct infoHashed_s {
-	//short hash;
-	//short arenaNum;
-	char* name;
-	char* info;
-	struct infoHashed_s* next;
-} infoHashed_t;
+//typedef struct infoHashed_s {
+//	//short hash;
+//	//short arenaNum;
+//	char* name;
+//	char* info;
+//	struct infoHashed_s* next;
+//} infoHashed_t;
 
-extern int					g_numArenas;
-extern infoHashed_t			g_arenaInfosHashed[MAX_ARENAS];
+//extern int					g_numArenas;
+//extern infoHashed_t			g_arenaInfosHashed[MAX_ARENAS];
 
 #define MAX_BOTS			1024
 #define MAX_BOTS_TEXT		8192
 
 
-qboolean BG_DB_VerifyPassword(const char* password, int clientNumNotify);
+//qboolean BG_DB_VerifyPassword(const char* password, int clientNumNotify);
 
 
 
@@ -944,24 +952,24 @@ typedef struct
 	qboolean	bounceJumped;
 } pml_t;
 
-extern	pml_t		pml;
+//extern	pml_t		pml;
 
 // movement parameters
-extern	float	pm_stopspeed;
-extern	float	pm_duckScale;
-extern	float	pm_swimScale;
-extern	float	pm_wadeScale;
-
-extern	float	pm_accelerate;
-extern	float	pm_airaccelerate;
-extern	float	pm_wateraccelerate;
-extern	float	pm_flyaccelerate;
-
-extern	float	pm_friction;
-extern	float	pm_waterfriction;
-extern	float	pm_flightfriction;
-
-extern	int		c_pmove;
+//extern	float	pm_stopspeed;
+//extern	float	pm_duckScale;
+//extern	float	pm_swimScale;
+//extern	float	pm_wadeScale;
+//
+//extern	float	pm_accelerate;
+//extern	float	pm_airaccelerate;
+//extern	float	pm_wateraccelerate;
+//extern	float	pm_flyaccelerate;
+//
+//extern	float	pm_friction;
+//extern	float	pm_waterfriction;
+//extern	float	pm_flightfriction;
+//
+//extern	int		c_pmove;
 
 extern int forcePowerNeeded_1_02_pm[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS];
 extern int forcePowerNeeded_1_04_pm[NUM_FORCE_POWER_LEVELS][NUM_FORCE_POWERS];
@@ -982,6 +990,8 @@ class PMove {
 	mvversion_t	jk2gameplay = VERSION_UNDEF;  // Current gameplay to apply
 	pmove_t* pm;
 	pml_t		pml;
+
+	CModel* cm = NULL;
 
 	int(*forcePowerNeeded)[NUM_FORCE_POWERS] = NULL;
 	weaponData_t* weaponData = NULL;
@@ -1021,8 +1031,39 @@ class PMove {
 
 	int		c_pmove = 0;
 
+	getEntFunc_t	getEnt;
+	void*			getEntReference = NULL;
+
+	inline void	PM_Trace(trace_t* results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask) {
+		if (!cm) {
+			throw std::exception("PM_Trace: cm is null.");
+			return;
+		}
+
+		cm->CM_TraceWrap(results, start, mins, maxs, end, passEntityNum, contentMask);
+	}
+	inline int	PM_PointContents(vec3_t point, int passEntityNum) {
+		if (!cm) {
+			throw std::exception("PM_PointContents: cm is null.");
+			return 0;
+		}
+
+		return cm->CM_PointContentsWrap(point, passEntityNum);
+	}
+
 public:
-	PMove(demoType_t demoType) {
+	void SetCModel(CModel* cmodel) {
+		cm = cmodel;
+	}
+	void SetGetEntFunc(getEntFunc_t getEntA) {
+		getEnt = getEntA;
+	}
+	void SetGetEntFuncReference(void* getEntReferenceA) {
+		getEntReference = getEntReferenceA;
+	}
+	PMove(demoType_t demoType, CModel* cmodel, getEntFunc_t getEntA) {
+		cm = cmodel;
+		getEnt = getEntA;
 		srand(time(NULL));
 		switch (demoType)
 		{
@@ -1049,7 +1090,46 @@ public:
 		}
 		//mysrand(time(NULL)); // On linux rand() behaves different than on Winodws or in a qvm, ...
 	}
+	void step(playerState_t* ps, usercmd_t* ucmd, void* getEntReferenceA, int gametype) {
+		if (getEntReferenceA) {
+			getEntReference = getEntReferenceA;
+		}
+		pmove_t	cg_pmove;
+		cg_pmove.ps = ps;
+		if (cg_pmove.ps->pm_type == PM_DEAD) {
+			cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;
+		}
+		else {
+			cg_pmove.tracemask = MASK_PLAYERSOLID;
+		}
+		if (cg_pmove.ps->persistant[PERS_TEAM] == TEAM_SPECTATOR) {
+			cg_pmove.tracemask &= ~CONTENTS_BODY;	// spectators can fly through bodies
+		}
+		cg_pmove.noFootsteps = qfalse;// (cgs.dmflags & DF_NO_FOOTSTEPS) > 0;
+		cg_pmove.haveForceSpeedSmash = qfalse;
+		cg_pmove.pmove_fixed = 0;// cg_pmove_fixed.integer;// | cg_pmove_fixed.integer;
+		cg_pmove.pmove_msec = 7;// cg_pmove_msec.integer;
+		cg_pmove.pmove_float = 0;//cg_pmove_float.integer;
+
+		cg_pmove.debugLevel = 0;
+		cg_pmove.isSpecialPredict = qfalse;
+
+		cg_pmove.highFpsFix = qfalse;// (cgs.jcinfo & JK2PRO_CINFO_HIGHFPSFIX);
+
+		cg_pmove.mod = SVMOD_NONE_UNKNOWN;
+
+		cg_pmove.cmd = *ucmd;
+		cg_pmove.animations = bgGlobalAnimations;
+		cg_pmove.gametype = gametype;
+		cg_pmove.debugMelee = 1;
+		cg_pmove.unlockRandom = 0;
+		cg_pmove.handleStrafebotSlopes = qtrue;
+		// bgClients .... sigh
+
+
+	}
 private:
+
 
 	qboolean BG_InSpecialJump(int anim, int runFlags);
 	qboolean BG_InSaberStandAnim(int anim);
