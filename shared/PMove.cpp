@@ -4859,7 +4859,19 @@ void  PMove::PM_SetAnimFrame( playerState_t *gent, int frame, qboolean torso, qb
 	gent->saberLockFrame = frame;
 }
 
+#if CLIENTSIDEONLY
+#define ENTPROP(a) s.a
+#define ENTPOS s.pos.trBase
+#else
+#define ENTPROP(a) a
+#define ENTPOS origin
+#endif
+
+#if CLIENTSIDEONLY
+void  PMove::PM_SaberLockBreak(const bgEntity_t* genemy, qboolean victory)
+#else
 void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
+#endif
 {
 	int	winAnim = BOTH_STAND1_GENERAL;
 	// int loseAnim = BOTH_STAND1_GENERAL;
@@ -4872,7 +4884,9 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 		winAnim = BOTH_A3_T__B__GENERAL;
 		if ( !victory )
 		{//no-one won
+#if !CLIENTSIDEONLY
 			genemy->saberMove = LS_A_T2B_GENERAL;
+#endif
 			// loseAnim = winAnim;
 		}
 		else
@@ -4885,7 +4899,9 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 		winAnim = BOTH_K1_S1_T__GENERAL;
 		if ( !victory )
 		{//no-one won
+#if !CLIENTSIDEONLY
 			genemy->saberMove = LS_K1_T__GENERAL;
+#endif
 			// loseAnim = winAnim;
 		}
 		else
@@ -4901,8 +4917,10 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 		}
 		else
 		{
+#if !CLIENTSIDEONLY
 			genemy->saberMove = LS_H1_BL_GENERAL;
 			genemy->saberBlocked = BLOCKED_PARRY_BROKEN;
+#endif
 			punishLoser = qtrue;
 		}
 		break;
@@ -4914,8 +4932,10 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 		}
 		else
 		{
+#if !CLIENTSIDEONLY
 			genemy->saberMove = LS_H1_BR_GENERAL;
 			genemy->saberBlocked = BLOCKED_PARRY_BROKEN;
+#endif
 			punishLoser = qtrue;
 		}
 		break;
@@ -4928,22 +4948,30 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 
 		int strength = 8;
 
-		VectorSubtract(genemy->origin, pm->ps->origin, oppDir);
+		VectorSubtract(genemy->ENTPOS, pm->ps->origin, oppDir);
 		VectorNormalize(oppDir);
 
+#if !CLIENTSIDEONLY
 		genemy->forceHandExtend = HANDEXTEND_KNOCKDOWN;
 		genemy->forceHandExtendTime = pm->cmd.serverTime + 1100;
 		genemy->forceDodgeAnim = 0; //this toggles between 1 and 0, when it's 1 we should play the get up anim
+#endif
 
 		//genemy->otherKiller = pm->ps->clientNum;
 		//genemy->otherKillerTime = pm->cmd.serverTime + 5000;
 		//genemy->otherKillerDebounceTime = pm->cmd.serverTime + 100;
 
+#if !CLIENTSIDEONLY
 		genemy->velocity[0] = oppDir[0]*(strength*40);
 		genemy->velocity[1] = oppDir[1]*(strength*40);
 		genemy->velocity[2] = 100;
+#endif
 
+#if CLIENTSIDEONLY
+		pm->checkDuelLoss = genemy->s.number+1;
+#else
 		pm->checkDuelLoss = genemy->clientNum+1;
+#endif
 	}
 	else
 	{ //If no one lost, then shove each player away from the other
@@ -4951,31 +4979,44 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 
 		int strength = 4;
 
-		VectorSubtract(genemy->origin, pm->ps->origin, oppDir);
+		VectorSubtract(genemy->ENTPOS, pm->ps->origin, oppDir);
 		VectorNormalize(oppDir);
+#if !CLIENTSIDEONLY
 		genemy->velocity[0] = oppDir[0]*(strength*40);
 		genemy->velocity[1] = oppDir[1]*(strength*40);
 		genemy->velocity[2] = 150;
+#endif
 
-		VectorSubtract(pm->ps->origin, genemy->origin, oppDir);
+		VectorSubtract(pm->ps->origin, genemy->ENTPOS, oppDir);
 		VectorNormalize(oppDir);
 		pm->ps->velocity[0] = oppDir[0]*(strength*40);
 		pm->ps->velocity[1] = oppDir[1]*(strength*40);
 		pm->ps->velocity[2] = 150;
 
+#if !CLIENTSIDEONLY
 		genemy->forceHandExtend = HANDEXTEND_WEAPONREADY;
+#endif
 	}
 
 	pm->ps->weaponTime = 0;
+#if !CLIENTSIDEONLY
 	genemy->weaponTime = 0;
+#endif
 
+#if CLIENTSIDEONLY
+	pm->ps->saberLockTime = 0;
+	pm->ps->saberLockFrame = 0;
+	pm->ps->saberLockEnemy = 0;
+#else
 	pm->ps->saberLockTime = genemy->saberLockTime = 0;
 	pm->ps->saberLockFrame = genemy->saberLockFrame = 0;
 	pm->ps->saberLockEnemy = genemy->saberLockEnemy = 0;
+#endif
 
 	pm->ps->forceHandExtend = HANDEXTEND_WEAPONREADY;
 
 	PM_AddEvent( EV_JUMP_GENERAL );
+#if !CLIENTSIDEONLY
 	if ( !victory )
 	{//no-one won
 		BG_AddPredictableEventToPlayerstate(EV_JUMP_GENERAL, 0, genemy);
@@ -4987,13 +5028,18 @@ void  PMove::PM_SaberLockBreak( playerState_t *genemy, qboolean victory )
 			BG_AddPredictableEventToPlayerstate(EV_JUMP_GENERAL, PM_irand_timesync( 0, 75 + pml.randomAdd, pm->modParms.raceMode, 74), genemy); // what is this eventparm? doesnt seem used for anything?
 		}
 	}
+#endif
 }
 
 void  PMove::PM_SaberLocked( void )
 {
 	int	remaining = 0;
 
+#if CLIENTSIDEONLY
+	const bgEntity_t* genemy = pm->getEnt(pm->ps->saberLockEnemy,getEntReference);
+#else
 	playerState_t *genemy = pm->bgClients[pm->ps->saberLockEnemy];
+#endif
 	if ( !genemy )
 	{
 		return;
@@ -5002,20 +5048,22 @@ void  PMove::PM_SaberLocked( void )
 			(pm->ps->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_BF1LOCK_GENERAL ||
 			(pm->ps->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_CWCIRCLELOCK_GENERAL ||
 			(pm->ps->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_CCWCIRCLELOCK_GENERAL )
-		&& ( (genemy->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_BF2LOCK_GENERAL ||
-			(genemy->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_BF1LOCK_GENERAL ||
-			(genemy->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_CWCIRCLELOCK_GENERAL ||
-			(genemy->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_CCWCIRCLELOCK_GENERAL )
+		&& ( (genemy->ENTPROP(torsoAnim)&~ANIM_TOGGLEBIT) == BOTH_BF2LOCK_GENERAL ||
+			(genemy->ENTPROP(torsoAnim) &~ANIM_TOGGLEBIT) == BOTH_BF1LOCK_GENERAL ||
+			(genemy->ENTPROP(torsoAnim) &~ANIM_TOGGLEBIT) == BOTH_CWCIRCLELOCK_GENERAL ||
+			(genemy->ENTPROP(torsoAnim) &~ANIM_TOGGLEBIT) == BOTH_CCWCIRCLELOCK_GENERAL )
 		)
 	{
 		float dist = 0;
 
 		pm->ps->torsoTimer = 0;
 		pm->ps->weaponTime = 0;
+#if !CLIENTSIDEONLY
 		genemy->torsoTimer = 0;
 		genemy->weaponTime = 0;
+#endif
 
-		dist = DistanceSquared(pm->ps->origin,genemy->origin);
+		dist = DistanceSquared(pm->ps->origin,genemy->ENTPOS);
 		if ( dist < 64 || dist > 6400 )
 		{//between 8 and 80 from each other
 			PM_SaberLockBreak( genemy, qfalse );
@@ -5081,10 +5129,11 @@ void  PMove::PM_SaberLocked( void )
 				return;
 			}
 
-			anim = &pm->animations[(genemy->torsoAnim&~ANIM_TOGGLEBIT)];
+			anim = &pm->animations[(genemy->ENTPROP(torsoAnim)&~ANIM_TOGGLEBIT)];
 
-			if ( (genemy->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_CWCIRCLELOCK_GENERAL ||
-				(genemy->torsoAnim&~ANIM_TOGGLEBIT) == BOTH_BF1LOCK_GENERAL )
+#if !CLIENTSIDEONLY
+			if ( (genemy->ENTPROP(torsoAnim)&~ANIM_TOGGLEBIT) == BOTH_CWCIRCLELOCK_GENERAL ||
+				(genemy->ENTPROP(torsoAnim)&~ANIM_TOGGLEBIT) == BOTH_BF1LOCK_GENERAL )
 			{
 				if ( !(jk2gameplay == VERSION_1_02 ? Q_irand( 0, 2 + pml.randomAdd, pm->modParms.raceMode, 1) : PM_irand_timesync( 0, 2 + pml.randomAdd, pm->modParms.raceMode, 1)) )
 				{
@@ -5096,6 +5145,7 @@ void  PMove::PM_SaberLocked( void )
 			{
 				PM_SetAnimFrame( genemy, anim->firstFrame+anim->numFrames-remaining, qtrue, qtrue );
 			}
+#endif
 		}
 	}
 	else
@@ -5181,7 +5231,11 @@ saberMoveName_t  PMove::PM_SaberFlipOverAttackMove(trace_t *tr)
 {
 	vec3_t fwdAngles, jumpFwd;
 	float zDiff = 0;
+#if CLIENTSIDEONLY
+	const bgEntity_t* psData;
+#else
 	playerState_t *psData;
+#endif
 
 	VectorCopy( pm->ps->viewangles, fwdAngles );
 	fwdAngles[PITCH] = fwdAngles[ROLL] = 0;
@@ -5189,12 +5243,20 @@ saberMoveName_t  PMove::PM_SaberFlipOverAttackMove(trace_t *tr)
 	VectorScale( jumpFwd, 50, pm->ps->velocity );
 	pm->ps->velocity[2] = 400;
 
+#if CLIENTSIDEONLY
+	psData = pm->getEnt(tr->entityNum, getEntReference);
+#else
 	psData = pm->bgClients[tr->entityNum];
+#endif
 
 	//go higher for enemies higher than you, lower for those lower than you
 	if (psData)
 	{
+#if CLIENTSIDEONLY
+		zDiff = psData->ENTPOS[2] - pm->ps->origin[2];
+#else
 		zDiff = psData->origin[2] - pm->ps->origin[2];
+#endif
 	}
 	else
 	{
@@ -5596,9 +5658,14 @@ void  PMove::PM_WeaponLightsaber(void)
 			if (pm->ps->saberLockEnemy < ENTITYNUM_NONE &&
 				pm->ps->saberLockEnemy >= 0)
 			{
+#if CLIENTSIDEONLY
+				const bgEntity_t* en;
+				en = pm->getEnt(pm->ps->saberLockEnemy, getEntReference);
+#else
 				playerState_t *en;
 
 				en = pm->bgClients[pm->ps->saberLockEnemy];
+#endif
 
 				if (en)
 				{
@@ -8448,9 +8515,15 @@ void PMove::PM_UpdateAntiLoop() {
 }
 
 //rww - Get a pointer to the bgEntity by the index
+#if CLIENTSIDEONLY
+const bgEntity_t* PMove::PM_BGEntForNum(int num)
+{
+	const bgEntity_t* ent;
+#else
 bgEntity_t* PMove::PM_BGEntForNum(int num)
 {
 	bgEntity_t* ent;
+#endif
 
 	if (!pm)
 	{
@@ -10172,7 +10245,11 @@ qboolean PMove::PM_CheckJump( void )
 					}
 					if ( anim != -1 )
 					{//trace in the dir we're pushing in and see if there's a vertical wall there
-						bgEntity_t *traceEnt;
+#if CLIENTSIDEONLY
+						const bgEntity_t* traceEnt;
+#else
+						bgEntity_t* traceEnt;
+#endif
 
 						VectorMA( pm->ps->origin, 8, checkDir, traceto );
 						PM_Trace( &trace, pm->ps->origin, mins, maxs, traceto, pm->ps->clientNum, CONTENTS_SOLID );//FIXME: clip brushes too?

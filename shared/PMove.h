@@ -438,7 +438,7 @@ typedef struct bgEntity_s
 } bgEntity_t;
 //#endif
 
-typedef bgEntity_t* (*getEntFunc_t)(int entNum, void* reference);
+typedef const bgEntity_t* (*getEntFunc_t)(int entNum, void* reference);
 
 typedef enum serverModType_s {
 	SVMOD_NONE_UNKNOWN,
@@ -509,8 +509,9 @@ typedef struct {
 	qboolean	positionChangedOutsidePmove;
 #if CLIENTSIDEONLY
 	qboolean	haveForceSpeedSmash; // for cgame
+#else
+	playerState_t* bgClients[MAX_CLIENTS];
 #endif
-	playerState_t	*bgClients[MAX_CLIENTS];
 	int			checkDuelLoss;
 	int			requiredCmdMsec;
 	qboolean	isSpecialPredict; // not a real predict, just for image smoothing
@@ -1126,7 +1127,7 @@ public:
 		cg_pmove.handleStrafebotSlopes = qtrue;
 		// bgClients .... sigh
 
-
+		Pmove(&cg_pmove);
 	}
 private:
 
@@ -1188,7 +1189,11 @@ private:
 	int PM_SaberAttackChainAngle(int move1, int move2);
 	qboolean PM_SaberKataDone_1_02(void);
 	void PM_SetAnimFrame(playerState_t * gent, int frame, qboolean torso, qboolean legs);
-	void PM_SaberLockBreak(playerState_t * genemy, qboolean victory);
+#if CLIENTSIDEONLY
+	void  PM_SaberLockBreak(const bgEntity_t* genemy, qboolean victory);
+#else
+	void  PM_SaberLockBreak(playerState_t* genemy, qboolean victory);
+#endif
 	void PM_SaberLocked(void);
 	qboolean PM_SaberInBrokenParry(int move);
 	int PM_BrokenParryForParry(int move);
@@ -1311,7 +1316,11 @@ private:
 	void PmoveSingle(pmove_t* pmove);
 	void Pmove(pmove_t* pmove);
 	void PM_ForceJumpCharge();
+#if CLIENTSIDEONLY
+	const bgEntity_t* PM_BGEntForNum(int num);
+#else
 	bgEntity_t* PM_BGEntForNum(int num);
+#endif
 	void PM_UpdateAntiLoop();
 };
 
