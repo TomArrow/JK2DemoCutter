@@ -2082,6 +2082,7 @@ void Info_RemoveKey(char* s, const char* key, bool isMOHAADemo);
 void Info_RemoveKey_Big(char* s, const char* key);
 qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value, bool isMOHAADemo);
 void Info_SetValueForKey_Big(char* s, int capacity, const char* key, const char* value);
+int Info_ApplyOverrides(const char* overrides, char* data, int maxLengthOverrides, int maxLengthData);
 
 
 // entityState_t->event values

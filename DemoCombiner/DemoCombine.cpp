@@ -57,6 +57,10 @@ demo_t			demo;
 
 
 
+class GlobalCombineOptions {
+public:
+	std::string serverInfoOverrides = "";
+};
 
 
 
@@ -181,7 +185,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 
 
 
-qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, std::vector<std::string>* bspDirectories) {
+qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, std::vector<std::string>* bspDirectories, const GlobalCombineOptions& opts) {
 	fileHandle_t	newHandle = 0;
 	char			outputNameNoExt[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -329,6 +333,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 	infoCopy[0] = 0;
 	strcpy_s(infoCopy, isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING, demo.cut.Cl.gameState.stringData+demo.cut.Cl.gameState.stringOffsets[0]);
 	Info_SetValueForKey_Big(infoCopy,sizeof(infoCopy), "sv_hostname", "^1^7^1FAKE ^4^7^4DEMO");
+	Info_ApplyOverrides(opts.serverInfoOverrides.c_str(), infoCopy, opts.serverInfoOverrides.size()+1,sizeof(infoCopy));
 	demoCutConfigstringModifiedManual(&demo.cut.Cl, 0, infoCopy, demoType);
 
 	char mapname[MAX_STRING_CHARS_MAX];
@@ -1238,12 +1243,42 @@ int main(int argcO, char** argvO) {
 		std::cout << "need 2 arguments: outputname, scriptname\n";
 		std::cout << "Extra options:\n";
 		std::cout << op << "\n";
+		std::cout << "INI Format:\n";
+		std::cout << "[__general__]\n";
+		std::cout << "serverInfoOverrides=\\mapname\\mymapname\n";
+		std::cout << "[randomdemoidentifier]\n";
+		std::cout << "path=path/to/demo.dm_15\n";
+		std::cout << "submodels=0/1 (whether to copy submodels like doors)\n";
+		std::cout << "models=0/1 (whether to copy models)\n";
+		std::cout << "copyRemainingPlayersAsG2AnimEnts=0/1 (whether to remaining players as G2 ents)\n";
+		std::cout << "players=list of players by client num or name, separated by comma\n";
+		std::cout << "allPlayers=0/1 (whether to copy all players)\n";
+		std::cout << "delay=milliseconds of delay\n";
+		std::cout << "start=when to start showing this demo\n";
+		std::cout << "end=when to stop showing this demo\n";
+		std::cout << "playerStateStart=when to start showing this demo's angle\n";
+		std::cout << "playerStateEnd=when to stop showing this demo's angle\n";
 		return 1;
 	}
 	else if (h->is_set()) {
 		std::cout << "need 2 arguments: outputname, scriptname\n";
 		std::cout << "Extra options:\n";
 		std::cout << op << "\n";
+		std::cout << "INI Format:\n";
+		std::cout << "[__general__]\n";
+		std::cout << "serverInfoOverrides=\\mapname\\mymapname\n";
+		std::cout << "[randomdemoidentifier]\n";
+		std::cout << "path=path/to/demo.dm_15\n";
+		std::cout << "submodels=0/1 (whether to copy submodels like doors)\n";
+		std::cout << "models=0/1 (whether to copy models)\n";
+		std::cout << "copyRemainingPlayersAsG2AnimEnts=0/1 (whether to remaining players as G2 ents)\n";
+		std::cout << "players=list of players by client num or name, separated by comma\n";
+		std::cout << "allPlayers=0/1 (whether to copy all players)\n";
+		std::cout << "delay=milliseconds of delay\n";
+		std::cout << "start=when to start showing this demo\n";
+		std::cout << "end=when to stop showing this demo\n";
+		std::cout << "playerStateStart=when to start showing this demo's angle\n";
+		std::cout << "playerStateEnd=when to stop showing this demo's angle\n";
 		return 0;
 	}
 	initializeGameInfos();
@@ -1272,13 +1307,30 @@ int main(int argcO, char** argvO) {
 		}
 	}
 
+	GlobalCombineOptions opts;
+
 	for (auto const& it : ini)
 	{
-		DemoSource demoSource;
 		auto const& section = it.first;
 		auto const& collection = it.second;
-		demoSource.sourceName = section;
+
 		std::cout << "[" << section << "]" << std::endl;
+
+		if (section == "__general__") {
+			std::cout << "serverInfoOverrides: " << collection.get("serverInfoOverrides") << std::endl;
+			if (collection.has("serverInfoOverrides")) {
+				opts.serverInfoOverrides = collection.get("serverInfoOverrides");
+
+				opts.serverInfoOverrides = opts.serverInfoOverrides.erase(opts.serverInfoOverrides.find_last_not_of("\\") + 1);
+				if (opts.serverInfoOverrides.size() > 0 && opts.serverInfoOverrides[0] != '\\') {
+					opts.serverInfoOverrides = "\\" + opts.serverInfoOverrides;
+				}
+			}
+			continue;
+		}
+
+		DemoSource demoSource;
+		demoSource.sourceName = section;
 		//std::cout << "test: " << collection.get("test")<< strlen(collection.get("test").c_str()) << std::endl;
 		std::cout << "path: " << collection.get("path") << std::endl;
 
@@ -1361,7 +1413,7 @@ int main(int argcO, char** argvO) {
 	}
 	*/
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
-	if (demoCut(filteredOutputName,&demoSources, &bspDirectories)) {
+	if (demoCut(filteredOutputName,&demoSources, &bspDirectories, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully combined in %.5f seconds \n", scriptName, seconds);

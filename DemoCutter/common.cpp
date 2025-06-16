@@ -565,6 +565,70 @@ void Info_RemoveKey_Big(char* s, const char* key) {
 }
 
 
+
+/*
+===============
+Info_ApplyOverrides
+
+Apply values from one info string to another and override the other ones values.
+FIXME: overflow check?
+===============
+*/
+int Info_ApplyOverrides(const char* overrides, char* data, int maxLengthOverrides, int maxLengthData) {
+	char	pkey[BIG_INFO_KEY];
+	char	value[BIG_INFO_VALUE];
+	//static	char value[2][BIG_INFO_VALUE];	// use two buffers so compares
+											// work without stomping on each other
+	//static	int	valueindex = 0;
+	char* o;
+	const char* s = overrides;
+	int		overridesApplied = 0;
+
+	if (!overrides || !data) {
+		return 0;
+	}
+
+	//if (strlen(s) >= BIG_INFO_STRING) {
+	if (strnlen_s(overrides, maxLengthOverrides) >= BIG_INFO_STRING) {
+		Com_Error(ERR_DROP, "Info_ApplyOverrides: oversize overrides");
+	}
+	if (strnlen_s(data, maxLengthData) >= BIG_INFO_STRING) {
+		Com_Error(ERR_DROP, "Info_ApplyOverrides: oversize data");
+	}
+
+	//valueindex ^= 1;
+	if (*s == '\\')
+		s++;
+	while (1) {
+		o = pkey;
+		while (*s != '\\') {
+			if (!*s)
+				return overridesApplied;
+			*o++ = *s++;
+		}
+		*o = 0;
+		s++;
+
+		o = value;//value[valueindex];
+
+		while (*s != '\\' && *s) {
+			*o++ = *s++;
+		}
+		*o = 0;
+
+		Info_SetValueForKey_Big(data, maxLengthData, pkey, value);
+		//if (!_stricmp(key, pkey))
+		//	return value[valueindex];
+
+		if (!*s)
+			break;
+		s++;
+	}
+
+	return overridesApplied;
+}
+
+
 /*
 ===============
 Info_ValueForKey
