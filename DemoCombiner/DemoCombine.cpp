@@ -379,6 +379,11 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 			}
 		}
 	}
+	if (cm) {
+		for (int i = 0; i < demoReaders.size(); i++) {
+			demoReaders[i]->reader.setCM(cm);
+		}
+	}
 
 	// Write demo header
 	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType,createCompressedOutput);

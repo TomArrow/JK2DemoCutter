@@ -994,6 +994,8 @@ class PMove {
 
 	CModel* cm = NULL;
 
+	demoType_t	demoType;
+
 	int(*forcePowerNeeded)[NUM_FORCE_POWERS] = NULL;
 	weaponData_t* weaponData = NULL;
 
@@ -1062,9 +1064,10 @@ public:
 	void SetGetEntFuncReference(void* getEntReferenceA) {
 		getEntReference = getEntReferenceA;
 	}
-	PMove(demoType_t demoType, CModel* cmodel, getEntFunc_t getEntA) {
+	PMove(demoType_t demoTypeA, CModel* cmodel, getEntFunc_t getEntA) {
 		cm = cmodel;
 		getEnt = getEntA;
+		demoType = demoTypeA;
 		srand(time(NULL));
 		switch (demoType)
 		{
@@ -1095,7 +1098,7 @@ public:
 		if (getEntReferenceA) {
 			getEntReference = getEntReferenceA;
 		}
-		pmove_t	cg_pmove;
+		pmove_t	cg_pmove = { 0 };
 		cg_pmove.ps = ps;
 		if (cg_pmove.ps->pm_type == PM_DEAD) {
 			cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;
@@ -1127,7 +1130,18 @@ public:
 		cg_pmove.handleStrafebotSlopes = qtrue;
 		// bgClients .... sigh
 
+		ps->legsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType);
+		ps->torsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType);
+		ps->saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(ps->saberMove, demoType);
+		ps->weapon = generalizeGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType);
+
 		Pmove(&cg_pmove);
+
+		ps->legsAnim = specializeGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->legsAnim, demoType);
+		ps->torsoAnim = specializeGameValue<GMAP_ANIMATIONS, UNSAFE>(ps->torsoAnim, demoType);
+		ps->saberMove = specializeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(ps->saberMove, demoType);
+		ps->weapon = specializeGameValue<GMAP_WEAPONS, UNSAFE>(ps->weapon, demoType);
+
 	}
 private:
 

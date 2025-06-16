@@ -5,6 +5,10 @@
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
 #include <demoCut.h>
+#if USE_PMOVE
+#include "CModel.h"
+#include "PMove.h"
+#endif
 
 #include <DemoReaderBase.h>
 
@@ -188,8 +192,34 @@ class DemoReader : public DemoReaderBase {
 	void updateConfigStringRelatedInfo();
 
 	void generateBasePlayerStates();
-
+#if USE_PMOVE
+	CModel* cm = NULL;
+	PMove* pm = NULL;
+#endif
 public:
+#if USE_PMOVE
+	static const bgEntity_t* getEnt(int entNum, void* reference) {
+		SnapshotInfo* snapInfo = (SnapshotInfo*)reference;
+		//if (snapInfo->playerState.clientNum == entNum) {// TODO
+		//	return NULL;
+		//}
+		if (snapInfo->entities.find(entNum) != snapInfo->entities.end()) { // this is kinda ugly :/ oh well. shouldnt be important most of the time
+			return (const bgEntity_t*)&snapInfo->entities[entNum];
+		}
+		return NULL; // TODO
+	}
+
+	// you are responsible for destroying cmodel yourself. DemoReader won't do it for you.
+	void setCM(CModel* cmodel) {
+		cm = cmodel;
+		if (cm && !pm) {
+			pm = new PMove(demoType, cm, getEnt);
+		}
+		else if(pm) {
+			pm->SetCModel(cm);
+		}
+	}
+#endif
 
 	qboolean LoadDemo(const char* sourceDemoFile);
 	void convertPSTo(playerState_t* ps, demoType_t targetDemoType);
@@ -199,6 +229,11 @@ public:
 
 #ifdef DEBUG
 	~DemoReader() {
+#if USE_PMOVE
+		if (pm) {
+			delete pm;
+		}
+#endif
 		std::cout << "DemoReader being destroyed.";
 	}
 #endif

@@ -586,6 +586,7 @@ inline float AngleDelta(float angle1, float angle2);
 inline float AngleNormalize180(float angle);
 inline float AngleNormalize360(float angle);
 
+
 typedef union {
 	float f;
 	int i;
@@ -1356,6 +1357,9 @@ typedef struct usercmd_s {
 	signed char	forwardmove, rightmove, upmove;
 } usercmd_t;
 
+
+
+usercmd_t CG_DirToCmd(int moveDir);
 
 
 // Be extra(!!) careful here because of the unions.

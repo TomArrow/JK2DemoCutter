@@ -6218,6 +6218,57 @@ inline float AngleDelta(float angle1, float angle2) {
 	return AngleNormalize180(angle1 - angle2);
 }
 
+#define KEY_W       0
+#define KEY_WA      1
+#define KEY_A       2
+#define KEY_AS      3
+#define KEY_S       4
+#define KEY_SD      5
+#define KEY_D       6
+#define KEY_DW      7
+usercmd_t CG_DirToCmd(int moveDir){
+	usercmd_t outCmd = { 0 };
+	switch(moveDir){
+		case KEY_W:
+			outCmd.forwardmove = 127;
+			outCmd.rightmove = 0;
+			break;
+		case KEY_WA:
+			outCmd.forwardmove = 127;
+			outCmd.rightmove = -127;
+			break;
+		case KEY_A:
+			outCmd.forwardmove = 0;
+			outCmd.rightmove = -127;
+			break;
+		case KEY_AS:
+			outCmd.forwardmove = -127;
+			outCmd.rightmove = -127;
+			break;
+		case KEY_S:
+			outCmd.forwardmove = -127;
+			outCmd.rightmove = 0;
+			break;
+		case KEY_SD:
+			outCmd.forwardmove = -127;
+			outCmd.rightmove = 127;
+			break;
+		case KEY_D:
+			outCmd.forwardmove = 0;
+			outCmd.rightmove = 127;
+			break;
+		case KEY_DW:
+			outCmd.forwardmove = 127;
+			outCmd.rightmove = 127;
+			break;
+		default:
+			break;
+	}
+	return outCmd;
+}
+
+
+
 /*
 ================
 G_SetOrigin

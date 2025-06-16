@@ -1582,6 +1582,33 @@ void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from
 
 	// if the next frame is a teleport, we can't lerp to it
 	if (nextPsTeleport) { // TODO make that actually matter
+#if USE_PMOVE
+		if (pm && (nextps->commandTime - out->commandTime) > 50) { // he might have gotten lost from our focus. do a bit of pmove to let things settle.
+			int steps=0,maxSteps = 1000;
+			usercmd_t ucmd =  CG_DirToCmd(curps->movementDir);
+			//while (out->commandTime < nextps->commandTime && steps < maxSteps) {
+			while (out->commandTime < time && steps < maxSteps) {
+				ucmd.serverTime = out->commandTime + 7;
+				//if (ucmd.serverTime > nextps->commandTime) {
+				//	ucmd.serverTime = nextps->commandTime;
+				//}
+				if (ucmd.serverTime > time) {
+					ucmd.serverTime = time;
+				}
+
+				ucmd.upmove = (out->pm_flags & PMF_JUMP_HELD) ? 0 : 127; // autohop.
+
+				pm->step(out, &ucmd, (void*)from, GT_FFA);
+
+				if (out->commandTime != ucmd.serverTime) {
+					std::cout << "WTF pmove didn't do anything.\n";
+					break;
+				}
+				steps++;
+			}
+			std::cout << "Did pmove for " << steps << " steps for client " << out->clientNum<< "\n";
+		}
+#endif
 		return;
 	}
 
