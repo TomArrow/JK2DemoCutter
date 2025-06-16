@@ -10,7 +10,10 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
-
+#include <array>
+#if USE_PMOVE
+#include "polytools.h"
+#endif
 
 
 // Most of this code is from cl_demos_cut.cpp from jomma/jamme
@@ -893,7 +896,7 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 
 	// Okay now we know the messageNum of before and after. Let's interpolate! How exciting!
 	//InterpolatePlayer(clientNum,time, &snapshotInfos[lastPastSnap], &snapshotInfos[firstNextSnap], &retVal, detailedPS);
-	InterpolatePlayer(clientNum,time, lastPastSnapIt->second.get(), firstNextSnap == -1 ? NULL : firstNextSnapIt->second.get(), &retVal, detailedPS);
+	InterpolatePlayer(clientNum,time, &lastPastSnapIt, firstNextSnap == -1 ? NULL : &firstNextSnapIt, &retVal, detailedPS);
 	//InterpolatePlayer(clientNum,time, lastPastSnapIt->second.release(), firstNextSnap == -1 ? NULL : firstNextSnapIt->second.release(), &retVal, detailedPS); // i must have had this double by accident right?
 
 	return retVal;
@@ -1510,7 +1513,63 @@ void DemoReader::InterpolatePlayerState(double time,SnapshotInfo* from, Snapshot
 	//cg.predictedTimeFrac = f * (nextps->commandTime - curps->commandTime);
 }
 
-void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS) {
+template<typename T, std::size_t ARRAY_LEN>
+int DemoReader::getPastPlayerAngles(int clientNum, SnapshotInfoMapIterator snapInfoIterator, std::array<T, ARRAY_LEN>& times, std::array<T, ARRAY_LEN>& pitch, std::array<T, ARRAY_LEN>& yaw, qboolean fill) {
+	if (snapInfoIterator == snapshotInfos.end()) {
+		return 0;//wtf. idk be safe
+	}
+	snapInfoIterator++;
+	SnapshotInfoMapIteratorReverse it = std::make_reverse_iterator(snapInfoIterator);
+	int valuesGotten = 0;
+	int lastCommandTime = 0;
+	int startCommandTime =0;
+	int startServerTime = snapInfoIterator->second->serverTime;
+	qboolean gotATime = qfalse;
+	while (valuesGotten < ARRAY_LEN && it != snapshotInfos.rend()) {
+		if (it->second->serverTime > startServerTime || (startServerTime - it->second->serverTime) > 10000) {
+			break; // don't look behind more than 10 seconds, it's not gonnna be useful at all. also don't look back if stuff wraps around.
+		}
+		std::map<int, int>* cmdTimes = &it->second->playerCommandOrServerTimes;
+		auto timeIt = cmdTimes->find(clientNum);
+		if (timeIt == cmdTimes->end() || gotATime && timeIt->second == lastCommandTime) {
+			it++;
+			continue; // player not in this or commandTime hasn't changed
+		}
+		SnapshotInfoMapIteratorReverse itNext = it; 
+		itNext++;// because calling base() should then point to the same elemnt. dumb.
+		playerState_t ps = GetPlayerFromSnapshot(clientNum, (itNext).base(), NULL,qfalse);
+
+		if (gotATime) {
+			times[ARRAY_LEN - valuesGotten - 1] = ps.commandTime- startCommandTime;
+			float angleDelta = AngleSubtract(ps.viewangles[PITCH], pitch[ARRAY_LEN - valuesGotten ]); // need to "denormalize" the angle progression to avoid wrapped angles.
+			pitch[ARRAY_LEN - valuesGotten - 1] = pitch[ARRAY_LEN - valuesGotten] + angleDelta;
+			angleDelta = AngleSubtract(ps.viewangles[YAW], yaw[ARRAY_LEN - valuesGotten]); // need to "denormalize" the angle progression to avoid wrapped angles.
+			yaw[ARRAY_LEN - valuesGotten - 1] = yaw[ARRAY_LEN - valuesGotten] + angleDelta;
+		}
+		else {
+			startCommandTime = ps.commandTime;
+			times[ARRAY_LEN - valuesGotten - 1] = 0;
+			pitch[ARRAY_LEN - valuesGotten - 1] = ps.viewangles[PITCH];
+			yaw[ARRAY_LEN - valuesGotten - 1] = ps.viewangles[YAW];
+		}
+		lastCommandTime = ps.commandTime;
+		gotATime = qtrue;
+		valuesGotten++;
+
+		it++;
+	}
+	if (!valuesGotten) return 0;
+	int filled = valuesGotten;
+	while (fill && filled < ARRAY_LEN) { // just duplicate a bit with time going back
+		times[ARRAY_LEN - filled - 1] = times[ARRAY_LEN - filled] - 50;
+		pitch[ARRAY_LEN - filled - 1] = pitch[ARRAY_LEN - filled];
+		yaw[ARRAY_LEN - filled - 1] = yaw[ARRAY_LEN - filled];
+		filled++;
+	}
+	return valuesGotten;
+}
+
+void DemoReader::InterpolatePlayer(int clientNum, double time, SnapshotInfoMapIterator* fromIt, SnapshotInfoMapIterator* toIt, playerState_t* outPS, qboolean detailedPS) {
 	float			f;
 	int				i;
 	playerState_t* out;
@@ -1520,6 +1579,11 @@ void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from
 	//qboolean		nextPsTeleport = to->playerStateTeleport;
 	qboolean		nextPsTeleport = qfalse;
 	int currentTime = 0, nextTime = 0, currentServerTime = 0, nextServerTime = 0;
+	SnapshotInfo* from, *to;
+
+	from = fromIt ? (*fromIt)->second.get() : NULL;
+	to = toIt ? (*toIt)->second.get() : NULL;
+
 
 	out = outPS;
 	*out = from->playerState;
@@ -1586,6 +1650,26 @@ void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from
 		if (pm && (nextps->commandTime - out->commandTime) > 50) { // he might have gotten lost from our focus. do a bit of pmove to let things settle.
 			int steps=0,maxSteps = 1000;
 			usercmd_t ucmd =  CG_DirToCmd(curps->movementDir);
+			int startCmdTime = out->commandTime;
+
+#define POLYORDER 3
+
+			std::array<float, 10> times = { 0 };
+			std::array<float, 10> pitch = { 0 };
+			std::array<float, 10> yaw = { 0 };
+			std::array<float, POLYORDER+1> pitchPoly;
+			std::array<float, POLYORDER + 1> yawPoly;
+			bool polyvalid = false;
+			if (getPastPlayerAngles(clientNum, *fromIt, times, pitch, yaw, qtrue)) {
+				pitchPoly = std::move(bfs::polyfit<POLYORDER>(times, pitch));
+				yawPoly = std::move(bfs::polyfit<POLYORDER>(times, yaw));
+				polyvalid = true;
+			}
+
+			for (int i = 0; polyvalid && i < POLYORDER+1; i++) {
+				polyvalid = polyvalid && fpclassify(pitchPoly[i]) != FP_NAN && fpclassify(yawPoly[i]) != FP_NAN;
+			}
+
 			//while (out->commandTime < nextps->commandTime && steps < maxSteps) {
 			while (out->commandTime < time && steps < maxSteps) {
 				ucmd.serverTime = out->commandTime + 7;
@@ -1596,10 +1680,21 @@ void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from
 					ucmd.serverTime = time;
 				}
 
-				// preserve angle
-				ucmd.angles[0] = ANGLE2SHORT(out->viewangles[0] - SHORT2ANGLE(out->delta_angles[0]));
-				ucmd.angles[1] = ANGLE2SHORT(out->viewangles[1] - SHORT2ANGLE(out->delta_angles[1]));
-				ucmd.angles[2] = ANGLE2SHORT(out->viewangles[2] - SHORT2ANGLE(out->delta_angles[2]));
+				if (polyvalid) {
+					// preserve angle
+					float pitchA = bfs::polyval(pitchPoly.data(), pitchPoly.size(), (float)(ucmd.serverTime - startCmdTime));
+					ucmd.angles[0] = ANGLE2SHORT(std::clamp(pitchA, -89.0f, 89.0f)- SHORT2ANGLE(out->delta_angles[0]));
+					float yawA = bfs::polyval(yawPoly.data(), yawPoly.size(), (float)(ucmd.serverTime - startCmdTime));
+					yawA = AngleNormalize360(yawA);
+					ucmd.angles[1] = ANGLE2SHORT(yawA - SHORT2ANGLE(out->delta_angles[1]));
+					ucmd.angles[2] = ANGLE2SHORT(out->viewangles[2] - SHORT2ANGLE(out->delta_angles[2]));
+				}
+				else {
+					// preserve angle
+					ucmd.angles[0] = ANGLE2SHORT(out->viewangles[0] - SHORT2ANGLE(out->delta_angles[0]));
+					ucmd.angles[1] = ANGLE2SHORT(out->viewangles[1] - SHORT2ANGLE(out->delta_angles[1]));
+					ucmd.angles[2] = ANGLE2SHORT(out->viewangles[2] - SHORT2ANGLE(out->delta_angles[2]));
+				}
 
 				// autohop.
 				ucmd.upmove = (out->pm_flags & PMF_JUMP_HELD) ? 0 : 127;
@@ -1756,7 +1851,28 @@ qboolean DemoReader::purgeSnapsBefore(int snapNum) {
 	SnapshotInfoMapIterator itEnd = snapshotInfos.find(snapNum);
 	SnapshotInfoMapIterator itStart = snapshotInfos.begin();
 	if (itEnd != snapshotInfos.end() && itEnd != itStart) {
-		snapshotInfos.erase(itStart, itEnd);
+		ClearSnapshotsBeforeIterator(itEnd);
+		//snapshotInfos.erase(itStart, itEnd);
+		return qtrue;
+	}
+	return qfalse;
+}
+qboolean DemoReader::purgeSnapsBefore(int snapNum, int keepExtra) {
+
+	int countErase = 0;
+	SnapshotInfoMapIterator itEnd = snapshotInfos.find(snapNum);
+	SnapshotInfoMapIterator itStart = snapshotInfos.begin();
+	if (itEnd != snapshotInfos.end() && itEnd != itStart) {
+		auto revIt = std::make_reverse_iterator(itEnd);
+		while (keepExtra > 0 && revIt != snapshotInfos.rend()) {
+			revIt++;
+			keepExtra--;
+		}
+		itEnd = revIt.base();
+		if (itEnd != snapshotInfos.end() && itEnd != itStart) {
+			ClearSnapshotsBeforeIterator(itEnd);
+			//snapshotInfos.erase(itStart, itEnd);
+		}
 		return qtrue;
 	}
 	return qfalse;

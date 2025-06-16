@@ -1091,8 +1091,17 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 
 				demoReaders[i]->targetFramesRead++;
 
-
-				demoReaders[i]->reader.purgeSnapsBefore(smallestSnapNumUsed);
+#if USE_PMOVE
+				//if (demoReaders[i]->framesSincePurge > 1000) { // don't purge on every frame for performance reasons. does it even matter tho?
+					demoReaders[i]->reader.purgeSnapsBefore(smallestSnapNumUsed, 100); // keep 200 extra for pmove angle interpolation
+					//demoReaders[i]->framesSincePurge = 0;
+				//}
+				//else {
+				//	demoReaders[i]->framesSincePurge++;
+				//}
+#else
+				demoReaders[i]->reader.purgeSnapsBefore(smallestSnapNumUsed); // keep 200 extra for pmove angle interpolation
+#endif
 			}
 			/*else {
 				// We reached the end of this demo.

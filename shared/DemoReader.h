@@ -178,7 +178,7 @@ class DemoReader : public DemoReaderBase {
 	entityState_t* findEntity(int number);
 
 	void InterpolatePlayerState(double time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS);
-	void InterpolatePlayer(int clientNum, double time, SnapshotInfo* from, SnapshotInfo* to, playerState_t* outPS, qboolean detailedPS = qfalse);
+	void InterpolatePlayer(int clientNum, double time, SnapshotInfoMapIterator* from, SnapshotInfoMapIterator* to, playerState_t* outPS, qboolean detailedPS = qfalse);
 
 	// Obsolete:
 	//qboolean demoRead(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, highlightSearchMode_t searchMode);
@@ -190,6 +190,9 @@ class DemoReader : public DemoReaderBase {
 	playerState_t GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIterator snapInfoIterator, SnapshotInfoMapIterator* playerStateSourceSnap = NULL, qboolean detailedPS = qfalse);
 
 	void updateConfigStringRelatedInfo();
+
+	template<typename T, std::size_t ARRAY_LEN>
+	int getPastPlayerAngles(int clientNum, SnapshotInfoMapIterator snapInfoIterator,std::array<T, ARRAY_LEN>& times, std::array<T, ARRAY_LEN>& pitch, std::array<T, ARRAY_LEN>& yaw, qboolean fill);
 
 	void generateBasePlayerStates();
 #if USE_PMOVE
@@ -280,6 +283,7 @@ public:
 	qboolean EndReachedAtTime(double time);
 	int getDemoRecorderClientNum();
 	qboolean	purgeSnapsBefore(int snapNum);
+	qboolean	purgeSnapsBefore(int snapNum, int keepExtra);
 };
 
 
@@ -319,6 +323,7 @@ public:
 	std::vector<SourcePlayerInfo> playersToCopy;
 	DemoSource* sourceInfo;
 	int targetFramesRead;
+	size_t framesSincePurge=0;
 };
 
 
