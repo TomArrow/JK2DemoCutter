@@ -1596,7 +1596,13 @@ void DemoReader::InterpolatePlayer(int clientNum, double time,SnapshotInfo* from
 					ucmd.serverTime = time;
 				}
 
-				ucmd.upmove = (out->pm_flags & PMF_JUMP_HELD) ? 0 : 127; // autohop.
+				// preserve angle
+				ucmd.angles[0] = ANGLE2SHORT(out->viewangles[0] - SHORT2ANGLE(out->delta_angles[0]));
+				ucmd.angles[1] = ANGLE2SHORT(out->viewangles[1] - SHORT2ANGLE(out->delta_angles[1]));
+				ucmd.angles[2] = ANGLE2SHORT(out->viewangles[2] - SHORT2ANGLE(out->delta_angles[2]));
+
+				// autohop.
+				ucmd.upmove = (out->pm_flags & PMF_JUMP_HELD) ? 0 : 127;
 
 				pm->step(out, &ucmd, (void*)from, GT_FFA);
 
