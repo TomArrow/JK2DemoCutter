@@ -4961,7 +4961,7 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 
 
 typedef ankerl::unordered_dense::map<uint16_t, entityState_t, ankerl::unordered_dense::hash<uint16_t>> SnapshotEntities;
-typedef std::map<uint16_t, entityState_t> SnapshotEntitiesOrdered;
+//typedef std::map<uint16_t, entityState_t> SnapshotEntitiesOrdered;
 typedef std::map<uint16_t, entityState_t*> SnapshotEntitiesOrderedPointers;
 typedef ankerl::unordered_dense::map<uint16_t, int, ankerl::unordered_dense::hash<uint16_t>> EntityIntegerMap;
 

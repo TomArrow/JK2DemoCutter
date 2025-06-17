@@ -102,7 +102,10 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		}
 	}
 
-	std::map<int, int> lastSpectatedClientNums; // Need this for later.
+	std::vector<int> lastSpectatedClientNums; // Need this for later.
+	for (int i = 0; i < demoReaders.size(); i++) {
+		lastSpectatedClientNums.push_back(-1);
+	}
 
 	SlotManager slotManager(demoReaders.size()*2); // reserve count of source demos * 2 (keep free ones cuz saberentitynum)
 

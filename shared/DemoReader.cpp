@@ -315,6 +315,10 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 		lastKnownCommandOrServerTimes[i] = -1;
 	}
 
+	for (int i = 0; i < MAX_GENTITIES; i++) {
+		lastMessageWithEntity[i] = -1;
+	}
+
 	Com_Memset(&extraFieldInfo, 0, sizeof(extraFieldInfo));
 	extraFieldInfo.dimensionInfoType = (dimensionDataType_t)(-1);
 	extraFieldInfo.truncationOffset = demoCutGetDemoNameTruncationOffset(sourceDemoFile);
@@ -404,7 +408,7 @@ void	DemoReader::ClearSnapshotsBeforeIterator(SnapshotInfoMapIterator snapInfoIt
 	int msgNum = snapInfoIt->first;
 	for (int i = 0; i < MAX_GENTITIES; i++) {
 		if (lastMessageWithEntity[i] < msgNum) {
-			lastMessageWithEntity.erase(i);
+			lastMessageWithEntity[i] = -1;
 		}
 	}
 	for (int i = 0; i < maxClientsThisDemo; i++) {
@@ -863,7 +867,7 @@ playerState_t DemoReader::GetInterpolatedPlayer(int clientNum, double time, Snap
 	// TODO actually: give way to return info about whether demo is over and such. So we dont end up with stuck entities in one place, tehy should disappear instead.
 	// Although... in case of short visibility interruptions it might actually be better to keep returning interpolated values? (but is that related?)
 	if (lastPastSnapCommandTime >= lastKnownCommandOrServerTimes[clientNum] && endReached) {
-		if (lastMessageWithEntity.find(clientNum) == lastMessageWithEntity.end()) {
+		if (lastMessageWithEntity[clientNum] == -1) {
 			// We never knew anything about this player at all.
 			return retVal;
 		}
@@ -958,7 +962,7 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 	}
 
 	// Ok now we wanna make sure we have at least one snap after the last one before "time" that has a different commandTime so we have something to interpolate.
-	while (lastMessageWithEntity.find(entityNum)->second <= lastPastSnap && !endReached) {
+	while (lastMessageWithEntity[entityNum] <= lastPastSnap && !endReached) { // TODO limit future seek?
 		ReadMessage();
 	}
 
@@ -966,7 +970,7 @@ entityState_t DemoReader::GetInterpolatedNPC(int entityNum, double time, /*Snaps
 	// Just return the last state we have about this player.
 	// TODO actually: give way to return info about whether demo is over and such. So we dont end up with stuck entities in one place, tehy should disappear instead.
 	// Although... in case of short visibility interruptions it might actually be better to keep returning interpolated values? (but is that related?)
-	if (lastMessageWithEntity.find(entityNum)->second <= lastPastSnap && endReached) {
+	if (lastMessageWithEntity[entityNum] <= lastPastSnap && endReached) {
 		//if (lastMessageWithEntity.find(clientNum) == lastMessageWithEntity.end()) {
 			// We never knew anything about this player at all.
 		//	return retVal;

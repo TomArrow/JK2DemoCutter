@@ -11,7 +11,7 @@ typedef std::vector<int>::iterator SnapshotTimesIterator;
 class DemoReaderLight : public DemoReaderBase {
 
 
-	std::map<int, int> lastEvent;
+	EntityIntegerMap lastEvent;
 
 	std::vector<int> pingValues[MAX_CLIENTS_MAX];
 	qboolean		playerSeen[MAX_CLIENTS_MAX];

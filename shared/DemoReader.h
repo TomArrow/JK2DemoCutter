@@ -151,7 +151,8 @@ class DemoReader : public DemoReaderBase {
 	std::vector<Event> readEvents;
 
 	int					lastKnownCommandOrServerTimes[MAX_CLIENTS_MAX]; // For each clientnum
-	std::map<int,int>	lastMessageWithEntity; 
+	int					lastMessageWithEntity[MAX_GENTITIES]; 
+	//std::map<int,int>	lastMessageWithEntity; 
 
 	playerState_t	oldPS[MAX_CLIENTS_MAX];
 
@@ -355,8 +356,11 @@ public:
 		mappingMeta meta;
 	};
 private:
-	std::map<int, sourceDemoMapping> mappings;
-	typedef std::map<int, sourceDemoMapping>::iterator mappingIterator;
+	//std::map<int, sourceDemoMapping> mappings;
+	typedef ankerl::unordered_dense::map<uint16_t, sourceDemoMapping, ankerl::unordered_dense::hash<uint16_t>> MappingMap;
+	MappingMap mappings;
+	//bool occupied[MAX_GENTITIES] = {false};
+	typedef MappingMap::iterator mappingIterator;
 public:
 	SlotManager() {
 
@@ -460,6 +464,7 @@ public:
 	std::vector<std::tuple<int,sourceDemoMapping>> freeSlots(int demoIndex) { // Returns the erased slots
 		std::vector<std::tuple<int, sourceDemoMapping>> erasedSlots;
 		int countErased = 0;
+		restart:
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); ) {
 			mappingIterator iteratorHere = it;
 			it++;
@@ -468,6 +473,7 @@ public:
 				mappings.erase(iteratorHere);
 				availableSlots++;
 				countErased++;
+				goto restart; // since we're using ankerl's dense map now, iterators become invalidated.
 			}
 		}
 		return erasedSlots;

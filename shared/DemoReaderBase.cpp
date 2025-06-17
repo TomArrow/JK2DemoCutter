@@ -35,12 +35,12 @@ const char* DemoReaderBase::GetConfigString(int configStringNum, int* maxLength)
 }
 
 
-std::map<int, entityState_t> DemoReaderBase::GetCurrentEntities() {
-	std::map<int, entityState_t> retVal;
+SnapshotEntities DemoReaderBase::GetCurrentEntities() {
+	SnapshotEntities retVal;
 	for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 		entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 		retVal[thisEntity->number] = *thisEntity;
-}
+	}
 	return retVal;
 }
 

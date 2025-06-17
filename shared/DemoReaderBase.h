@@ -86,7 +86,7 @@ public:
 	qboolean SeekToAnySnapshotIfNotYet();
 	qboolean CloseDemo();
 	playerState_t GetCurrentPlayerState();	
-	std::map<int, entityState_t> GetCurrentEntities(); 
+	SnapshotEntities GetCurrentEntities(); 
 	clSnapshot_t GetCurrentSnap();
 	const char* GetConfigString(int configStringNum, int* maxLength);
 	const char* GetPlayerConfigString(int playerNum, int* maxLength);

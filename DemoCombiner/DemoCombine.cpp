@@ -258,7 +258,10 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 		}
 	}
 
-	std::map<int, int> lastSpectatedClientNums; // Need this for later.
+	std::vector<int> lastSpectatedClientNums; // Need this for later.
+	for (int i = 0; i < demoReaders.size(); i++) {
+		lastSpectatedClientNums.push_back(-1);
+	}
 
 	//int copiedPlayerIndex = 0;
 
