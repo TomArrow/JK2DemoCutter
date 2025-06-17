@@ -21,6 +21,8 @@ try some fuzzing?
 make some kind of display for acceleration/speed over course of a run to compare quality of runs
 
 
+maybe git@github.com:mblum/libgp.git for the angle extrapolation?
+
 
 way to have ET_GRAPPLE to have skins:
 - use CS_CHARSKINS

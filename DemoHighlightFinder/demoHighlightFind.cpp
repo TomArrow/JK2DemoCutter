@@ -408,7 +408,8 @@ TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 int lastEventTime[MAX_GENTITIES];
 float lastGroundHeight[MAX_CLIENTS_MAX]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
-std::map<int,std::string> lastPlayerModel;
+//std::map<int,std::string> lastPlayerModel;
+std::string lastPlayerModel[MAX_CLIENTS_MAX];
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
@@ -445,7 +446,8 @@ struct playerDemoStats_t {
 // To keep good performance, we have an array of pointers towards the current playerDemoStats_t struct in the map for each player for quick access
 // This array is updated whenever a "cs" command is received (since that could mean a map or playername change or a new player connecting.
 typedef std::tuple<std::string, std::string, int> playerDemoStatsMapKey_t;
-std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
+//std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
+ankerl::unordered_dense::map<playerDemoStatsMapKey_t, playerDemoStats_t, ankerl::unordered_dense::hash<playerDemoStatsMapKey_t>> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
 
 playerDemoStats_t* playerDemoStatsPointers[MAX_CLIENTS_MAX];
 
@@ -488,7 +490,8 @@ struct cgs{
 
 #ifdef DEBUGSTATSDB
 typedef std::tuple<int, int, int, int, int,int> animStanceKey; // demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance
-std::map< animStanceKey, int> animStanceCounts;
+//std::unordered_map< animStanceKey, int, tupleHash::tuple_hash> animStanceCounts;
+ankerl::unordered_dense::map< animStanceKey, int, ankerl::unordered_dense::hash<animStanceKey>> animStanceCounts;
 typedef enum frameInfoType_t {
 	PLAYER,
 	PLAYER_HIGHWEIGHT,
@@ -502,9 +505,9 @@ char* frameInfoTypeNames[] = {
 	"weapon_highweight",
 };
 typedef std::tuple<int, frameInfoType_t, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int> frameInfoViewModelAnimKey; // demoVersion,type,viewModelAnim,frameInfo0Index,frameInfo1Index,frameInfo2Index,frameInfo3Index,frameInfo4Index,frameInfo5Index,frameInfo6Index,frameInfo7Index,frameInfo8Index,frameInfo9Index,frameInfo10Index,frameInfo11Index,frameInfo12Index,frameInfo13Index,frameInfo14Index,frameInfo15Index
-std::map< frameInfoViewModelAnimKey, int> frameInfoViewModelAnimCounts;
+ankerl::unordered_dense::map< frameInfoViewModelAnimKey, int, ankerl::unordered_dense::hash<frameInfoViewModelAnimKey>> frameInfoViewModelAnimCounts;
 typedef std::tuple<int, frameInfoType_t, int, int> frameInfoViewModelAnimSimpleKey; // demoVersion,type,viewModelAnim,frameInfoIndex
-std::map< frameInfoViewModelAnimSimpleKey, int> frameInfoViewModelAnimSimpleCounts;
+ankerl::unordered_dense::map< frameInfoViewModelAnimSimpleKey, int, ankerl::unordered_dense::hash<frameInfoViewModelAnimSimpleKey>> frameInfoViewModelAnimSimpleCounts;
 #endif
 
 
@@ -567,8 +570,11 @@ struct SpreeInfo {
 
 // For detecting killstreaks
 // Killer is the key, kill info is the value
-std::map<int, std::vector<Kill>> kills;
-std::map<int, int> timeCheckedForKillStreaks;
+//std::map<int, int> timeCheckedForKillStreaks;
+ankerl::unordered_dense::map<int, std::vector<Kill>, ankerl::unordered_dense::hash<int>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
+//std::map<int, std::vector<Kill>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
+//std::vector<Kill> kills[MAX_GENTITIES];
+int timeCheckedForKillStreaks[MAX_GENTITIES] = { 0 };
 
 #define KILLSTREAK_MIN_KILLS 3
 #define KILLSTREAK_SUPERFAST_MAX_INTERVAL 1000

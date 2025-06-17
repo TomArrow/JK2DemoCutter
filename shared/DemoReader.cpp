@@ -1654,6 +1654,7 @@ void DemoReader::InterpolatePlayer(int clientNum, double time, SnapshotInfoMapIt
 
 #define POLYORDER 3
 
+			// polynomial (3rd degree) extrapolation of view angles
 			std::array<float, 10> times = { 0 };
 			std::array<float, 10> pitch = { 0 };
 			std::array<float, 10> yaw = { 0 };

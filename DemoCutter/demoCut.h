@@ -30,6 +30,8 @@
 
 #include "tsl/htrie_map.h"
 
+#include "unordered_dense.h"
+
 extern int GlobalDebugOutputFlags;
 extern int64_t GlobalDebugDemoTime;
 extern const char* DPrintFLocation;
@@ -3929,9 +3931,9 @@ static const int saberMoveJK2ToGeneral[] {
 	LS_MOVE_MAX_GENERAL//
 };
 
-extern std::map <int, std::string>  saberMoveNames_general;
-extern std::map <int, std::string>  saberStyleNames;
-extern std::unordered_map <std::string, int>  mohaaWeaponModelMap;
+extern ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberMoveNames_general;
+extern ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberStyleNames;
+extern ankerl::unordered_dense::map <std::string, int, ankerl::unordered_dense::hash<std::string>>  mohaaWeaponModelMap;
 
 typedef enum
 {

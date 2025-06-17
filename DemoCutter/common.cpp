@@ -1302,7 +1302,7 @@ saberMoveData_jk2_t	saberMoveData_jk2[LS_MOVE_MAX_JK2] = {//							NB:randomized
 	{"Reflect LL",	BOTH_P1_S1_BL_DM16,		Q_R,	Q_BR,	AFLAG_ACTIVE,	50,		BLK_WIDE,	LS_R_TL2BR_JK2,		LS_A_BR2TL_JK2,		300	},	// LS_PARRY_LL_JK2,
 };
 
-std::map <int, std::string>  saberMoveNames_general
+ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberMoveNames_general
 {
 		// Invalid, or saber not armed
 	  std::make_pair(LS_INVALID_GENERAL, "_INVALID"),
@@ -1501,7 +1501,7 @@ std::map <int, std::string>  saberMoveNames_general
 	  //std::make_pair(LS_MOVE_MAX, "")//
 };
 
-std::map <int, std::string>  saberStyleNames
+ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberStyleNames
 {
 	std::make_pair(FORCE_LEVEL_0, "_UNKST"),
 	std::make_pair(FORCE_LEVEL_1, "_BLU"),
@@ -1518,7 +1518,7 @@ std::map <int, std::string>  saberStyleNames
 };
 
 
-std::unordered_map <std::string, int>  mohaaWeaponModelMap
+ankerl::unordered_dense::map <std::string, int, ankerl::unordered_dense::hash<std::string>>  mohaaWeaponModelMap
 {
 	std::make_pair("NONE",WPREFIX_NONE), // ?
 	std::make_pair("models/items/papers.tik",WPREFIX_PAPERS), // ????
