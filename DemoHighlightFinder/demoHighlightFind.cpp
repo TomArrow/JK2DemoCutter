@@ -5722,7 +5722,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							walkDetectedTimesObsoleteIndex[i] = 0;
 						}
 						else {
-							newestRemoveWorthyWalks[i] = 0;
+							//newestRemoveWorthyWalks[i] = 0;
 						}
 					}
 					// Do the removal.
@@ -7192,7 +7192,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 
 								for (int i = 0; i < boosts.size(); i++) {
-
+									if ((demoCurrentTime - boosts[i].demoTime) > BOOST_DETECT_MAX_AGE) continue; // meh
 									qboolean doThis = qfalse;
 									// find out if we should even bother
 									if (boosts[i].boostedClientNum == attacker && boosts[i].boosterClientNum != target) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
