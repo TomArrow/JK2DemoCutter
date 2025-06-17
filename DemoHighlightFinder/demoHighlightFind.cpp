@@ -571,7 +571,7 @@ struct SpreeInfo {
 // For detecting killstreaks
 // Killer is the key, kill info is the value
 //std::map<int, int> timeCheckedForKillStreaks;
-ankerl::unordered_dense::map<int, std::vector<Kill>, ankerl::unordered_dense::hash<int>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
+ankerl::unordered_dense::map<uint16_t, std::vector<Kill>, ankerl::unordered_dense::hash<uint16_t>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
 //std::map<int, std::vector<Kill>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
 //std::vector<Kill> kills[MAX_GENTITIES];
 int timeCheckedForKillStreaks[MAX_GENTITIES] = { 0 };

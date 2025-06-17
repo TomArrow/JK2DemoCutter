@@ -1198,8 +1198,8 @@ playerState_t DemoReader::GetLastOrNextPlayer(int clientNum, int serverTime, Sna
 	
 }
 
-std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnapIt) {
-	std::map<int, entityState_t> retVal;
+SnapshotEntities DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnapIt) {
+	SnapshotEntities retVal;
 
 	int searchEndTime = serverTime + maxTimeIntoFuture;
 
@@ -1235,7 +1235,7 @@ std::map<int, entityState_t> DemoReader::GetFutureEntityStates(int serverTime, i
 	
 }
 
-void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnapIt) {
+void DemoReader::GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, SnapshotEntities* mapToEnhance, const SnapshotInfoMapIterator* referenceSnapIt) {
 
 	int searchEndTime = serverTime + maxTimeIntoFuture;
 
@@ -1529,7 +1529,7 @@ int DemoReader::getPastPlayerAngles(int clientNum, SnapshotInfoMapIterator snapI
 		if (it->second->serverTime > startServerTime || (startServerTime - it->second->serverTime) > 10000) {
 			break; // don't look behind more than 10 seconds, it's not gonnna be useful at all. also don't look back if stuff wraps around.
 		}
-		std::map<int, int>* cmdTimes = &it->second->playerCommandOrServerTimes;
+		EntityIntegerMap* cmdTimes = &it->second->playerCommandOrServerTimes;
 		auto timeIt = cmdTimes->find(clientNum);
 		if (timeIt == cmdTimes->end() || gotATime && timeIt->second == lastCommandTime) {
 			it++;
@@ -1770,7 +1770,7 @@ void DemoReader::InterpolatePlayer(int clientNum, double time, SnapshotInfoMapIt
 
 
 
-std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * translatedTime, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+SnapshotEntities DemoReader::GetEntitiesAtTime(double time, double * translatedTime, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time);
@@ -1786,7 +1786,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * 
 		*translatedTime = time;
 	}
 
-	if (endReached && !anySnapshotParsed) return std::map<int, entityState_t>(); // Nothing to do really lol.
+	if (endReached && !anySnapshotParsed) return SnapshotEntities(); // Nothing to do really lol.
 
 	// Ok now we are sure we have at least one snapshot. Good.
 	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
@@ -1807,7 +1807,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtTime(double time, double * 
 	return snapshotInfos[lastPastSnap]->entities;
 }
 
-std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
+SnapshotEntities DemoReader::GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum) { // Can't use currentEntities one really because we might have seeked past the current time already for some interpolation reasons
 
 	SeekToAnySnapshotIfNotYet();
 	SeekToTime(time+0.5);
@@ -1819,7 +1819,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 	// Now let's translate time into server time
 	time = time - demoBaseTime + demoStartTime;
 
-	if (endReached && !anySnapshotParsed) return std::map<int, entityState_t>(); // Nothing to do really lol.
+	if (endReached && !anySnapshotParsed) return SnapshotEntities(); // Nothing to do really lol.
 
 	// Ok now we are sure we have at least one snapshot. Good.
 	// Now we wanna make sure we have a snapshot in the future with a different commandtime than the one before "time".
@@ -1831,7 +1831,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 			}
 			if (includingPS) {
 
-				std::map<int, entityState_t> retVal = it->second->entities;
+				SnapshotEntities retVal = it->second->entities;
 				entityState_t psEnt;
 				Com_Memset(&psEnt, 0, sizeof(psEnt));
 				BG_PlayerStateToEntityState(&it->second->playerState, &psEnt,qfalse,demoType,qtrue);
@@ -1843,7 +1843,7 @@ std::map<int,entityState_t> DemoReader::GetEntitiesAtPreciseTime(int time, qbool
 			}
 		}
 	}
-	return std::map<int, entityState_t>();
+	return SnapshotEntities();
 }
 
 qboolean DemoReader::purgeSnapsBefore(int snapNum) { 

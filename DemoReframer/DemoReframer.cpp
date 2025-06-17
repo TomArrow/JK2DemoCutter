@@ -225,8 +225,8 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 	updatePlayerDemoStats(&demoReader->reader);
 
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
-	std::map<int, entityState_t> playerEntities;
-	std::map<int, entityState_t> playerEntitiesOld;
+	SnapshotEntities playerEntities;
+	SnapshotEntities playerEntitiesOld;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
@@ -523,13 +523,15 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 			}
 			Com_Memcpy(demo.cut.Cl.snap.areamask, areamasHere, sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do.  TODO: Actually in some older demos this results in hall of mirrors effect hmm
 		}
-		
+
+		SnapshotEntitiesOrderedPointers ordered = SnapShotEntitiesToOrderedPointers(playerEntities);
 		if (isFirstSnapshot) {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL,createCompressedOutput);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, NULL,NULL,createCompressedOutput);
 			isFirstSnapshot = qfalse;
 		}
 		else {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld, createCompressedOutput);
+			SnapshotEntitiesOrderedPointers orderedOld = SnapShotEntitiesToOrderedPointers(playerEntitiesOld);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, &orderedOld, &mainPlayerPSOld, createCompressedOutput);
 		}
 
 		framesWritten++;

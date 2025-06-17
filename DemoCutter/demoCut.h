@@ -4960,14 +4960,28 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 
 
 
+typedef ankerl::unordered_dense::map<uint16_t, entityState_t, ankerl::unordered_dense::hash<uint16_t>> SnapshotEntities;
+typedef std::map<uint16_t, entityState_t> SnapshotEntitiesOrdered;
+typedef std::map<uint16_t, entityState_t*> SnapshotEntitiesOrderedPointers;
+typedef ankerl::unordered_dense::map<uint16_t, int, ankerl::unordered_dense::hash<uint16_t>> EntityIntegerMap;
 
+
+static inline SnapshotEntitiesOrderedPointers SnapShotEntitiesToOrderedPointers(SnapshotEntities& ents) {
+	SnapshotEntitiesOrderedPointers ptrs;
+	// it might be slightly faster to use an std::vector with std::pair and then run a single std::sort, however
+	// std::map guarantees order so semantically it is better.
+	for (auto it = ents.begin(); it != ents.end(); it++) {
+		ptrs.emplace(it->first, &it->second);
+	}
+	return ptrs;
+}
 
 // Shared demo parsing functions
 class SnapshotInfo {
 public:
 	int snapNum;
-	std::map<int, entityState_t> entities;
-	std::map<int, int> playerCommandOrServerTimes;
+	SnapshotEntities entities;
+	EntityIntegerMap playerCommandOrServerTimes;
 	bool hasPlayer[MAX_CLIENTS_MAX]{};
 	byte mohaaPlayerWeapon[MAX_CLIENTS_MAX]{};
 	playerState_t playerState;
@@ -4977,6 +4991,9 @@ public:
 	bool playerStateTeleport;
 	bool snapFlagServerCount; // Used for considering teleports for non-playerstate clients
 };
+
+
+
 
 
 
@@ -4999,9 +5016,9 @@ qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);
-void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities);
+void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, SnapshotEntitiesOrderedPointers* entities, SnapshotEntitiesOrderedPointers* fromEntities);
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);
-void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw);
+void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, SnapshotEntitiesOrderedPointers* entities, SnapshotEntitiesOrderedPointers* fromEntities, playerState_t* fromPS,qboolean raw);
 
 const char* jsonGetRealMetadataKeyName(rapidjson::Document* doc, const char* searchName);
 std::string printRapidJsonValue(rapidjson::Value* value);

@@ -266,13 +266,13 @@ public:
 	
 	playerState_t GetInterpolatedPlayerState(double time);
 	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL, int futureSeekLimit=0);
-	std::map<int, entityState_t> GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnap = NULL);
-	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, std::map<int, entityState_t>* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
+	SnapshotEntities GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnap = NULL);
+	void GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, SnapshotEntities* mapToEnhance, const SnapshotInfoMapIterator* referenceSnap = NULL); // Same as the other overload but enhances an existing map if item with lower serverTime is found.
 	playerState_t GetInterpolatedPlayer(int clientNum, double time, SnapshotInfo** oldSnap=NULL, SnapshotInfo** newSnap=NULL, qboolean detailedPS = qfalse, float* translatedTime=NULL);
 	entityState_t GetInterpolatedNPC(int entityNum, double time, /*SnapshotInfo** oldSnap = NULL, SnapshotInfo** newSnap = NULL, */float* translatedTime = NULL);
 
-	std::map<int, entityState_t> GetEntitiesAtTime(double time, double * translatedTime = NULL, int* sourceSnapNum = NULL);
-	std::map<int, entityState_t> GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum = NULL);
+	SnapshotEntities GetEntitiesAtTime(double time, double * translatedTime = NULL, int* sourceSnapNum = NULL);
+	SnapshotEntities GetEntitiesAtPreciseTime(int time, qboolean includingPS, int* sourceSnapNum = NULL);
 	std::vector<std::string> GetNewCommands(double time);
 	std::vector<std::string> GetNewCommandsAtServerTime(int serverTime);
 	std::vector<Event> GetNewEvents(double time, eventKind_t kind=EK_ENTITY);

@@ -5919,11 +5919,9 @@ qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStri
 
 
 
+static SnapshotEntitiesOrderedPointers emptyEntities;
 
-
-static std::map<int, entityState_t> emptyEntities;
-
-void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities) {
+void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, SnapshotEntitiesOrderedPointers* entities, SnapshotEntitiesOrderedPointers* fromEntities) {
 	entityState_t* oldent, * newent;
 	int oldindex, newindex;
 	int oldnum, newnum;
@@ -5952,7 +5950,7 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 			//newent = &clCut->parseEntities[(to->parseEntitiesNum + newindex) & (MAX_PARSE_ENTITIES - 1)];
 			//newnum = newent->number;
 			newnum = newIterator->first;
-			newent = &newIterator->second;
+			newent = newIterator->second;
 		}
 		if (oldindex >= from_num_entities) {
 			oldnum = 9999;
@@ -5960,7 +5958,7 @@ void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType
 		else {
 			//oldent = &clCut->parseEntities[(from->parseEntitiesNum + oldindex) & (MAX_PARSE_ENTITIES - 1)];
 			//oldnum = oldent->number;
-			oldent = &oldIterator->second;
+			oldent = oldIterator->second;
 			oldnum = oldIterator->first;
 		}
 		if (newnum == oldnum) {
@@ -6011,7 +6009,7 @@ qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* c
 
 //void demoCutWriteDeltaSnapshotManual(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType,std::map<int,entityState_t>* entities,std::map<int,entityState_t>* fromEntities,playerState_t* fromPS) {
 // TODO: Make this work for JKA? No idea. Whatever.
-void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, std::map<int, entityState_t>* entities, std::map<int, entityState_t>* fromEntities, playerState_t* fromPS,qboolean raw) {
+void demoCutWriteDeltaSnapshotManual(std::vector<std::string>* newCommands, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, SnapshotEntitiesOrderedPointers* entities, SnapshotEntitiesOrderedPointers* fromEntities, playerState_t* fromPS,qboolean raw) {
 	msg_t			msgImpl, * msg = &msgImpl;
 	byte			msgData[MAX_MSGLEN];
 	std::vector<byte>			msgDataRaw;

@@ -458,10 +458,10 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 	demo.cut.Clc.serverMessageSequence++;
 
 	int time = startTime; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
-	std::map<int, entityState_t> playerEntities;
-	std::map<int, entityState_t> playerEntitiesOld;
-	std::map<int, entityState_t> futureEntityStates;
-	std::map<int, entityState_t> pastEntityStates;
+	SnapshotEntities playerEntities;
+	SnapshotEntities playerEntitiesOld;
+	SnapshotEntities futureEntityStates;
+	SnapshotEntities pastEntityStates;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS,tmpPS2,tmpPS3, mainPlayerPS, mainPlayerPSOld;
@@ -1143,12 +1143,14 @@ qboolean demoMerge( const char* outputName, std::vector<std::string>* inputFiles
 
 		if (doWriteSnap) {
 
+			SnapshotEntitiesOrderedPointers ordered = SnapShotEntitiesToOrderedPointers(playerEntities);
 			if (isFirstSnapshot) {
-				demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL, NULL, createCompressedOutput);
+				demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, NULL, NULL, createCompressedOutput);
 				isFirstSnapshot = qfalse;
 			}
 			else {
-				demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld, createCompressedOutput);
+				SnapshotEntitiesOrderedPointers orderedOld = SnapShotEntitiesToOrderedPointers(playerEntitiesOld);
+				demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, &orderedOld, &mainPlayerPSOld, createCompressedOutput);
 			}
 
 			framesWritten++;

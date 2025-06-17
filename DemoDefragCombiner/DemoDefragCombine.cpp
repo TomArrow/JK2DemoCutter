@@ -175,8 +175,8 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 	double sourceTime = 0.0f;
 	double time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	float fps = 60.0f;
-	std::map<int, entityState_t> playerEntities;
-	std::map<int, entityState_t> playerEntitiesOld;
+	SnapshotEntities playerEntities;
+	SnapshotEntities playerEntitiesOld;
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
@@ -204,7 +204,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				SnapshotInfo* snapInfo = demoReaders[i]->reader.GetSnapshotInfoAtOrBeforeDemoTime(sourceTime - demoReaders[i]->sourceInfo->delay, qtrue); // Find out which player to show at this time
 				SnapshotInfo* realSourceSnap = NULL;
 				tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(snapInfo->playerState.clientNum, sourceTime - demoReaders[i]->sourceInfo->delay - demoReaders[i]->playersToCopy[snapInfo->playerState.clientNum].pingCompensation, &realSourceSnap); // Interpolate him. TODO: Make more efficient.
-				std::map<int, entityState_t> hereEntities = snapInfo->entities;
+				SnapshotEntities hereEntities = snapInfo->entities;
 
 				smallestSnapNumUsed = std::min(smallestSnapNumUsed, snapInfo->snapNum);
 				if (realSourceSnap) {
@@ -281,7 +281,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 
 				double thisTimeInServerTime;
 				int entitiesSourceSnapNum = INT_MAX;
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i]->reader.GetEntitiesAtTime(sourceTime - demoReaders[i]->sourceInfo->delay, &thisTimeInServerTime,&entitiesSourceSnapNum);
+				SnapshotEntities sourceEntitiesAtTime = demoReaders[i]->reader.GetEntitiesAtTime(sourceTime - demoReaders[i]->sourceInfo->delay, &thisTimeInServerTime,&entitiesSourceSnapNum);
 
 				smallestSnapNumUsed = std::min(smallestSnapNumUsed, entitiesSourceSnapNum);
 
@@ -369,12 +369,14 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 		clSnapshot_t mainPlayerSnapshot = demoReaders[0]->reader.GetCurrentSnap();
 		Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 
+		SnapshotEntitiesOrderedPointers ordered = SnapShotEntitiesToOrderedPointers(playerEntities);
 		if (isFirstSnapshot) {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, NULL,NULL, createCompressedOutput);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, NULL,NULL, createCompressedOutput);
 			isFirstSnapshot = qfalse;
 		}
 		else {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &playerEntities, &playerEntitiesOld, &mainPlayerPSOld, createCompressedOutput);
+			SnapshotEntitiesOrderedPointers orderedOld = SnapShotEntitiesToOrderedPointers(playerEntitiesOld);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, &orderedOld, &mainPlayerPSOld, createCompressedOutput);
 		}
 
 		time += 1000.0 / fps;

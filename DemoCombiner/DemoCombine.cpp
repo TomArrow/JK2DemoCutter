@@ -393,8 +393,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 	double sourceTime = 0.0f;
 	double time = 10000.0f; // You don't want to start at time 0. It causes incomprehensible weirdness. In fact, it crashes most clients if you try to play back the demo.
 	double fps = 60.0f;
-	std::map<int, entityState_t> targetEntities;
-	std::map<int, entityState_t> targetEntitiesOld;
+	SnapshotEntities targetEntities;
+	SnapshotEntities targetEntitiesOld;
 	//entityMeta_t	entityMeta[MAX_GENTITIES];
 	entityMeta_t	entityMetaOld[MAX_GENTITIES];
 
@@ -611,7 +611,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 				int maxLengthTmp;
 				double thisTimeInServerTime;
 				int entitiesSnapNum = -1;
-				std::map<int, entityState_t> sourceEntitiesAtTime = demoReaders[i]->reader.GetEntitiesAtTime(sourceTime - demoReaders[i]->sourceInfo->delay,&thisTimeInServerTime ,&entitiesSnapNum);
+				SnapshotEntities sourceEntitiesAtTime = demoReaders[i]->reader.GetEntitiesAtTime(sourceTime - demoReaders[i]->sourceInfo->delay,&thisTimeInServerTime ,&entitiesSnapNum);
 				
 				smallestSnapNumUsed = std::min(smallestSnapNumUsed,entitiesSnapNum);
 
@@ -955,7 +955,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 					// Just ignore the return value.
 				}
 				std::vector<Event> newEventsHere = demoReaders[i]->reader.GetNewEvents(sourceTime - demoReaders[i]->sourceInfo->delay);
-				std::map<int, entityState_t> entitiesHere;
+				SnapshotEntities entitiesHere;
 				qboolean entitiesAlreadyRead = qfalse; // Slight optimization really, nthing more.
 				int preciseEntitiesSnapNum = -1;
 				for (int c = 0; c < newEventsHere.size(); c++) {
@@ -1176,12 +1176,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 		//Com_Memcpy(demo.cut.Cl.snap.areamask, mainPlayerSnapshot.areamask,sizeof(demo.cut.Cl.snap.areamask));// We might wanna do something smarter someday but for now this will do. 
 		Com_Memset(demo.cut.Cl.snap.areamask,0,sizeof(demo.cut.Cl.snap.areamask));
 
+		SnapshotEntitiesOrderedPointers ordered = SnapShotEntitiesToOrderedPointers(targetEntities);
 		if (isFirstSnapshot) {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &targetEntities, NULL,NULL,createCompressedOutput);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, NULL,NULL,createCompressedOutput);
 			isFirstSnapshot = qfalse;
 		}
 		else {
-			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &targetEntities, &targetEntitiesOld, &mainPlayerPSOld,createCompressedOutput);
+			SnapshotEntitiesOrderedPointers orderedOld = SnapShotEntitiesToOrderedPointers(targetEntitiesOld);
+			demoCutWriteDeltaSnapshotManual(&commandsToAdd, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl, demoType, &ordered, &orderedOld, &mainPlayerPSOld,createCompressedOutput);
 		}
 
 		time += 1000.0 / fps;
