@@ -28,6 +28,8 @@
 
 #define BUFFERBAT
 
+#define KILLVECARRAY 1
+
 std::queue<entityState_t*> parsedEventEntities;
 
 
@@ -568,10 +570,22 @@ struct SpreeInfo {
 	float maxVictimSpeed;
 };
 
+
+
 // For detecting killstreaks
 // Killer is the key, kill info is the value
 //std::map<int, int> timeCheckedForKillStreaks;
+#if KILLVECARRAY
+std::vector<Kill> kills[MAX_CLIENTS_MAX + 1]; // +1 is for world
+#define KILLERARRAYINDEX(k) (((k) < 0 || (k)>=max_clients) ? max_clients : (k)) 
+#define KILLERARRAYINDEX_REVERSE(k) (((k) < 0 || (k)>=max_clients) ? ENTITYNUM_WORLD : (k)) 
+EzBitmask<MAX_GENTITIES> clientHasKills;
+#else
 ankerl::unordered_dense::map<uint16_t, std::vector<Kill>, ankerl::unordered_dense::hash<uint16_t>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
+#define KILLERARRAYINDEX(k) (k)
+#define KILLERARRAYINDEX_REVERSE(k) (k)
+#endif
+//
 //std::map<int, std::vector<Kill>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
 //std::vector<Kill> kills[MAX_GENTITIES];
 int timeCheckedForKillStreaks[MAX_GENTITIES] = { 0 };
@@ -1159,6 +1173,11 @@ int specialJumpCount[MAX_CLIENTS_MAX]; // Jumps over items in certain situations
 
 //int64_t walkDetectedTime[max_clients];
 std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS_MAX];
+size_t walkDetectedTimesObsoleteIndex[MAX_CLIENTS_MAX] = { 0 };
+
+inline bool demoTimeSmallerPredicate(const int64_t& curTime, const float& demoTime) {
+	return curTime < demoTime;
+};
 
 
 struct {
@@ -1775,64 +1794,96 @@ entityState_t* findEntity(int number) {
 	return NULL;
 }
 
+template<float Speed::*thingie>
+inline float getMaxSpeedThingForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
+	float maxThingie = -1.0f;
+	//for (auto it = speeds[clientNum].begin(), end = speeds[clientNum].end(); it != end; it++) {
+	//	if (it->time >= fromTime && it->time <= toTime && (*it).*thingie > maxThingie) {
+	//		maxThingie = (*it).*thingie;
+	//	}
+	//}
+
+	// i know its disgusting but i want this to run fast in debug mode
+	Speed* data = speeds[clientNum].data();
+	data += speeds[clientNum].size() -1;
+	for (int64_t i = speeds[clientNum].size() - 1; i >= 0; i--, data--) {
+		if (data->time < fromTime) break;
+		if (data->time <= toTime && (*data).*thingie > maxThingie) {
+			maxThingie = (*data).*thingie;
+		}
+	}
+	//for (auto it = speeds[clientNum].rbegin(), end = speeds[clientNum].rend(); it != end; it++) {
+	//	if (it->time >= fromTime && it->time <= toTime && (*it).*thingie > maxThingie) {
+	//		maxThingie = (*it).*thingie;
+	//	}
+	//}
+	return maxThingie;
+}
 
 float getMaxSpeedForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
-	float maxSpeed = -1.0f;
+	//float maxSpeed = -1.0f;
 	/*for (auto it = speeds[clientNum].begin(); it != speeds[clientNum].end(); it++) {
 		if (it->first >= fromTime && it->first <= toTime && it->second > maxSpeed) {
 			maxSpeed = it->second;
 		}
 	}*/
-	for (int i = 0;i< speeds[clientNum].size(); i++) {
-		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && speeds[clientNum][i].speed > maxSpeed) {
-			maxSpeed = speeds[clientNum][i].speed;
-		}
-	}
-	return maxSpeed;
+	//for (auto it = speeds[clientNum].begin(), end = speeds[clientNum].end(); it != end; it++) {
+	//	if (it->time >= fromTime && it->time <= toTime && it->speed > maxSpeed) {
+	//		maxSpeed = it->speed;
+	//	}
+	//}
+	//return maxSpeed;
+	return getMaxSpeedThingForClientinTimeFrame<&Speed::speed>(clientNum, fromTime, toTime);
 }
 
 
 float getMaxAngularSpeedForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
-	float maxSpeed = -1.0f;
-	for (int i = 0;i< speeds[clientNum].size(); i++) {
-		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularSpeed) > maxSpeed) {
-			maxSpeed = abs(speeds[clientNum][i].angularSpeed);
-		}
-	}
-	return maxSpeed;
+
+	return getMaxSpeedThingForClientinTimeFrame<&Speed::angularSpeed>(clientNum, fromTime, toTime);
+	//float maxSpeed = -1.0f;
+	//for (int i = 0;i< speeds[clientNum].size(); i++) {
+	//	if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularSpeed) > maxSpeed) {
+	//		maxSpeed = abs(speeds[clientNum][i].angularSpeed);
+	//	}
+	//}
+	//return maxSpeed;
 }
 
 
 float getMaxAngularAccelerationForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
-	float maxAccel = -1.0f;
-	for (int i = 0;i< speeds[clientNum].size(); i++) {
-		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularAcceleration) > maxAccel) {
-			maxAccel = abs(speeds[clientNum][i].angularAcceleration);
-		}
-	}
-	return maxAccel;
+
+	return getMaxSpeedThingForClientinTimeFrame<&Speed::angularAcceleration>(clientNum, fromTime, toTime);
+	//float maxAccel = -1.0f;
+	//for (int i = 0;i< speeds[clientNum].size(); i++) {
+	//	if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularAcceleration) > maxAccel) {
+	//		maxAccel = abs(speeds[clientNum][i].angularAcceleration);
+	//	}
+	//}
+	//return maxAccel;
 }
 
 
 float getMaxAngularJerkForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
-	float maxJerk = -1.0f;
-	for (int i = 0;i< speeds[clientNum].size(); i++) {
-		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularJerk) > maxJerk) {
-			maxJerk = abs(speeds[clientNum][i].angularJerk);
-		}
-	}
-	return maxJerk;
+	return getMaxSpeedThingForClientinTimeFrame<&Speed::angularJerk>(clientNum, fromTime, toTime);
+	//float maxJerk = -1.0f;
+	//for (int i = 0;i< speeds[clientNum].size(); i++) {
+	//	if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularJerk) > maxJerk) {
+	//		maxJerk = abs(speeds[clientNum][i].angularJerk);
+	//	}
+	//}
+	//return maxJerk;
 }
 
 
 float getMaxAngularSnapForClientinTimeFrame(int clientNum, int64_t fromTime, int64_t toTime) {
-	float maxSnap = -1.0f;
-	for (int i = 0;i< speeds[clientNum].size(); i++) {
-		if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularSnap) > maxSnap) {
-			maxSnap = abs(speeds[clientNum][i].angularSnap);
-		}
-	}
-	return maxSnap;
+	return getMaxSpeedThingForClientinTimeFrame<&Speed::angularSnap>(clientNum, fromTime, toTime);
+	//float maxSnap = -1.0f;
+	//for (int i = 0;i< speeds[clientNum].size(); i++) {
+	//	if (speeds[clientNum][i].time >= fromTime && speeds[clientNum][i].time <= toTime && abs(speeds[clientNum][i].angularSnap) > maxSnap) {
+	//		maxSnap = abs(speeds[clientNum][i].angularSnap);
+	//	}
+	//}
+	//return maxSnap;
 }
 
 template <unsigned int max_clients>
@@ -5609,7 +5660,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							break;
 						}
 					}
-					if (lastIndexToRemove != -1) {
+					if (lastIndexToRemove != -1 && lastIndexToRemove>= boosts.size()/2) { // too much left in: longer loops. but if we delete less than half,
 						boosts.erase(boosts.begin(), boosts.begin()+lastIndexToRemove+1);
 					}
 					
@@ -5635,20 +5686,43 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					// Some preparation. Find the relevant walk times that are older than BOOST_DETECT_MAX_AGE_WALKING, but out of those, find the newest one so we can use that info to remove any boosts that happened before that.
 					static int64_t newestRemoveWorthyWalks[max_clients];
 					Com_Memset(newestRemoveWorthyWalks, 0, sizeof(newestRemoveWorthyWalks));
+					int64_t oldestInterestingWalkingTime = demoCurrentTime - BOOST_DETECT_MAX_AGE_WALKING;
 					for (int i = 0; i < max_clients; i++) {
 						size_t maxIndexToRemove = -1;
-						for (int w = 0; w < walkDetectedTimes[i].size(); w++) {
-							bool isRemoveWorthy = (demoCurrentTime - walkDetectedTimes[i][w]) > BOOST_DETECT_MAX_AGE_WALKING;
+						//for (int w = 0; w < walkDetectedTimes[i].size(); w++) {
+						int w = walkDetectedTimesObsoleteIndex[i]; // kinda cringe performance micro-optimization, so we don't have to erase stuff from the vector on every frame (slow) but also don't have to iterate over it all.
+						for (int64_t* it = walkDetectedTimes[i].data() + walkDetectedTimesObsoleteIndex[i], *endIt = walkDetectedTimes[i].data() + walkDetectedTimes[i].size(); it!=endIt; it++,w++) {
+							bool isRemoveWorthy = (demoCurrentTime - *it) > BOOST_DETECT_MAX_AGE_WALKING;
 							if (isRemoveWorthy) {
-								maxIndexToRemove = w;
-								newestRemoveWorthyWalks[i] = walkDetectedTimes[i][w];
+								walkDetectedTimesObsoleteIndex[i] = maxIndexToRemove = w;
+								newestRemoveWorthyWalks[i] = *it;
 							}
 							else {
 								break;
 							}
 						}
-						if (maxIndexToRemove != -1) {
+						/*auto firstToKeepIt = std::lower_bound(walkDetectedTimes[i].begin(), walkDetectedTimes[i].end(), oldestInterestingWalkingTime);
+						if (firstToKeepIt != walkDetectedTimes[i].end()) {
+							maxIndexToRemove = (firstToKeepIt - walkDetectedTimes[i].begin())-1;
+							newestRemoveWorthyWalks[i] = *firstToKeepIt-1;
+						}
+						else {
+							maxIndexToRemove = walkDetectedTimes[i].size() - 1;
+							if (maxIndexToRemove != -1) {
+								newestRemoveWorthyWalks[i] = walkDetectedTimes[i].back();
+							}
+						}*/
+
+						if (maxIndexToRemove != -1 && maxIndexToRemove > walkDetectedTimes[i].size()/2) { 
+							// don't do erase operations on every frame.
+							// let's say the vec has 30 items and on each frame we erase a single one. 
+							// that means on each frame we reduce the loopsize by 1 item, basically keeping it high anyway
+							// but in return, we have to shift the entire array of 30 items by 1 on each frame. bad tradeoff.
 							walkDetectedTimes[i].erase(walkDetectedTimes[i].begin(), walkDetectedTimes[i].begin() + maxIndexToRemove + 1);
+							walkDetectedTimesObsoleteIndex[i] = 0;
+						}
+						else {
+							newestRemoveWorthyWalks[i] = 0;
 						}
 					}
 					// Do the removal.
@@ -7038,8 +7112,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 							std::string nearbyPlayersString = nearbyPlayersSS.str();
 
-
+#if KILLVECARRAY
+							kills[KILLERARRAYINDEX(attacker)].push_back(thisKill);
+							clientHasKills.setbit(KILLERARRAYINDEX(attacker));
+#else
 							kills[attacker].push_back(thisKill);
+#endif
 
 
 
@@ -7843,26 +7921,36 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				for (int cln = 0; cln < max_clients; cln++) {
 					requiredMetaEventAges[METRACKER_KILLSPREES][cln] = demoCurrentTime - bufferTime; // We will set the proper value below but kills is a map that might not contain a key for some players so we just go safe here and set the appropriate value below.
 				}
-				for (auto clientIt = kills.begin(); clientIt != kills.end(); clientIt++) {
+#if KILLVECARRAY
+				for (int attackerNum = 0; attackerNum <= max_clients; attackerNum++) { // <= because max_clients itself is used for world kills
+					if (!clientHasKills[attackerNum]) continue;
+					std::vector<Kill>* killsVec = &kills[attackerNum];
+					int clientNumAttacker = KILLERARRAYINDEX_REVERSE(attackerNum);
+#else
+				for (auto clientIt = kills.begin(),endIt = kills.end(); clientIt != endIt; clientIt++) {
+					std::vector<Kill>* killsVec = &clientIt->second;
+					int clientNumAttacker = clientIt->first;
+#endif
 
 					static const int killStreakSpeedTypes[] = { KILLSTREAK_SUPERFAST_MAX_INTERVAL,KILLSTREAK_MAX_INTERVAL,SLOW_KILLSTREAK_MAX_INTERVAL,VERYSLOW_KILLSTREAK_MAX_INTERVAL,VERYVERYSLOW_KILLSTREAK_MAX_INTERVAL,GIGASUPERVERYVERYSLOW_OPTIONAL_KILLSTREAK_MAX_INTERVAL };
 					constexpr int spCount = sizeof(killStreakSpeedTypes) / sizeof(int);
 
 					//const int speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // Moved to start of function.
 
-					int clientNumAttacker = clientIt->first;
 
 					// Update required meta event tracking times
 					if(clientNumAttacker < max_clients && clientNumAttacker >=0 ){
-						if (clientIt->second.size() == 0) {
-							requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; // No kills in backlog. We only have to keep [bufferTime] milliseconds into past.
-						}
-						else {
-							requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = clientIt->second[0].time - bufferTime; // Kills in backlog that might become part of killsprees. Take oldest one and go [bufferTime] milliseconds back in time and there's our answer.
+						//if (killsVec->size() == 0) {
+						//	requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = demoCurrentTime - bufferTime; // No kills in backlog. We only have to keep [bufferTime] milliseconds into past.
+						//}
+						//else 
+						if(killsVec->size() > 0)
+						{
+							requiredMetaEventAges[METRACKER_KILLSPREES][clientNumAttacker] = (*killsVec)[0].time - bufferTime; // Kills in backlog that might become part of killsprees. Take oldest one and go [bufferTime] milliseconds back in time and there's our answer.
 						}
 					}
 
-					if (clientIt->second.size() == 0 || (clientIt->second.back().time + killStreakSpeedTypes[spCount-1-speedTypesSkip]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
+					if (killsVec->size() == 0 || (killsVec->back().time + killStreakSpeedTypes[spCount-1-speedTypesSkip]) >= demoCurrentTime) continue; // Might still have an unfinished one here!
 
 					// TODO ... Wait... what happens if there's two shorter duration killsprees behind each other here? Will that get caught? Oh yeah it might.
 					for (int sp = 0; sp < (spCount- speedTypesSkip); sp++) { // We do this twice, for every killstreak duration type.
@@ -7889,8 +7977,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						std::string* lastKillHash = NULL;
 
-						for (int i = 0; i < clientIt->second.size(); i++) {
-							Kill* thisKill = &clientIt->second[i];
+						for (int i = 0; i < killsVec->size(); i++) {
+							Kill* thisKill = &(*killsVec)[i];
 
 							// Whether it was or wasn't a killstreak, there are no killstreaks up to this point, so earlier than current kill time can be safely cleaned up.
 							timeCheckedForKillStreaks[clientNumAttacker] = thisKill->time - 1;
@@ -7946,7 +8034,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					// We can clear the entire thing since earlier we made sure that we aren't in the middle of an ongoing killstreak
 					// So anything that's in there now was already checked for being part of a killstreak.
 					// So we can get rid of it all.
-					clientIt->second.clear();
+					killsVec->clear();
+#if KILLVECARRAY
+					clientHasKills.clearbit(attackerNum);
+#endif
 
 					// Can reset this now as no pending killsprees are here anymore.
 					if (clientNumAttacker < max_clients && clientNumAttacker >= 0) {
@@ -7968,12 +8059,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), lastToRemove);
 					}*/
 					int countToRemove = 0;
-					for (int s = 0; s < speeds[clientNumAttacker].size();s++) {
-						if ((demoCurrentTime - speeds[clientNumAttacker][s].time) > OLDER_SPEEDS_STORE_LIMIT) {
+					for (auto it= speeds[clientNumAttacker].begin(),end= speeds[clientNumAttacker].end(); it!=end;it++) {
+						if ((demoCurrentTime - it->time) > OLDER_SPEEDS_STORE_LIMIT) { // BUT WAIT. What about killsprees with maxspeedattacker etc? oh wait. nvm
 							countToRemove++;
 						}
 					}
-					if (countToRemove) {
+					if (countToRemove && countToRemove > 100) { // don't do remove operations on every frame.
 						speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), speeds[clientNumAttacker].begin()+ countToRemove);
 					}
 				}

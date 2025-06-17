@@ -4950,8 +4950,20 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 
 
 
-
-
+template<int bits>
+class EzBitmask {
+	byte data[(bits / 8) + 1] = { 0 };
+public:
+	inline const bool operator [](size_t bit) {
+		return (data[(bit >> 3)] & (1 << (bit & 7)));
+	}
+	inline void setbit(size_t bit) {
+		data[(bit >> 3)] |= (1 << (bit & 7));
+	}
+	inline void clearbit(size_t bit) {
+		data[(bit >> 3)] &= ~(1 << (bit & 7));
+	}
+};
 
 
 
