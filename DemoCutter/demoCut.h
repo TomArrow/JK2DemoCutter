@@ -2114,13 +2114,17 @@ typedef enum {
 	GT_TOURNAMENT_GENERAL,		// one on one tournament
 	GT_SINGLE_PLAYER_GENERAL,	// single player ffa
 
+
+	GT_POWERDUEL_GENERAL, // jka
+	GT_RACE_GENERAL, // ql racing
+	GT_HM_GENERAL, // cpma? this seems to be an improved duel mode
+
 	//-- team games go after this --
 
 	GT_TEAM_GENERAL,			// team deathmatch
 	GT_SAGA_SIEGE_GENERAL,			// saga/siege
 	GT_CTF_GENERAL,				// capture the flag
 	GT_CTY_GENERAL,
-	GT_POWERDUEL_GENERAL, // jka
 	GT_1FCTF_GENERAL,//q3
 	GT_OBELISK_GENERAL,//q3
 	GT_HARVESTER_GENERAL, //q3
@@ -2128,16 +2132,14 @@ typedef enum {
 	GT_OBJECTIVE_GENERAL, //moh
 	GT_TOW_GENERAL, //moh
 	GT_LIBERATION_GENERAL, //moh
-	GT_RACE_GENERAL, // ql
 	GT_CA_GENERAL, // ql idk
 	GT_FT_GENERAL, // ql freezetag
 	GT_DOMINATION_GENERAL, // ql
 	GT_CTFS_GENERAL, // ql attack and defend
-	GT_REDROVER_GENERAL, // ql
-	GT_HM_GENERAL, // cpma?
-	GT_NTF_GENERAL, // cpma?
+	GT_REDROVER_GENERAL, // ql - is this really a team game by typical definition? meh i guess so
+	GT_NTF_GENERAL, // cpma not team fortress
 	GT_TWO_VS_TWO_GENERAL, // cpma?
-	GT_CBTDM_GENERAL, // idk cod?
+	GT_CBTDM_GENERAL, // idk cod?	
 
 	GT_MAX_GAME_TYPE_GENERAL
 } gametype_general_t;
@@ -5216,6 +5218,7 @@ static const int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
 	ITEMLIST_NUM_TOTAL_GENERAL+1,
 	MAX_ANIMATIONS_GENERAL+1,
 	ET_EVENTS_GENERAL+1,
+	GT_MAX_GAME_TYPE_GENERAL+1,
 }; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
 
 static const int gameMappingTypeGeneralValueOffset[GAMEMAPPINGTYPES_COUNT] {

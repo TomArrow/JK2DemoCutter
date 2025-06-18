@@ -25,6 +25,17 @@ enum highlightSearchMode_t {
 };
 
 
+class PlayerInfo {
+public:
+	int				team = TEAM_FREE;
+	int				color1 = 0;
+	std::string		model = "";
+	std::string		skin = "";
+	qboolean		skinExists = qfalse;
+	qboolean		modelNeededTeamAdjustment = qfalse;
+};
+
+
 class Command {
 public:
 	int64_t demoTime;
@@ -117,6 +128,12 @@ inline bool snapshotInfosSnapNumPredicate(const std::pair<const int, std::unique
 
 class DemoReader : public DemoReaderBase {
 
+
+
+
+	struct {
+		gametype_general_t	gameTypeGeneral = GT_FFA_GENERAL;
+	} game;
 
 	//jp::Regex defragRecordFinishRegex(R"raw(\^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+):(\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.)raw", "mSi");
 	jp::Regex defragRecordFinishRegex;
@@ -247,6 +264,9 @@ public:
 	int64_t getCutStartOffset(qboolean withTruncationOffset = qtrue);
 	qboolean containsDimensionData();
 	demoType_t getDemoType();
+	inline gametype_general_t getGametypeGeneral() {
+		return game.gameTypeGeneral;
+	}
 	bool isThisMOHAADemo();
 	int getClientNumForDemo(std::string* playerSearchString, qboolean printEndLine = qfalse);
 	int GetFirstSnapServerTime();
@@ -264,7 +284,9 @@ public:
 	qboolean SeekToPlayerCommandOrServerTime(int clientNum, int serverTime); // The reason this is called "OR servertime" is because player entities aren't guaranteed to have commandtime in them, they only have it if g_smoothclients is true.
 	void	ClearSnapshotsBeforeIterator(SnapshotInfoMapIterator snapInfoIt);
 
-	
+	// tmpPS is for DM_14 to get saber color
+	PlayerInfo GetPlayerInfo(int clientnum, playerState_t* tmpPS = NULL);
+
 	playerState_t GetInterpolatedPlayerState(double time);
 	playerState_t GetLastOrNextPlayer(int clientNum, int serverTime, SnapshotInfoMapIterator* usedSourceSnap=NULL,SnapshotInfoMapIterator* usedSourcePlayerStateSnap=NULL, qboolean detailedPS = qfalse, const SnapshotInfoMapIterator* referenceSnap = NULL, int futureSeekLimit=0);
 	SnapshotEntities GetFutureEntityStates(int serverTime, int maxTimeIntoFuture, bool includePlayerStates, const SnapshotInfoMapIterator* referenceSnap = NULL);

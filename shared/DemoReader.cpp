@@ -1343,6 +1343,56 @@ void DemoReader::convertPSTo(playerState_t* ps, demoType_t targetDemoType) { // 
 
 }
 
+
+
+PlayerInfo DemoReader::GetPlayerInfo(int clientnum, playerState_t* tmpPS) {
+	PlayerInfo retVal;
+
+	int maxLength;
+	//const char* playerInfo = demoReaders[i]->reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
+	const char* playerInfo = GetPlayerConfigString(clientnum, &maxLength);
+	std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
+	retVal.team = atoi(Info_ValueForKey(playerInfo, maxLength, "t"));
+	retVal.color1 = demoType == DM_14 && tmpPS ? tmpPS->saberColor : atoi(Info_ValueForKey(playerInfo, maxLength, "c1"));
+
+	std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
+	size_t firstSlash = thisModel.find_first_of("/");
+
+	if (firstSlash == std::string::npos) {
+		// No variant. Just the model name
+		retVal.model = thisModel;
+		//baseModelCString = thisModel->c_str();
+	}
+	else {
+		retVal.model = thisModel.substr(0, firstSlash);
+		//baseModelCString = thisModel->c_str();
+		if (firstSlash < (thisModel.size() - 1)) {
+			retVal.skinExists = qtrue;
+			retVal.skin = thisModel.substr(firstSlash + 1, thisModel.size() - firstSlash - 1);
+			//variantCString = variant.c_str();
+		}
+	}
+
+	if (getGametypeGeneral() >= GT_TEAM_GENERAL) {
+		if (retVal.team == TEAM_BLUE && (!retVal.skinExists || retVal.skin != "blue")) {
+			retVal.skinExists = qtrue;
+			retVal.skin = "blue";
+			retVal.modelNeededTeamAdjustment = qtrue;
+		}
+		else if (retVal.team == TEAM_RED && (!retVal.skinExists || retVal.skin != "red")) {
+			retVal.skinExists = qtrue;
+			retVal.skin = "red";
+			retVal.modelNeededTeamAdjustment = qtrue;
+		}
+	}
+
+	return retVal;
+}
+
+
+
+
+
 playerState_t DemoReader::GetInterpolatedPlayerState(double time) {
 	playerState_t retVal;
 	Com_Memset(&retVal, 0, sizeof(playerState_t));
@@ -1990,11 +2040,18 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 }
 void DemoReader::updateConfigStringRelatedInfo() { // TODO expand this to be time-relevant by also reading tinfo and filling health and armor and such
 	int maxLength;
+
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
 	maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	const char* systemInfo = thisDemo.cut.Cl.gameState.stringData + offset;
 	int g_entHUDFields = atoi(Info_ValueForKey(systemInfo, maxLength, "g_entHUDFields"));
 	extraFieldInfo.g_entHUDieldsValue = g_entHUDFields;
+
+	offset = thisDemo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+	maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	const char* serverInfo = thisDemo.cut.Cl.gameState.stringData + offset;
+	int gametype = atoi(Info_ValueForKey(serverInfo, maxLength, "g_gametype"));
+	game.gameTypeGeneral = (gametype_general_t)generalizeGameValue<GMAP_GAMETYPE, UNSAFE>(gametype, demoType);
 }
 
 

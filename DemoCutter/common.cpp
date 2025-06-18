@@ -694,7 +694,7 @@ Info_SetValueForKey
 Changes or adds a key/value pair
 ==================
 */
-qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* value, bool isMOHAADemo) {
+qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value, bool isMOHAADemo) {
 	char	newi[MAX_INFO_STRING_MAX];
 
 	if (strlen(s) >= (isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING)) {
@@ -721,12 +721,17 @@ qboolean Info_SetValueForKey(char* s,int capacity, const char* key, const char* 
 	if (!strlen(value))
 		return qfalse;
 
-	Com_sprintf(newi, sizeof(newi),  "\\%s\\%s", key, value);
+	Com_sprintf(newi, sizeof(newi), "\\%s\\%s", key, value);
 
 	// q3infoboom exploit
 	if (strlen(newi) + strlen(s) >= (isMOHAADemo ? MAX_INFO_STRING_MAX : MAX_INFO_STRING)) {
 		Com_DPrintf("Info string length exceeded\n");
 		return qfalse;
+	}
+
+	// TA: lil safety measure for userinfo strings as they dont always start with \ unfortunately
+	if (*s != '\\' && *s != '\0'){
+		strcat_s(newi, sizeof(newi), "\\");
 	}
 
 	//strcat(newi, s);

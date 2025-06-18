@@ -457,6 +457,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 						targetClientNum = slotManager.getPlayerSlot(i, clientNumHere, &isNewPlayer);
 						if (isNewPlayer) {
 							static char copy[MAX_INFO_STRING];
+							PlayerInfo pi = demoReaders[i]->reader.GetPlayerInfo(clientNumHere, &tmpPS);
 							tmpConfigString = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
 
 							if (sourceDemoType == DM_14) {
@@ -464,6 +465,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 								tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay - pingCompensationHere, NULL,NULL, qfalse, NULL);
 								// DM_14 (jk2sp) stores saber color differently
 								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", tmpPS.saberColor), demoReaders[i]->reader.isThisMOHAADemo());
+								tmpConfigString = copy;
+							}
+							else if (pi.modelNeededTeamAdjustment) {
+								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength, sizeof(copy)), tmpConfigString);
+								tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay - pingCompensationHere, NULL, NULL, qfalse, NULL);
+								// DM_14 (jk2sp) stores saber color differently
+								Info_SetValueForKey(copy, sizeof(copy), "model", va("%s/%s", pi.model.c_str(), pi.skin.c_str()), demoReaders[i]->reader.isThisMOHAADemo());
 								tmpConfigString = copy;
 							}
 
@@ -569,40 +577,53 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 							tmpES.eType = ET_GRAPPLE_JK2;
 							// We don't have a player model. So instead get a ModelIndex for this playermodel
 							{	// TODO It's kinda wasteful to do this on every frame. Maybe figure out way to do it only when the model changes.
-								int maxLength;
-								//const char* playerInfo = demoReaders[i]->reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
-								const char* playerInfo = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &maxLength);
-								std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
-								int thisPlayerTeam = atoi(Info_ValueForKey(playerInfo, maxLength, "t"));
-								int thisPlayerColor1 = sourceDemoType == DM_14 ? tmpPS.saberColor : atoi(Info_ValueForKey(playerInfo, maxLength, "c1"));
+								PlayerInfo pi = demoReaders[i]->reader.GetPlayerInfo(clientNumHere, &tmpPS);
+								//int maxLength;
+								////const char* playerInfo = demoReaders[i]->reader.GetConfigString(CS_PLAYERS + clientNumHere, &maxLength);
+								//const char* playerInfo = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &maxLength);
+								//std::string thisModel = Info_ValueForKey(playerInfo, maxLength, "model");
+								//int thisPlayerTeam = atoi(Info_ValueForKey(playerInfo, maxLength, "t"));
+								//int thisPlayerColor1 = sourceDemoType == DM_14 ? tmpPS.saberColor : atoi(Info_ValueForKey(playerInfo, maxLength, "c1"));
+								//gametype_general_t gametype = demoReaders[i]->reader.getGametypeGeneral();
 
-								std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
-								size_t firstSlash = thisModel.find_first_of("/");
+								//std::transform(thisModel.begin(), thisModel.end(), thisModel.begin(), tolowerSignSafe);
+								//size_t firstSlash = thisModel.find_first_of("/");
 
-								bool variantExists = false;
-								std::string baseModel = "";
-								std::string variant = "";
-								if (firstSlash == std::string::npos) {
-									// No variant. Just the model name
-									baseModel = thisModel;
-									//baseModelCString = thisModel->c_str();
-								}
-								else {
-									baseModel = thisModel.substr(0, firstSlash);
-									//baseModelCString = thisModel->c_str();
-									if (firstSlash < (thisModel.size() - 1)) {
-										variantExists = true;
-										variant = thisModel.substr(firstSlash + 1, thisModel.size() - firstSlash - 1);
-										//variantCString = variant.c_str();
-									}
-								}
+								//bool variantExists = false;
+								//std::string baseModel = "";
+								//std::string variant = "";
+								//if (firstSlash == std::string::npos) {
+								//	// No variant. Just the model name
+								//	baseModel = thisModel;
+								//	//baseModelCString = thisModel->c_str();
+								//}
+								//else {
+								//	baseModel = thisModel.substr(0, firstSlash);
+								//	//baseModelCString = thisModel->c_str();
+								//	if (firstSlash < (thisModel.size() - 1)) {
+								//		variantExists = true;
+								//		variant = thisModel.substr(firstSlash + 1, thisModel.size() - firstSlash - 1);
+								//		//variantCString = variant.c_str();
+								//	}
+								//}
 
-								tmpES.demoToolsData.entityMeta.skin = internedStrings.insert(variant).first->c_str();
+								//if (gametype >= GT_TEAM_GENERAL) {
+								//	if (thisPlayerTeam == TEAM_BLUE) {
+								//		variantExists = true;
+								//		variant = "blue";
+								//	}
+								//	else if (thisPlayerTeam == TEAM_RED) {
+								//		variantExists = true;
+								//		variant = "red";
+								//	}
+								//}
 
-								tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd, demoType);
-								tmpES.trickedentindex = variantExists ? G_GrappleSkinIndex(variant.c_str(), &demo.cut.Cl, &commandsToAdd, demoType) : 0;
-								tmpES.trickedentindex |= std::clamp(thisPlayerTeam,0,3) << 6;
-								tmpES.trickedentindex |= std::clamp(thisPlayerColor1,0,15) << 8; // saber color. 0-15 
+								tmpES.demoToolsData.entityMeta.skin = pi.skinExists ? internedStrings.insert(pi.skin).first->c_str() : "";
+
+								tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", pi.model.c_str()), &demo.cut.Cl, &commandsToAdd, demoType);
+								tmpES.trickedentindex = pi.skinExists ? G_GrappleSkinIndex(pi.skin.c_str(), &demo.cut.Cl, &commandsToAdd, demoType) : 0;
+								tmpES.trickedentindex |= std::clamp(pi.team,0,3) << 6;
+								tmpES.trickedentindex |= std::clamp(pi.color1,0,15) << 8; // saber color. 0-15 
 
 							}
 						}
