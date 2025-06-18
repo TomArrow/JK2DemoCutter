@@ -1373,7 +1373,7 @@ PlayerInfo DemoReader::GetPlayerInfo(int clientnum, playerState_t* tmpPS) {
 		}
 	}
 
-	if (getGametypeGeneral() >= GT_TEAM_GENERAL) {
+	if (game.gameTypeGeneral >= GT_TEAM_GENERAL) {
 		if (retVal.team == TEAM_BLUE && (!retVal.skinExists || retVal.skin != "blue" || retVal.color1 != SABER_BLUE)) {
 			retVal.skinExists = qtrue;
 			retVal.skin = "blue";

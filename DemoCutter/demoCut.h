@@ -834,16 +834,6 @@ typedef enum {
 
 
 // Jk2 SP stuff
-typedef enum
-{
-	SABER_RED,
-	SABER_ORANGE,
-	SABER_YELLOW,
-	SABER_GREEN,
-	SABER_BLUE,
-	SABER_PURPLE
-
-} saber_colors_t;
 
 #define MAX_INVENTORY			15		// See INV_MAX
 // JK2 SP stuff end
