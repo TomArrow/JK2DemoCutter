@@ -1501,6 +1501,18 @@ static int mohaaModToGeneralMap[]{ // based on wolfcamql
 	MOD_MAX_GENERAL,//MOD_TOTAL_NUMBER_GENERAL,
 };
 
+static const int mohaaGametypeToGeneral[]{ // based on openmohaa
+	GT_SINGLE_PLAYER_GENERAL, // single player
+	GT_FFA_GENERAL,           // free for all
+	GT_TEAM_GENERAL,          // team deathmatch
+	GT_TEAM_ROUNDS_GENERAL,
+	GT_OBJECTIVE_GENERAL,
+	// Team Assault game mode
+	GT_TOW_GENERAL,
+	// Team Tactics game mode
+	GT_LIBERATION_GENERAL,
+	GT_MAX_GAME_TYPE_GENERAL
+};
 static const int mohaaEntityTypeToGeneral[]{ // based on wolfcamql
 	ET_MODELANIM_SKEL_GENERAL,
 	ET_MODELANIM_GENERAL,

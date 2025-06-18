@@ -2107,6 +2107,42 @@ int Info_ApplyOverrides(const char* overrides, char* data, int maxLengthOverride
 
 #define	EVENT_VALID_MSEC	300
 
+typedef enum {
+	GT_FFA_GENERAL,				// free for all
+	GT_HOLOCRON_GENERAL,		// holocron ffa
+	GT_JEDIMASTER_GENERAL,		// jedi master
+	GT_TOURNAMENT_GENERAL,		// one on one tournament
+	GT_SINGLE_PLAYER_GENERAL,	// single player ffa
+
+	//-- team games go after this --
+
+	GT_TEAM_GENERAL,			// team deathmatch
+	GT_SAGA_SIEGE_GENERAL,			// saga/siege
+	GT_CTF_GENERAL,				// capture the flag
+	GT_CTY_GENERAL,
+	GT_POWERDUEL_GENERAL, // jka
+	GT_1FCTF_GENERAL,//q3
+	GT_OBELISK_GENERAL,//q3
+	GT_HARVESTER_GENERAL, //q3
+	GT_TEAM_ROUNDS_GENERAL, //moh
+	GT_OBJECTIVE_GENERAL, //moh
+	GT_TOW_GENERAL, //moh
+	GT_LIBERATION_GENERAL, //moh
+	GT_RACE_GENERAL, // ql
+	GT_CA_GENERAL, // ql idk
+	GT_FT_GENERAL, // ql freezetag
+	GT_DOMINATION_GENERAL, // ql
+	GT_CTFS_GENERAL, // ql attack and defend
+	GT_REDROVER_GENERAL, // ql
+	GT_HM_GENERAL, // cpma?
+	GT_NTF_GENERAL, // cpma?
+	GT_TWO_VS_TWO_GENERAL, // cpma?
+	GT_CBTDM_GENERAL, // idk cod?
+
+	GT_MAX_GAME_TYPE_GENERAL
+} gametype_general_t;
+
+
 //
 // entityState_t->eType
 //
@@ -2153,6 +2189,22 @@ typedef enum {
 	ET_EVENTS_GENERAL
 } entityType_general_t;
 
+
+static const int jk2GametypeToGeneral[] {
+	GT_FFA_GENERAL,				// free for all
+	GT_HOLOCRON_GENERAL,		// holocron ffa
+	GT_JEDIMASTER_GENERAL,		// jedi master
+	GT_TOURNAMENT_GENERAL,		// one on one tournament
+	GT_SINGLE_PLAYER_GENERAL,	// single player ffa
+
+	//-- team games go after this --
+
+	GT_TEAM_GENERAL,			// team deathmatch
+	GT_SAGA_SIEGE_GENERAL,			// saga
+	GT_CTF_GENERAL,				// capture the flag
+	GT_CTY_GENERAL,
+	GT_MAX_GAME_TYPE_GENERAL
+};
 static const int jk2EntityTypeToGeneral[] {
 	ET_GENERAL_GENERAL,
 	ET_PLAYER_GENERAL,
@@ -5152,6 +5204,7 @@ enum gameMappingType_t { // When changing this, also update gameMappingTypeGener
 	GMAP_ITEMLIST,
 	GMAP_ANIMATIONS,
 	GMAP_ENTITYTYPE,
+	GMAP_GAMETYPE,
 	GAMEMAPPINGTYPES_COUNT
 };
 

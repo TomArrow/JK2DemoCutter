@@ -921,6 +921,24 @@ static const int jkaEntityTypeToGeneral[] {
 } ;
 
 
+static const int jkaGametypeToGeneral[] {
+	GT_FFA_GENERAL,				// free for all
+	GT_HOLOCRON_GENERAL,		// holocron match
+	GT_JEDIMASTER_GENERAL,		// jedi master
+	GT_TOURNAMENT_GENERAL,		// one on one tournament
+	GT_POWERDUEL_GENERAL,
+	GT_SINGLE_PLAYER_GENERAL,	// single player tournament
+
+	//-- team games go after this --
+
+	GT_TEAM_GENERAL,			// team deathmatch
+	GT_SAGA_SIEGE_GENERAL,			// siege
+	GT_CTF_GENERAL,				// capture the flag
+	GT_CTY_GENERAL,
+	GT_MAX_GAME_TYPE_GENERAL
+} ;
+
+
 
 
 const int lsMoveJKAToGeneral[] {

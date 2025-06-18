@@ -14,6 +14,11 @@
 #define	EF_NPC_JK2SP					0x00000002	// An NPC
 #define	EF_BOUNCE_SHRAPNEL_JK2SP					0x1000 // An NPC
 
+static const int jk2spGametypeToGeneral[] {
+	GT_SINGLE_PLAYER_GENERAL,
+	GT_MAX_GAME_TYPE_GENERAL
+};
+
 static const int jk2spEntityTypeToGeneral[] {
 	ET_GENERAL_GENERAL,
 	ET_PLAYER_GENERAL,

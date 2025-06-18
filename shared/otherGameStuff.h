@@ -1113,6 +1113,21 @@ static const int q3EntityTypeToGeneral [] {
 							// this avoids having to set eFlags and eventNum
 };
 
+static const int q3GameTypeToGeneral [] {
+	GT_FFA_GENERAL,				// free for all
+	GT_TOURNAMENT_GENERAL,		// one on one tournament
+	GT_SINGLE_PLAYER_GENERAL,	// single player ffa
+
+	//-- team games go after this --
+
+	GT_TEAM_GENERAL,			// team deathmatch
+	GT_CTF_GENERAL,				// capture the flag
+	GT_1FCTF_GENERAL,
+	GT_OBELISK_GENERAL,
+	GT_HARVESTER_GENERAL,
+	GT_MAX_GAME_TYPE_GENERAL
+};
+
 static const int qlEntityTypeToGeneral [] { // based on wolfcamql
 	ET_GENERAL_GENERAL,
 	ET_PLAYER_GENERAL,
@@ -1131,6 +1146,25 @@ static const int qlEntityTypeToGeneral [] { // based on wolfcamql
 	ET_EVENTS_GENERAL				// any of the EV_* events can be added freestanding
 							// by setting eType to ET_EVENTS + eventNum
 							// this avoids having to set eFlags and eventNum
+};
+
+
+static const int qlGametypeToGeneral [] { // based on wolfcamql
+
+	GT_FFA_GENERAL,				// free for all
+	GT_TOURNAMENT_GENERAL,		// one on one tournament
+	GT_RACE_GENERAL, // ql
+	GT_TEAM_GENERAL,
+	GT_CA_GENERAL, // ql idk
+	GT_CTF_GENERAL,				// capture the flag
+	GT_1FCTF_GENERAL,//q3
+	GT_OBELISK_GENERAL,//q3
+	GT_HARVESTER_GENERAL, //q3
+	GT_FT_GENERAL, // ql freezetag
+	GT_DOMINATION_GENERAL, // ql
+	GT_CTFS_GENERAL, // ql attack and defend
+	GT_REDROVER_GENERAL, // ql
+	GT_MAX_GAME_TYPE_GENERAL
 };
 
 
