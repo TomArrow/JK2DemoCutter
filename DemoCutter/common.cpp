@@ -19,6 +19,7 @@ constexpr char* postEOFUcmdMarker = "HIDDENUCMD";
 // Most of it is likely still the same as in the original Jedi Knight source code releases
 //
 
+InternedStringTable internedStrings;
 
 
 int GlobalDebugOutputFlags = 0;

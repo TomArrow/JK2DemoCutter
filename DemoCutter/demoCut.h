@@ -879,6 +879,7 @@ typedef enum entityExtraValues_t {
 
 typedef struct entityMeta_s {
 	vec3_t	modelScale;
+	const char* skin;
 } entityMeta_t;
 
 typedef enum demoToolsEntityFlags_s {
@@ -4947,6 +4948,14 @@ qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke sup
 	return qtrue;
 }
 
+
+
+
+
+
+typedef ankerl::unordered_dense::segmented_set<std::string, ankerl::unordered_dense::hash<std::string>> InternedStringTable;
+
+extern InternedStringTable internedStrings;
 
 
 

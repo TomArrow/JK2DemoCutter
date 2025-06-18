@@ -597,6 +597,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 									}
 								}
 
+								tmpES.demoToolsData.entityMeta.skin = internedStrings.insert(variant).first->c_str();
+
 								tmpES.modelindex = G_ModelIndex(va("models/players/%s/model.glm", baseModel.c_str()), &demo.cut.Cl, &commandsToAdd, demoType);
 								tmpES.trickedentindex = variantExists ? G_GrappleSkinIndex(variant.c_str(), &demo.cut.Cl, &commandsToAdd, demoType) : 0;
 								tmpES.trickedentindex |= std::clamp(thisPlayerTeam,0,3) << 6;
@@ -1155,7 +1157,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 		}
 
 		for (auto it = targetEntities.begin(); it != targetEntities.end(); it++) {
-			if (it->second.demoToolsData.entityMeta.modelScale[0] != entityMetaOld[it->first].modelScale[0] || it->second.demoToolsData.entityMeta.modelScale[1] != entityMetaOld[it->first].modelScale[1] || it->second.demoToolsData.entityMeta.modelScale[2] != entityMetaOld[it->first].modelScale[2]) {
+			if (it->second.demoToolsData.entityMeta.modelScale[0] != entityMetaOld[it->first].modelScale[0] || it->second.demoToolsData.entityMeta.modelScale[1] != entityMetaOld[it->first].modelScale[1] || it->second.demoToolsData.entityMeta.modelScale[2] != entityMetaOld[it->first].modelScale[2] || it->second.demoToolsData.entityMeta.skin != entityMetaOld[it->first].skin) {
 				char entcs[MAX_INFO_STRING];
 				entcs[0] = '\0';
 				if (it->second.demoToolsData.entityMeta.modelScale[0]) {
@@ -1167,8 +1169,12 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 				if (it->second.demoToolsData.entityMeta.modelScale[2]) {
 					Info_SetValueForKey(entcs, sizeof(entcs), "modelScaleZ", va("%.5f", it->second.demoToolsData.entityMeta.modelScale[2]), isMOHAADemo);
 				}
+				if (it->second.demoToolsData.entityMeta.skin) {
+					Info_SetValueForKey(entcs, sizeof(entcs), "skin", it->second.demoToolsData.entityMeta.skin, isMOHAADemo);
+				}
 				commandsToAdd.push_back(makeEntityConfigStringCommand(it->first, entcs));
 				VectorCopy(it->second.demoToolsData.entityMeta.modelScale, entityMetaOld[it->first].modelScale);
+				entityMetaOld[it->first].skin = it->second.demoToolsData.entityMeta.skin;
 			}
 		}
 
@@ -1269,7 +1275,7 @@ int main(int argcO, char** argvO) {
 		std::cout << "path=path/to/demo.dm_15\n";
 		std::cout << "submodels=0/1 (whether to copy submodels like doors)\n";
 		std::cout << "models=0/1 (whether to copy models)\n";
-		std::cout << "copyRemainingPlayersAsG2AnimEnts=0/1 (whether to remaining players as G2 ents)\n";
+		std::cout << "restAsAnimEnts=0/1 (whether to remaining players as G2 ents)\n";
 		std::cout << "players=list of players by client num or name, separated by comma\n";
 		std::cout << "allPlayers=0/1 (whether to copy all players)\n";
 		std::cout << "delay=milliseconds of delay\n";
@@ -1290,7 +1296,7 @@ int main(int argcO, char** argvO) {
 		std::cout << "path=path/to/demo.dm_15\n";
 		std::cout << "submodels=0/1 (whether to copy submodels like doors)\n";
 		std::cout << "models=0/1 (whether to copy models)\n";
-		std::cout << "copyRemainingPlayersAsG2AnimEnts=0/1 (whether to remaining players as G2 ents)\n";
+		std::cout << "restAsAnimEnts=0/1 (whether to remaining players as G2 ents)\n";
 		std::cout << "players=list of players by client num or name, separated by comma\n";
 		std::cout << "allPlayers=0/1 (whether to copy all players)\n";
 		std::cout << "delay=milliseconds of delay\n";
