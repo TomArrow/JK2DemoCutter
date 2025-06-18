@@ -456,15 +456,15 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 						qboolean isNewPlayer = qfalse;
 						targetClientNum = slotManager.getPlayerSlot(i, clientNumHere, &isNewPlayer);
 						if (isNewPlayer) {
-
+							static char copy[MAX_INFO_STRING];
 							tmpConfigString = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
 
 							if (sourceDemoType == DM_14) {
-								static char copy[MAX_INFO_STRING];
 								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength,sizeof(copy)),tmpConfigString);
 								tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay - pingCompensationHere, NULL,NULL, qfalse, NULL);
 								// DM_14 (jk2sp) stores saber color differently
 								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", tmpPS.saberColor), demoReaders[i]->reader.isThisMOHAADemo());
+								tmpConfigString = copy;
 							}
 
 							if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
