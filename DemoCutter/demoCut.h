@@ -435,6 +435,25 @@ Ghoul2 Insert End
 
 
 
+typedef enum
+{
+	SABER_RED,
+	SABER_ORANGE,
+	SABER_YELLOW,
+	SABER_GREEN,
+	SABER_BLUE,
+	SABER_PURPLE,
+	//[RGBSaber]
+	SABER_RGB,
+	SABER_FLAME1,
+	SABER_ELEC1,
+	SABER_FLAME2,
+	SABER_ELEC2,
+	SABER_BLACK,
+	//[/RGBSaber]
+	NUM_SABER_COLORS
+
+} saber_colors_t;
 
 #define SABER_LENGTH_MAX	40
 

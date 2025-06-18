@@ -1374,14 +1374,16 @@ PlayerInfo DemoReader::GetPlayerInfo(int clientnum, playerState_t* tmpPS) {
 	}
 
 	if (getGametypeGeneral() >= GT_TEAM_GENERAL) {
-		if (retVal.team == TEAM_BLUE && (!retVal.skinExists || retVal.skin != "blue")) {
+		if (retVal.team == TEAM_BLUE && (!retVal.skinExists || retVal.skin != "blue" || retVal.color1 != SABER_BLUE)) {
 			retVal.skinExists = qtrue;
 			retVal.skin = "blue";
+			retVal.color1 = SABER_BLUE;
 			retVal.modelNeededTeamAdjustment = qtrue;
 		}
-		else if (retVal.team == TEAM_RED && (!retVal.skinExists || retVal.skin != "red")) {
+		else if (retVal.team == TEAM_RED && (!retVal.skinExists || retVal.skin != "red" || retVal.color1 != SABER_RED)) {
 			retVal.skinExists = qtrue;
 			retVal.skin = "red";
+			retVal.color1 = SABER_RED;
 			retVal.modelNeededTeamAdjustment = qtrue;
 		}
 	}
