@@ -889,6 +889,7 @@ typedef enum entityExtraValues_t {
 typedef struct entityMeta_s {
 	vec3_t	modelScale;
 	const char* skin;
+	byte saberColor;
 } entityMeta_t;
 
 typedef enum demoToolsEntityFlags_s {

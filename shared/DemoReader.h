@@ -413,7 +413,7 @@ public:
 		// Error: No free slot found
 		return -1;
 	}
-	int getEntitySlot(int demoIndex, int entityNum, sourceDemoMappingType type = SDMT_NONE) {
+	int getEntitySlot(int demoIndex, int entityNum, sourceDemoMappingType type = SDMT_NONE, qboolean* wasNewSlot = NULL) {
 		// Check if mapping already exists
 		for (mappingIterator it = mappings.begin(); it != mappings.end(); it++) {
 			if (it->second.demoIndex == demoIndex && it->second.entityNum == entityNum) {
@@ -426,6 +426,9 @@ public:
 				// Free slot!
 				mappings[i] = { demoIndex,entityNum,qfalse,type };
 				availableSlots--;
+				if (wasNewSlot) {
+					*wasNewSlot = qtrue;
+				}
 				return i;
 			}
 		}

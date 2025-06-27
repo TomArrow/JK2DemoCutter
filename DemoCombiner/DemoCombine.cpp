@@ -401,6 +401,8 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 	//entityMeta_t	entityMeta[MAX_GENTITIES];
 	entityMeta_t	entityMetaOld[MAX_GENTITIES];
 
+	int				saberColors[MAX_GENTITIES];
+
 	std::vector<std::string> commandsToAdd;
 	std::vector<Event> eventsToAdd;
 	playerState_t tmpPS, mainPlayerPS, mainPlayerPSOld;
@@ -416,6 +418,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 	Com_Memset(blockedEntities, 0,sizeof(blockedEntities));
 	//Com_Memset(entityMeta, 0,sizeof(entityMeta));
 	Com_Memset(entityMetaOld, 0,sizeof(entityMetaOld));
+	Com_Memset(saberColors, 0,sizeof(saberColors));
 
 	//for (int i = 0; i < MAX_GENTITIES; i++) {
 		//VectorSet(entityMeta[i].modelScale, 1.0f, 1.0f, 1.0f);
@@ -449,7 +452,12 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 
 					int targetClientNum = -1;
 					if (asG2AnimEnt) {
-						targetClientNum = slotManager.getEntitySlot(i, clientNumHere, SlotManager::sourceDemoMappingType::SDMT_G2);
+						qboolean isNewSlot = qfalse;
+						targetClientNum = slotManager.getEntitySlot(i, clientNumHere, SlotManager::sourceDemoMappingType::SDMT_G2, &isNewSlot);
+						if (isNewSlot) {
+							PlayerInfo pi = demoReaders[i]->reader.GetPlayerInfo(clientNumHere, &tmpPS);
+							saberColors[targetClientNum] = pi.color1;
+						}
 					}
 					else {
 
@@ -475,6 +483,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", pi.color1), demoReaders[i]->reader.isThisMOHAADemo());
 								tmpConfigString = copy;
 							}
+							saberColors[targetClientNum] = pi.color1;
 
 							if (strlen(tmpConfigString)) { // Would be pretty weird if this wasn't the case tho tbh.
 								//demoCutConfigstringModifiedManual(&demo.cut.Cl, CS_PLAYERS + (copiedPlayerIndex++), tmpConfigString);
@@ -625,7 +634,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 								tmpES.trickedentindex = pi.skinExists ? G_GrappleSkinIndex(pi.skin.c_str(), &demo.cut.Cl, &commandsToAdd, demoType) : 0;
 								tmpES.trickedentindex |= std::clamp(pi.team,0,3) << 6;
 								tmpES.trickedentindex |= std::clamp(pi.color1,0,15) << 8; // saber color. 0-15 
-
+								tmpES.demoToolsData.entityMeta.saberColor = saberColors[targetClientNum]+1;
 							}
 						}
 						//playerEntities[copiedPlayerIndex] = tmpES;
@@ -807,6 +816,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 							tmpEntity.trickedentindex = grappleSkinIndex; // bottom 6 bits btw. above that we have 2 bits for team then. 0 in this case (team_free)
 							//tmpEntity.trickedentindex |= std::clamp(0, 0, 3) << 6;
 							tmpEntity.trickedentindex |= std::clamp(tmpEntity.modelindex3, 0, 15) << 8; // saber color. 0-15 
+							tmpEntity.demoToolsData.entityMeta.saberColor = tmpEntity.modelindex3+1;
 
 							tmpEntity.number = targetEntitySlot;
 							tmpEntity.legsAnim = convertGameValue<GMAP_ANIMATIONS,UNSAFE>(tmpEntity.legsAnim,sourceDemoType, demoType);
@@ -1179,7 +1189,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 		}
 
 		for (auto it = targetEntities.begin(); it != targetEntities.end(); it++) {
-			if (it->second.demoToolsData.entityMeta.modelScale[0] != entityMetaOld[it->first].modelScale[0] || it->second.demoToolsData.entityMeta.modelScale[1] != entityMetaOld[it->first].modelScale[1] || it->second.demoToolsData.entityMeta.modelScale[2] != entityMetaOld[it->first].modelScale[2] || it->second.demoToolsData.entityMeta.skin != entityMetaOld[it->first].skin) {
+			if (it->second.demoToolsData.entityMeta.modelScale[0] != entityMetaOld[it->first].modelScale[0] || it->second.demoToolsData.entityMeta.modelScale[1] != entityMetaOld[it->first].modelScale[1] || it->second.demoToolsData.entityMeta.modelScale[2] != entityMetaOld[it->first].modelScale[2] || it->second.demoToolsData.entityMeta.skin != entityMetaOld[it->first].skin || it->second.demoToolsData.entityMeta.saberColor != entityMetaOld[it->first].saberColor) {
 				char entcs[MAX_INFO_STRING];
 				entcs[0] = '\0';
 				if (it->second.demoToolsData.entityMeta.modelScale[0]) {
@@ -1194,9 +1204,13 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 				if (it->second.demoToolsData.entityMeta.skin) {
 					Info_SetValueForKey(entcs, sizeof(entcs), "skin", it->second.demoToolsData.entityMeta.skin, isMOHAADemo);
 				}
+				if (it->second.demoToolsData.entityMeta.saberColor) {
+					Info_SetValueForKey(entcs, sizeof(entcs), "c1", va("%d",(int)it->second.demoToolsData.entityMeta.saberColor-1), isMOHAADemo);
+				}
 				commandsToAdd.push_back(makeEntityConfigStringCommand(it->first, entcs));
 				VectorCopy(it->second.demoToolsData.entityMeta.modelScale, entityMetaOld[it->first].modelScale);
 				entityMetaOld[it->first].skin = it->second.demoToolsData.entityMeta.skin;
+				entityMetaOld[it->first].saberColor = it->second.demoToolsData.entityMeta.saberColor;
 			}
 		}
 
