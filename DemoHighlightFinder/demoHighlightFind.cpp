@@ -8058,14 +8058,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (countToRemove) {
 						speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), lastToRemove);
 					}*/
-					int countToRemove = 0;
-					for (auto it= speeds[clientNumAttacker].begin(),end= speeds[clientNumAttacker].end(); it!=end;it++) {
-						if ((demoCurrentTime - it->time) > OLDER_SPEEDS_STORE_LIMIT) { // BUT WAIT. What about killsprees with maxspeedattacker etc? oh wait. nvm
-							countToRemove++;
+					if(clientNumAttacker >= 0 && clientNumAttacker < max_clients){
+						int countToRemove = 0;
+						for (auto it= speeds[clientNumAttacker].begin(),end= speeds[clientNumAttacker].end(); it!=end;it++) {
+							if ((demoCurrentTime - it->time) > OLDER_SPEEDS_STORE_LIMIT) { // BUT WAIT. What about killsprees with maxspeedattacker etc? oh wait. nvm
+								countToRemove++;
+							}
 						}
-					}
-					if (countToRemove && countToRemove > 100) { // don't do remove operations on every frame.
-						speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), speeds[clientNumAttacker].begin()+ countToRemove);
+						if (countToRemove && countToRemove > 100) { // don't do remove operations on every frame.
+							speeds[clientNumAttacker].erase(speeds[clientNumAttacker].begin(), speeds[clientNumAttacker].begin()+ countToRemove);
+						}
 					}
 				}
 
