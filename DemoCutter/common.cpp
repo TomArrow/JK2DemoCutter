@@ -6521,6 +6521,8 @@ static void bounceEntity(entityState_t* entity, double newServerTime, demoType_t
 
 }
 
+#define UPDATETRTIME(trajectory,newtime) if((trajectory).trType == TR_LINEAR_STOP){ (trajectory).trDuration = std::max(0,(int)(newtime)-(trajectory).trTime); }; (trajectory).trTime=(newtime);
+
 void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t demoType, CModel* cm) {
 
 	vec3_t newPos;
@@ -6576,8 +6578,8 @@ void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t de
 			BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
 			VectorCopy(newPos, entity->pos.trDelta);
 
-			entity->pos.trTime = newServerTime;
-			entity->apos.trTime = newServerTime;
+			UPDATETRTIME(entity->pos, newServerTime);
+			UPDATETRTIME(entity->apos, newServerTime);
 			return;
 		}
 
@@ -6592,8 +6594,8 @@ void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t de
 		VectorCopy(newPos, entity->pos.trBase);
 		BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
 		VectorCopy(newPos, entity->pos.trDelta);
-		entity->pos.trTime = newServerTime;
-		entity->apos.trTime = newServerTime;
+		UPDATETRTIME(entity->pos, newServerTime);
+		UPDATETRTIME(entity->apos, newServerTime);
 	}
 
 
@@ -6606,26 +6608,54 @@ void retimeEntity(entityState_t* entity, double newServerTime, double newDemoTim
 	CModel* cm = NULL;
 #endif
 
+	if (entity->solid != SOLID_BMODEL){//entity->pos.trType == TR_GRAVITY) {
 
-	double currentTime = std::max(entity->pos.trTime, entity->apos.trTime); // they can be different. i think if we start at the lower one it could cause weirdness.. so start at a common max
-	double baseStep,nextTime;
+		double currentTime = std::max(entity->pos.trTime, entity->apos.trTime); // they can be different. i think if we start at the lower one it could cause weirdness.. so start at a common max
+		double baseStep,nextTime;
 
 
-	while (currentTime < newServerTime) {
-		baseStep = (newServerTime - currentTime) > 1000 ? (newServerTime - currentTime - 1000) : 100; // in case of some weirdness, skip up to 1 second before here.
-		nextTime = ((entity->pos.trType > TR_INTERPOLATE || entity->apos.trType > TR_INTERPOLATE) && cm) ? std::min((double)newServerTime, currentTime + baseStep) : newServerTime;
+		while (currentTime < newServerTime) {
+			baseStep = (newServerTime - currentTime) > 1000 ? (newServerTime - currentTime - 1000) : 100; // in case of some weirdness, skip up to 1 second before here.
+			nextTime = ((entity->pos.trType > TR_INTERPOLATE || entity->apos.trType > TR_INTERPOLATE) && cm) ? std::min((double)newServerTime, currentTime + baseStep) : newServerTime;
 
-		// we need to go in steps because bouncing uses a trace to see how far the entity can get when tracing to the evaluated trajectory
-		// however the gravity pull doesn't rersult in a linear line movement, rather a curve, so the "impact" point changes as the delta in time moves forward,
-		// leading to stutttering in bounce situations
+			// we need to go in steps because bouncing uses a trace to see how far the entity can get when tracing to the evaluated trajectory
+			// however the gravity pull doesn't rersult in a linear line movement, rather a curve, so the "impact" point changes as the delta in time moves forward,
+			// leading to stutttering in bounce situations
 
-		retimeEntityStep(entity, nextTime, demoType, cm);
-		currentTime = nextTime;
-	}
+			retimeEntityStep(entity, nextTime, demoType, cm);
+			currentTime = nextTime;
+		}
 	
+		entity->pos.trTime += newDemoTime - newServerTime;
+		entity->apos.trTime += newDemoTime - newServerTime;
+	}
+	else {
+		// oldschool method
+		// the above is way cooler and fancier but its not good for some things like bmodels
+#if 0
+		// wait... is this even needed? we can just update trTime can't we?
+		vec3_t newPos;
+		BG_EvaluateTrajectory(&entity->pos, newServerTime, newPos);
+		VectorCopy(newPos, entity->pos.trBase);
+		BG_EvaluateTrajectoryDelta(&entity->pos, newServerTime, newPos);
+		VectorCopy(newPos, entity->pos.trDelta);
+		BG_EvaluateTrajectory(&entity->apos, newServerTime, newPos);
+		VectorCopy(newPos, entity->apos.trBase);
+		BG_EvaluateTrajectoryDelta(&entity->apos, newServerTime, newPos);
+		VectorCopy(newPos, entity->apos.trDelta);
 
-	entity->pos.trTime += newDemoTime - newServerTime;
-	entity->apos.trTime += newDemoTime - newServerTime;
+		UPDATETRTIME(entity->pos, newServerTime);
+		UPDATETRTIME(entity->apos, newServerTime);
+		entity->pos.trTime = newDemoTime;
+		entity->apos.trTime = newDemoTime;
+#else
+		// right. this just gets evaluated in the client anyway. why bruteforce it..
+		entity->pos.trTime += newDemoTime - newServerTime;
+		entity->apos.trTime += newDemoTime - newServerTime;
+#endif
+
+
+	}
 }
 
 
