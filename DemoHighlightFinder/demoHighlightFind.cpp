@@ -209,6 +209,7 @@ std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
 typedef struct entityDumpCSVPoint_t {
 	int serverTime;
 	int eType;
+	const char* extraInfo;
 	trajectory_t pos;
 	trajectory_t apos;
 };
@@ -3804,6 +3805,7 @@ static void inline writeEntityDumpCSV(int entityNum, const ExtraSearchOptions& o
 		int oldEType = INT_MIN;
 		bool streamOpen = false;
 		int fileIndex = 0;
+		const char* oldExtraInfo = NULL;
 		const char* etypename;
 
 		std::ofstream strafeCSVentityOutputHandle;
@@ -3811,16 +3813,17 @@ static void inline writeEntityDumpCSV(int entityNum, const ExtraSearchOptions& o
 
 		for (auto it = entityDumpCSVDataPoints[entityNum].begin(); it != entityDumpCSVDataPoints[entityNum].end(); it++) {
 
-			if (!streamOpen || oldEType != it->eType) {
+			if (!streamOpen || oldEType != it->eType || oldExtraInfo != it->extraInfo) {
 				if (streamOpen) {
 					strafeCSVentityOutputHandle.close();
 				}
 				etypename = it->eType >= 0 && it->eType < ET_EVENTS_GENERAL ? entityTypesGeneralNames[it->eType].name : (it->eType >= ET_EVENTS_GENERAL ? "ET_EVENTS_GENERAL" : "ET_WEIRD");
-				strafeCSVentityOutputHandle.open(va("entityCSVDumps/entityDumpCSV_entity%d_%d_%d_%s.csv", entityNum, fileIndex++,it->serverTime, etypename), std::ios_base::app); // append instead of overwrite
+				strafeCSVentityOutputHandle.open(va("entityCSVDumps/entityDumpCSV_entity%d_%d_st%d_%s_%s.csv", entityNum, fileIndex++,it->serverTime, etypename,it->extraInfo ? it->extraInfo : ""), std::ios_base::app); // append instead of overwrite
 
 				strafeCSVentityOutputHandle << "serverTime,pos.trType,pos.trTime,pos.trDuration,pos.trBase[0],pos.trBase[1],pos.trBase[2],pos.trDelta[0],pos.trDelta[1],pos.trDelta[2],apos.trType,apos.trTime,apos.trDuration,apos.trBase[0],apos.trBase[1],apos.trBase[2],apos.trDelta[0],apos.trDelta[1],apos.trDelta[2]\n";
 				streamOpen = true;
 				oldEType = it->eType;
+				oldExtraInfo = it->extraInfo;
 			}
 
 			strafeCSVentityOutputHandle << it->serverTime << ","<< it->pos.trType << ","<< it->pos.trTime << ","<< it->pos.trDuration << ","<< it->pos.trBase[0] << ","<< it->pos.trBase[1] << ","<< it->pos.trBase[2] << ","<< it->pos.trDelta[0] << ","<< it->pos.trDelta[1] << ","<< it->pos.trDelta[2] << ","<< it->apos.trType << ","<< it->apos.trTime << ","<< it->apos.trDuration << ","<< it->apos.trBase[0] << ","<< it->apos.trBase[1] << ","<< it->apos.trBase[2] << ","<< it->apos.trDelta[0] << ","<< it->apos.trDelta[1] << ","<< it->apos.trDelta[2] << "\n";
@@ -4942,6 +4945,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						newPoint.pos = thisEs->pos;
 						newPoint.apos = thisEs->apos;
 						newPoint.eType = generalizedEntityType;
+						newPoint.extraInfo = NULL;
+						if (thisEs->solid == SOLID_BMODEL) {
+							newPoint.extraInfo = internedStrings.emplace(va("_bmodel%d", thisEs->modelindex)).first->c_str();
+						}
 						entityDumpCSVDataPoints[thisEs->number].push_back(newPoint);
 					}
 
