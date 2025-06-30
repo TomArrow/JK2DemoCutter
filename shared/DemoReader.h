@@ -303,6 +303,7 @@ public:
 	
 	const char* GetModelConfigString(int modelNum, int* maxLength);
 	const char* GetSoundConfigString(int soundNum, int* maxLength);
+	const char* GetEffectConfigString(int effectNum, int* maxLength);
 	qboolean EndReachedAtTime(double time);
 	int getDemoRecorderClientNum();
 	qboolean	purgeSnapsBefore(int snapNum);

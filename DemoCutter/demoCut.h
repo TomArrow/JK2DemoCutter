@@ -5120,6 +5120,7 @@ std::string makeConfigStringCommand(int index, std::string value);
 std::string makeEntityConfigStringCommand(int index, std::string value);
 int G_FindConfigstringIndex(const char* name, int start, int max, qboolean create, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_SoundIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
+int G_EffectIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_ModelIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_GrappleSkinIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
 int G_ModelIndex_NoAdd(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType);
@@ -5197,6 +5198,7 @@ struct gameConstantsInfo_t {
 	int cs_level_start_time;
 	int ef_teleportbit;
 	int cs_max;
+	int cs_effects;
 };
 
 #define MAX_SPECIALIZED_MAPPINGS 5	// If this ever isnt enough, just increase it.
@@ -5314,6 +5316,9 @@ inline int getCS_MODELS(demoType_t demoType) {
 }
 inline int getCS_SOUNDS(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.cs_sounds;
+}
+inline int getCS_EFFECTS(demoType_t demoType) {
+	return gameInfosMapped[demoType]->constants.cs_effects;
 }
 inline int getCS_LEVEL_START_TIME(demoType_t demoType) {
 	return gameInfosMapped[demoType]->constants.cs_level_start_time;

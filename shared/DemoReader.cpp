@@ -2022,6 +2022,13 @@ const char* DemoReader::GetSoundConfigString(int soundNum,int* maxLength) {
 	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
 	return thisDemo.cut.Cl.gameState.stringData + offset;
 }
+
+const char* DemoReader::GetEffectConfigString(int effectNum,int* maxLength) {
+	int configStringBaseIndex = getCS_EFFECTS(demoType);// (demoType == DM_26 || demoType == DM_25) ? CS_SOUNDS_JKA : CS_SOUNDS;
+	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + effectNum];
+	if (maxLength) *maxLength = sizeof(thisDemo.cut.Cl.gameState.stringData) - offset;
+	return thisDemo.cut.Cl.gameState.stringData + offset;
+}
 const char* DemoReader::GetModelConfigString(int modelNum,int* maxLength) {
 	int configStringBaseIndex = getCS_MODELS(demoType); //(demoType == DM_26 || demoType == DM_25) ? CS_MODELS_JKA : CS_MODELS;
 	int offset = thisDemo.cut.Cl.gameState.stringOffsets[configStringBaseIndex + modelNum];
@@ -2788,6 +2795,12 @@ void remapConfigStrings(int eventNumber, entityState_t* tmpEntity, clientActive_
 		const char* soundName = reader->GetSoundConfigString(soundIndex, &maxLength);
 		int newSoundIndex = G_SoundIndex((char*)soundName, clCut, commandsToAdd, demoType);
 		tmpEntity->eventParm = newSoundIndex;
+	}
+	if (eventHere == EV_PLAY_EFFECT_ID_GENERAL || eventHere == EV_PLAY_EFFECT_GENERAL && reader->getDemoType() == DM_14) {
+		int effectIndex = tmpEntity->eventParm;
+		const char* effectName = reader->GetEffectConfigString(effectIndex, &maxLength);
+		int newEffectIndex = G_EffectIndex((char*)effectName, clCut, commandsToAdd, demoType);
+		tmpEntity->eventParm = newEffectIndex;
 	}
 	if (doModelIndex && tmpEntity->modelindex) {
 		const char* modelName = reader->GetModelConfigString(tmpEntity->modelindex, &maxLength);

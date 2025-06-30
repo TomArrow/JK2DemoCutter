@@ -6214,6 +6214,9 @@ int G_FindConfigstringIndex(const char* name, int start, int max, qboolean creat
 int G_SoundIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_SOUNDS(demoType), MAX_SOUNDS, qtrue, clCut, commandsToAdd, demoType);
 }
+int G_EffectIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
+	return G_FindConfigstringIndex(name, getCS_EFFECTS(demoType), MAX_LOCATIONS_JK2, qtrue, clCut, commandsToAdd, demoType); // yes, the max is MAX_LOCATIONS. just jk2 things. reusing it.
+}
 int G_ModelIndex(const char* name, clientActive_t* clCut, std::vector<std::string>* commandsToAdd, demoType_t demoType) {
 	return G_FindConfigstringIndex(name, getCS_MODELS(demoType), MAX_MODELS, qtrue, clCut, commandsToAdd, demoType);
 }
@@ -7793,7 +7796,7 @@ static gameInfo_t gameInfos[] = {
 			{playerStateFields_jk2sp,sizeof(playerStateFields_jk2sp) / sizeof(playerStateFields_jk2sp[0]),}
 		},
 		MAX_CONFIGSTRINGS_JK2SP,//MAX_CONFIGSTRINGS,
-		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME, EF_TELEPORT_BIT, CS_MAX_JK2SP},
+		{CS_MODELS_JK2SP,CS_SOUNDS_JK2SP,CS_PLAYERS_JK2SP,ET_EVENTS_JK2SP,EF_MISSILE_STICK_JK2SP,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME, EF_TELEPORT_BIT, CS_MAX_JK2SP, CS_EFFECTS_JK2SP},
 		1 // Just the main player
 	},
 	{ // First is treated as default.
@@ -7932,7 +7935,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA, CS_MAX_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA, CS_MAX_JKA, CS_EFFECTS_JKA},
 	},{
 		DM_26,
 		{
@@ -7976,7 +7979,7 @@ static gameInfo_t gameInfos[] = {
 			qtrue // The playerstate stuff is actually more convoluted in jka, need special handling that cant be represented purely in terms of this table
 		},
 		MAX_CONFIGSTRINGS_JKA,
-		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA, CS_MAX_JKA},
+		{CS_MODELS_JKA,CS_SOUNDS_JKA,CS_PLAYERS_JKA,ET_EVENTS_JKA,EF_MISSILE_STICK_JKA,ANIM_TOGGLEBIT,CS_LEVEL_START_TIME_JKA, EF_TELEPORT_BIT_JKA, CS_MAX_JKA, CS_EFFECTS_JKA},
 	},{
 		DM_26_XBOX,
 		{
@@ -8305,6 +8308,7 @@ void initializeGameInfos() {
 			if (!gameInfos[i].constants.cs_level_start_time) gameInfos[i].constants.cs_level_start_time = CS_LEVEL_START_TIME;
 			if (!gameInfos[i].constants.ef_teleportbit) gameInfos[i].constants.ef_teleportbit = EF_TELEPORT_BIT;
 			if (!gameInfos[i].constants.cs_max) gameInfos[i].constants.cs_max = CS_MAX_JK2;
+			if (!gameInfos[i].constants.cs_effects) gameInfos[i].constants.cs_effects = CS_EFFECTS_JK2;
 			if (!gameInfos[i].maxClients) gameInfos[i].maxClients = MAX_CLIENTS;
 
 			// BTw for dynamically created arrays here: We don't care about destroying them. They are created one time at startup and that's it. When program closes they disappear too.

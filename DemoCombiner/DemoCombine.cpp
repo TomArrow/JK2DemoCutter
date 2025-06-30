@@ -1062,6 +1062,16 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 					}
 					else if (eventNumber == EV_PLAY_EFFECT_JK2) {
 
+						if (sourceDemoType == DM_14) {
+							remapConfigStrings(eventNumber, &thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qfalse, qfalse, demoType);
+							thisEvent->theEvent.event = EV_PLAY_EFFECT_ID_JK2;
+							eventNumber = EV_PLAY_EFFECT_ID_JK2;
+						}
+						addThisEvent = qtrue;
+					}
+					else if (eventNumber == EV_PLAY_EFFECT_ID_JK2) {
+
+						remapConfigStrings(eventNumber, &thisEvent->theEvent, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qfalse, qfalse, demoType);
 						addThisEvent = qtrue;
 					}
 					else if (eventNumber == EV_GENERAL_SOUND_JK2 && thisEvent->theEvent.eType > ET_EVENTS_JK2) { // Only copy event entities. Not players with the event or sth.
