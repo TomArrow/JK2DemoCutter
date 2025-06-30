@@ -936,6 +936,27 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 						}
 
 					}
+					else if (demoReaders[i]->sourceInfo->copySubmodels && generalizedEntityType == ET_MOVER_GENERAL && it->second.solid == SOLID_BMODEL) {
+
+						int targetEntitySlot = slotManager.getEntitySlot(i, it->first);
+						if (targetEntitySlot != -1) { // (otherwise we've ran out of slots)
+							entityState_t tmpEntity = it->second;
+							tmpEntity.eType = ET_MOVER_JK2;
+							tmpEntity.number = targetEntitySlot;
+							tmpEntity.modelindex = it->second.modelindex;
+							//tmpEntity.modelindex2 = it->second.modelindex2;
+
+							tmpEntity.pos = it->second.pos;
+							tmpEntity.apos = it->second.apos;
+							if (sourceDemoType == DM_14) {
+								tmpEntity.pos.trType = (trType_t)VersionMagic_SPtoMPTrType(tmpEntity.pos.trType);
+								tmpEntity.apos.trType = (trType_t)VersionMagic_SPtoMPTrType(tmpEntity.apos.trType);
+							}
+							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qfalse, qfalse, demoType);
+							retimeEntity(&tmpEntity, thisTimeInServerTime, time, sourceDemoType, cm);
+							targetEntities[targetEntitySlot] = tmpEntity;
+						}
+					}
 
 					
 					// Players are already handled otherwhere

@@ -153,6 +153,7 @@ public:
 	bool strafeCSVInterpolate = false;
 	bool playerCSVDump = false;
 	bool playerCSVDumpCommandTimeDupeSkip = false;
+	int	entityCSVDump = 0; // -1 = all ents; 0 = none; > 0 specific ent
 	bool doChatSearch = false;
 	bool doPrintSearch = false;
 	bool doStringSearch = false;
@@ -204,6 +205,14 @@ typedef struct playerDumpCSVPoint_t {
 	vec3_t viewangles;
 };
 std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
+
+typedef struct entityDumpCSVPoint_t {
+	int serverTime;
+	int eType;
+	trajectory_t pos;
+	trajectory_t apos;
+};
+std::vector<entityDumpCSVPoint_t> entityDumpCSVDataPoints[MAX_GENTITIES];
 
 
 #define PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -3699,6 +3708,11 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			writePlayerDumpCSV(i, opts);
 		}
 	}
+	if (opts.entityCSVDump) {
+		for (int i = max_clients; i < MAX_GENTITIES; i++) {
+			writeEntityDumpCSV(i, opts);
+		}
+	}
 #ifdef BUFFERBAT
 
 	if (streamsize(io.outputBatHandle)) {
@@ -3781,6 +3795,40 @@ static void inline writePlayerDumpCSV(int clientNum, const ExtraSearchOptions& o
 		}
 
 		strafeCSVPlayerOutputHandle.close();
+	}
+}
+
+static void inline writeEntityDumpCSV(int entityNum, const ExtraSearchOptions& opts) {
+	if (entityDumpCSVDataPoints[entityNum].size() > 0) {
+
+		int oldEType = INT_MIN;
+		bool streamOpen = false;
+		int fileIndex = 0;
+		const char* etypename;
+
+		std::ofstream strafeCSVentityOutputHandle;
+		std::filesystem::create_directory("entityCSVDumps");
+
+		for (auto it = entityDumpCSVDataPoints[entityNum].begin(); it != entityDumpCSVDataPoints[entityNum].end(); it++) {
+
+			if (!streamOpen || oldEType != it->eType) {
+				if (streamOpen) {
+					strafeCSVentityOutputHandle.close();
+				}
+				etypename = it->eType >= 0 && it->eType < ET_EVENTS_GENERAL ? entityTypesGeneralNames[it->eType].name : (it->eType >= ET_EVENTS_GENERAL ? "ET_EVENTS_GENERAL" : "ET_WEIRD");
+				strafeCSVentityOutputHandle.open(va("entityCSVDumps/entityDumpCSV_entity%d_%d_%d_%s.csv", entityNum, fileIndex++,it->serverTime, etypename), std::ios_base::app); // append instead of overwrite
+
+				strafeCSVentityOutputHandle << "serverTime,pos.trType,pos.trTime,pos.trDuration,pos.trBase[0],pos.trBase[1],pos.trBase[2],pos.trDelta[0],pos.trDelta[1],pos.trDelta[2],apos.trType,apos.trTime,apos.trDuration,apos.trBase[0],apos.trBase[1],apos.trBase[2],apos.trDelta[0],apos.trDelta[1],apos.trDelta[2]\n";
+				streamOpen = true;
+				oldEType = it->eType;
+			}
+
+			strafeCSVentityOutputHandle << it->serverTime << ","<< it->pos.trType << ","<< it->pos.trTime << ","<< it->pos.trDuration << ","<< it->pos.trBase[0] << ","<< it->pos.trBase[1] << ","<< it->pos.trBase[2] << ","<< it->pos.trDelta[0] << ","<< it->pos.trDelta[1] << ","<< it->pos.trDelta[2] << ","<< it->apos.trType << ","<< it->apos.trTime << ","<< it->apos.trDuration << ","<< it->apos.trBase[0] << ","<< it->apos.trBase[1] << ","<< it->apos.trBase[2] << ","<< it->apos.trDelta[0] << ","<< it->apos.trDelta[1] << ","<< it->apos.trDelta[2] << "\n";
+		}
+
+		if (streamOpen) {
+			strafeCSVentityOutputHandle.close();
+		}
 	}
 }
 
@@ -4887,6 +4935,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					int generalizedEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType, demoType);
 
+
+					if (thisEs->number > max_clients && (opts.entityCSVDump == -1  || opts.entityCSVDump == thisEs->number)) {
+						entityDumpCSVPoint_t newPoint;
+						newPoint.serverTime = demo.cut.Cl.snap.serverTime;
+						newPoint.pos = thisEs->pos;
+						newPoint.apos = thisEs->apos;
+						newPoint.eType = generalizedEntityType;
+						entityDumpCSVDataPoints[thisEs->number].push_back(newPoint);
+					}
+
 					// Player related tracking
 					if (thisEs->number >= 0 && thisEs->number < max_clients) {
 
@@ -5213,6 +5271,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 
 					}
+				
 				}
 
 				// 
@@ -8990,6 +9049,7 @@ int main(int argcO, char** argvO) {
 	auto p = op.add<popl::Switch>("p", "print-debug", "Prints out various debug things, like all configstrings.");
 	auto a = op.add<popl::Implicit<int>>("a", "net-analysis", "Debugs some net stuff to understand how mods work. A bit like shownet but without showing all the normal stuff like angles/origin etc, and with support for pers/stats/ammo etc. Pass number for more (atm only mode 1)",1);
 	auto y = op.add<popl::Implicit<int>>("y", "player-frames-csv", "Writes CSV files containing position, velocity and viewangle of players. Pass 1 as a value to skip duplicate commandTime values",0);
+	auto E = op.add<popl::Implicit<int>>("E", "entity-frames-csv", "Writes CSV files containing trajectory of non-player entities. Pass a number to only do a specific entity number.",-1);
 	auto z = op.add<popl::Value<std::string>>("z", "strafe-csv", "Writes CSV files containing different strafes. Pass 2 numbers separated by comma. Sync point (ups speed) and reset point ups (speed). Optionally, a third number for a minimum run length in milliseconds.");
 	auto Z = op.add<popl::Switch>("Z", "strafe-csv-interpolate", "Does the strafe CSV with interpolated values instead of leaving them empty when not available at a certain time interval.");
 	auto C = op.add<popl::Value<std::string>>("C", "chat-search", "Searches for a string in chats.");
@@ -9045,6 +9105,7 @@ int main(int argcO, char** argvO) {
 	opts.printDebug = p->value();
 	opts.strafeCSVInterpolate = Z->value();
 	opts.playerCSVDump = y->is_set();
+	opts.entityCSVDump = !E->is_set() ? 0 : E->value();
 	opts.skipKills = K->is_set();
 	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
 	opts.writeChatsUnique = L->is_set() ? (L->value() & 1) : false;

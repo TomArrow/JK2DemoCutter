@@ -2155,6 +2155,13 @@ typedef enum {
 } gametype_general_t;
 
 
+typedef struct enumName_s {
+	int	value; // wasteful but i only do this to make sure I don't mistype stuff
+	const char* name;
+} enumName_t;
+
+#define ENUMENTRY(a) { a , #a }
+
 //
 // entityState_t->eType
 //
@@ -2201,6 +2208,7 @@ typedef enum {
 	ET_EVENTS_GENERAL
 } entityType_general_t;
 
+extern enumName_t entityTypesGeneralNames[ET_EVENTS_GENERAL];
 
 static const int jk2GametypeToGeneral[] {
 	GT_FFA_GENERAL,				// free for all
