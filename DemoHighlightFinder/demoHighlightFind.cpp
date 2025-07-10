@@ -458,8 +458,9 @@ struct playerDemoStats_t {
 // To keep good performance, we have an array of pointers towards the current playerDemoStats_t struct in the map for each player for quick access
 // This array is updated whenever a "cs" command is received (since that could mean a map or playername change or a new player connecting.
 typedef std::tuple<std::string, std::string, int> playerDemoStatsMapKey_t;
-//std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
-ankerl::unordered_dense::map<playerDemoStatsMapKey_t, playerDemoStats_t, ankerl::unordered_dense::hash<playerDemoStatsMapKey_t>> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
+std::unordered_map<playerDemoStatsMapKey_t, playerDemoStats_t,tupleHash::tuple_hash> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
+//ankerl::unordered_dense::map<playerDemoStatsMapKey_t, playerDemoStats_t, ankerl::unordered_dense::hash<playerDemoStatsMapKey_t>> playerDemoStatsMap; // Keys are: Mapname, playername, clientnum
+// NOPE DONT USE ANKERL HERE because the pointers arent stable so if we insert new values, old iterators get invalidated (shudder). playerDemoStatsPointers keeps the pointers. leads to absolutely horrible and near-impossible to track down issues. ended up figuring it out only with git bisect. we might be able to work around it but honestly it seems barely worth it. cana consider doing it someday, idk.
 
 playerDemoStats_t* playerDemoStatsPointers[MAX_CLIENTS_MAX];
 
