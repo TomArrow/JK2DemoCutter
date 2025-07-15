@@ -16,10 +16,16 @@
  *
  *****************************************************************************/
 
+//#define _FILE_OFFSET_BITS 64
+
 
 #include "demoCut.h"
 #include "files_lzma.hpp"
 
+#if _WIN32
+#define ftell(a) _ftelli64(a)
+#define fseek(a,b,c) _fseeki64(a,(int64_t)b,c)
+#endif
 
 #define MAX_ZPATH			256
 #include <string>
@@ -87,9 +93,9 @@ FS_Write
 Properly handles partial writes
 =================
 */
-int FS_Write(const void* buffer, int len, fileHandle_t h, qboolean ignoreCompression) {
-	int		block, remaining;
-	int		written;
+int64_t FS_Write(const void* buffer, int64_t len, fileHandle_t h, qboolean ignoreCompression) {
+	int64_t		block, remaining;
+	int64_t		written;
 	byte* buf;
 	int		tries;
 	FILE* f;
@@ -350,9 +356,9 @@ void FS_FCloseFile(fileHandle_t f) {
 #define	PROTOCOL_VERSION	16	//v1.04
 
 
-int FS_filelength(fileHandle_t f) {
-	int		pos;
-	int		end;
+int64_t FS_filelength(fileHandle_t f) {
+	int64_t		pos;
+	int64_t		end;
 	FILE* h;
 
 	if (!fsh[f].compressedFileInfo.compression || fsh[f].compressedFileInfo.compression == FILECOMPRESSION_RAW) {
@@ -382,13 +388,13 @@ int FS_filelength(fileHandle_t f) {
 }
 
 
-int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed, qboolean nonExclusiveRead) {
+int64_t FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed, qboolean nonExclusiveRead) {
 	std::string		netpath;
-	long			hash;
-	int				l;
+	//long			hash;
+	size_t				l;
 	char demoExt[16];
 
-	hash = 0;
+	//hash = 0;
 
 	//if (!fs_searchpaths) {
 	//	Com_Error(ERR_FATAL, "Filesystem call made without initialization\n");
@@ -471,7 +477,7 @@ int FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFI
 }
 
 
-int		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression) {
+int64_t		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression) {
 	if (msg->raw) {
 		msg->dataRaw->resize(msg->cursize);
 		return FS_Read(msg->dataRaw->data(),msg->cursize,f,ignoreCompression);
@@ -481,9 +487,9 @@ int		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression) {
 	}
 }
 
-int FS_Read(void* buffer, int len, fileHandle_t f, qboolean ignoreCompression) {
-	int		block, remaining;
-	int		read;
+int64_t FS_Read(void* buffer, int64_t len, fileHandle_t f, qboolean ignoreCompression) {
+	size_t		block, remaining;
+	size_t		read;
 	byte* buf;
 	int		tries;
 

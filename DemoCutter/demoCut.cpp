@@ -232,7 +232,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
 	std::vector<byte>	oldDataRaw;
-	int				oldSize;
+	int64_t			oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
 	int				buf;

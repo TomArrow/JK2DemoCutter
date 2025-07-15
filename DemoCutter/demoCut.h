@@ -2050,16 +2050,16 @@ enum fileCompressionScheme_t {
 };
 
 
-int		FS_Write(const void* buffer, int len, fileHandle_t f, qboolean ignoreCompression=qfalse);
+int64_t		FS_Write(const void* buffer, int64_t len, fileHandle_t f, qboolean ignoreCompression=qfalse);
 //fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse, fileCompressionScheme_t compression= FILECOMPRESSION_NONE); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
 fileHandle_t	FS_FOpenFileWrite(const char* qpath, fileCompressionScheme_t compression, qboolean quiet = qfalse); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
-int		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression = qfalse);
-int		FS_Read(void* buffer, int len, fileHandle_t f, qboolean ignoreCompression = qfalse);
+int64_t		FS_Read(msg_t* msg, fileHandle_t f, qboolean ignoreCompression = qfalse);
+int64_t		FS_Read(void* buffer, int64_t len, fileHandle_t f, qboolean ignoreCompression = qfalse);
 qboolean FS_FileExists(const char* file);
 qboolean FS_FileErase(const char* file);
 void	FS_FCloseFile(fileHandle_t f);
 //int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType = qfalse, fileCompressionScheme_t* compressionUsed=NULL);
-int		FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed=NULL, qboolean nonExclusiveRead=qfalse);
+int64_t	FS_FOpenFileRead(const char* qpath, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed=NULL, qboolean nonExclusiveRead=qfalse); 
 
 void	QDECL Com_sprintf(char* dest,int size, const char* fmt, ...);
 

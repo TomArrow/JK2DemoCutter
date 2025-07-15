@@ -47,7 +47,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	msg_t			newMsgRemember;
 	byte			newData[MAX_MSGLEN];
 	std::vector<byte>	newDataRaw;
-	int				oldSize;
+	int64_t				oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
 	int				buf;
@@ -242,7 +242,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				goto cuterror;
 		}
 
-		oldSize -= oldMsg.cursize;
+		oldSize -= (int64_t)oldMsg.cursize;
 		// init the bitstream
 		MSG_BeginReading(&oldMsg);
 		// Skip the reliable sequence acknowledge number
