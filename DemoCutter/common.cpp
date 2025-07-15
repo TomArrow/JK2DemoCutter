@@ -5124,8 +5124,8 @@ static inline qboolean demoCutParseCommandStringReal(msg_t* msg, clientConnectio
 #if 0//def MSG_READBITS_TRANSCODE
 	msg_t remember = *msg;
 	qboolean pass0 = qtrue;
-#endif
 	reread:
+#endif
 	int seq = MSG_ReadLong(msg);
 	char* s = MSG_ReadString(msg, demoType);
 	if (clcCut->serverCommandSequence >= seq) {

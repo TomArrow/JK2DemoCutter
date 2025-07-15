@@ -4686,6 +4686,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		//
 		// parse the message
 		//
+		byte previouscmd = 255;
+		byte previousOcmd = 255;
 		while (1) {
 			bool malformedMessageCaught = false;
 			int oldMsgOffset = oldMsg.readcount;
@@ -4721,7 +4723,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					break;
 				}
 			default:
-				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message %d (%d) \n",cmd,ocmd);
+				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message %d (%d); previous: %d (%d) \n",cmd,ocmd,previouscmd,previousOcmd);
 				if (isMOHAADemo && readGamestate == 0) {
 					goto cutcontinue; // Uh I made some silly oopsie
 				}
@@ -8447,6 +8449,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// nothing to parse.
 				break;
 			}
+		
+			previouscmd = cmd;
+			previousOcmd = ocmd;
 		}
 
 		// Check for finished laugh sequences
