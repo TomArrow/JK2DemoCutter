@@ -478,7 +478,7 @@ cutcomplete:
 cuterror:
 	if (oldSize > 0 && oldHandle) {
 		std::cerr << "Found data at the end of the demo after parsing. Copying over from start of message.\n";
-		byte buffer[1024*1024*8]; // 8 MB buffer?
+		static byte buffer[1024*1024*8]; // 8 MB buffer?
 		//byte buffer[16]; // 8 MB buffer?
 		// we errored or something. copy over the rest of the data.
 		if (!FS_Seek(oldHandle, messageStartFilePos, FS_SEEK_SET)) {
