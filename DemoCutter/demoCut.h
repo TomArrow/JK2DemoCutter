@@ -5094,7 +5094,11 @@ public:
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader, bool& SEHExceptionCaught);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut);
+#ifdef MSG_READBITS_TRANSCODE
+qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught, qboolean* wasNewCommand = NULL);
+#else
 qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught);
+#endif
 qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType);
 //qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean writeOldSnap = qfalse);
 qboolean demoCutParseSnapshot(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, bool& SEHExceptionCaught, bool& malformedMessage, qboolean writeOldSnap = qfalse);

@@ -15,6 +15,11 @@
 constexpr char* postEOFMetadataMarker = "HIDDENMETA";
 constexpr char* postEOFUcmdMarker = "HIDDENUCMD";
 
+#ifdef MSG_READBITS_TRANSCODE
+extern msg_t* transcodeTargetMsg;
+extern msg_t* deltaTargetMsg;
+#endif
+
 // Code is 99%-100% from jomme, from various files.
 // Most of it is likely still the same as in the original Jedi Knight source code releases
 //
@@ -5110,23 +5115,55 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	}
 }
 
-static inline void demoCutParseCommandStringReal(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType) {
+static inline qboolean demoCutParseCommandStringReal(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType) {
 	int index;
+#if 0//def MSG_READBITS_TRANSCODE
+	msg_t remember = *msg;
+	qboolean pass0 = qtrue;
+#endif
+	reread:
 	int seq = MSG_ReadLong(msg);
 	char* s = MSG_ReadString(msg, demoType);
 	if (clcCut->serverCommandSequence >= seq) {
-		return;
+		return qfalse;
 	}
+#if 0//def MSG_READBITS_TRANSCODE
+	if (deltaTargetMsg) {
+		if (pass0) {
+			pass0 = qfalse; // ok we do want this command. go set the transcodetargetmsg and read again.
+			*msg = remember;
+			transcodeTargetMsg = deltaTargetMsg;
+			goto reread;
+		}
+		else {
+			// ok set it back to NULL
+			transcodeTargetMsg = NULL;
+		}
+	}
+#endif
 	clcCut->serverCommandSequence = seq;
 	index = seq & (MAX_RELIABLE_COMMANDS - 1);
 	Q_strncpyz(clcCut->serverCommands[index], MAX_STRING_CHARS_MAX, s, sizeof(clcCut->serverCommands[index]));
 	if (GlobalDebugOutputFlags & (1 << DEBUG_COMMANDS)) {
 		std::cerr << "COMMAND DEBUG: demotime " << GlobalDebugDemoTime << ": cmd " << seq << ": " << s << "\n";
 	}
+	return qtrue;
 }
+#ifdef MSG_READBITS_TRANSCODE
+qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught, qboolean* wasNewCommand) {
+#else
 qboolean demoCutParseCommandString(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType, bool& SEHExceptionCaught) {
+#endif
 	__TRY{
-		demoCutParseCommandStringReal(msg,clcCut, demoType);
+
+#ifdef MSG_READBITS_TRANSCODE
+		qboolean wasNew = demoCutParseCommandStringReal(msg, clcCut, demoType);
+		if (wasNewCommand) {
+			*wasNewCommand = wasNew;
+		}
+#else
+		demoCutParseCommandStringReal(msg, clcCut, demoType);
+#endif
 		return qtrue;
 	}
 	__EXCEPT{

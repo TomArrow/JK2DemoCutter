@@ -10,6 +10,7 @@
 
 #ifdef MSG_READBITS_TRANSCODE
 extern msg_t* transcodeTargetMsg;
+extern msg_t* deltaTargetMsg;
 #endif
 
 
@@ -24,7 +25,8 @@ demo_t			demo;
 
 
 
-
+qboolean optimizeCommands = qtrue;
+qboolean optimizeSnaps = qfalse;
 
 
 
@@ -41,6 +43,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	byte			oldData[MAX_MSGLEN];
 	std::vector<byte>	oldDataRaw;
 	msg_t			newMsg;
+	msg_t			newMsgRemember;
 	byte			newData[MAX_MSGLEN];
 	std::vector<byte>	newDataRaw;
 	int				oldSize;
@@ -246,6 +249,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				Com_DPrintf("Demo cutter, read past end of server message.\n");
 				goto cuterror;
 			}
+			newMsgRemember = newMsg;
 			cmd = MSG_ReadByte(&oldMsg);
 			cmd = generalizeGameSVCOp(cmd, demoType);
 			if (cmd == svc_EOF_general) {
@@ -282,8 +286,20 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			case svc_nop_general:
 				break;
 			case svc_serverCommand_general:
-				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType, SEHExceptionCaught)) {
-					goto cuterror;
+				if (!optimizeCommands) {
+					if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType, SEHExceptionCaught)) {
+						goto cuterror;
+					}
+				}
+				else {
+					qboolean wasNew = qfalse;
+					if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType, SEHExceptionCaught,&wasNew)) {
+						newMsg = newMsgRemember;
+						goto cuterror; // TODO handle more gracefully? just go next msg?
+					}
+					if (!wasNew) {
+						newMsg = newMsgRemember;
+					}
 				}
 				break;
 			case svc_gamestate_general:

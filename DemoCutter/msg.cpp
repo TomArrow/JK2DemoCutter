@@ -459,6 +459,7 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 
 #ifdef MSG_READBITS_TRANSCODE
 msg_t* transcodeTargetMsg = NULL;
+msg_t* deltaTargetMsg = NULL; // message target for writing new stuff to
 #endif
 
 int MSG_ReadBits( msg_t *msg, int bits ) {
