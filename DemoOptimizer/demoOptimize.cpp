@@ -27,6 +27,7 @@ demo_t			demo;
 
 qboolean optimizeCommands = qtrue;
 qboolean optimizeSnaps = qtrue;
+int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to protect against corruption. e.g. every 10000 packets. at 100 fps thats like 100 seconds
 
 
 
@@ -70,6 +71,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	bool SEHExceptionCaught = false;
 	int				nonIssueSnap;
 	qboolean		nonIssueSnapSet = qfalse;
+	int64_t			deltaSnapcount = 0;
 
 
 	//mvprotocol_t	protocol;
@@ -328,7 +330,12 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				}
 				// check if we can optimize this one (turn it into a highly efficient delta)
 				if (optimizeSnaps && demo.cut.Cl.snap.valid && !demo.cut.Cl.snap.snapIssues && !(demo.cut.Cl.snap.snapFlags & SNAPFLAG_NOT_ACTIVE)) {
-					if (nonIssueSnapSet ) {
+					if (optimizeSnapsSafety && deltaSnapcount >= optimizeSnapsSafety) {
+						newMsg = newMsgRemember;
+						demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, NULL, &demo.cut.Cl, demoType);
+						deltaSnapcount = 0;
+					}
+					else if (nonIssueSnapSet ) {
 						clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[nonIssueSnap & PACKET_MASK];
 
 						// ok we have an old and a new frame BUT let's make sure the old is still valid and not phased out from being very old or having some other issues
@@ -346,11 +353,28 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 							newMsg = newMsgRemember;
 							demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType);
+							deltaSnapcount++;
 						}
 
 					}
+					else {
+						if (demo.cut.Cl.snap.deltaNum >= 0) {
+							deltaSnapcount++;
+						}
+						else {
+							deltaSnapcount = 0;
+						}
+					}
 					nonIssueSnap = demo.cut.Cl.snap.messageNum;
 					nonIssueSnapSet = qtrue;
+				}
+				else {
+					if (demo.cut.Cl.snap.deltaNum >= 0) {
+						deltaSnapcount++;
+					}
+					else {
+						deltaSnapcount = 0;
+					}
 				}
 				/*if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
