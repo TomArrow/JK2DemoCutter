@@ -2049,7 +2049,14 @@ enum fileCompressionScheme_t {
 	FILECOMPRESSION_LZMA // The special compressed file format with LZMA compression
 };
 
+typedef enum {
+	FS_SEEK_CUR,
+	FS_SEEK_END,
+	FS_SEEK_SET
+} fsOrigin_t;
 
+int		FS_Seek(fileHandle_t f, int64_t offset, int origin);
+int64_t		FS_FTell(fileHandle_t f);
 int64_t		FS_Write(const void* buffer, int64_t len, fileHandle_t f, qboolean ignoreCompression=qfalse);
 //fileHandle_t	FS_FOpenFileWrite(const char* qpath, qboolean quiet = qfalse, fileCompressionScheme_t compression= FILECOMPRESSION_NONE); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t
 fileHandle_t	FS_FOpenFileWrite(const char* qpath, fileCompressionScheme_t compression, qboolean quiet = qfalse); // Compressedtype has an int at the start corresponding to fileCompressionScheme_t

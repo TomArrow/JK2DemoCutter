@@ -25,8 +25,8 @@ demo_t			demo;
 
 
 
-qboolean optimizeCommands = qtrue;
-qboolean optimizeSnaps = qtrue;
+qboolean optimizeCommands = qfalse;
+qboolean optimizeSnaps = qfalse;
 int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to protect against corruption. e.g. every 10000 packets. at 100 fps thats like 100 seconds
 
 
@@ -48,6 +48,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	byte			newData[MAX_MSGLEN];
 	std::vector<byte>	newDataRaw;
 	int64_t				oldSize;
+	int64_t				oldSizeMessageStart;
+	int64_t				messageStartFilePos = 0;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
 	int				buf;
@@ -72,7 +74,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	int				nonIssueSnap;
 	qboolean		nonIssueSnapSet = qfalse;
 	int64_t			deltaSnapcount = 0;
-
+	qboolean		currentMessageWritten = qtrue;
 
 	//mvprotocol_t	protocol;
 
@@ -134,7 +136,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}*/
-	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
+	oldSizeMessageStart = oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
 		Com_DPrintf("Failed to open %s for optimizing.\n", oldName);
 		return qfalse;
@@ -215,6 +217,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 
 		transcodeTargetMsg = &newMsg;
 
+		messageStartFilePos = FS_FTell(oldHandle);
+		oldSizeMessageStart = oldSize;
+
 		/* Read the sequence number */
 		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
 			goto cuterror;
@@ -241,6 +246,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
 				goto cuterror;
 		}
+
+		currentMessageWritten = qfalse;
 
 		oldSize -= (int64_t)oldMsg.cursize;
 		// init the bitstream
@@ -459,15 +466,41 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		else {
 			FS_Write(newMsg.data, newMsg.cursize, newHandle);
 		}
+		currentMessageWritten = qtrue;
 	}
 cutcomplete:
-	if (newHandle) {
+	if (newHandle && !(oldSize > 0 && oldHandle)) {
 		buf = -1;
 		FS_Write(&buf, 4, newHandle);
 		FS_Write(&buf, 4, newHandle);
 		ret = qtrue;
 	}
 cuterror:
+	if (oldSize > 0 && oldHandle) {
+		std::cerr << "Found data at the end of the demo after parsing. Copying over from start of message.\n";
+		//byte buffer[1024*1024*8]; // 8 MB buffer?
+		byte buffer[16]; // 8 MB buffer?
+		// we errored or something. copy over the rest of the data.
+		if (!FS_Seek(oldHandle, messageStartFilePos, FS_SEEK_SET)) {
+			oldSize = oldSizeMessageStart;
+			while (oldSize > 0) {
+				int64_t toRead = std::min(oldSize, (int64_t)sizeof(buffer));
+				int64_t countRead = FS_Read(buffer, toRead, oldHandle);
+				int64_t countWritten = 0;
+				while (countRead > 0) {
+					int64_t countWrittenHere = FS_Write(buffer + countWritten,countRead,newHandle);
+					countWritten += countWrittenHere;
+					countRead -= countWrittenHere;
+				}
+				oldSize -= countWritten;
+			}
+		}
+		else {
+			std::cerr << "Failed copying over remaining data at the end of the demo, seek failed\n";
+		}
+
+	}
+
 	//remove previosly converted demo from the same cut
 	if (newHandle) {
 		/*memset(newName, 0, sizeof(newName));

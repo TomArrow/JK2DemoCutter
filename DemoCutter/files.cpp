@@ -387,6 +387,74 @@ int64_t FS_filelength(fileHandle_t f) {
 
 }
 
+/*
+=================
+FS_Seek
+
+=================
+*/
+int FS_Seek(fileHandle_t f, int64_t offset, int origin) {
+	int		_origin;
+	char	foo[65536];
+
+	if (fsh[f].compressedFileInfo.compression/* == FILECOMPRESSION_LZMA*/) {
+		Com_Error(ERR_FATAL, "Can't use FS_Seek on compressed files.");
+	}
+
+	if (fsh[f].zipFile == qtrue) {
+		return -1;
+		/*
+		if (offset == 0 && origin == FS_SEEK_SET) {
+			// set the file position in the zip file (also sets the current file info)
+			unzSetOffset(fsh[f].handleFiles.file.z, fsh[f].zipFilePos);
+			return unzOpenCurrentFile(fsh[f].handleFiles.file.z);
+		}
+		else if (offset < 65536) {
+			// set the file position in the zip file (also sets the current file info)
+			unzSetOffset(fsh[f].handleFiles.file.z, fsh[f].zipFilePos);
+			unzOpenCurrentFile(fsh[f].handleFiles.file.z);
+			return FS_Read(foo, offset, f, module);
+		}
+		else {
+			Com_Error(ERR_FATAL, "ZIP FILE FSEEK NOT YET IMPLEMENTED");
+			return -1;
+		}*/
+	}
+	else {
+		FILE* file;
+		file = FS_FileForHandle(f);
+		switch (origin) {
+		case FS_SEEK_CUR:
+			_origin = SEEK_CUR;
+			break;
+		case FS_SEEK_END:
+			_origin = SEEK_END;
+			break;
+		case FS_SEEK_SET:
+			_origin = SEEK_SET;
+			break;
+		default:
+			_origin = SEEK_CUR;
+			Com_Error(ERR_FATAL, "Bad origin in FS_Seek");
+			break;
+		}
+
+
+		return fseek(file, offset, _origin);
+	}
+}
+int64_t	FS_FTell(fileHandle_t f) {
+	int64_t pos = 0;
+
+
+	if (fsh[f].zipFile == qtrue) {
+		//pos = unztell(fsh[f].handleFiles.file.z);
+	}
+	else {
+		pos = ftell(fsh[f].handleFiles.file.o);
+	}
+	return pos;
+}
 
 int64_t FS_FOpenFileRead(const char* filename, fileHandle_t* file, qboolean uniqueFILE, qboolean compressedType, fileCompressionScheme_t* compressionUsed, qboolean nonExclusiveRead) {
 	std::string		netpath;
