@@ -26,7 +26,7 @@ demo_t			demo;
 
 
 qboolean optimizeCommands = qtrue;
-qboolean optimizeSnaps = qfalse;
+qboolean optimizeSnaps = qtrue;
 
 
 
@@ -68,6 +68,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	qboolean		isCompressedFile = qfalse;
 	qboolean		createCompressedOutput = qtrue;
 	bool SEHExceptionCaught = false;
+	int				nonIssueSnap;
+	qboolean		nonIssueSnapSet = qfalse;
 
 
 	//mvprotocol_t	protocol;
@@ -94,6 +96,11 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(sourceDemoFile, ext, oldName, &demoType, &isCompressedFile, &demo.cut.Clc);
+
+	if (isCompressedFile) {
+		std::cerr << "Optimizing compressed files is not currently supported\n"; // todo make this work. im worried about the dataraw vector. not sure if i have to  clear it when doing the remember reset
+		return qfalse;
+	}
 
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
@@ -127,7 +134,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	}*/
 	oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
-		Com_DPrintf("Failed to open %s for compressing.\n", oldName);
+		Com_DPrintf("Failed to open %s for optimizing.\n", oldName);
 		return qfalse;
 	}
 
@@ -178,7 +185,6 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		Com_DPrintf("Failed to open %s for target cutting.\n", newName);
 		return qfalse;
 	}
-
 
 
 
@@ -308,6 +314,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 				//	goto cutcomplete;
 				//}
+				nonIssueSnapSet = qfalse; // gamestate will invalidate these old ones to delta from. meh we need to actually test this tho.
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, &demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
 					goto cuterror;
 				}
@@ -316,7 +323,34 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 				break;
 			case svc_snapshot_general:
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught, malformedMessageCaught)) {
+					newMsg = newMsgRemember;
 					goto cuterror;
+				}
+				// check if we can optimize this one (turn it into a highly efficient delta)
+				if (optimizeSnaps && demo.cut.Cl.snap.valid && !demo.cut.Cl.snap.snapIssues && !(demo.cut.Cl.snap.snapFlags & SNAPFLAG_NOT_ACTIVE)) {
+					if (nonIssueSnapSet ) {
+						clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[nonIssueSnap & PACKET_MASK];
+
+						// ok we have an old and a new frame BUT let's make sure the old is still valid and not phased out from being very old or having some other issues
+						bool canUse = qtrue;
+						canUse = canUse && !((oldSnap->snapFlags ^ demo.cut.Cl.snap.snapFlags) & SNAPFLAG_SERVERCOUNT); // make sure theyre from the same map
+						canUse = canUse && demo.cut.Cl.snap.messageNum > oldSnap->messageNum; // make sure we're in order. yea ik... shit happens
+						canUse = canUse && demo.cut.Cl.snap.serverTime > oldSnap->serverTime; // make sure we're in order. yea ik... shit happens
+						canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
+						canUse = canUse && oldSnap->valid && !oldSnap->snapIssues; // should be already covered but let's be safe
+						canUse = canUse && (demo.cut.Cl.snap.messageNum - oldSnap->messageNum < 100); // don't delta from extremely old frames
+						canUse = canUse && (demo.cut.Cl.snap.serverTime - oldSnap->serverTime < 1000); // don't delta from extremely old frames
+						canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128); // good old safety check from parsesnapshot
+
+						if (canUse) {
+
+							newMsg = newMsgRemember;
+							demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType);
+						}
+
+					}
+					nonIssueSnap = demo.cut.Cl.snap.messageNum;
+					nonIssueSnapSet = qtrue;
 				}
 				/*if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.

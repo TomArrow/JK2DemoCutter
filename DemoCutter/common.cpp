@@ -4935,6 +4935,10 @@ configStringReadRetry:
 				return qfalse;
 			}
 
+			if (i == CS_SYSTEMINFO) {
+				clCut->serverId = atoi(Info_ValueForKey(s, BIG_INFO_STRING, "sv_serverid"));
+			}
+
 			if (clcCut->demoCheckFor103 && i == CS_SERVERINFO && *demoType == DM_15) {
 				//This is the big serverinfo string containing the value of the "version" cvar of the server.
 				//If we are about to play a demo, we can use this information to ascertain whether this demo was recorded on
@@ -5192,6 +5196,10 @@ qboolean demoCutConfigstringModified(clientActive_t* clCut, demoType_t demoType)
 		return qtrue; // unchanged
 	}
 
+	if (index == CS_SYSTEMINFO) {
+		clCut->serverId = atoi(Info_ValueForKey(s, BIG_INFO_STRING, "sv_serverid"));
+	}
+
 	if (GlobalDebugOutputFlags & (1 << DEBUG_CONFIGSTRING)) {
 		std::cerr << "CONFIGSTRING DEBUG (CONFIGSTRINGMODIFIED): serverTime " << clCut->snap.serverTime << ", index " << index << ": " << s << "\n";
 	}
@@ -5261,20 +5269,24 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 			oldSnap = &clCut->snapshots[clcCut->lastValidSnap & PACKET_MASK];
 			lastOneNum = clcCut->lastValidSnap;
 			Com_DPrintf("Delta from invalid frame (not supposed to happen!). Trying to use last valid snap.\n");
+			newSnap.snapIssues |= SNAPISSUE_DELTAFROMINVALID_TRYING_LAST;
 		}
 
 		if (!oldSnap->valid) {
 			// should never happen
 			Com_DPrintf("Delta from invalid frame (not supposed to happen!).\n");
+			newSnap.snapIssues |= SNAPISSUE_DELTAFROMINVALID;
 		}
 		//else if (oldSnap->messageNum != newSnap.deltaNum) {
 		else if (oldSnap->messageNum != lastOneNum) {
 			// The frame that the server did the delta from
 			// is too old, so we can't reconstruct it properly.
 			Com_DPrintf("Delta frame too old.\n");
+			newSnap.snapIssues |= SNAPISSUE_DELTAFRAMETOOOLD;
 		}
 		else if (clCut->parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128) { // is this reliable? assumes max of 128 entities in packet?
 			Com_DPrintf("Delta parseEntitiesNum too old.\n");
+			newSnap.snapIssues |= SNAPISSUE_DELTAPARSEENTITIESNUMTOOOLD;
 		}
 		else {
 			newSnap.valid = qtrue;	// valid delta parse
@@ -5315,6 +5327,11 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 	}
 	clcCut->lastValidSnap = newSnap.messageNum;
 	clcCut->lastValidSnapSet = qtrue;
+
+	//if (!newSnap.snapIssues) {
+	//	clcCut->lastNonIssueSnap = newSnap.messageNum;
+	////	clcCut->lastNonIssueSnapSet = qtrue;
+	//}
 
 	// clear the valid flags of any snapshots between the last
 	// received and this one, so if there was a dropped packet
@@ -5829,8 +5846,6 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	byte			msgData[MAX_MSGLEN];
 	std::vector<byte>			msgDataRaw;
 	clSnapshot_t* frame, * oldframe;
-	int				lastframe = 0;
-	int				snapFlags;
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
@@ -5865,18 +5880,16 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	// this is the snapshot we are creating
 	frame = &clCut->snap;
 	if (clCut->snap.messageNum > 0 && !forceNonDelta) {
-		lastframe = 1;
 		oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
 		if (!oldframe->valid) {
 			// not yet set
-			lastframe = 0;
 			oldframe = NULL;
 		}
 	}
 	else {
-		lastframe = 0;
 		oldframe = NULL;
 	}
+	/*
 	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_snapshot_general, demoType));
 	// send over the current server time so the client can drift
 	// its view of time to try to match
@@ -5927,6 +5940,72 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	if (isMOHAADemo) {
 		MSG_WriteSounds(msg, frame->sounds, frame->number_of_sounds);
 
+	}*/
+	demoCutWriteDeltaSnapshotActual(msg, frame, oldframe, clCut, demoType);
+
+	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
+	demoCutWriteDemoMessage(msg, f, clcCut);
+}
+void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot_t* oldframe, clientActive_t* clCut, demoType_t demoType) {
+	int				lastframe = 0;
+
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+
+
+	// this is the snapshot we are creating
+	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_snapshot_general, demoType));
+	// send over the current server time so the client can drift
+	// its view of time to try to match
+	MSG_WriteLong(msg, frame->serverTime);
+
+	if (isMOHAADemo) {
+		if (frame->serverTimeResidual > 254) // TODO Is this handled well here/elsewhere? idk
+			MSG_WriteByte(msg, 255);
+		else MSG_WriteByte(msg, frame->serverTimeResidual);
+	}
+
+	if (oldframe) {
+		lastframe = frame->messageNum - oldframe->messageNum;
+	}
+
+	// what we are delta'ing from
+	MSG_WriteByte(msg, lastframe);
+	MSG_WriteByte(msg, frame->snapFlags);
+	// send over the areabits
+	MSG_WriteByte(msg, sizeof(frame->areamask));
+	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
+	// delta encode the playerstate
+	if (oldframe) {
+		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps,qfalse, demoType, clCut->serverFrameTime);
+		if (demoType == DM_26 || demoType == DM_25) {
+			if (frame->ps.m_iVehicleNum) {
+				//then write the vehicle's playerstate too
+				if (!oldframe->ps.m_iVehicleNum) {
+					//if last frame didn't have vehicle, then the old vps isn't gonna delta
+					//properly (because our vps on the client could be anything)
+					MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue, demoType, clCut->serverFrameTime);
+				}
+				else {
+					MSG_WriteDeltaPlayerstate(msg, &oldframe->vps, &frame->vps, qtrue, demoType, clCut->serverFrameTime);
+				}
+			}
+		}
+	}
+	else {
+		MSG_WriteDeltaPlayerstate(msg, NULL, &frame->ps,qfalse, demoType, clCut->serverFrameTime);
+		if (demoType == DM_26 || demoType == DM_25) {
+			if (frame->ps.m_iVehicleNum) {
+				//then write the vehicle's playerstate too
+				MSG_WriteDeltaPlayerstate(msg, NULL, &frame->vps, qtrue,demoType, clCut->serverFrameTime);
+			}
+		}
+	}
+	// delta encode the entities
+	demoCutEmitPacketEntities(oldframe, frame, msg, clCut, demoType);
+
+	if (isMOHAADemo) {
+		MSG_WriteSounds(msg, frame->sounds, frame->number_of_sounds);
+
 		// TODO Maybe do this? Or naw? Not that important for now I guess
 		/*if (client->centerprint) {
 			if (client->locprint) {
@@ -5942,8 +6021,6 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 		}*/
 	}
 
-	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
-	demoCutWriteDemoMessage(msg, f, clcCut);
 }
 
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType) { 

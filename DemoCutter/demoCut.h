@@ -1333,9 +1333,19 @@ typedef struct server_sound_s { // MOHAA
 	qboolean streamed;
 } server_sound_t;
 
+typedef enum snapIssues_s {
+	SNAPISSUE_DELTAFROMINVALID_TRYING_LAST = (1<<0),
+	SNAPISSUE_DELTAFROMINVALID = (1 << 1),
+	SNAPISSUE_DELTAFRAMETOOOLD = (1 << 2),
+	SNAPISSUE_DELTAPARSEENTITIESNUMTOOOLD = (1 << 3),
+
+} snapIssues_t;
+
 typedef struct {
 	qboolean		valid;			// cleared if delta parsing was invalid
 	int				snapFlags;		// rate delayed and dropped commands
+
+	int				snapIssues;		// from snapIssues_t enum. to see if parsing this was smooth
 
 	int				serverTime;		// server time the message is valid for (in msec)
 	int				serverTimeResidual; // MOHAA
@@ -1706,6 +1716,7 @@ typedef struct {
 
 	clSnapshot_t	snapshots[PACKET_BACKUP];
 
+
 	//char* mSharedMemory;
 } clientActive_t;
 
@@ -1850,6 +1861,9 @@ typedef struct {
 	// For Cutter and generally
 	qboolean	lastValidSnapSet;
 	int			lastValidSnap;
+	 
+	//qboolean	lastNonIssueSnapSet;
+	//int			lastNonIssueSnap;
 
 	int			timeDemoFrames;		// counter of rendered frames
 	int			timeDemoStart;		// cls.realtime before first frame
@@ -5112,6 +5126,7 @@ qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
+void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot_t* oldframe, clientActive_t* clCut, demoType_t demoType);
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);
 void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, SnapshotEntitiesOrderedPointers* entities, SnapshotEntitiesOrderedPointers* fromEntities);
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);
