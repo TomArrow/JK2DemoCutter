@@ -596,7 +596,7 @@ int main(int argc, char** argv) {
 	if (demoCompress(demoName, outputName)) {
 		std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000000.0f;
-		Com_Printf("Demo %s got successfully compressed in %.5f seconds \n", demoName, seconds);
+		Com_Printf("Demo %s got successfully optimized in %.5f seconds \n", demoName, seconds);
 	}
 	else {
 		Com_DPrintf("Demo %s has failed to get compressed or compressed with errors\n", demoName);
