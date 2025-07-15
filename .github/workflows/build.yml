@@ -67,6 +67,11 @@ jobs:
       working-directory: ${{github.workspace}}
       shell: cmd
       run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoMerger/DemoMerger.vcxproj
+      
+    - name: Build Optimizer
+      working-directory: ${{github.workspace}}
+      shell: cmd
+      run: msbuild /m /p:Configuration=${{ matrix.build_type }} /p:Platform=${{ matrix.arch }} DemoOptimizer/DemoOptimizer.vcxproj
 
 
     - name: Collect files
@@ -84,6 +89,8 @@ jobs:
         move ${{github.workspace}}\DemoCompressor\x64\Release\*.pdb ${{github.workspace}}\outdir\
         move ${{github.workspace}}\DemoMerger\x64\Release\*.exe ${{github.workspace}}\outdir\
         move ${{github.workspace}}\DemoMerger\x64\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoOptimizer\x64\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoOptimizer\x64\Release\*.pdb ${{github.workspace}}\outdir\
         
     - name: Collect files
       if: ${{ matrix.build_type == 'Release' &&  matrix.arch == 'Win32' }}
@@ -100,6 +107,8 @@ jobs:
         move ${{github.workspace}}\DemoCompressor\Release\*.pdb ${{github.workspace}}\outdir\
         move ${{github.workspace}}\DemoMerger\Release\*.exe ${{github.workspace}}\outdir\
         move ${{github.workspace}}\DemoMerger\Release\*.pdb ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoOptimizer\Release\*.exe ${{github.workspace}}\outdir\
+        move ${{github.workspace}}\DemoOptimizer\Release\*.pdb ${{github.workspace}}\outdir\
 
     - uses: 'actions/upload-artifact@v4'
       if: ${{ matrix.build_type == 'Release' }}
