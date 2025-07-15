@@ -1,0 +1,279 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\lzmaSDK">
+      <UniqueIdentifier>{501d5864-7fa4-4ed3-a1c7-178c534b84b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\zlib">
+      <UniqueIdentifier>{0521e698-11e7-4b54-866f-39256ce875d4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="demoOptimize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zArcIn.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zBuf.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zBuf2.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zCrc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zCrcOpt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zDec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zFile.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\7zStream.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Aes.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\AesOpt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Alloc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bcj2.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bcj2Enc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bra.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Bra86.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\BraIA64.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\CpuArch.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Delta.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\DllSecur.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzFind.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzFindMt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzFindOpt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2Dec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2DecMt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma2Enc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma86Dec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Lzma86Enc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzmaDec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzmaEnc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\LzmaLib.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\MtCoder.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\MtDec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7Dec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Ppmd7Enc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Sha256.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Sha256Opt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Sort.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Threads.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\Xz.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzCrc64.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzCrc64Opt.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzDec.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzEnc.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\lzmaSDK\XzIn.c">
+      <Filter>Source Files\lzmaSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\adler32.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\compress.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\crc32.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\deflate.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzclose.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzlib.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzread.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\gzwrite.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\infback.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\inffast.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\inflate.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\inftrees.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\ioapi.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\trees.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\uncompr.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\zlib\zutil.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\animMappingTable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DemoCutter\common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DemoCutter\huffman.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DemoCutter\files.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DemoCutter\msg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\shared\include\jpcre2.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\include\pcre2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\crc32.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\deflate.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\gzguts.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inffast.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inffixed.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inflate.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\inftrees.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\ioapi.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\trees.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\zconf.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\zlib.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\zlib\zutil.h">
+      <Filter>Source Files\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DemoCutter\demoCut.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
