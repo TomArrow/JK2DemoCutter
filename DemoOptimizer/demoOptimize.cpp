@@ -25,8 +25,8 @@ demo_t			demo;
 
 
 
-qboolean optimizeCommands = qfalse;
-qboolean optimizeSnaps = qfalse;
+qboolean optimizeCommands = qtrue;
+qboolean optimizeSnaps = qtrue;
 int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to protect against corruption. e.g. every 10000 packets. at 100 fps thats like 100 seconds
 
 
