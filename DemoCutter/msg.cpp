@@ -225,7 +225,12 @@ static inline void HuffmanPutBitFast(uint8_t* fout, int32_t bitIndex, int32_t bi
 		return;
 	}
 
-	fout[(bitIndex >> 3)] |= bit << (bitIndex & 7);
+	if (bit) {
+		fout[(bitIndex >> 3)] |= 1 << (bitIndex & 7);
+	}
+	else {
+		fout[(bitIndex >> 3)] &= ~(1 << (bitIndex & 7)); // cuz i think we can get corruption otherwise unless the buffer is nulled? VERY rare for some reason
+	}
 }
 
 static inline void HuffmanOffsetTransmitFast(uint8_t* fout, int32_t* offset, int32_t ch)
