@@ -1356,6 +1356,7 @@ typedef struct {
 	int				deltaNum;		// messageNum the delta is from
 	int				ping;			// time from when cmdNum-1 was sent to time packet was reeceived
 	byte			areamask[MAX_MAP_AREA_BYTES];		// portalarea visibility bits
+	int				areamaskLen;
 
 	int				cmdNum;			// the next cmdNum the server is expecting
 	playerState_t	ps;						// complete information about the current player at this time
@@ -5135,7 +5136,7 @@ qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
-void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot_t* oldframe, clientActive_t* clCut, demoType_t demoType);
+void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot_t* oldframe, clientActive_t* clCut, demoType_t demoType, qboolean replicateAreaMaskSize=qfalse);
 qboolean demoCutConfigstringModifiedManual(clientActive_t* clCut, int configStringNum, const char* value, demoType_t demoType);
 void demoCutEmitPacketEntitiesManual(msg_t* msg, clientActive_t* clCut, demoType_t demoType, SnapshotEntitiesOrderedPointers* entities, SnapshotEntitiesOrderedPointers* fromEntities);
 qboolean demoCutInitClearGamestate(clientConnection_t* clcCut, clientActive_t* clCut, int serverCommandSequence, int clientNum, int checksumFeed);

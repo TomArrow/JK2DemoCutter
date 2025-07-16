@@ -5294,12 +5294,12 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 	}
 	try {
 		// read areamask
-		len = MSG_ReadByte(msg);
+		newSnap.areamaskLen = MSG_ReadByte(msg);
 		//if (len > sizeof(newSnap.areamask)) {
 		//	Com_Printf("demoCutParseSnapshot: Invalid size %d for areamask", len);
 		//	return qfalse;
 		//}
-		MSG_ReadData(msg, &newSnap.areamask, len);
+		MSG_ReadData(msg, &newSnap.areamask, newSnap.areamaskLen);
 		// read playerinfo
 		MSG_ReadDeltaPlayerstate(msg, oldSnap ? &oldSnap->ps : NULL, &newSnap.ps, demoType, qfalse, &clCut->snap.ps);
 
@@ -5946,7 +5946,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	MSG_WriteByte(msg, specializeGeneralSVCOp(svc_EOF_general, demoType));
 	demoCutWriteDemoMessage(msg, f, clcCut);
 }
-void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot_t* oldframe, clientActive_t* clCut, demoType_t demoType) {
+void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot_t* oldframe, clientActive_t* clCut, demoType_t demoType, qboolean replicateAreaMaskSize) {
 	int				lastframe = 0;
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
@@ -5972,8 +5972,15 @@ void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot
 	MSG_WriteByte(msg, lastframe);
 	MSG_WriteByte(msg, frame->snapFlags);
 	// send over the areabits
-	MSG_WriteByte(msg, sizeof(frame->areamask));
-	MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
+	if (replicateAreaMaskSize) {
+		int trueLen = std::min((int)sizeof(frame->areamask), frame->areamaskLen);
+		MSG_WriteByte(msg, trueLen);
+		MSG_WriteData(msg, frame->areamask, trueLen);
+	}
+	else {
+		MSG_WriteByte(msg, sizeof(frame->areamask));
+		MSG_WriteData(msg, frame->areamask, sizeof(frame->areamask));
+	}
 	// delta encode the playerstate
 	if (oldframe) {
 		MSG_WriteDeltaPlayerstate(msg, &oldframe->ps, &frame->ps,qfalse, demoType, clCut->serverFrameTime);

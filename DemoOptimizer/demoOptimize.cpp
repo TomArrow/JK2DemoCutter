@@ -361,7 +361,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 						if (canUse) {
 
 							newMsg = newMsgRemember;
-							demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType);
+							demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType,qtrue);
 							deltaSnapcount++;
 						}
 
