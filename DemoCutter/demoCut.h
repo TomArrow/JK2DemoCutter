@@ -278,6 +278,7 @@ typedef struct _iobuf
 //#define	PACKET_BACKUP	32	// number of old messages that must be kept on client and
 #define	PACKET_BACKUP	2048	// number of old messages that must be kept on client and
 							// server for delta comrpession and ping estimation
+#define	PACKET_BACKUP_MIN	32	// we can expect this much from any client ( i hope ? )
 #define	PACKET_MASK		(PACKET_BACKUP-1)
 
 #define	MAX_MAP_AREA_BYTES		32		// bit vector of area visibility
@@ -295,6 +296,7 @@ typedef struct _iobuf
 
 //#define	MAX_PARSE_ENTITIES	2048
 #define	MAX_PARSE_ENTITIES	131072
+#define	MAX_PARSE_ENTITIES_MIN 2048 // we can expect this much from any client. though quake 2 is only 1024 but we dont support it rn and may never so w/e
 
 #define	MAX_PS_EVENTS			2
 

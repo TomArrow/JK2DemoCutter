@@ -352,9 +352,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 						canUse = canUse && demo.cut.Cl.snap.serverTime > oldSnap->serverTime; // make sure we're in order. yea ik... shit happens
 						canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
 						canUse = canUse && oldSnap->valid && !oldSnap->snapIssues; // should be already covered but let's be safe
-						canUse = canUse && (demo.cut.Cl.snap.messageNum - oldSnap->messageNum < 100); // don't delta from extremely old frames
+						canUse = canUse && (demo.cut.Cl.snap.messageNum - oldSnap->messageNum < PACKET_BACKUP_MIN); // don't delta from extremely old frames (was 100 but make it 32 so vanilla clients dont struggle)
 						canUse = canUse && (demo.cut.Cl.snap.serverTime - oldSnap->serverTime < 1000); // don't delta from extremely old frames
-						canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES - 128); // good old safety check from parsesnapshot
+						canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES_MIN - 128); // good old safety check from parsesnapshot
 
 						if (canUse) {
 
