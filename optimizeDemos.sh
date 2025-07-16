@@ -30,7 +30,7 @@ analyzer () {
 	#echo "random: $random"
 	outputname="$random.$extension"
 	
-	DemoOptimizer "$1" "$random"
+	DemoOptimizer "$1" "$random" --fail-if-no-reduction
 	
 	if [ $? -eq 0 ]; then
 		echo "Demo $1 optimizing successful"
