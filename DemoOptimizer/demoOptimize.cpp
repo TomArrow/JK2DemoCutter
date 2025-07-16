@@ -7,6 +7,7 @@
 #include "Handleapi.h"
 #endif
 #include <chrono>
+#include "popl.hpp"
 
 #ifdef MSG_READBITS_TRANSCODE
 extern msg_t* transcodeTargetMsg;
@@ -37,7 +38,7 @@ int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to pro
 #endif
 
 
-qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
+qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double* fileRatio) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -47,6 +48,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 	msg_t			newMsgRemember;
 	byte			newData[MAX_MSGLEN];
 	std::vector<byte>	newDataRaw;
+	int64_t				oldSizeFull;
 	int64_t				oldSize;
 	int64_t				oldSizeMessageStart;
 	int64_t				messageStartFilePos = 0;
@@ -136,7 +138,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName) {
 		demoType = DM_16;
 		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
 	}*/
-	oldSizeMessageStart = oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
+	oldSizeFull = oldSizeMessageStart = oldSize = FS_FOpenFileRead(va("%s%s", oldName, originalExt), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
 		Com_DPrintf("Failed to open %s for optimizing.\n", oldName);
 		return qfalse;
@@ -513,6 +515,9 @@ cuterror:
 		if (FS_FileExists(newName))
 			FS_FileErase(newName);*/
 	}
+	int64_t newSize = FS_FTell(newHandle);
+	*fileRatio = (double)newSize / (double)oldSizeFull;
+	std::cout << va("Demo Optimizer: File ratio %.2f%%: From ",(float)(100.0* (*fileRatio))) << oldSizeFull << " to " << newSize << "\n";
 	FS_FCloseFile(oldHandle);
 	FS_FCloseFile(newHandle);
 
@@ -571,37 +576,67 @@ cuterror:
 }*/
 
 
-int main(int argc, char** argv) {
-	if (argc < 2) {
+int main(int argcO, char** argvO) {
+
+	popl::OptionParser op("Allowed options");
+	auto h = op.add<popl::Switch>("h", "help", "Show help");
+	auto f = op.add<popl::Switch>("f", "fail-if-no-reduction", "Fail if no filesize reduction was achieved.");
+
+	op.parse(argcO, argvO);
+	auto args = op.non_option_args();
+
+
+	if (args.size() < 1) {
 		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
+		std::cin.get();
 		return 1;
 	}
-	initializeGameInfos();
-	char* demoName = NULL;
-	char* outputName = NULL;
-	if (argc == 2) {
-		demoName = argv[1];
+	else if (h->is_set()) {
+		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
+		std::cout << "Extra options:\n";
+		std::cout << op << "\n";
+		return 0;
 	}
-	else if (argc == 3) {
-		demoName = argv[1];
-		outputName = argv[2];
+	initializeGameInfos();
+	const char* demoName = NULL;
+	const char* outputName = NULL;
+	bool deleteOutputName = false;
+	if (args.size() == 1) {
+		demoName = args[0].c_str();
+	}
+	else if (args.size() == 2) {
+		demoName = args[0].c_str();
+		outputName = args[1].c_str();
 		char* filteredOutputName = new char[strlen(outputName) + 1];
 		sanitizeFilename(outputName, filteredOutputName);
-		strcpy(outputName, filteredOutputName);
-		delete[] filteredOutputName;
+		outputName = filteredOutputName;
+		//strcpy(outputName, filteredOutputName);
+		//delete[] filteredOutputName;
+		deleteOutputName = true;
 	}
 
 	std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
 
-	if (demoCompress(demoName, outputName)) {
+	double fileRatio = 100000;
+	if (demoCompress(demoName, outputName,&fileRatio)) {
 		std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000000.0f;
-		Com_Printf("Demo %s got successfully optimized in %.5f seconds \n", demoName, seconds);
-		return 0;
+		if (fileRatio >= 1.0 && f->is_set()) {
+			Com_DPrintf("Demo %s got successfully optimized in %.5f seconds BUT -f/--fail-if-no-reduction was specified and no filesize reduction was achieved. Failing.\n", demoName, seconds);
+			return 3;
+		} else{
+			Com_Printf("Demo %s got successfully optimized in %.5f seconds \n", demoName, seconds);
+			return 0;
+		}
 	}
 	else {
 		Com_DPrintf("Demo %s has failed to get compressed or compressed with errors\n", demoName);
 		return 2;
+	}
+	if (deleteOutputName) {
+		delete[] outputName;
 	}
 #ifdef DEBUG
 	std::cin.get();

@@ -217,6 +217,8 @@ static inline void HuffmanPutBitFast(uint8_t* fout, int32_t bitIndex, int32_t bi
 {
 	const int32_t byteIndex = bitIndex >> 3;
 	const int32_t bitOffset = bitIndex & 7;
+
+	// i think we could skip this now that we're doing the below thing. no need. but i'm a bit scared xd
 	if (bitOffset == 0) // Is this the first bit of a new byte?
 	{
 		// We don't need to preserve what's already in there,
@@ -229,7 +231,7 @@ static inline void HuffmanPutBitFast(uint8_t* fout, int32_t bitIndex, int32_t bi
 		fout[(bitIndex >> 3)] |= 1 << (bitIndex & 7);
 	}
 	else {
-		fout[(bitIndex >> 3)] &= ~(1 << (bitIndex & 7)); // cuz i think we can get corruption otherwise unless the buffer is nulled? VERY rare for some reason
+		fout[(bitIndex >> 3)] &= ~(1 << (bitIndex & 7)); // cuz when we restore an old state we never go through the point where we set the entire byte to 0 (e.g. demooptimizer)
 	}
 }
 
