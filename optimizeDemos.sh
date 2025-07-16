@@ -34,8 +34,8 @@ analyzer () {
 	
 	if [ $? -eq 0 ]; then
 		echo "Demo $1 optimizing successful"
-		mv "$filename" "_demoopt_meta"
-		mv "$outputname" "$filename"
+		mv -vn "$filename" "_demoopt_meta"
+		mv -vn "$outputname" "$filename"
 		touch "$successname"
 	else
 		>&2 echo "Demo $1 optimizing failed for unknown reason"
