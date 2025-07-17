@@ -13,7 +13,17 @@
 extern msg_t* transcodeTargetMsg;
 extern msg_t* deltaTargetMsg;
 #endif
+#include <set>
 
+// TODO Make work with dm3?
+
+
+
+class ExtraOptimizeOptions {
+public:
+	int minMsec = 0;
+	bool commandTimeSlash = false;
+};
 
 
 
@@ -24,7 +34,7 @@ extern msg_t* deltaTargetMsg;
 
 demo_t			demo;
 
-
+#define MAX_MSEC 500
 
 qboolean optimizeCommands = qtrue;
 qboolean optimizeSnaps = qtrue;
@@ -38,7 +48,7 @@ int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to pro
 #endif
 
 
-qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double* fileRatio) {
+qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double* fileRatio, const ExtraOptimizeOptions& opts) {
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
@@ -192,11 +202,20 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 		return qfalse;
 	}
 
-
+	int psCommandTime = INT_MIN;
+	int lastWrittenServerTime = INT_MIN;
+	std::set<int> serverCommandsToFlush;
+	std::set<int> newServerCommands;
+	bool doingSnapsManipulation =  opts.minMsec || opts.commandTimeSlash;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
+	uint64_t skippableCmds = (1 << svc_serverCommand_general) | (1 << svc_EOF_general) | (1 << svc_snapshot_general);
+	uint64_t unskippableCmds = ~skippableCmds; // if any of these were received, we can't skip the message. to avoid weird situations we didn't expect.
 	while (oldSize > 0) {
-		//cutcontinue:
+	cutcontinue:
+		uint64_t cmds = 0;
+		newServerCommands.clear();
+		bool skipMessage = false;
 		if (isCompressedFile) {
 			oldDataRaw.clear();
 			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
@@ -256,6 +275,15 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 		MSG_BeginReading(&oldMsg);
 		// Skip the reliable sequence acknowledge number
 		MSG_ReadLong(&oldMsg);
+
+
+		for (auto it = serverCommandsToFlush.begin(); it != serverCommandsToFlush.end(); it++) {
+			char* command = demo.cut.Clc.serverCommands[*it & (MAX_RELIABLE_COMMANDS - 1)];
+			MSG_WriteByte(&newMsg,specializeGeneralSVCOp(svc_serverCommand_general,demoType));
+			MSG_WriteLong(&newMsg,*it);
+			MSG_WriteString(&newMsg,command,demoType);
+		}
+
 		//
 		// parse the message
 		//
@@ -269,6 +297,12 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 			newMsgRemember = newMsg;
 			cmd = MSG_ReadByte(&oldMsg);
 			cmd = generalizeGameSVCOp(cmd, demoType);
+			if (cmd >= 0 && cmd < 63) {
+				cmds |= (1 << cmd);
+			}
+			else {
+				cmds |= (1 << 63);
+			}
 			if (cmd == svc_EOF_general) {
 				// copy over the rest for a perfect copy
 				//(oldMsg.bit >> 3) + 1 == oldMsg.cursize
@@ -287,15 +321,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 
 				break;
 			}
-			// skip all the gamestates until we reach needed
-			//if (readGamestate < demo.currentNum) {
-			//	//if (readGamestate < (demo.nextNum-1)) { // not sure if this is correct tbh... but I dont wanna rewrite entire cl_demos
-			//	if (cmd == svc_gamestate) {
-			//		readGamestate++;
-			//	}
-			//	goto cutcontinue;
-			//}
-			// other commands
+
 			switch (cmd) {
 			default:
 				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
@@ -314,8 +340,13 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 						newMsg = newMsgRemember;
 						goto cuterror; // TODO handle more gracefully? just go next msg?
 					}
-					if (!wasNew) {
+					if (!wasNew && optimizeCommands // is a dupe, already have it.
+						|| serverCommandsToFlush.size() > 0 && serverCommandsToFlush.find(demo.cut.Clc.serverCommandSequence) != serverCommandsToFlush.end() // already have it from flushing
+						) { 
 						newMsg = newMsgRemember;
+					}
+					else {
+						newServerCommands.insert(demo.cut.Clc.serverCommandSequence);
 					}
 				}
 				break;
@@ -337,14 +368,29 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 					newMsg = newMsgRemember;
 					goto cuterror;
 				}
+
+				if(opts.minMsec || opts.commandTimeSlash){
+					int serverTimeDelta = demo.cut.Cl.snap.serverTime - lastWrittenServerTime;
+
+					if (opts.minMsec && serverTimeDelta < opts.minMsec && demo.cut.Cl.snap.serverTime > lastWrittenServerTime) {
+						// skip this message
+						skipMessage = true;
+					}
+					else if (opts.commandTimeSlash && serverTimeDelta < MAX_MSEC && demo.cut.Cl.snap.serverTime > lastWrittenServerTime && demo.cut.Cl.snap.ps.commandTime == psCommandTime) {
+						// skip this message
+						skipMessage = true;
+					}
+					psCommandTime = demo.cut.Cl.snap.ps.commandTime;
+				}
+
 				// check if we can optimize this one (turn it into a highly efficient delta)
-				if (optimizeSnaps && demo.cut.Cl.snap.valid && !demo.cut.Cl.snap.snapIssues && !(demo.cut.Cl.snap.snapFlags & SNAPFLAG_NOT_ACTIVE)) {
-					if (optimizeSnapsSafety && deltaSnapcount >= optimizeSnapsSafety) {
+				if ((optimizeSnaps || doingSnapsManipulation) && demo.cut.Cl.snap.valid && !demo.cut.Cl.snap.snapIssues && !(demo.cut.Cl.snap.snapFlags & SNAPFLAG_NOT_ACTIVE)) {
+					if (optimizeSnaps && optimizeSnapsSafety && deltaSnapcount >= optimizeSnapsSafety) {
 						newMsg = newMsgRemember;
 						demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, NULL, &demo.cut.Cl, demoType);
 						deltaSnapcount = 0;
 					}
-					else if (nonIssueSnapSet ) {
+					else if (nonIssueSnapSet && optimizeSnaps) {
 						clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[nonIssueSnap & PACKET_MASK];
 
 						// ok we have an old and a new frame BUT let's make sure the old is still valid and not phased out from being very old or having some other issues
@@ -366,6 +412,12 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 						}
 
 					}
+					else if (doingSnapsManipulation) {
+						// we might have skipped a frame and don't have anything to delta from. we need to write a non-delta. sorry.
+						newMsg = newMsgRemember;
+						demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, NULL, &demo.cut.Cl, demoType);
+						deltaSnapcount = 0;
+					}
 					else {
 						if (demo.cut.Cl.snap.deltaNum >= 0) {
 							deltaSnapcount++;
@@ -374,8 +426,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 							deltaSnapcount = 0;
 						}
 					}
-					nonIssueSnap = demo.cut.Cl.snap.messageNum;
-					nonIssueSnapSet = qtrue;
+					if (!skipMessage) {
+						nonIssueSnap = demo.cut.Cl.snap.messageNum;
+						nonIssueSnapSet = qtrue;
+					}
 				}
 				else {
 					if (demo.cut.Cl.snap.deltaNum >= 0) {
@@ -458,6 +512,14 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 			//}
 		}
 
+		if (skipMessage && !(cmds & unskippableCmds)) {
+
+			for (auto it = newServerCommands.begin(); it != newServerCommands.end(); it++) {
+				serverCommandsToFlush.insert(*it);
+			}
+			goto cutcontinue;
+		}
+
 		int sequenceToWrite = LittleLong(demo.cut.Clc.serverMessageSequence);
 		int cursizeToWrite = LittleLong(newMsg.cursize);
 		FS_Write(&sequenceToWrite, 4, newHandle);
@@ -468,6 +530,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 		else {
 			FS_Write(newMsg.data, newMsg.cursize, newHandle);
 		}
+		serverCommandsToFlush.clear();
+		lastWrittenServerTime = demo.cut.Cl.snap.serverTime;
 		currentMessageWritten = qtrue;
 	}
 cutcomplete:
@@ -581,10 +645,15 @@ int main(int argcO, char** argvO) {
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto f = op.add<popl::Switch>("f", "fail-if-no-reduction", "Fail if no filesize reduction was achieved.");
+	auto c = op.add<popl::Switch>("c", "commandtime-optimization", "Smoothing: Remove frames in which the followed/main player's command time didn't update.");
+	auto s = op.add<popl::Implicit<int>>("s", "snaps-limit", "Smoothing: Limit snapshot rate. Discard snapshots arriving faster than the specified value.", 50);
 
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
+	ExtraOptimizeOptions opts;
+	opts.commandTimeSlash = c->is_set();
+	opts.minMsec = !s->is_set() ? 0 : (1000 / s->value());
 
 	if (args.size() < 1) {
 		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
@@ -620,7 +689,7 @@ int main(int argcO, char** argvO) {
 	std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
 
 	double fileRatio = 100000;
-	if (demoCompress(demoName, outputName,&fileRatio)) {
+	if (demoCompress(demoName, outputName,&fileRatio,opts)) {
 		std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000000.0f;
 		if (fileRatio >= 1.0 && f->is_set()) {
