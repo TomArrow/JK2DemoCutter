@@ -5130,6 +5130,7 @@ qboolean demoCutParseMOHAASVC(msg_t* msg, demoType_t demoType, byte cmd, bool& S
 
 void demoCutEmitPacketEntities(clSnapshot_t* from, clSnapshot_t* to, msg_t* msg, clientActive_t* clCut, demoType_t demoType);
 void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clcCut);
+void demoCutWriteEmptyMessageMetadataPart(msg_t* msg, demoType_t demoType, const char* metaData);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
 qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool& SEHExceptionCaught);

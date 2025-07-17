@@ -15,6 +15,10 @@ extern msg_t* deltaTargetMsg;
 #endif
 #include <set>
 
+
+#include "include/rapidjson/document.h"
+#include "include/rapidjson/writer.h"
+
 // TODO Make work with dm3?
 
 
@@ -87,29 +91,26 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 	qboolean		nonIssueSnapSet = qfalse;
 	int64_t			deltaSnapcount = 0;
 	qboolean		currentMessageWritten = qtrue;
+	bool doingSnapsManipulation = opts.minMsec || opts.commandTimeSlash;
 
-	//mvprotocol_t	protocol;
+	rapidjson::Document* jsonPreviousMetaDocument = NULL;
+	rapidjson::Document* jsonMetaDocument = NULL;
+	if (doingSnapsManipulation) {
 
-	// Since not in MME:
-	/*if (!play) {
-		Com_Printf("Demo cutting is allowed in mme mode only.\n");
-		return qfalse;
-	}*/
-	//startTime += play->startTime;
-	//endTime += play->startTime;
+		jsonMetaDocument = new rapidjson::Document();
+		jsonMetaDocument->SetObject();
+		jsonMetaDocument->AddMember("opt_snapsmanip",1,jsonMetaDocument->GetAllocator());
+		//(*jsonMetaDocument)["opt_snapsmanip"] = 1;
+		if (opts.commandTimeSlash) {
+			//(*jsonMetaDocument)["opt_snapsmanip_cts"] = 1;
+			jsonMetaDocument->AddMember("opt_snapsmanip_cts", 1, jsonMetaDocument->GetAllocator());
+		}
+		if (opts.minMsec) {
+			//(*jsonMetaDocument)["opt_snapsmanip_minmsec"] = opts.minMsec;
+			jsonMetaDocument->AddMember("opt_snapsmanip_minmsec", opts.minMsec, jsonMetaDocument->GetAllocator());
+		}
+	}
 
-
-	//protocol = MV_GetCurrentProtocol();
-	//if (protocol == PROTOCOL_UNDEF)
-	//	ext = ".dm_16";
-	//else
-	//	ext = va(".dm_%i", protocol);
-	//ext = Cvar_FindVar("mme_demoExt")->string;
-	//strncpy_s(oldName, sizeof(oldName), sourceDemoFile, strlen(sourceDemoFile) - 6);
-	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
-	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
-
-	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(sourceDemoFile, ext, oldName, &demoType, &isCompressedFile, &demo.cut.Clc);
 
@@ -206,7 +207,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 	int lastWrittenServerTime = INT_MIN;
 	std::set<int> serverCommandsToFlush;
 	std::set<int> newServerCommands;
-	bool doingSnapsManipulation =  opts.minMsec || opts.commandTimeSlash;
+
+
+	qboolean wasFirstCommandByte = qfalse;
+	qboolean firstCommandByteRead = qfalse;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	uint64_t skippableCmds = (1 << svc_serverCommand_general) | (1 << svc_EOF_general) | (1 << svc_snapshot_general);
@@ -296,6 +300,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 			}
 			newMsgRemember = newMsg;
 			cmd = MSG_ReadByte(&oldMsg);
+			wasFirstCommandByte = (qboolean)!firstCommandByteRead;
+			firstCommandByteRead = qtrue;
 			cmd = generalizeGameSVCOp(cmd, demoType);
 			if (cmd >= 0 && cmd < 63) {
 				cmds |= (1 << cmd);
@@ -304,6 +310,77 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 				cmds |= (1 << 63);
 			}
 			if (cmd == svc_EOF_general) {
+				int minSize = 0;
+				if (wasFirstCommandByte && jsonMetaDocument) { // if we are adding metadata, we must parse the old one. otherwise meh.
+					msg_t eofOldMsgRemember = oldMsg;
+					transcodeTargetMsg = NULL;
+					const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
+					transcodeTargetMsg = &newMsg;
+					
+					// check for hidden meta content
+					if (maybeMeta) {
+
+						jsonPreviousMetaDocument = new rapidjson::Document();
+						if (jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !jsonPreviousMetaDocument->IsObject()) {
+							// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
+							// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
+							// will quit the process. Because the user can after all just adjust and fix the commandline.
+							std::cout << "Old demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+							break;
+						}
+
+						// Copy any old values to the new meta unless they already exist.
+						if (!jsonMetaDocument) {
+							jsonMetaDocument = new rapidjson::Document();
+							jsonMetaDocument->SetObject();
+						}
+
+						for (rapidjson::Value::MemberIterator it = jsonPreviousMetaDocument->MemberBegin(); it != jsonPreviousMetaDocument->MemberEnd(); it++) {
+
+							const char* newName = NULL;
+
+							if (_strnicmp(it->name.GetString(),"opt_snapsmanip",sizeof("opt_snapsmanip")-1)) { // if it isnt one of our "registered" keywords, copy it over
+								newName = it->name.GetString();
+							}
+							else {
+								// We add "_" before the name because a lot of metadata can potentially stop being meaningful once we do a cut to the file with existing metadata,
+								// since metadata can contain stuff relative to positioning of events inside a demo and metadata can be completely custom.
+								// We thus indicate the "generation" of the metadata by the amount of underscores before it.
+								// But if the demo cut is starting at 0, we can keep the original name.
+								// Also, metadata we KNOW to be ok to copy we keep (like original filename)
+								newName = va("_%s", it->name.GetString());
+							}
+
+							if (!jsonMetaDocument->HasMember(newName)) {
+
+								rapidjson::Value newNameRapid(newName, jsonMetaDocument->GetAllocator());
+								//newNameRapid.SetString(newName,strlen(newName));
+								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo copied to new demo as " << newName << ".\n";
+								jsonMetaDocument->AddMember(newNameRapid, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+							}
+							else {
+								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo overridden by new metadata. Discarding.\n";
+							}
+						}
+					}
+
+					if (maybeMeta) {
+						// if this was metadata, dump the modified one now.
+						rapidjson::StringBuffer sb;
+						rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+						jsonMetaDocument->Accept(writer);
+						const char* finalJsonMetaString = sb.GetString();
+						newMsg = newMsgRemember;
+						demoCutWriteEmptyMessageMetadataPart(&newMsg, demoType, finalJsonMetaString);
+						minSize = newMsg.cursize;
+						delete jsonMetaDocument;
+						jsonMetaDocument = NULL;
+						if (jsonPreviousMetaDocument) {
+							delete jsonPreviousMetaDocument;
+						}
+					}
+				}
+
 				// copy over the rest for a perfect copy
 				//(oldMsg.bit >> 3) + 1 == oldMsg.cursize
 				//(oldMsg.bit >> 3) == oldMsg.cursize-1
@@ -317,6 +394,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 					msg_t remember = newMsg;
 					MSG_ReadBits(&oldMsg, 1);
 					newMsg = remember; // remember the old state or we increase the size. we just want the data array to be identical even if that data is irrelevant
+				}
+				
+				if (newMsg.cursize < minSize) { // that's in case we did the metadata. it needs a minsize. :/
+					newMsg.cursize = minSize;
 				}
 
 				break;
@@ -510,6 +591,20 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 			//if (!strcmp(cmd, "map_restart")) {
 			//	mapRestartCounter++;
 			//}
+		}
+
+		if (jsonMetaDocument) {
+			// if the original demo had no metadata, but we want to save it, dump it now before the first message.
+			rapidjson::StringBuffer sb;
+			rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+			jsonMetaDocument->Accept(writer);
+			const char* finalJsonMetaString = sb.GetString();
+			demoCutWriteEmptyMessageWithMetadata(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType, createCompressedOutput, finalJsonMetaString);
+			delete jsonMetaDocument;
+			jsonMetaDocument = NULL;
+			if (jsonPreviousMetaDocument) {
+				delete jsonPreviousMetaDocument;
+			}
 		}
 
 		if (skipMessage && !(cmds & unskippableCmds)) {
