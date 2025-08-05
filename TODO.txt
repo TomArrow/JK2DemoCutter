@@ -3,6 +3,7 @@ save horizontal speeds separately!!!!!
 
 // TODO Parse com_protocol for quake games in case they decide to override protocol despite demo name...
 
+find kills near mines. for clutch rets
 
 Properly set checksumfeed in reframes so it loads the right pk3 files with dl_ prefix
 

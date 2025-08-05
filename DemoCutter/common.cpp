@@ -5272,6 +5272,11 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 			newSnap.snapIssues |= SNAPISSUE_DELTAFROMINVALID_TRYING_LAST;
 		}
 
+		if (oldSnap->snapIssues) {
+			//Com_DPrintf("Delta from frame that had issues.\n");
+			newSnap.snapIssues |= SNAPISSUE_DELTAFROMSNAPWITHISSUES;
+		}
+
 		if (!oldSnap->valid) {
 			// should never happen
 			Com_DPrintf("Delta from invalid frame (not supposed to happen!).\n");
