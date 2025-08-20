@@ -8,6 +8,7 @@
 #endif
 #include <chrono>
 #include "popl.hpp"
+#include <sstream>
 
 #ifdef MSG_READBITS_TRANSCODE
 extern msg_t* transcodeTargetMsg;
@@ -22,15 +23,26 @@ extern msg_t* deltaTargetMsg;
 // TODO Make work with dm3?
 
 
+extern bool debugWrite;
+extern bool debugRead;
+extern std::stringstream ssDebugRead;
+extern std::stringstream ssDebugWrite;
 
 class ExtraOptimizeOptions {
 public:
 	int minMsec = 0;
 	bool commandTimeSlash = false;
 	bool bruteForce = false;
+	int	debugMessage = -1;
 };
 
-
+inline size_t streamsize(std::ostream* stream) {
+	size_t oldPointer = stream->tellp();
+	stream->seekp(0, std::ios::end);
+	size_t end = stream->tellp();
+	stream->seekp(oldPointer, std::ios::beg);
+	return end;
+}
 
 // TODO attach amount of dropped frames in filename.
 
@@ -459,10 +471,16 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 				readGamestate++;
 				break;
 			case svc_snapshot_general:
+
+				if (opts.debugMessage != -1 && opts.debugMessage == demo.cut.Clc.serverMessageSequence) {
+					debugRead = true;
+				}
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught, malformedMessageCaught)) {
 					newMsg = newMsgRemember;
+					debugRead = false;
 					goto cuterror;
 				}
+				debugRead = false;
 
 				if(opts.minMsec || opts.commandTimeSlash){
 					int serverTimeDelta = demo.cut.Cl.snap.serverTime - lastWrittenServerTime;
@@ -497,9 +515,13 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 								canUse = canUse && canUseOldSnap(&demo.cut.Cl.snap, oldSnap, tryNum);
 								if (canUse) {
 									newMsg = newMsgRemember;
+									if (opts.debugMessage != -1 && opts.debugMessage == demo.cut.Cl.snap.messageNum && demo.cut.Cl.snap.deltaNum == tryNum) {
+										debugWrite = true;
+									}
 									demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+									debugWrite = false;
 									if (tryNum == demo.cut.Cl.snap.deltaNum && oldbit != newMsg.bit) {
-										std::cerr << "Brute force testing original deltanum but size doesn't match, wtf. Old bit: " << oldbit << ", newbit rewritten old: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << oldSnap->messageNum << "\n";
+										std::cerr << "Brute force testing original deltanum but size doesn't match, wtf. Old bit: " << oldbit << ", newbit rewritten old: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << oldSnap->messageNum << ", curSnap: " << demo.cut.Cl.snap.messageNum << "\n";
 									}
 									if (newMsg.bit < smallestbit) {
 										smallestbit = newMsg.bit;
@@ -512,10 +534,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 								newMsg = newMsgRemember;
 								demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue); 
 								if (smallestbit != newMsg.bit) {
-									std::cerr << "Brute force searched for most efficient source snap, but actual application did not match predicted size. Old bit: " << oldbit << ", predicted newbit: " << smallestbit << ", actual newbit: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << smallestBitNum << "\n";
+									std::cerr << "Brute force searched for most efficient source snap, but actual application did not match predicted size. Old bit: " << oldbit << ", predicted newbit: " << smallestbit << ", actual newbit: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << smallestBitNum << ", curSnap: " << demo.cut.Cl.snap.messageNum << "\n";
 								}
 								if (smallestbit > oldbit) {
-									std::cerr << "Brute-force searched most efficient snapshot, but new snapshot bigger than old one, wtf. Old bit: " << oldbit << ", newbit: " << smallestbit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold : " << smallestBitNum << "\n";
+									std::cerr << "Brute-force searched most efficient snapshot, but new snapshot bigger than old one, wtf. Old bit: " << oldbit << ", newbit: " << smallestbit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold : " << smallestBitNum << ", curSnap: " << demo.cut.Cl.snap.messageNum << "\n";
 								}
 							}
 						}
@@ -547,9 +569,14 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 									canUse = canUse && canUseOldSnap(&demo.cut.Cl.snap, oldSnap, demo.cut.Cl.snap.deltaNum);
 									if (canUse) {
 										newMsg = newMsgRemember;
+
+										if (opts.debugMessage != -1 && opts.debugMessage == demo.cut.Cl.snap.messageNum) {
+											debugWrite = true;
+										}
 										demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+										debugWrite = false;
 										if (oldbit != newMsg.bit) {
-											std::cerr << "New snapshot bigger than old one, so rewrote original but size doesn't match, wtf. Old bit: " << oldbit << ", newbit: " << newbit << ", newbit rewritten old: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << oldSnap->messageNum << "\n";
+											std::cerr << "New snapshot bigger than old one, so rewrote original but size doesn't match, wtf. Old bit: " << oldbit << ", newbit: " << newbit << ", newbit rewritten old: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << oldSnap->messageNum << ", curSnap: " << demo.cut.Cl.snap.messageNum << "\n";
 										}
 									}
 								}
@@ -746,6 +773,20 @@ cuterror:
 	FS_FCloseFile(oldHandle);
 	FS_FCloseFile(newHandle);
 
+	if (streamsize(&ssDebugWrite)) {
+		std::ofstream outputHandle;
+		outputHandle.open("optimizeDebugWrite.log", std::ios_base::app); // append instead of overwrite
+		outputHandle << ssDebugWrite.rdbuf();
+		outputHandle.close();
+	}
+	if (streamsize(&ssDebugRead)) {
+		std::ofstream outputHandle;
+		outputHandle.open("optimizeDebugRead.log", std::ios_base::app); // append instead of overwrite
+		outputHandle << ssDebugRead.rdbuf();
+		outputHandle.close();
+	}
+	MSG_PrintFieldErrors(demoType);
+
 #ifdef _WIN32
 	// On Windows we now change the Date modified to that of the original file.
 	// TODO Implement for other OSes?
@@ -801,6 +842,7 @@ cuterror:
 }*/
 
 
+
 int main(int argcO, char** argvO) {
 
 	popl::OptionParser op("Allowed options");
@@ -809,6 +851,7 @@ int main(int argcO, char** argvO) {
 	auto c = op.add<popl::Switch>("c", "commandtime-optimization", "Smoothing: Remove frames in which the followed/main player's command time didn't update.");
 	auto s = op.add<popl::Implicit<int>>("s", "snaps-limit", "Smoothing: Limit snapshot rate. Discard snapshots arriving faster than the specified value.", 50);
 	auto b = op.add<popl::Switch>("b", "brute-force", "Brute force: Try all possible source snaps to find the most efficient one. Slow.");
+	auto D = op.add<popl::Implicit<int>>("D", "debug-message", "Write detailed information about a particular message when reading/writing (values and bit counts).", -1);
 
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
@@ -817,6 +860,7 @@ int main(int argcO, char** argvO) {
 	opts.commandTimeSlash = c->is_set();
 	opts.bruteForce = b->is_set();
 	opts.minMsec = !s->is_set() ? 0 : (1000 / s->value());
+	opts.debugMessage = !D->is_set() ? -1 : D->value();
 
 	if (args.size() < 1) {
 		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
@@ -856,10 +900,10 @@ int main(int argcO, char** argvO) {
 		std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000000.0f;
 		if (fileRatio >= 1.0 && f->is_set()) {
-			Com_DPrintf("Demo %s got successfully optimized in %.5f seconds BUT -f/--fail-if-no-reduction was specified and no filesize reduction was achieved. Failing.\n", demoName, seconds);
+			Com_DPrintf("Demo %s got successfully optimized in %.5f seconds BUT -f/--fail-if-no-reduction was specified and no filesize reduction was achieved (%.4f%%). Failing.\n", demoName, seconds, (float)(100.0f * (fileRatio)));
 			return 3;
 		} else{
-			Com_Printf("Demo %s got successfully optimized in %.5f seconds \n", demoName, seconds);
+			Com_Printf("Demo %s got successfully optimized in %.5f seconds (%.4f%%)\n", demoName, seconds, (float)(100.0f * (fileRatio)));
 			return 0;
 		}
 	}

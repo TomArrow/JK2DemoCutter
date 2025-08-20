@@ -13,6 +13,12 @@
 //#define _NEWHUFFTABLE_		// Build "c:\\netchan.bin"
 //#define _USINGNEWHUFFTABLE_		// Build a new frequency table to cut and paste.
 
+extern bool debugWrite;
+extern bool debugRead;
+extern std::stringstream ssDebugRead;
+extern std::stringstream ssDebugWrite;
+
+ankerl::unordered_dense::map< demoTypeFieldOffset, size_t, ankerl::unordered_dense::hash<demoTypeFieldOffset>> readOverflows;
 
 #define FASTHUFFMAN // Based on: https://github.com/mightycow/uberdemotools/commit/685b132abc4803f4c813fa07928cd9a4099e5d59
 #define MSG_ALLCHARS // Don't strip out stuff > 127 in strings. We might wanna do this on a demo type basis but really what's the point. If the input demo contained sth, it's fair to say we can use it, and the clients strip it out on their own anyway, why double the effort here. TODO: What about the % character thing? Keep it too for sake of preserving original data?
@@ -348,6 +354,9 @@ int	overflows;
 // negative bit values include signs
 void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 	int	i;
+	int obits = bits;
+	int oldbits = msg->bit;
+	int ovalue = value;
 
 	oldsize += bits;
 
@@ -462,6 +471,10 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 		msg->cursize = (msg->bit>>3)+1;
 #endif
 	}
+
+	if (debugWrite) {
+		ssDebugWrite << obits << "\tbits (" << (msg->bit-oldbits) << " actual):" << ovalue << "\n";
+	}
 }
 
 #ifdef MSG_READBITS_TRANSCODE
@@ -474,6 +487,7 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 	int			get;
 	qboolean	sgn;
 	int			i, nbits;
+	int			oldbits = msg->bit;
 	value = 0;
 #ifdef MSG_READBITS_TRANSCODE
 	int originalBits = bits;
@@ -573,6 +587,10 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 		MSG_WriteBits(transcodeTargetMsg, value, originalBits);
 	}
 #endif
+
+	if (debugRead) {
+		ssDebugRead << originalBits << "\tbits (" << (msg->bit - oldbits) << " actual):" << value << "\n";
+	}
 
 	return value;
 }
@@ -2682,7 +2700,10 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 		if ( from == NULL ) {
 			return;
 		}
-		MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((from->number + 1) % MAX_GENTITIES) : from->number, GENTITYNUM_BITS );
+		MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((from->number + 1) % MAX_GENTITIES) : from->number, GENTITYNUM_BITS ); 
+		if (debugWrite) {
+			ssDebugWrite << "ENTITY " << from->number << "\n";
+		}
 		MSG_WriteBits( msg, 1, 1 );
 		return;
 	}
@@ -2716,12 +2737,18 @@ void MSG_WriteDeltaEntity( msg_t *msg, struct entityState_s *from, struct entity
 		}
 		// write two bits for no change
 		MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((to->number + 1) % MAX_GENTITIES) : to->number, GENTITYNUM_BITS );
+		if (debugWrite) {
+			ssDebugWrite << "ENTITY " << to->number << "\n";
+		}
 		MSG_WriteBits( msg, 0, 1 );		// not removed
 		MSG_WriteBits( msg, 0, 1 );		// no delta
 		return;
 	}
 
 	MSG_WriteBits( msg, demoType == DM3_MOHAA_PROT_15 ? ((to->number + 1) % MAX_GENTITIES) : to->number, GENTITYNUM_BITS ); // mohaa extensions apparently add 1 to the value and then subtract it when reading. idfk why.
+	if (debugWrite) {
+		ssDebugWrite << "ENTITY " << to->number << "\n";
+	}
 	MSG_WriteBits( msg, 0, 1 );			// not removed
 	MSG_WriteBits( msg, 1, 1 );			// we have a delta
 
@@ -2854,6 +2881,10 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 		startBit = msg->readcount * 8 - GENTITYNUM_BITS;
 	} else {
 		startBit = ( msg->readcount - 1 ) * 8 + msg->bit - GENTITYNUM_BITS;
+	}
+
+	if (debugRead) {
+		ssDebugRead << "ENTITY " << number << "\n";
 	}
 
 	// check for a remove
@@ -3012,6 +3043,17 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 					else {
 						// integer
 						*toF = MSG_ReadBits(msg, field->bits);
+
+						if (*toF == *fromF) {
+							// server tried to encode a value that doesn't fit into the field width, either on this or on the previous frame
+							// we could try to change some bit here so its not the same value anymore but ends up being sent as the same value
+							// to replicate this problem in the rewritten message. worth tho? only a very specially adapted client would even be able to tell the difference,
+							// and even then it would be impossible to tell if the value was fugged in the previous frame or on this one
+							//std::cerr << "Field " << field->name << " must have overflown during write. Demo writer must have believed a delta exists, but none does: " << *fromF << " == " << *toF << "\n";
+							//((netField_t*)field)->readOverflows++; // casting away the const. im fucking evil :(
+							demoTypeFieldOffset keyHere = { demoType,field->offset,0 };  
+							readOverflows[keyHere]++;
+						}
 						if (print) {
 							Com_Printf("%s:%i ", field->name, *toF);
 						}
@@ -3142,6 +3184,10 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		}
 	}
 
+	if (debugWrite) {
+		ssDebugWrite << "PLAYERSTATE\n";
+	}
+
 	MSG_WriteByte( msg, lc );	// # of changes
 
 #ifndef FINAL_BUILD
@@ -3153,6 +3199,10 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	for ( i = 0, field = playerStateFieldsHere; i < lc ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
+
+		if (debugWrite) {
+			ssDebugWrite << "FIELD " << field->name << "\n";
+		}
 
 		if ( *fromF == *toF ) {
 			MSG_WriteBits( msg, 0, 1 );	// no change
@@ -3303,6 +3353,10 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	
 	MSG_WriteBits( msg, 1, 1 );	// changed
 
+	if (debugWrite) {
+		ssDebugWrite << "EXTRA STATS" << "\n";
+	}
+
 	if ( statsbits ) {
 		MSG_WriteBits( msg, 1, 1 );	// changed
 		if (isMOHAADemo) {
@@ -3338,7 +3392,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	}
 
 	if (isMOHAADemo) {
-
+		if (debugWrite) {
+			ssDebugWrite << "EXTRA ACTIVEITEMS" << "\n";
+		}
 		if (activeitemsbits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
 			MSG_WriteBits(msg, activeitemsbits, MAX_ACTIVEITEMS);
@@ -3350,6 +3406,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 			MSG_WriteBits(msg, 0, 1);	// no change
 		}
 
+		if (debugWrite) {
+			ssDebugWrite << "EXTRA AMMOAMOUNT" << "\n";
+		}
 		if (ammo_amountbits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
 			MSG_WriteBits(msg, ammo_amountbits, MAX_AMMO_AMOUNT);
@@ -3362,6 +3421,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		}
 
 
+		if (debugWrite) {
+			ssDebugWrite << "EXTRA AMMO" << "\n";
+		}
 		if (ammobits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
 			MSG_WriteBits(msg, ammobits, MAX_AMMO);
@@ -3373,6 +3435,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 			MSG_WriteBits(msg, 0, 1);	// no change
 		}
 
+		if (debugRead) {
+			ssDebugRead << "EXTRA MAXAMMOAMOUNT" << "\n";
+		}
 
 		if (max_ammo_amountbits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
@@ -3386,7 +3451,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		}
 	}
 	else {
-
+		if (debugWrite) {
+			ssDebugWrite << "EXTRA PERSISTANT" << "\n";
+		}
 		if (persistantbits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
 			MSG_WriteShort(msg, persistantbits);
@@ -3405,7 +3472,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 			MSG_WriteBits(msg, 0, 1);	// no change
 		}
 
-
+		if (debugWrite) {
+			ssDebugWrite << "EXTRA AMMO" << "\n";
+		}
 		if (ammobits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
 			MSG_WriteShort(msg, ammobits);
@@ -3424,7 +3493,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 			MSG_WriteBits(msg, 0, 1);	// no change
 		}
 
-
+		if (debugWrite) {
+			ssDebugWrite << "EXTRA POWERUPS" << "\n";
+		}
 		if (powerupbits) {
 			MSG_WriteBits(msg, 1, 1);	// changed
 			MSG_WriteShort(msg, powerupbits);
@@ -3437,6 +3508,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 		}
 
 		if (demoType == DM_14) {
+			if (debugWrite) {
+				ssDebugWrite << "EXTRA INVENTORY" << "\n";
+			}
 			if (inventorybits) {
 				MSG_WriteBits(msg, 1, 1);	// changed
 				MSG_WriteShort(msg, inventorybits);
@@ -3452,6 +3526,30 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	
 }
 
+void MSG_PrintFieldErrors(demoType_t demoType) {
+
+	const netField_t* field;
+	const netField_t* fields = NULL;
+	int numFields,i;
+	if (getPlayerStateFields(&fields, &numFields, demoType)) {
+		for (i = 0, field = &fields[0]; i < numFields; i++, field++) {
+			demoTypeFieldOffset keyHere = { demoType,field->offset,1 };  // 3rd paaram means playerstate
+			size_t countOverflowsHere = readOverflows[keyHere];
+			if (countOverflowsHere) {
+				std::cerr << countOverflowsHere << " read overflows (delta when values were identical) detected for the PS field " << field->name << "\n";
+			}
+		}
+	}
+	if (getEntityStateFields(&fields, &numFields, demoType)) {
+		for (i = 0, field = &fields[0]; i < numFields; i++, field++) {
+			demoTypeFieldOffset keyHere = { demoType,field->offset,0 };  // 3rd paaram means playerstate
+			size_t countOverflowsHere = readOverflows[keyHere];
+			if (countOverflowsHere) {
+				std::cerr << countOverflowsHere << " read overflows (delta when values were identical) detected for the ES field " << field->name << "\n";
+			}
+		}
+	}
+}
 
 /*
 ===================
@@ -3548,6 +3646,10 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				break;
 		}
 	}
+
+	if (debugRead) {
+		ssDebugRead << "PLAYERSTATE\n";
+	}
 	
 	lc = MSG_ReadByte(msg);
 
@@ -3562,6 +3664,10 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	for ( i = 0, field = psFields ; i < lc ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
+
+		if (debugRead) {
+			ssDebugRead << "FIELD " << field->name << "\n";
+		}
 
 #ifdef _DONETPROFILE_
 		startBytes=msg->readcount;
@@ -3616,6 +3722,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				} else {
 					// integer
 					*toF = MSG_ReadBits( msg, field->bits );
+					if (*toF == *fromF) {
+						// server tried to encode a value that doesn't fit into the field width, either on this or on the previous frame
+						// we could try to change some bit here so its not the same value anymore but ends up being sent as the same value
+						// to replicate this problem in the rewritten message. worth tho? only a very specially adapted client would even be able to tell the difference,
+						// and even then it would be impossible to tell if the value was fugged in the previous frame or on this one
+						//std::cerr << "Field " << field->name << " must have overflown during write. Demo writer must have believed a delta exists, but none does: " << *fromF << " == " << *toF << "\n";
+						//((netField_t*)field)->readOverflows++; // casting away the const. im fucking evil :(
+						demoTypeFieldOffset keyHere = { demoType,field->offset,1 };  // 3rd paaram means playerstate
+						readOverflows[keyHere]++;
+					}
 					if ( print ) {
 						Com_Printf( "%s:%i ", field->name, *toF );
 					}
@@ -3641,6 +3757,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 #endif
 	if (MSG_ReadBits( msg, 1 ) ) {
 		// parse stats
+		if (debugRead) {
+			ssDebugRead << "EXTRA STATS" << "\n";
+		}
 		if ( MSG_ReadBits( msg, 1 ) ) {
 			//LOG("PS_STATS");
 
@@ -3687,6 +3806,10 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 
 		if (isMOHAADemo) {
 
+			if (debugRead) {
+				ssDebugRead << "EXTRA ACTIVEITEMS" << "\n";
+			}
+
 			// parse activeItems
 			if (MSG_ReadBits(msg, 1)) {
 				//LOG("PS_ITEMS");
@@ -3711,6 +3834,10 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 						}
 					}
 				}
+			}
+
+			if (debugRead) {
+				ssDebugRead << "EXTRA AMMOAMOUNT" << "\n";
 			}
 
 			// parse ammo_amount
@@ -3739,6 +3866,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				}
 			}
 
+			if (debugRead) {
+				ssDebugRead << "EXTRA AMMO" << "\n";
+			}
 			// parse ammo_name_index
 			if (MSG_ReadBits(msg, 1)) {
 				//LOG("PS_AMMO");
@@ -3765,6 +3895,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				}
 			}
 
+			if (debugRead) {
+				ssDebugRead << "EXTRA MAXAMMOAMOUNT" << "\n";
+			}
 			// parse powerups
 			if (MSG_ReadBits(msg, 1)) {
 				//LOG("PS_MAX_AMMO_AMOUNT");
@@ -3797,6 +3930,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	#ifdef _DONETPROFILE_
 			startBytes=msg->readcount;
 	#endif
+			if (debugRead) {
+				ssDebugRead << "EXTRA PERSISTANT" << "\n";
+			}
 			if ( MSG_ReadBits( msg, 1 ) ) {
 				//LOG("PS_PERSISTANT");
 				bits = MSG_ReadShort (msg);
@@ -3835,6 +3971,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	#ifdef _DONETPROFILE_
 			startBytes=msg->readcount;
 	#endif
+			if (debugRead) {
+				ssDebugRead << "EXTRA AMMO" << "\n";
+			}
 			if ( MSG_ReadBits( msg, 1 ) ) {
 				//LOG("PS_AMMO");
 				bits = MSG_ReadShort (msg);
@@ -3873,6 +4012,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	#ifdef _DONETPROFILE_
 			startBytes=msg->readcount;
 	#endif
+			if (debugRead) {
+				ssDebugRead << "EXTRA POWERUPS" << "\n";
+			}
 			if ( MSG_ReadBits( msg, 1 ) ) {
 				//LOG("PS_POWERUPS");
 				bits = MSG_ReadShort (msg);
@@ -3904,6 +4046,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	#ifdef _DONETPROFILE_
 				startBytes = msg->readcount;
 	#endif
+				if (debugRead) {
+					ssDebugRead << "EXTRA INVENTORY" << "\n";
+				}
 				if (MSG_ReadBits(msg, 1)) {
 					//LOG("PS_INVENTORY");
 					bits = MSG_ReadShort(msg);

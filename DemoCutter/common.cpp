@@ -30,6 +30,11 @@ InternedStringTable internedStrings;
 int GlobalDebugOutputFlags = 0;
 int64_t GlobalDebugDemoTime = 0;
 
+bool debugWrite = false;
+bool debugRead = false;
+std::stringstream ssDebugRead;
+std::stringstream ssDebugWrite;
+
 
 
 std::string errorInfo = "";
@@ -5985,6 +5990,9 @@ void demoCutWriteDeltaSnapshotActual(msg_t* msg, clSnapshot_t* frame, clSnapshot
 	// send over the areabits
 	if (replicateAreaMaskSize) {
 		int trueLen = std::min((int)sizeof(frame->areamask), frame->areamaskLen);
+		if (sizeof(frame->areamask) < frame->areamaskLen) {
+			std::cerr << "sizeof(frame->areamask) < frame->areamaskLen: " << sizeof(frame->areamask) << ", " << frame->areamaskLen << "\n";
+		}
 		MSG_WriteByte(msg, trueLen);
 		MSG_WriteData(msg, frame->areamask, trueLen);
 	}

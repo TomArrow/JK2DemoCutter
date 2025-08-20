@@ -1910,7 +1910,7 @@ void MSG_InitOOB(msg_t* buf, byte* data, int length);
 void MSG_Clear(msg_t* buf);
 void MSG_WriteData(msg_t* buf, const void* data, int length);
 void MSG_Bitstream(msg_t* buf);
-
+void MSG_PrintFieldErrors(demoType_t demoType);
 
 struct usercmd_s;
 struct entityState_s;
@@ -4030,6 +4030,10 @@ static const int saberMoveJK2ToGeneral[] {
 
 	LS_MOVE_MAX_GENERAL//
 };
+
+
+typedef std::tuple<demoType_t, int, int> demoTypeFieldOffset; // demoType, field offset, ispsfield
+extern ankerl::unordered_dense::map< demoTypeFieldOffset, size_t, ankerl::unordered_dense::hash<demoTypeFieldOffset>> readOverflows;
 
 extern ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberMoveNames_general;
 extern ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberStyleNames;
