@@ -498,6 +498,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 								if (canUse) {
 									newMsg = newMsgRemember;
 									demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+									if (tryNum == demo.cut.Cl.snap.deltaNum && oldbit != newMsg.bit) {
+										std::cerr << "Brute force testing original deltanum but size doesn't match, wtf. Old bit: " << oldbit << ", newbit rewritten old: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << oldSnap->messageNum << "\n";
+									}
 									if (newMsg.bit < smallestbit) {
 										smallestbit = newMsg.bit;
 										smallestBitNum = tryNum;
