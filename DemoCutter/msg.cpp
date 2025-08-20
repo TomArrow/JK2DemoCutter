@@ -489,9 +489,9 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 	int			i, nbits;
 	int			oldbits = msg->bit;
 	value = 0;
-#ifdef MSG_READBITS_TRANSCODE
+//#ifdef MSG_READBITS_TRANSCODE
 	int originalBits = bits;
-#endif
+//#endif
 
 	if ( bits < 0 ) {
 		bits = -bits;

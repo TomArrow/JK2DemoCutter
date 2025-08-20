@@ -509,7 +509,8 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 						if (opts.bruteForce) {
 							int smallestbit = INT_MAX;
 							int smallestBitNum = INT_MIN;
-							for (int tryNum = nonIssueSnap; tryNum > demo.cut.Cl.snap.messageNum-PACKET_BACKUP_MIN; tryNum--) {
+							int smallestNumTry = std::max(-1, demo.cut.Cl.snap.messageNum - PACKET_BACKUP_MIN);
+							for (int tryNum = nonIssueSnap; tryNum > smallestNumTry; tryNum--) {
 								clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[tryNum & PACKET_MASK];
 								bool canUse = oldSnap->isNonIssueSnap;
 								canUse = canUse && canUseOldSnap(&demo.cut.Cl.snap, oldSnap, tryNum);
@@ -562,7 +563,28 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 								newMsg = newMsgRemember;
 								demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
 								int newbit = newMsg.bit;
-								if (oldbit < newbit) {
+
+								// try to find one that uses same client num.
+								if (oldbit < newbit && demo.cut.Cl.snap.ps.clientNum != oldSnap->ps.clientNum) {
+									int smallestNumTry = std::max(-1, demo.cut.Cl.snap.messageNum - PACKET_BACKUP_MIN);
+									int tryNum = nonIssueSnap;
+									bool found = false;
+									for (; tryNum > smallestNumTry; tryNum--) {
+										oldSnap = &demo.cut.Cl.snapshots[tryNum & PACKET_MASK];
+										if (demo.cut.Cl.snap.ps.clientNum == oldSnap->ps.clientNum) {
+											found = true;
+											break;
+										}
+									}
+									bool canUse = found && oldSnap->isNonIssueSnap && canUseOldSnap(&demo.cut.Cl.snap, oldSnap, tryNum);
+									if (canUse) {
+										newMsg = newMsgRemember;
+										demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+										newbit = newMsg.bit;
+									}
+								}
+
+								if (oldbit < newbit && demo.cut.Cl.snap.deltaNum != -1) {
 									// ok it didnt reduce the size. revert.
 									oldSnap = &demo.cut.Cl.snapshots[demo.cut.Cl.snap.deltaNum & PACKET_MASK];
 									canUse = oldSnap->isNonIssueSnap;
