@@ -1366,6 +1366,8 @@ typedef struct {
 	int				numEntities;			// all of the entities that need to be presented
 	int				parseEntitiesNum;		// at the time of this snapshot
 
+	qboolean		isNonIssueSnap;			// confirmed to be delta-able from
+
 	int				serverCommandNum;		// execute all commands up to this before
 											// making the snapshot current
 

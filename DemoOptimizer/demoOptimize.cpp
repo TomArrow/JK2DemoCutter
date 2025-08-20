@@ -27,6 +27,7 @@ class ExtraOptimizeOptions {
 public:
 	int minMsec = 0;
 	bool commandTimeSlash = false;
+	bool bruteForce = false;
 };
 
 
@@ -45,6 +46,19 @@ qboolean optimizeSnaps = qtrue;
 int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to protect against corruption. e.g. every 10000 packets. at 100 fps thats like 100 seconds
 
 
+
+bool canUseOldSnap(clSnapshot_t* newSnap, clSnapshot_t* oldSnap, int nonIssueSnap) {
+	bool canUse = qtrue;
+	canUse = canUse && !((oldSnap->snapFlags ^ newSnap->snapFlags) & SNAPFLAG_SERVERCOUNT); // make sure theyre from the same map
+	canUse = canUse && newSnap->messageNum > oldSnap->messageNum; // make sure we're in order. yea ik... shit happens
+	canUse = canUse && newSnap->serverTime > oldSnap->serverTime; // make sure we're in order. yea ik... shit happens
+	canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
+	canUse = canUse && oldSnap->valid && !oldSnap->snapIssues; // should be already covered but let's be safe
+	canUse = canUse && (newSnap->messageNum - oldSnap->messageNum < PACKET_BACKUP_MIN); // don't delta from extremely old frames (was 100 but make it 32 so vanilla clients dont struggle)
+	canUse = canUse && (newSnap->serverTime - oldSnap->serverTime < 1000); // don't delta from extremely old frames
+	canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES_MIN - 128); // good old safety check from parsesnapshot
+	return canUse;
+}
 
 
 #ifdef RELDEBUG
@@ -472,24 +486,72 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 						deltaSnapcount = 0;
 					}
 					else if (nonIssueSnapSet && optimizeSnaps) {
-						clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[nonIssueSnap & PACKET_MASK];
 
-						// ok we have an old and a new frame BUT let's make sure the old is still valid and not phased out from being very old or having some other issues
-						bool canUse = qtrue;
-						canUse = canUse && !((oldSnap->snapFlags ^ demo.cut.Cl.snap.snapFlags) & SNAPFLAG_SERVERCOUNT); // make sure theyre from the same map
-						canUse = canUse && demo.cut.Cl.snap.messageNum > oldSnap->messageNum; // make sure we're in order. yea ik... shit happens
-						canUse = canUse && demo.cut.Cl.snap.serverTime > oldSnap->serverTime; // make sure we're in order. yea ik... shit happens
-						canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
-						canUse = canUse && oldSnap->valid && !oldSnap->snapIssues; // should be already covered but let's be safe
-						canUse = canUse && (demo.cut.Cl.snap.messageNum - oldSnap->messageNum < PACKET_BACKUP_MIN); // don't delta from extremely old frames (was 100 but make it 32 so vanilla clients dont struggle)
-						canUse = canUse && (demo.cut.Cl.snap.serverTime - oldSnap->serverTime < 1000); // don't delta from extremely old frames
-						canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES_MIN - 128); // good old safety check from parsesnapshot
+						int oldbit = newMsg.bit;
+						if (opts.bruteForce) {
+							int smallestbit = INT_MAX;
+							int smallestBitNum = INT_MIN;
+							for (int tryNum = nonIssueSnap; tryNum > demo.cut.Cl.snap.messageNum-PACKET_BACKUP_MIN; tryNum--) {
+								clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[tryNum & PACKET_MASK];
+								bool canUse = oldSnap->isNonIssueSnap;
+								canUse = canUse && canUseOldSnap(&demo.cut.Cl.snap, oldSnap, tryNum);
+								if (canUse) {
+									newMsg = newMsgRemember;
+									demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+									if (newMsg.bit < smallestbit) {
+										smallestbit = newMsg.bit;
+										smallestBitNum = tryNum;
+									}
+								}
+							}
+							if (smallestBitNum != INT_MIN) {
+								clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[smallestBitNum & PACKET_MASK];
+								newMsg = newMsgRemember;
+								demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue); 
+								if (smallestbit != newMsg.bit) {
+									std::cerr << "Brute force searched for most efficient source snap, but actual application did not match predicted size. Old bit: " << oldbit << ", predicted newbit: " << smallestbit << ", actual newbit: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << smallestBitNum << "\n";
+								}
+								if (smallestbit > oldbit) {
+									std::cerr << "Brute-force searched most efficient snapshot, but new snapshot bigger than old one, wtf. Old bit: " << oldbit << ", newbit: " << smallestbit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold : " << smallestBitNum << "\n";
+								}
+							}
+						}
+						else {
 
-						if (canUse) {
+							clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[nonIssueSnap & PACKET_MASK];
 
-							newMsg = newMsgRemember;
-							demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType,qtrue);
-							deltaSnapcount++;
+							// ok we have an old and a new frame BUT let's make sure the old is still valid and not phased out from being very old or having some other issues
+							bool canUse = canUseOldSnap(&demo.cut.Cl.snap, oldSnap, nonIssueSnap);
+
+							/*canUse = canUse && !((oldSnap->snapFlags ^ demo.cut.Cl.snap.snapFlags) & SNAPFLAG_SERVERCOUNT); // make sure theyre from the same map
+							canUse = canUse && demo.cut.Cl.snap.messageNum > oldSnap->messageNum; // make sure we're in order. yea ik... shit happens
+							canUse = canUse && demo.cut.Cl.snap.serverTime > oldSnap->serverTime; // make sure we're in order. yea ik... shit happens
+							canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
+							canUse = canUse && oldSnap->valid && !oldSnap->snapIssues; // should be already covered but let's be safe
+							canUse = canUse && (demo.cut.Cl.snap.messageNum - oldSnap->messageNum < PACKET_BACKUP_MIN); // don't delta from extremely old frames (was 100 but make it 32 so vanilla clients dont struggle)
+							canUse = canUse && (demo.cut.Cl.snap.serverTime - oldSnap->serverTime < 1000); // don't delta from extremely old frames
+							canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES_MIN - 128); // good old safety check from parsesnapshot
+							*/
+
+							if (canUse) {
+								newMsg = newMsgRemember;
+								demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+								int newbit = newMsg.bit;
+								if (oldbit < newbit) {
+									// ok it didnt reduce the size. revert.
+									oldSnap = &demo.cut.Cl.snapshots[demo.cut.Cl.snap.deltaNum & PACKET_MASK];
+									canUse = oldSnap->isNonIssueSnap;
+									canUse = canUse && canUseOldSnap(&demo.cut.Cl.snap, oldSnap, demo.cut.Cl.snap.deltaNum);
+									if (canUse) {
+										newMsg = newMsgRemember;
+										demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, oldSnap, &demo.cut.Cl, demoType, qtrue);
+										if (oldbit != newMsg.bit) {
+											std::cerr << "New snapshot bigger than old one, so rewrote original but size doesn't match, wtf. Old bit: " << oldbit << ", newbit: " << newbit << ", newbit rewritten old: " << newMsg.bit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold: " << oldSnap->messageNum << "\n";
+										}
+									}
+								}
+								deltaSnapcount++;
+							}
 						}
 
 					}
@@ -509,6 +571,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 					}
 					if (!skipMessage) {
 						nonIssueSnap = demo.cut.Cl.snap.messageNum;
+						demo.cut.Cl.snap.isNonIssueSnap = demo.cut.Cl.snapshots[demo.cut.Cl.snap.messageNum & PACKET_MASK].isNonIssueSnap = qtrue;
 						nonIssueSnapSet = qtrue;
 					}
 				}
@@ -742,12 +805,14 @@ int main(int argcO, char** argvO) {
 	auto f = op.add<popl::Switch>("f", "fail-if-no-reduction", "Fail if no filesize reduction was achieved.");
 	auto c = op.add<popl::Switch>("c", "commandtime-optimization", "Smoothing: Remove frames in which the followed/main player's command time didn't update.");
 	auto s = op.add<popl::Implicit<int>>("s", "snaps-limit", "Smoothing: Limit snapshot rate. Discard snapshots arriving faster than the specified value.", 50);
+	auto b = op.add<popl::Switch>("b", "brute-force", "Brute force: Try all possible source snaps to find the most efficient one. Slow.");
 
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
 	ExtraOptimizeOptions opts;
 	opts.commandTimeSlash = c->is_set();
+	opts.bruteForce = b->is_set();
 	opts.minMsec = !s->is_set() ? 0 : (1000 / s->value());
 
 	if (args.size() < 1) {
