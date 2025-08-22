@@ -173,6 +173,7 @@ public:
 	bool writeChatsCategorized = false; // Not currently implemented
 	bool doStatsDb = false;
 	bool doStrafeDeviation = false;
+	bool findjumpbugs = false;
 };
 
 
@@ -1000,9 +1001,11 @@ struct frameInfo_t {
 	int otherKillerValue[max_clients];
 	int otherKillerTime[max_clients];
 #endif
-	qboolean pmFlagKnockback[MAX_CLIENTS_MAX];
+	//qboolean pmFlagKnockback[MAX_CLIENTS_MAX];
+	int pmFlags[MAX_CLIENTS_MAX];
 	qboolean psTeleportBit[MAX_CLIENTS_MAX];
 	int pmFlagTime[MAX_CLIENTS_MAX];
+	float jumpzstart[MAX_CLIENTS_MAX];
 	int duelTime[MAX_CLIENTS_MAX];
 	int commandTime[MAX_CLIENTS_MAX];
 	int legsAnimGeneral[MAX_CLIENTS_MAX];
@@ -5338,8 +5341,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					thisFrameInfo.duelTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.duelTime;
 					thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.commandTime;
+					thisFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_flags;
+					thisFrameInfo.jumpzstart[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.fd.forceJumpZStart;
 					thisFrameInfo.legsAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralLegsAnim;
 					thisFrameInfo.torsoAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralTorsoAnim;
+
+					// jumpbug detection
+					if (opts.findjumpbugs && (lastFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_JUMP_HELD) && (thisFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_JUMP_HELD) && lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum][2] < 0 && demo.cut.Cl.snap.ps.velocity[2] > 0 && demo.cut.Cl.snap.ps.groundEntityNum == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[demo.cut.Cl.snap.ps.clientNum] == ENTITYNUM_NONE && lastFrameInfo.jumpzstart[demo.cut.Cl.snap.ps.clientNum] == demo.cut.Cl.snap.ps.fd.forceJumpZStart) {
+						//std::cout << "hehe found\n";
+						int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + demo.cut.Cl.snap.ps.clientNum];
+						const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+						const char* playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+						logSpecialThing("JUMPBUGSEARCH", "", "", playerName, demo.cut.Cl.snap.ps.clientNum, demoCurrentTime, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts);
+					}
 
 					// Backflip detection
 					if (
@@ -5486,7 +5500,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// If otherKiller and otherKillerTime in PS has changed from last frame, this player is boosted. Add the boost to his list.
 				{
 					qboolean playerStateBoostDetected = qfalse;
-					thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
+					//thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.pm_flags & PMF_TIME_KNOCKBACK);
 					thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.pm_time;
 					thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] = (qboolean)!!(demo.cut.Cl.snap.ps.eFlags & getEF_TELEPORTBIT(demoType));
 
@@ -5527,7 +5541,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #else
 					int psCommandTimeDelta = thisFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum] - lastFrameInfo.commandTime[demo.cut.Cl.snap.ps.clientNum];
 					if (thisFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] == lastFrameInfo.psTeleportBit[demo.cut.Cl.snap.ps.clientNum] &&   // Respawn/teleport also creates knockback. But we're not looking for that.
-						thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum]
+						//thisFrameInfo.pmFlagKnockback[demo.cut.Cl.snap.ps.clientNum]
+						(thisFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_TIME_KNOCKBACK)
 						&& thisFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum] != (lastFrameInfo.pmFlagTime[demo.cut.Cl.snap.ps.clientNum]-(psCommandTimeDelta))
 						) {
 						
@@ -9071,6 +9086,7 @@ int main(int argcO, char** argvO) {
 	auto K = op.add<popl::Switch>("K", "skip-kills", "Skips searching for kills (e.g. if you want to only search for chats or defrag runs)");
 	auto L = op.add<popl::Implicit<int>>("L", "log-chats", "Writes database with chats. 1 = unique chats database (every unique chat only once). 2 = categorized chats (not currently implemented)", 1);
 	auto Q = op.add<popl::Implicit<int>>("Q", "skip-stats", "1 = Avoids creating the statistics db, 2 = avoids strafe deviation calculation. Bitmask. Can combine.",1);
+	auto j = op.add<popl::Implicit<int>>("j", "find-jumpbugs", "Finds instances of jumpbugs in demos.",1);
 
 	
 	op.parse(argcO, argvO);
@@ -9118,6 +9134,7 @@ int main(int argcO, char** argvO) {
 	opts.printDebug = p->value();
 	opts.strafeCSVInterpolate = Z->value();
 	opts.playerCSVDump = y->is_set();
+	opts.findjumpbugs = j->is_set();
 	opts.entityCSVDump = !E->is_set() ? 0 : E->value();
 	opts.skipKills = K->is_set();
 	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
