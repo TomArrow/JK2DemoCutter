@@ -1053,7 +1053,7 @@ void CModel::ParseFace(dsurface_t* ds, mapVert_t* verts, int* indexes) {
 
 	for (i = 0; i < MAXLIGHTMAPS; i++)
 	{
-			lightmapNum[i] = LittleLong(ds->lightmapNum[i]);
+		lightmapNum[i] = LittleLong(ds->lightmapNum[i]);
 	}
 
 	// get fog volume
@@ -1136,6 +1136,15 @@ void CModel::ParseFace(dsurface_t* ds, mapVert_t* verts, int* indexes) {
 			tri[1].xyz[j] = LittleFloat(verts[triindexes[1]].xyz[j]);
 			tri[2].xyz[j] = LittleFloat(verts[triindexes[2]].xyz[j]);
 		}
+		for (j = 0; j < 2; j++) {
+			//cv->points[i][j] = LittleFloat(verts[i].xyz[j]);
+			tri[0].lightmapSt[j] = LittleFloat(verts[triindexes[0]].lightmap[0][j]);
+			tri[1].lightmapSt[j] = LittleFloat(verts[triindexes[1]].lightmap[0][j]);
+			tri[2].lightmapSt[j] = LittleFloat(verts[triindexes[2]].lightmap[0][j]);
+		}
+		tri[0].lightmapNum = lightmapNum[0];
+		tri[1].lightmapNum = lightmapNum[0];
+		tri[2].lightmapNum = lightmapNum[0];
 		//faceTriangles.push_back(tri);
 		indices.push_back((int)faceVerts.size());
 		faceVerts.push_back(tri[0]);
@@ -1233,6 +1242,34 @@ void CModel::R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump) {
 
 	//ri.Printf(PRINT_DEVELOPER, "...loaded %d faces, %i meshes, %i trisurfs, %i flares\n",
 	//	numFaces, numMeshes, numTriSurfs, numFlares);
+}
+
+
+void CModel::R_LoadLightmaps(lump_t* l) {
+	const byte* buf, * buf_p;
+	int			len;
+	byte		image[LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3];
+	int			i, j;
+	float maxIntensity = 0;
+	double sumIntensity = 0;
+
+	len = l->filelen;
+	if (!len) {
+		return;
+	}
+	buf = cmod_base + l->fileofs;
+
+	// create all the lightmaps
+	int numLightmaps = len / (LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3);
+
+
+	for (i = 0; i < numLightmaps; i++) {
+		buf_p = buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
+		lightmap_t lm;
+		memcpy(lm.data, buf_p, sizeof(lm.data));
+		lightmaps.push_back(lm);
+	}
+
 }
 
 
@@ -1334,6 +1371,10 @@ void CModel::CM_LoadMap_Actual( const char *name, qboolean clientload, int *chec
 	CMod_LoadPatches( &header.lumps[LUMP_SURFACES], &header.lumps[LUMP_DRAWVERTS] );
 
 	if (loadDrawSurfs) {
+		lightmaps.clear();
+		faceVerts.clear();
+		indices.clear();
+		R_LoadLightmaps(&header.lumps[LUMP_LIGHTMAPS]);
 		R_LoadSurfaces(&header.lumps[LUMP_SURFACES], &header.lumps[LUMP_DRAWVERTS], &header.lumps[LUMP_DRAWINDEXES]);
 	}
 

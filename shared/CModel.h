@@ -559,7 +559,14 @@ typedef struct triangle_s {
 } triangle_t;
 typedef struct vertXYZ_s {
 	vec3_t	xyz;
+	vec2_t	lightmapSt;
+	uint16_t	lightmapNum;
 } vertXYZ_t;
+#define	LIGHTMAP_SIZE	128
+typedef struct lightmap_s {
+	byte	data[LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3];
+} lightmap_t;
+
 
 class CModel {
 
@@ -626,6 +633,7 @@ class CModel {
 	// render stuff (simplified)
 	void R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump);
 	void ParseFace(dsurface_t* ds, mapVert_t* verts,  int* indexes);
+	void R_LoadLightmaps(lump_t* l);
 
 	// cm_test.c
 	int  CM_PointLeafnum_r(const vec3_t p, int num);
@@ -773,7 +781,7 @@ class CModel {
 	std::vector<int> indices;
 	//std::vector<triangle_t> faceTriangles;
 	std::vector<vertXYZ_t> faceVerts;
-
+	std::vector<lightmap_t> lightmaps;
 public:
 
 	const std::vector<vertXYZ_t>& GetFaceVerts() const {
@@ -781,6 +789,9 @@ public:
 	}
 	const std::vector<int>& GetFaceVertIndices() const {
 		return indices;
+	}
+	const std::vector<lightmap_t>& GetLightmaps() const {
+		return lightmaps;
 	}
 
 	static std::string GetMapPath(const char* filename, const std::vector<std::string>* bspPaths = NULL) {

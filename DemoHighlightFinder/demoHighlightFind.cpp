@@ -60,7 +60,9 @@ bool haveMapModel = false;
 S3L_Model3D cubeModel; // 3D model, has a geometry, position, rotation etc.
 S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
 std::vector<S3L_Unit>		mapVertices;
+std::vector<S3L_Unit>		mapUVs;
 std::vector<S3L_Index>		mapTriangles;
+std::vector<lightmap_t>		mapLightmaps;
 std::vector<S3L_Model3D>	scene3dmodels;
 #define S3L_POSX(y) ((y)*S3L_POSMULT)
 #define S3L_POSY(z) ((z)*S3L_POSMULT)
@@ -72,26 +74,50 @@ std::vector<S3L_Model3D>	scene3dmodels;
 //#define S3L_ROTY(y) ((-y)*S3L_F/360)
 //#define S3L_ROTZ(z) ((-z)*S3L_F/360)
 bool renderingMap = false;
+uint32_t previousTriangle = -1;
+int drawLightmapNum = 0;
+S3L_Vec4 uv0, uv1, uv2;
 void drawPixel(S3L_PixelInfo* p)
 {
-	uint8_t c;  // ASCII pixel we'll write to the screen
+	uint8_t c[3];  // ASCII pixel we'll write to the screen
 
 	/* We'll draw different triangles with different ASCII symbols to give the
 	illusion of lighting. */
 
-	if (renderingMap && p->modelIndex == 0) {
-		c = std::min(p->depth / S3L_POSMULT /8, (S3L_Unit)128);
+	if (renderingMap && p->modelIndex == 0) { // rendering world
+		if (p->triangleID != previousTriangle)
+		{
+
+			S3L_getIndexedTriangleValues(p->triangleIndex, mapTriangles.data(), mapUVs.data(), 3, &uv0, &uv1, &uv2);
+			drawLightmapNum = uv0.z;
+			previousTriangle = p->triangleID;
+		}
+
+		// kind of a fog sort of thing.
+		if (drawLightmapNum >= mapLightmaps.size()) {
+			c[0] = c[1] = c[2] = std::min(p->depth / S3L_POSMULT / 8, (S3L_Unit)128);
+		}
+		else {
+			lightmap_t* lm = &mapLightmaps[drawLightmapNum];
+			S3L_Unit uv[2];
+			uv[0] = std::clamp(S3L_interpolateBarycentric(uv0.x, uv1.x, uv2.x, p->barycentric), (S3L_Unit)0, (S3L_Unit)LIGHTMAP_SIZE-1);
+			uv[1] = std::clamp(S3L_interpolateBarycentric(uv0.y, uv1.y, uv2.y, p->barycentric), (S3L_Unit)0, (S3L_Unit)LIGHTMAP_SIZE-1);
+
+			c[0] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3];
+			c[1] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 +1];
+			c[2] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 + 2];
+		}
 	}
 	else {
 
 		if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
 			p->triangleIndex == 4 || p->triangleIndex == 5)
-			c = '#';
+			c[0] = c[1] = c[2] = '#';
 		else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
 			p->triangleIndex == 6 || p->triangleIndex == 7)
-			c = 'x';
+			c[0] = c[1] = c[2] = 'x';
 		else
-			c = '.';
+			c[0] = c[1] = c[2] = '.';
 	}
 
 	// draw to ASCII screen
@@ -100,9 +126,9 @@ void drawPixel(S3L_PixelInfo* p)
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3] = c;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+1] = c;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+2] = c;
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c;
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c;
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c;
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c[0];
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c[0];
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c[0];
 }
 
 
@@ -4971,11 +4997,23 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								cm = new CModel(mappath.c_str(),true);
 								auto faceVerts = cm->GetFaceVerts();
 								auto faceVertIndices = cm->GetFaceVertIndices();
+								auto lightmaps = cm->GetLightmaps();
 								mapVertices.clear();
+								mapUVs.clear();
+								mapLightmaps.clear();
+								for (auto it = lightmaps.begin(); it != lightmaps.end(); it++) {
+									mapLightmaps.push_back(*it);
+								}
+								//if (!mapLightmaps.size()) {
+								//	mapLightmaps.emplace_back();
+								//}
 								for (auto it = faceVerts.begin(); it != faceVerts.end(); it++) {
 									mapVertices.push_back(S3L_POSX(it->xyz[1]));
 									mapVertices.push_back(S3L_POSY(it->xyz[2]));
 									mapVertices.push_back(S3L_POSZ(it->xyz[0]));
+									mapUVs.push_back(it->lightmapSt[0]*LIGHTMAP_SIZE);
+									mapUVs.push_back(it->lightmapSt[1]*LIGHTMAP_SIZE);
+									mapUVs.push_back(it->lightmapNum >= mapLightmaps.size() ? mapLightmaps.size()-1 : it->lightmapNum);
 								}
 								mapTriangles.clear();
 								for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
@@ -5151,7 +5189,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						memset(drawBuffer, 0, sizeof(drawBuffer));
 
-
+						previousTriangle = -1;
 						S3L_newFrame();        // has to be called before each frame
 						S3L_drawScene(scene);  /* This starts the scene rendering. The drawPixel
 													function will be called to draw it. */
