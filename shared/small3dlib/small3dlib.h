@@ -2622,6 +2622,9 @@ static inline int8_t S3L_triangleIsVisible(
 #else
       clipTest(z,<=,S3L_NEAR) || // completely in front of NEAR?
 #endif
+#ifdef S3L_FAR
+      clipTest(z,>,S3L_FAR) || // completely behind FAR
+#endif
       clipTest(x,<,0) ||
       clipTest(x,>=,S3L_RESOLUTION_X) ||
       clipTest(y,<,0) ||

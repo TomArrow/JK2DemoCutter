@@ -35,6 +35,7 @@
 
 #define VIDEOWIDTH 400
 #define VIDEOHEIGHT 300
+#define S3L_POSMULT 8
 // we need to define screen resolution before including the library:
 #define S3L_RESOLUTION_X VIDEOWIDTH
 #define S3L_RESOLUTION_Y VIDEOHEIGHT
@@ -43,6 +44,11 @@
 #define S3L_NEAR_CROSS_STRATEGY 3 // 3
 #define S3L_USE_WIDER_TYPES 0
 #define S3L_PERSPECTIVE_CORRECTION 2
+//#define S3L_STENCIL_BUFFER 1
+//#define S3L_SORT 1
+#define S3L_MAX_TRIANGES_DRAWN 100000
+//#define S3L_FAR S3L_POSMULT*2048
+#define S3L_Z_BUFFER 1
 #include "../shared/small3dlib/small3dlib.h" // now include the library
 
 
@@ -56,7 +62,6 @@ S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
 std::vector<S3L_Unit>		mapVertices;
 std::vector<S3L_Index>		mapTriangles;
 std::vector<S3L_Model3D>	scene3dmodels;
-#define S3L_POSMULT 8
 #define S3L_POSX(y) ((y)*S3L_POSMULT)
 #define S3L_POSY(z) ((z)*S3L_POSMULT)
 #define S3L_POSZ(x) ((x)*S3L_POSMULT)
