@@ -49,6 +49,7 @@
 #define S3L_MAX_TRIANGES_DRAWN 100000
 //#define S3L_FAR S3L_POSMULT*2048
 #define S3L_Z_BUFFER 1
+#define S3L_USE_WIDER_TYPES 1
 #include "../shared/small3dlib/small3dlib.h" // now include the library
 
 
@@ -96,6 +97,9 @@ void drawPixel(S3L_PixelInfo* p)
 		// kind of a fog sort of thing.
 		if (drawLightmapNum >= mapLightmaps.size()) {
 			c[0] = c[1] = c[2] = std::min(p->depth / S3L_POSMULT / 8, (S3L_Unit)128);
+			//c[0] = (p->triangleID) & 255;
+			//c[1] = (p->triangleID >> 8) & 255;
+			//c[2] = (p->triangleID >> 16) & 255;
 		}
 		else {
 			lightmap_t* lm = &mapLightmaps[drawLightmapNum];
@@ -103,9 +107,9 @@ void drawPixel(S3L_PixelInfo* p)
 			uv[0] = std::clamp(S3L_interpolateBarycentric(uv0.x, uv1.x, uv2.x, p->barycentric), (S3L_Unit)0, (S3L_Unit)LIGHTMAP_SIZE-1);
 			uv[1] = std::clamp(S3L_interpolateBarycentric(uv0.y, uv1.y, uv2.y, p->barycentric), (S3L_Unit)0, (S3L_Unit)LIGHTMAP_SIZE-1);
 
-			c[0] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3];
-			c[1] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 +1];
-			c[2] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 + 2];
+			c[2] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3];
+			c[1] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 + 1];
+			c[0] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 + 2];
 		}
 	}
 	else {
@@ -127,8 +131,8 @@ void drawPixel(S3L_PixelInfo* p)
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+1] = c;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+2] = c;
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c[0];
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c[0];
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c[0];
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c[1];
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c[2];
 }
 
 
