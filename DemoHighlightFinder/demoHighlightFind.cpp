@@ -84,6 +84,7 @@ void drawPixel(S3L_PixelInfo* p)
 
 	/* We'll draw different triangles with different ASCII symbols to give the
 	illusion of lighting. */
+	bool transparency = false;
 
 	if (renderingMap && p->modelIndex == 0) { // rendering world
 		if (p->triangleID != previousTriangle)
@@ -122,6 +123,8 @@ void drawPixel(S3L_PixelInfo* p)
 			c[0] = c[1] = c[2] = 'x';
 		else
 			c[0] = c[1] = c[2] = '.';
+
+		transparency = true;
 	}
 
 	// draw to ASCII screen
@@ -130,6 +133,13 @@ void drawPixel(S3L_PixelInfo* p)
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3] = c;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+1] = c;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+2] = c;
+	if (transparency) {
+		c[0] = std::min(((int)c[0] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3]) / 2, 255);
+		c[1] = std::min(((int)c[1] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1]) / 2, 255);
+		c[2] = std::min(((int)c[2] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2]) / 2, 255);
+		p->depth = p->previousZ;
+	}
+
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c[0];
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c[1];
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c[2];
@@ -5149,6 +5159,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						else {
 							renderingMap = false;
 						}
+						vec3_t mins, maxs;
 
 						for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
@@ -5156,23 +5167,38 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							//if (thisEs->number >= 32) break;
 							S3L_Model3D model = cubeModel;
 
+							if (!thisEs->solid || thisEs->solid == SOLID_BMODEL) continue;
+
+							IntegerToBoundingBox(thisEs->solid, mins, maxs, demoType);
+							float zCenter = thisEs->pos.trBase[2];
+							zCenter += (mins[2] + maxs[2]) * 0.5f;
+
 							model.transform.translation.x = S3L_POSX(thisEs->pos.trBase[1]);
-							model.transform.translation.y = S3L_POSY(thisEs->pos.trBase[2]);
+							model.transform.translation.y = S3L_POSY(zCenter);
 							model.transform.translation.z = S3L_POSZ(thisEs->pos.trBase[0]);
-							model.transform.scale.x = 20 * S3L_POSMULT;
-							model.transform.scale.y = 20 * S3L_POSMULT;
-							model.transform.scale.z = 20 * S3L_POSMULT;
+							model.transform.scale.x = (maxs[1] - mins[1]) * S3L_POSMULT;
+							model.transform.scale.y = (maxs[2] - mins[2]) * S3L_POSMULT;
+							model.transform.scale.z = (maxs[0] - mins[0]) * S3L_POSMULT;
 
 							scene3dmodels.push_back(model);
 						}
 
 						S3L_Model3D model = cubeModel;
+						float zCenter = demo.cut.Cl.snap.ps.origin[2];
+						if (demo.cut.Cl.snap.ps.viewheight >= DEFAULT_VIEWHEIGHT) {
+							maxs[2] = DEFAULT_MAXS_2;
+						} else if (demo.cut.Cl.snap.ps.viewheight >= DEFAULT_VIEWHEIGHT) {
+							maxs[2] = CROUCH_MAXS_2;
+						} else {
+							maxs[2] = -8;
+						} 
+						zCenter += (MINS_Z + maxs[2]) * 0.5f;
 						model.transform.translation.x = S3L_POSX(demo.cut.Cl.snap.ps.origin[1]);
-						model.transform.translation.y = S3L_POSY(demo.cut.Cl.snap.ps.origin[2]);
+						model.transform.translation.y = S3L_POSY(zCenter);
 						model.transform.translation.z = S3L_POSZ(demo.cut.Cl.snap.ps.origin[0]);
-						model.transform.scale.x = 20 * S3L_POSMULT;
-						model.transform.scale.y = 20 * S3L_POSMULT;
-						model.transform.scale.z = 20 * S3L_POSMULT;
+						model.transform.scale.x = 30 * S3L_POSMULT;
+						model.transform.scale.y = (maxs[2]-MINS_Z) * S3L_POSMULT;
+						model.transform.scale.z = 30 * S3L_POSMULT;
 
 						scene3dmodels.push_back(model);
 

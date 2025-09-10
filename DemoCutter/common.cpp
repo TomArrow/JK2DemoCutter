@@ -1857,7 +1857,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	if (isMOHAADemo) {
 		if (s->solid) {
 			vec3_t mins, maxs;
-			IntegerToBoundingBox(s->solid, mins, maxs);
+			IntegerToBoundingBox(s->solid, mins, maxs, demoType);
 			switch ((int)maxs[2]) { // Very bad way of doing this tbh. idk. different places of the code say different values. sigh
 			case 94:
 			case MAXS_Z_MOH:
@@ -6690,7 +6690,7 @@ void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t de
 			VectorCopy(entity->demoToolsData.maxs, maxs);
 		}
 		else {
-			IntegerToBoundingBox(entity->solid, mins, maxs);
+			IntegerToBoundingBox(entity->solid, mins, maxs, demoType);
 		}
 
 		// trace a line from the previous position to the current position
@@ -6891,23 +6891,36 @@ IntegerToBoundingBox (MOHAA)
 #define BBOX_MAX_BOTTOM_Z ( 1 << ( BBOX_ZBOTTOMBITS - 1 ) )
 #define BBOX_REALMAX_BOTTOM_Z ( 1 << BBOX_ZBOTTOMBITS )
 #define BBOX_MAX_TOP_Z ( 1 << BBOX_ZTOPBITS )
-void IntegerToBoundingBox(int num, vec3_t mins, vec3_t maxs)
+void IntegerToBoundingBox(int num, vec3_t mins, vec3_t maxs, demoType_t demoType)
 {
-	int x, y, zd, zu;
+	if (!demoTypeIsMOHAA(demoType)) {
+		int x, zd, zu;
+		x = (num & 255);
+		zd = ((num >> 8) & 255);
+		zu = ((num >> 16) & 255) - 32;
 
-	x = num & (BBOX_MAX_X - 1);
-	y = (num >> (BBOX_XBITS)) & (BBOX_MAX_Y - 1);
-	zd = (num >> (BBOX_XBITS + BBOX_YBITS)) & (BBOX_REALMAX_BOTTOM_Z - 1);
-	zd -= BBOX_MAX_BOTTOM_Z;
-	zu = (num >> (BBOX_XBITS + BBOX_YBITS + BBOX_ZBOTTOMBITS)) & (BBOX_MAX_TOP_Z - 1);
+		mins[0] = mins[1] = -x;
+		maxs[0] = maxs[1] = x;
+		mins[2] = -zd;
+		maxs[2] = zu;
+	}
+	else {
+		int x, y, zd, zu;
 
-	mins[0] = -x;
-	mins[1] = -y;
-	mins[2] = zd;
+		x = num & (BBOX_MAX_X - 1);
+		y = (num >> (BBOX_XBITS)) & (BBOX_MAX_Y - 1);
+		zd = (num >> (BBOX_XBITS + BBOX_YBITS)) & (BBOX_REALMAX_BOTTOM_Z - 1);
+		zd -= BBOX_MAX_BOTTOM_Z;
+		zu = (num >> (BBOX_XBITS + BBOX_YBITS + BBOX_ZBOTTOMBITS)) & (BBOX_MAX_TOP_Z - 1);
 
-	maxs[0] = x;
-	maxs[1] = y;
-	maxs[2] = zu;
+		mins[0] = -x;
+		mins[1] = -y;
+		mins[2] = zd;
+
+		maxs[0] = x;
+		maxs[1] = y;
+		maxs[2] = zu;
+	}
 }
 
 #ifdef DEBUG
@@ -7239,7 +7252,7 @@ static void GetAbsMinsMaxs(qboolean isBModel, vec3_t origin, vec3_t angles, vec3
 	absmax[2] += 1;
 }
 
-int G_GetHitLocation(entityState_t* target, vec3_t ppoint)
+int G_GetHitLocation(entityState_t* target, vec3_t ppoint, demoType_t demoType)
 {
 	vec3_t			point, point_dir;
 	vec3_t			forward, right, up;
@@ -7259,7 +7272,7 @@ int G_GetHitLocation(entityState_t* target, vec3_t ppoint)
 	AngleVectors(tangles, forward, right, up);
 
 	//get center of target
-	IntegerToBoundingBox(target->solid,mins,maxs);
+	IntegerToBoundingBox(target->solid,mins,maxs, demoType);
 	GetAbsMinsMaxs(qboolean(target->solid== SOLID_BMODEL),target->pos.trBase,target->apos.trBase,mins,maxs,absmin,absmax);
 	VectorAdd(absmin, absmax, tcenter);
 	VectorScale(tcenter, 0.5, tcenter);
