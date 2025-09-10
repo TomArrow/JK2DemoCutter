@@ -5347,7 +5347,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					thisFrameInfo.torsoAnimGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralTorsoAnim;
 
 					// jumpbug detection
-					if (opts.findjumpbugs && (lastFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_JUMP_HELD) && (thisFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_JUMP_HELD) && lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum][2] < 0 && demo.cut.Cl.snap.ps.velocity[2] > 0 && demo.cut.Cl.snap.ps.groundEntityNum == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[demo.cut.Cl.snap.ps.clientNum] == ENTITYNUM_NONE && lastFrameInfo.jumpzstart[demo.cut.Cl.snap.ps.clientNum] == demo.cut.Cl.snap.ps.fd.forceJumpZStart) {
+					if (opts.findjumpbugs && (lastFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_JUMP_HELD) && (thisFrameInfo.pmFlags[demo.cut.Cl.snap.ps.clientNum] & PMF_JUMP_HELD) && lastFrameInfo.playerVelocities[demo.cut.Cl.snap.ps.clientNum][2] < 0 && demo.cut.Cl.snap.ps.velocity[2] > 0 && demo.cut.Cl.snap.ps.groundEntityNum == ENTITYNUM_NONE && lastFrameInfo.groundEntityNum[demo.cut.Cl.snap.ps.clientNum] == ENTITYNUM_NONE && lastGroundHeight[demo.cut.Cl.snap.ps.clientNum] > demo.cut.Cl.snap.ps.origin[2]+500.0f && lastFrameInfo.jumpzstart[demo.cut.Cl.snap.ps.clientNum] == demo.cut.Cl.snap.ps.fd.forceJumpZStart) { // checking for demo.cut.Cl.snap.ps.fd.forceJumpZStart not being 0 is a bit cringe but idk what else to do
 						//std::cout << "hehe found\n";
 						int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + demo.cut.Cl.snap.ps.clientNum];
 						const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
