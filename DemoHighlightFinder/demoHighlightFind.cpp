@@ -60,11 +60,15 @@ S3L_Model3D mapModel;
 bool haveMapModel = false;
 S3L_Model3D cubeModel; // 3D model, has a geometry, position, rotation etc.
 S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
+typedef struct drawProperties3dModel_s {
+	byte	color[3];
+} drawProperties3dModel_t;
 std::vector<S3L_Unit>		mapVertices;
 std::vector<S3L_Unit>		mapUVs;
 std::vector<S3L_Index>		mapTriangles;
 std::vector<lightmap_t>		mapLightmaps;
 std::vector<S3L_Model3D>	scene3dmodels;
+std::vector<drawProperties3dModel_t>	scene3dmodelProperties;
 #define S3L_POSX(y) ((y)*S3L_POSMULT)
 #define S3L_POSY(z) ((z)*S3L_POSMULT)
 #define S3L_POSZ(x) ((x)*S3L_POSMULT)
@@ -123,6 +127,10 @@ void drawPixel(S3L_PixelInfo* p)
 			c[0] = c[1] = c[2] = 'x';
 		else
 			c[0] = c[1] = c[2] = '.';
+
+		c[0] = std::min(((int)c[0] * (int)scene3dmodelProperties[p->modelIndex].color[2]) >> 8, 255);
+		c[1] = std::min(((int)c[1] * (int)scene3dmodelProperties[p->modelIndex].color[1]) >> 8, 255);
+		c[2] = std::min(((int)c[2] * (int)scene3dmodelProperties[p->modelIndex].color[0]) >> 8, 255);
 
 		transparency = true;
 	}
@@ -4537,6 +4545,45 @@ qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int 
 }
 
 template<unsigned int max_clients>
+void setModelProps(drawProperties3dModel_t* modelProps, int number) {
+
+	if (number < max_clients) {
+		switch (playerTeams[number]) {
+		case TEAM_FREE:
+			modelProps->color[0] = 0;
+			modelProps->color[1] = 255;
+			modelProps->color[2] = 0;
+			break;
+		case TEAM_RED:
+			modelProps->color[0] = 255;
+			modelProps->color[1] = 0;
+			modelProps->color[2] = 0;
+			break;
+		case TEAM_BLUE:
+			modelProps->color[0] = 0;
+			modelProps->color[1] = 0;
+			modelProps->color[2] = 255;
+			break;
+		case TEAM_SPECTATOR:
+			modelProps->color[0] = 255;
+			modelProps->color[1] = 255;
+			modelProps->color[2] = 0;
+			break;
+		default:
+			modelProps->color[0] = 255;
+			modelProps->color[1] = 255;
+			modelProps->color[2] = 255;
+			break;
+		}
+	}
+	else {
+		modelProps->color[0] = 255;
+		modelProps->color[1] = 255;
+		modelProps->color[2] = 255;
+	}
+}
+
+template<unsigned int max_clients>
 qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io, sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
 	fileHandle_t	oldHandle = 0;
 	//fileHandle_t	newHandle = 0;
@@ -5151,10 +5198,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (demoCurrentTime - lastDemoRenderFrameTime >= opts.videoMinMsec) {
 						lastDemoRenderFrameTime = demoCurrentTime;
 						scene3dmodels.clear();
+						scene3dmodelProperties.clear();
 
 						if (haveMapModel) {
 							renderingMap = true;
 							scene3dmodels.push_back(mapModel);
+							scene3dmodelProperties.emplace_back();
 						}
 						else {
 							renderingMap = false;
@@ -5181,6 +5230,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							model.transform.scale.z = (maxs[0] - mins[0]) * S3L_POSMULT;
 
 							scene3dmodels.push_back(model);
+							drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
+							setModelProps<max_clients>(modelProps, thisEs->number);
 						}
 
 						S3L_Model3D model = cubeModel;
@@ -5201,6 +5252,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						model.transform.scale.z = 30 * S3L_POSMULT;
 
 						scene3dmodels.push_back(model);
+						drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
+						setModelProps<max_clients>(modelProps, demo.cut.Cl.snap.ps.clientNum);
 
 						S3L_Model3D* models = scene3dmodels.data();
 
