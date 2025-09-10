@@ -24,6 +24,8 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp" />
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\animMappingTable.cpp" />
+    <ClCompile Include="..\shared\CModel.cpp" />
+    <ClCompile Include="..\shared\libgmavi\libgmavi.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zArcIn.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zBuf.c" />
@@ -95,6 +97,9 @@
     <ClInclude Include="..\shared\boostTupleHash.hpp" />
     <ClInclude Include="..\shared\include\named_mutex.hpp" />
     <ClInclude Include="..\shared\include\picosha3.h" />
+    <ClInclude Include="..\shared\libgmavi\aviStruct.h" />
+    <ClInclude Include="..\shared\libgmavi\libgmavi.h" />
+    <ClInclude Include="..\shared\libgmavi\msaviriff.h" />
     <ClInclude Include="..\shared\pocketlzma\lzma_c.hpp" />
     <ClInclude Include="..\shared\SQLDelayer.h" />
     <ClInclude Include="..\shared\sqlite\sqlite3.h" />

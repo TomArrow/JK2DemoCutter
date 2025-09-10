@@ -19,16 +19,75 @@
 
 #include "popl.hpp"
 #include "SQLDelayer.h"
+#include "CModel.h"
 
 #include <mutex>
 #include "named_mutex.hpp"
 #include "tsl/htrie_map.h"
+#include "../shared/libgmavi/libgmavi.h"
 
 #define DEBUGSTATSDB
 
 #define BUFFERBAT
 
 #define KILLVECARRAY 1
+
+
+#define VIDEOWIDTH 400
+#define VIDEOHEIGHT 300
+// we need to define screen resolution before including the library:
+#define S3L_RESOLUTION_X VIDEOWIDTH
+#define S3L_RESOLUTION_Y VIDEOHEIGHT
+// and a name of the function we'll be using to draw individual pixels:
+#define S3L_PIXEL_FUNCTION drawPixel
+#include "../shared/small3dlib/small3dlib.h" // now include the library
+
+
+static byte drawBuffer[VIDEOWIDTH * VIDEOHEIGHT * 3];
+S3L_Unit cubeVertices[] = { S3L_CUBE_VERTICES(S3L_F) };
+S3L_Index cubeTriangles[] = { S3L_CUBE_TRIANGLES };
+S3L_Model3D cubeModel; // 3D model, has a geometry, position, rotation etc.
+S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
+std::vector<S3L_Model3D> scene3dmodels;
+#define S3L_POSX(y) ((y)*S3L_F)
+#define S3L_POSY(z) ((z)*S3L_F)
+#define S3L_POSZ(x) ((x)*S3L_F)
+#define S3L_ROTX(z) ((-z)*S3L_F/360)
+#define S3L_ROTY(x) ((-x)*S3L_F/360)
+#define S3L_ROTZ(y) ((-y)*S3L_F/360)
+//#define S3L_ROTX(x) ((-x)*S3L_F/360)
+//#define S3L_ROTY(y) ((-y)*S3L_F/360)
+//#define S3L_ROTZ(z) ((-z)*S3L_F/360)
+void drawPixel(S3L_PixelInfo* p)
+{
+	uint8_t c;  // ASCII pixel we'll write to the screen
+
+	/* We'll draw different triangles with different ASCII symbols to give the
+	illusion of lighting. */
+
+	if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
+		p->triangleIndex == 4 || p->triangleIndex == 5)
+		c = '#';
+	else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
+		p->triangleIndex == 6 || p->triangleIndex == 7)
+		c = 'x';
+	else
+		c = '.';
+
+	// draw to ASCII screen
+	int y = S3L_RESOLUTION_Y - 1 - p->y;
+	int x = S3L_RESOLUTION_X - 1 - p->x;
+	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3] = c;
+	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+1] = c;
+	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+2] = c;
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c;
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c;
+	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c;
+}
+
+
+CModel* cm = NULL;
+
 
 std::queue<entityState_t*> parsedEventEntities;
 
@@ -174,8 +233,25 @@ public:
 	bool doStatsDb = false;
 	bool doStrafeDeviation = false;
 	bool findjumpbugs = false;
+	bool makeVideo = false;
+	std::string videoPath;
+	std::vector<std::string> bspDirectories;
 };
 
+typedef struct videoFrame_s {
+	int64_t	demoTime;
+	byte	image[VIDEOWIDTH * VIDEOHEIGHT * 3];
+} videoFrame_t;
+
+std::vector<videoFrame_t> videoFrames;
+
+void saveVideo(const ExtraSearchOptions& opts) {
+	void* gmav = gmav_open(opts.videoPath.c_str(), VIDEOWIDTH, VIDEOHEIGHT, 60);
+	for (auto it = videoFrames.begin(); it != videoFrames.end(); it++) {
+		gmav_add(gmav, it->image);
+	}
+	gmav_finish(gmav);
+}
 
 typedef struct strafeCSVPoint_t {
 	int64_t timeOffset;
@@ -3540,6 +3616,9 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		}
 	}
 
+	if (opts.makeVideo && videoFrames.size()) {
+		saveVideo(opts);
+	}
 
 	if (opts.testOnly) return qtrue;
 
@@ -4555,6 +4634,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	sharedVars.oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 
 
+
+	if (opts.makeVideo) {
+		S3L_model3DInit(
+			cubeVertices,
+			S3L_CUBE_VERTEX_COUNT,
+			cubeTriangles,
+			S3L_CUBE_TRIANGLE_COUNT,
+			&cubeModel);
+	}
+
+
 	int messageOffset = 0;
 
 
@@ -4836,6 +4926,30 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0),SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
 					goto cuterror;
 				}
+				if (opts.makeVideo) {
+					if (cm) {
+						delete cm;
+						cm = NULL;
+					}
+					int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+					const char* info = demo.cut.Cl.gameState.stringData + offset;
+					char* mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "mapname");
+					if (mapname[0]) {
+						int mapnameLen = strlen(mapname);
+						if (mapnameLen + 4 < sizeof(mapname)) {
+							mapname[mapnameLen] = '.';
+							mapname[mapnameLen + 1] = 'b';
+							mapname[mapnameLen + 2] = 's';
+							mapname[mapnameLen + 3] = 'p';
+							mapname[mapnameLen + 4] = '\0';
+
+							std::string mappath = CModel::GetMapPath(mapname, &opts.bspDirectories);
+							if (mappath.size() > 0) {
+								cm = new CModel(mappath.c_str(),true);
+							}
+						}
+					}
+				}
 
 				firstSnapAfterGamestate = true;
 
@@ -4916,7 +5030,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					requiredMetaEventAges[METRACKER_KILLS][cl] = demoCurrentTime - bufferTime; // Kills are a point in time. Whenever a kill happens, we need to have the past [bufferTime] milliseconds available. So just always require the last [bufferTime] milliseconds minimum for kills.
 				}
 
-
 				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(demo.cut.Cl.snap.ps.saberMove,demoType);
 				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.legsAnim,demoType);
 				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
@@ -4932,6 +5045,70 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					playerTeams[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.stats[STAT_TEAM_MOH];
 				}
 
+				if (opts.makeVideo) {
+					scene3dmodels.clear();
+
+					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
+
+						entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+						//if (thisEs->number >= 32) break;
+						S3L_Model3D model = cubeModel;
+
+						model.transform.translation.x = S3L_POSX(thisEs->pos.trBase[1]);
+						model.transform.translation.y = S3L_POSY(thisEs->pos.trBase[2]);
+						model.transform.translation.z = S3L_POSZ(thisEs->pos.trBase[0]);
+						model.transform.scale.x = 20 * S3L_F;
+						model.transform.scale.y = 20 * S3L_F;
+						model.transform.scale.z = 20 * S3L_F;
+
+						scene3dmodels.push_back(model);
+					}
+
+					S3L_Model3D model = cubeModel;
+					model.transform.translation.x = S3L_POSX(demo.cut.Cl.snap.ps.origin[1]);
+					model.transform.translation.y = S3L_POSY(demo.cut.Cl.snap.ps.origin[2]);
+					model.transform.translation.z = S3L_POSZ(demo.cut.Cl.snap.ps.origin[0]);
+					model.transform.scale.x = 20 * S3L_F;
+					model.transform.scale.y = 20 * S3L_F;
+					model.transform.scale.z = 20 * S3L_F;
+
+					scene3dmodels.push_back(model);
+
+					S3L_Model3D* models = scene3dmodels.data();
+
+					S3L_sceneInit( // Initialize the scene we'll be rendering.
+						models,  // This is like an array with only one model in it.
+						scene3dmodels.size(),
+						&scene);
+
+					// shift the camera a little bit backwards so that it's not inside the cube:
+
+					//scene.camera.transform.translation.z = -2 * S3L_F;
+					vec3_t camerapos;
+					vec3_t forward;
+					AngleVectors(demo.cut.Cl.snap.ps.viewangles, forward, NULL, NULL);
+					VectorMA(demo.cut.Cl.snap.ps.origin,-80.0f,forward,camerapos);
+					scene.camera.transform.translation.x = S3L_POSX(camerapos[1]);
+					scene.camera.transform.translation.y = S3L_POSY(camerapos[2] + demo.cut.Cl.snap.ps.viewheight);
+					scene.camera.transform.translation.z = S3L_POSZ(camerapos[0]);
+
+
+					scene.camera.transform.rotation.x = 0;// S3L_ROTX(demo.cut.Cl.snap.ps.viewangles[2]);
+					scene.camera.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
+					scene.camera.transform.rotation.z = 0;// S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[1]);
+
+					scene.camera.focalLength = 120;
+
+					memset(drawBuffer,0,sizeof(drawBuffer));
+
+
+					S3L_newFrame();        // has to be called before each frame
+					S3L_drawScene(scene);  /* This starts the scene rendering. The drawPixel
+												function will be called to draw it. */
+
+					videoFrames.push_back({ demoCurrentTime,{0} });
+					memcpy(videoFrames.back().image,drawBuffer,sizeof(drawBuffer));
+				}
 
 				// Record speeds, check sabermove changes and other entity related tracking
 				for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
@@ -9087,6 +9264,8 @@ int main(int argcO, char** argvO) {
 	auto L = op.add<popl::Implicit<int>>("L", "log-chats", "Writes database with chats. 1 = unique chats database (every unique chat only once). 2 = categorized chats (not currently implemented)", 1);
 	auto Q = op.add<popl::Implicit<int>>("Q", "skip-stats", "1 = Avoids creating the statistics db, 2 = avoids strafe deviation calculation. Bitmask. Can combine.",1);
 	auto j = op.add<popl::Implicit<int>>("j", "find-jumpbugs", "Finds instances of jumpbugs in demos.",1);
+	auto v = op.add<popl::Value<std::string>>("v", "make-video", "Make a little preview video AVI.");
+	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
 
 	
 	op.parse(argcO, argvO);
@@ -9183,6 +9362,17 @@ int main(int argcO, char** argvO) {
 	if (T->is_set()) {
 		opts.doStringSearch = true;
 		opts.stringSearch = T->value();
+	}
+	if (v->is_set()) {
+		opts.makeVideo = true;
+		opts.videoPath = v->value();
+	}
+	if (b->is_set()) {
+		for (int i = 0; i < b->count(); i++) {
+			std::string dir = b->value(i);
+			dir = dir.erase(dir.find_last_not_of("/\\\"") + 1); // " also because uh ... someone might do -b "path\" .. xd
+			opts.bspDirectories.push_back(dir);
+		}
 	}
 
 	if (z->is_set()) {

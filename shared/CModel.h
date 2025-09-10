@@ -712,11 +712,12 @@ class CModel {
 
 
 	bool simpleHeightMode = false;
+	bool loadDrawSurfs = false;
 	vec3_t groundPos = { 0,0,0 };
 
 public:
 
-	static std::string GetMapPath(const char* filename, std::vector<std::string>* bspPaths = NULL) {
+	static std::string GetMapPath(const char* filename, const std::vector<std::string>* bspPaths = NULL) {
 
 		const char* pathRelativeToDir;
 		if (bspPaths) {
@@ -756,9 +757,10 @@ public:
 		delete[] path;
 		return "";
 	}
-	CModel(const char* filename) {
+	CModel(const char* filename, bool loadDrawSurfsA) {
 		int checksum = 0;
-
+		
+		loadDrawSurfs = loadDrawSurfsA;
 		if (FS_FileExists(filename)) {
 
 			CM_LoadMap(filename, qfalse, &checksum);

@@ -378,7 +378,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 
 			std::string mappath = CModel::GetMapPath(mapname, bspDirectories);
 			if (mappath.size() > 0) {
-				cm = new CModel(mappath.c_str());
+				cm = new CModel(mappath.c_str(),false);
 			}
 		}
 	}

@@ -209,6 +209,12 @@
     <ClCompile Include="..\shared\SQLDelayer.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\libgmavi\libgmavi.c">
+      <Filter>libgmavi</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\CModel.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -225,6 +231,9 @@
     </Filter>
     <Filter Include="Common\zlib">
       <UniqueIdentifier>{6af2f373-c149-42da-b467-9857652df5b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libgmavi">
+      <UniqueIdentifier>{488660f6-1262-42c9-91a3-fe730fbf51e1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -290,6 +299,15 @@
     </ClInclude>
     <ClInclude Include="..\shared\include\named_mutex.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\libgmavi\aviStruct.h">
+      <Filter>libgmavi</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\libgmavi\libgmavi.h">
+      <Filter>libgmavi</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\libgmavi\msaviriff.h">
+      <Filter>libgmavi</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
