@@ -65,6 +65,7 @@ class CModel;
 
 //=============================================================================
 
+#define	MAX_FACE_POINTS		64
 
 typedef struct {
 	int		fileofs, filelen;
@@ -121,6 +122,41 @@ typedef struct {
 	vec3_t		normal;
 	byte		color[MAXLIGHTMAPS][4];
 } drawVert_t;
+typedef enum {
+	SF_BAD,
+	SF_SKIP,				// ignore
+	SF_FACE,
+	SF_GRID,
+	SF_TRIANGLES,
+	SF_POLY,
+	SF_MD3,
+	SF_MD4,
+	/*
+	Ghoul2 Insert Start
+	*/
+
+	SF_MDX,
+	/*
+	Ghoul2 Insert End
+	*/
+	SF_FLARE,
+	SF_ENTITY,				// beams, rails, lightning, etc that can be determined by entity
+	SF_DISPLAY_LIST,
+
+	SF_NUM_SURFACE_TYPES,
+	SF_MAX = 0xffffffff			// ensures that sizeof( surfaceType_t ) == sizeof( int )
+} surfaceType_t;
+
+typedef struct msurface_s {
+	int					viewCount;		// if == tr.viewCount, already added
+	struct shader_s* shader;
+	int					fogIndex;
+	int					contents;		// so we can determine whether to draw a particular surface based on content flags
+	int					flags;		// surfaceflags (might come in handy?)
+	qboolean			trisoupMapSurf;
+
+	surfaceType_t* data;			// any of srf*_t
+} msurface_t;
 
 
 typedef struct {
@@ -147,6 +183,13 @@ typedef struct {
 } dsurface_t;
 
 
+typedef struct {
+	vec3_t		xyz;
+	float		st[2];
+	float		lightmap[MAXLIGHTMAPS][2];
+	vec3_t		normal;
+	byte		color[MAXLIGHTMAPS][4];
+} mapVert_t;
 
 
 // cm_polylib.h
@@ -511,6 +554,13 @@ typedef enum {
 	h_dontcare
 } ha_pref;
 
+typedef struct triangle_s {
+	vec3_t	xyz[3];
+} triangle_t;
+typedef struct vertXYZ_s {
+	vec3_t	xyz;
+} vertXYZ_t;
+
 class CModel {
 
 	void* gpvCachedMapDiskImage = NULL;
@@ -571,6 +621,11 @@ class CModel {
 	void CM_StoreBrushes(leafList_t* ll, int nodenum);
 
 	void CM_BoxLeafnums_r(leafList_t* ll, int nodenum);
+
+
+	// render stuff (simplified)
+	void R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump);
+	void ParseFace(dsurface_t* ds, mapVert_t* verts,  int* indexes);
 
 	// cm_test.c
 	int  CM_PointLeafnum_r(const vec3_t p, int num);
@@ -715,7 +770,18 @@ class CModel {
 	bool loadDrawSurfs = false;
 	vec3_t groundPos = { 0,0,0 };
 
+	std::vector<int> indices;
+	//std::vector<triangle_t> faceTriangles;
+	std::vector<vertXYZ_t> faceVerts;
+
 public:
+
+	const std::vector<vertXYZ_t>& GetFaceVerts() const {
+		return faceVerts; 
+	}
+	const std::vector<int>& GetFaceVertIndices() const {
+		return indices;
+	}
 
 	static std::string GetMapPath(const char* filename, const std::vector<std::string>* bspPaths = NULL) {
 

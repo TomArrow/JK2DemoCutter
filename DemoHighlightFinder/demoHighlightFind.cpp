@@ -40,24 +40,33 @@
 #define S3L_RESOLUTION_Y VIDEOHEIGHT
 // and a name of the function we'll be using to draw individual pixels:
 #define S3L_PIXEL_FUNCTION drawPixel
+#define S3L_NEAR_CROSS_STRATEGY 3 // 3
+#define S3L_USE_WIDER_TYPES 0
+#define S3L_PERSPECTIVE_CORRECTION 2
 #include "../shared/small3dlib/small3dlib.h" // now include the library
 
 
 static byte drawBuffer[VIDEOWIDTH * VIDEOHEIGHT * 3];
 S3L_Unit cubeVertices[] = { S3L_CUBE_VERTICES(S3L_F) };
 S3L_Index cubeTriangles[] = { S3L_CUBE_TRIANGLES };
+S3L_Model3D mapModel; 
+bool haveMapModel = false;
 S3L_Model3D cubeModel; // 3D model, has a geometry, position, rotation etc.
 S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
-std::vector<S3L_Model3D> scene3dmodels;
-#define S3L_POSX(y) ((y)*S3L_F)
-#define S3L_POSY(z) ((z)*S3L_F)
-#define S3L_POSZ(x) ((x)*S3L_F)
-#define S3L_ROTX(z) ((-z)*S3L_F/360)
-#define S3L_ROTY(x) ((-x)*S3L_F/360)
+std::vector<S3L_Unit>		mapVertices;
+std::vector<S3L_Index>		mapTriangles;
+std::vector<S3L_Model3D>	scene3dmodels;
+#define S3L_POSMULT 8
+#define S3L_POSX(y) ((y)*S3L_POSMULT)
+#define S3L_POSY(z) ((z)*S3L_POSMULT)
+#define S3L_POSZ(x) ((x)*S3L_POSMULT)
+#define S3L_ROTX(x) ((-x)*S3L_F/360)
+#define S3L_ROTY(y) ((-y)*S3L_F/360)
 #define S3L_ROTZ(y) ((-y)*S3L_F/360)
 //#define S3L_ROTX(x) ((-x)*S3L_F/360)
 //#define S3L_ROTY(y) ((-y)*S3L_F/360)
 //#define S3L_ROTZ(z) ((-z)*S3L_F/360)
+bool renderingMap = false;
 void drawPixel(S3L_PixelInfo* p)
 {
 	uint8_t c;  // ASCII pixel we'll write to the screen
@@ -65,14 +74,20 @@ void drawPixel(S3L_PixelInfo* p)
 	/* We'll draw different triangles with different ASCII symbols to give the
 	illusion of lighting. */
 
-	if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
-		p->triangleIndex == 4 || p->triangleIndex == 5)
-		c = '#';
-	else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
-		p->triangleIndex == 6 || p->triangleIndex == 7)
-		c = 'x';
-	else
-		c = '.';
+	if (renderingMap && p->modelIndex == 0) {
+		c = std::min(p->depth / S3L_POSMULT /8, (S3L_Unit)128);
+	}
+	else {
+
+		if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
+			p->triangleIndex == 4 || p->triangleIndex == 5)
+			c = '#';
+		else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
+			p->triangleIndex == 6 || p->triangleIndex == 7)
+			c = 'x';
+		else
+			c = '.';
+	}
 
 	// draw to ASCII screen
 	int y = S3L_RESOLUTION_Y - 1 - p->y;
@@ -246,7 +261,7 @@ typedef struct videoFrame_s {
 std::vector<videoFrame_t> videoFrames;
 
 void saveVideo(const ExtraSearchOptions& opts) {
-	void* gmav = gmav_open(opts.videoPath.c_str(), VIDEOWIDTH, VIDEOHEIGHT, 60);
+	void* gmav = gmav_open(opts.videoPath.c_str(), VIDEOWIDTH, VIDEOHEIGHT, 24);
 	for (auto it = videoFrames.begin(); it != videoFrames.end(); it++) {
 		gmav_add(gmav, it->image);
 	}
@@ -4927,13 +4942,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cuterror;
 				}
 				if (opts.makeVideo) {
+
+					char mapname[MAX_STRING_CHARS_MAX];
 					if (cm) {
 						delete cm;
 						cm = NULL;
+						haveMapModel = false;
 					}
 					int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char* info = demo.cut.Cl.gameState.stringData + offset;
-					char* mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "mapname");
+					Q_strncpyz(mapname,sizeof(mapname),Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "mapname"),sizeof(mapname));
 					if (mapname[0]) {
 						int mapnameLen = strlen(mapname);
 						if (mapnameLen + 4 < sizeof(mapname)) {
@@ -4946,6 +4964,21 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::string mappath = CModel::GetMapPath(mapname, &opts.bspDirectories);
 							if (mappath.size() > 0) {
 								cm = new CModel(mappath.c_str(),true);
+								auto faceVerts = cm->GetFaceVerts();
+								auto faceVertIndices = cm->GetFaceVertIndices();
+								mapVertices.clear();
+								for (auto it = faceVerts.begin(); it != faceVerts.end(); it++) {
+									mapVertices.push_back(S3L_POSX(it->xyz[1]));
+									mapVertices.push_back(S3L_POSY(it->xyz[2]));
+									mapVertices.push_back(S3L_POSZ(it->xyz[0]));
+								}
+								mapTriangles.clear();
+								for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
+									mapTriangles.push_back(*it);
+								}
+								S3L_model3DInit(mapVertices.data(),mapVertices.size()/3,mapTriangles.data(),mapTriangles.size() / 3,&mapModel);
+								//mapModel.config.backfaceCulling = 1;
+								haveMapModel = true;
 							}
 						}
 					}
@@ -5046,68 +5079,82 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 
 				if (opts.makeVideo) {
-					scene3dmodels.clear();
+					static int64_t lastDemoRenderFrameTime = -1000;
 
-					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
+					if (demoCurrentTime - lastDemoRenderFrameTime >= 42) {
+						lastDemoRenderFrameTime = demoCurrentTime;
+						scene3dmodels.clear();
 
-						entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
-						//if (thisEs->number >= 32) break;
+						if (haveMapModel) {
+							renderingMap = true;
+							scene3dmodels.push_back(mapModel);
+						}
+						else {
+							renderingMap = false;
+						}
+
+						for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
+
+							entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
+							//if (thisEs->number >= 32) break;
+							S3L_Model3D model = cubeModel;
+
+							model.transform.translation.x = S3L_POSX(thisEs->pos.trBase[1]);
+							model.transform.translation.y = S3L_POSY(thisEs->pos.trBase[2]);
+							model.transform.translation.z = S3L_POSZ(thisEs->pos.trBase[0]);
+							model.transform.scale.x = 20 * S3L_POSMULT;
+							model.transform.scale.y = 20 * S3L_POSMULT;
+							model.transform.scale.z = 20 * S3L_POSMULT;
+
+							scene3dmodels.push_back(model);
+						}
+
 						S3L_Model3D model = cubeModel;
-
-						model.transform.translation.x = S3L_POSX(thisEs->pos.trBase[1]);
-						model.transform.translation.y = S3L_POSY(thisEs->pos.trBase[2]);
-						model.transform.translation.z = S3L_POSZ(thisEs->pos.trBase[0]);
-						model.transform.scale.x = 20 * S3L_F;
-						model.transform.scale.y = 20 * S3L_F;
-						model.transform.scale.z = 20 * S3L_F;
+						model.transform.translation.x = S3L_POSX(demo.cut.Cl.snap.ps.origin[1]);
+						model.transform.translation.y = S3L_POSY(demo.cut.Cl.snap.ps.origin[2]);
+						model.transform.translation.z = S3L_POSZ(demo.cut.Cl.snap.ps.origin[0]);
+						model.transform.scale.x = 20 * S3L_POSMULT;
+						model.transform.scale.y = 20 * S3L_POSMULT;
+						model.transform.scale.z = 20 * S3L_POSMULT;
 
 						scene3dmodels.push_back(model);
+
+						S3L_Model3D* models = scene3dmodels.data();
+
+						S3L_sceneInit( // Initialize the scene we'll be rendering.
+							models,  // This is like an array with only one model in it.
+							scene3dmodels.size(),
+							&scene);
+
+						// shift the camera a little bit backwards so that it's not inside the cube:
+
+						//scene.camera.transform.translation.z = -2 * S3L_F;
+						vec3_t camerapos;
+						vec3_t forward;
+						AngleVectors(demo.cut.Cl.snap.ps.viewangles, forward, NULL, NULL);
+						VectorMA(demo.cut.Cl.snap.ps.origin, -80.0f, forward, camerapos);
+						scene.camera.transform.translation.x = S3L_POSX(camerapos[1]);
+						scene.camera.transform.translation.y = S3L_POSY(camerapos[2] + demo.cut.Cl.snap.ps.viewheight);
+						scene.camera.transform.translation.z = S3L_POSZ(camerapos[0]);
+
+
+						scene.camera.transform.rotation.x = S3L_ROTX(demo.cut.Cl.snap.ps.viewangles[0]);
+						scene.camera.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
+						scene.camera.transform.rotation.z = 0;// S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[1]);
+
+						scene.camera.focalLength = 300;
+
+						memset(drawBuffer, 0, sizeof(drawBuffer));
+
+
+						S3L_newFrame();        // has to be called before each frame
+						S3L_drawScene(scene);  /* This starts the scene rendering. The drawPixel
+													function will be called to draw it. */
+
+						videoFrames.push_back({ demoCurrentTime,{0} });
+						memcpy(videoFrames.back().image, drawBuffer, sizeof(drawBuffer));
 					}
 
-					S3L_Model3D model = cubeModel;
-					model.transform.translation.x = S3L_POSX(demo.cut.Cl.snap.ps.origin[1]);
-					model.transform.translation.y = S3L_POSY(demo.cut.Cl.snap.ps.origin[2]);
-					model.transform.translation.z = S3L_POSZ(demo.cut.Cl.snap.ps.origin[0]);
-					model.transform.scale.x = 20 * S3L_F;
-					model.transform.scale.y = 20 * S3L_F;
-					model.transform.scale.z = 20 * S3L_F;
-
-					scene3dmodels.push_back(model);
-
-					S3L_Model3D* models = scene3dmodels.data();
-
-					S3L_sceneInit( // Initialize the scene we'll be rendering.
-						models,  // This is like an array with only one model in it.
-						scene3dmodels.size(),
-						&scene);
-
-					// shift the camera a little bit backwards so that it's not inside the cube:
-
-					//scene.camera.transform.translation.z = -2 * S3L_F;
-					vec3_t camerapos;
-					vec3_t forward;
-					AngleVectors(demo.cut.Cl.snap.ps.viewangles, forward, NULL, NULL);
-					VectorMA(demo.cut.Cl.snap.ps.origin,-80.0f,forward,camerapos);
-					scene.camera.transform.translation.x = S3L_POSX(camerapos[1]);
-					scene.camera.transform.translation.y = S3L_POSY(camerapos[2] + demo.cut.Cl.snap.ps.viewheight);
-					scene.camera.transform.translation.z = S3L_POSZ(camerapos[0]);
-
-
-					scene.camera.transform.rotation.x = 0;// S3L_ROTX(demo.cut.Cl.snap.ps.viewangles[2]);
-					scene.camera.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
-					scene.camera.transform.rotation.z = 0;// S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[1]);
-
-					scene.camera.focalLength = 120;
-
-					memset(drawBuffer,0,sizeof(drawBuffer));
-
-
-					S3L_newFrame();        // has to be called before each frame
-					S3L_drawScene(scene);  /* This starts the scene rendering. The drawPixel
-												function will be called to draw it. */
-
-					videoFrames.push_back({ demoCurrentTime,{0} });
-					memcpy(videoFrames.back().image,drawBuffer,sizeof(drawBuffer));
 				}
 
 				// Record speeds, check sabermove changes and other entity related tracking

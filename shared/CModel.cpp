@@ -1042,7 +1042,198 @@ qboolean CModel::CM_DeleteCachedMap(qboolean bGuaranteedOkToDelete)
 }
 
 
+void CModel::ParseFace(dsurface_t* ds, mapVert_t* verts, int* indexes) {
+	int					i, j, k;
+	//srfSurfaceFace_t* cv;
+	int					numPoints, numIndexes;
+	int					lightmapNum[MAXLIGHTMAPS];
+	int					atlasLightmapNum[MAXLIGHTMAPS]; // lightmap index inside of the atlas
+	//size_t				sfaceSize;
+	//int				 ofsIndexes;
 
+	for (i = 0; i < MAXLIGHTMAPS; i++)
+	{
+			lightmapNum[i] = LittleLong(ds->lightmapNum[i]);
+	}
+
+	// get fog volume
+	//surf->fogIndex = LittleLong(ds->fogNum) + 1;
+
+	// get shader value
+	//surf->shader = ShaderForShaderNum(ds->shaderNum, lightmapNum, ds->lightmapStyles, ds->vertexStyles);
+	//if (r_singleShader->integer && !surf->shader->isSky) {
+	//	surf->shader = tr.defaultShader;
+	//}
+
+	//SetFlagsForShaderForSurface(surf, ds->shaderNum);
+
+	numPoints = LittleLong(ds->numVerts);
+	if (numPoints > MAX_FACE_POINTS) {
+		//ri.Printf(PRINT_WARNING, "WARNING: MAX_FACE_POINTS exceeded: %i\n", numPoints);
+		numPoints = MAX_FACE_POINTS;
+		//surf->shader = tr.defaultShader;
+	}
+
+	numIndexes = LittleLong(ds->numIndexes);
+
+	// create the srfSurfaceFace_t
+	//sfaceSize = (size_t) & ((srfSurfaceFace_t*)0)->points[numPoints];
+	//ofsIndexes = (int)sfaceSize;
+	//sfaceSize += sizeof(int) * numIndexes;
+
+	//cv = (srfSurfaceFace_t*)ri.Hunk_Alloc((int)sfaceSize, h_low);
+	//cv->surfaceType = SF_FACE;
+	//cv->numPoints = numPoints;
+	//cv->numIndices = numIndexes;
+	//cv->ofsIndices = ofsIndexes;
+	//cv->flags = surf->flags;
+	//cv->contents = surf->contents;
+
+
+	int surfaceCount = ds->numIndexes;
+	if (ds->surfaceType != 2 && (surfaceCount % 3) > 0)
+	{
+		return;
+	}
+
+
+	verts += LittleLong(ds->firstVert);
+	for (i = 0; i < numPoints; i++) {
+		for (j = 0; j < 3; j++) {
+			//cv->points[i][j] = LittleFloat(verts[i].xyz[j]);
+		}
+		for (j = 0; j < 2; j++) {
+			//cv->points[i][3 + j] = LittleFloat(verts[i].st[j]);
+			//for (k = 0; k < MAXLIGHTMAPS; k++)
+			//{
+				//cv->points[i][VERTEX_LM + j + (k * 2)] = LittleFloat(verts[i].lightmap[k][j]);
+			//}
+		}
+		for (k = 0; k < MAXLIGHTMAPS; k++)
+		{
+			//if (tr.lightmapAtlasActive) {
+			//	R_AtlasPackUV(verts[i].lightmap[k], atlasLightmapNum[k], &cv->points[i][VERTEX_LM + (k * 2)]);
+			//}
+			//R_ColorShiftLightingBytes(verts[i].color[k], (byte*)&cv->points[i][VERTEX_COLOR + k]);
+		}
+	}
+
+	indexes += LittleLong(ds->firstIndex);
+	for (i = 0; i < numIndexes; i++) {
+		//((int*)((byte*)cv + cv->ofsIndices))[i] = LittleLong(indexes[i]);
+
+	}
+	int triindexes[3];
+	for (i = 0; i < numIndexes; i+=3) {
+		//((int*)((byte*)cv + cv->ofsIndices))[i] = LittleLong(indexes[i]);
+		triindexes[0] = LittleLong(indexes[i]);
+		triindexes[1] = LittleLong(indexes[i+1]);
+		triindexes[2] = LittleLong(indexes[i+2]);
+		vertXYZ_t tri[3];
+		for (j = 0; j < 3; j++) {
+			//cv->points[i][j] = LittleFloat(verts[i].xyz[j]);
+			tri[0].xyz[j] = LittleFloat(verts[triindexes[0]].xyz[j]);
+			tri[1].xyz[j] = LittleFloat(verts[triindexes[1]].xyz[j]);
+			tri[2].xyz[j] = LittleFloat(verts[triindexes[2]].xyz[j]);
+		}
+		//faceTriangles.push_back(tri);
+		indices.push_back((int)faceVerts.size());
+		faceVerts.push_back(tri[0]);
+		indices.push_back((int)faceVerts.size());
+		faceVerts.push_back(tri[1]);
+		indices.push_back((int)faceVerts.size());
+		faceVerts.push_back(tri[2]);
+	}
+
+	// take the plane information from the lightmap vector
+	for (i = 0; i < 3; i++) {
+		//cv->plane.normal[i] = LittleFloat(ds->lightmapVecs[2][i]);
+	}
+	//cv->plane.dist = DotProduct(cv->points[0], cv->plane.normal);
+	//SetPlaneSignbits(&cv->plane);
+	//cv->plane.type = PlaneTypeForNormal(cv->plane.normal);
+
+	//surf->data = (surfaceType_t*)cv;
+}
+
+
+/*
+===============
+R_LoadSurfaces
+===============
+*/
+void CModel::R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump) {
+	dsurface_t* in;
+	msurface_t* out;
+	mapVert_t* dv;
+	int* indexes;
+	int			count;
+	int			numFaces, numMeshes, numTriSurfs, numFlares;
+	int			i;
+
+	numFaces = 0;
+	numMeshes = 0;
+	numTriSurfs = 0;
+	numFlares = 0;
+
+	in = (dsurface_t*)(cmod_base + surfs->fileofs);
+	if (surfs->filelen % sizeof(*in))
+		return;
+		//ri.Error(ERR_DROP, "LoadMap: funny lump size in %s", s_worldData.name);
+	count = surfs->filelen / sizeof(*in);
+
+	dv = (mapVert_t*)(cmod_base + verts->fileofs);
+	if (verts->filelen % sizeof(*dv))
+		return;
+		// ri.Error(ERR_DROP, "LoadMap: funny lump size in %s", s_worldData.name);
+
+	indexes = (int*)(cmod_base + indexLump->fileofs);
+	if (indexLump->filelen % sizeof(*indexes))
+		return;
+		//ri.Error(ERR_DROP, "LoadMap: funny lump size in %s", s_worldData.name);
+
+	//out = (struct msurface_s*)ri.Hunk_Alloc(count * sizeof(*out), h_low);
+
+	//s_worldData.surfaces = out;
+	//s_worldData.numsurfaces = count;
+
+	for (i = 0; i < count; i++, in++) {
+		switch (LittleLong(in->surfaceType)) {
+		case MST_PATCH:
+			//ParseMesh(in, dv, out);
+			numMeshes++;
+			break;
+		case MST_TRIANGLE_SOUP:
+			//ParseTriSurf(in, dv, out, indexes);
+			numTriSurfs++;
+			break;
+		case MST_PLANAR:
+			ParseFace(in, dv, indexes);
+			numFaces++;
+			break;
+		case MST_FLARE:
+			//ParseFlare(in, dv, out, indexes);
+			numFlares++;
+			break;
+		default:
+			return;
+			//ri.Error(ERR_DROP, "Bad surfaceType");
+		}
+	}
+
+#ifdef PATCH_STITCHING
+	//R_StitchAllPatches();
+#endif
+
+	//R_FixSharedVertexLodError();
+
+#ifdef PATCH_STITCHING
+	//R_MovePatchSurfacesToHunk();
+#endif
+
+	//ri.Printf(PRINT_DEVELOPER, "...loaded %d faces, %i meshes, %i trisurfs, %i flares\n",
+	//	numFaces, numMeshes, numTriSurfs, numFlares);
+}
 
 
 void CModel::CM_LoadMap_Actual( const char *name, qboolean clientload, int *checksum ) {
@@ -1141,6 +1332,10 @@ void CModel::CM_LoadMap_Actual( const char *name, qboolean clientload, int *chec
 	CMod_LoadEntityString (&header.lumps[LUMP_ENTITIES], name);
 	CMod_LoadVisibility( &header.lumps[LUMP_VISIBILITY] );
 	CMod_LoadPatches( &header.lumps[LUMP_SURFACES], &header.lumps[LUMP_DRAWVERTS] );
+
+	if (loadDrawSurfs) {
+		R_LoadSurfaces(&header.lumps[LUMP_SURFACES], &header.lumps[LUMP_DRAWVERTS], &header.lumps[LUMP_DRAWINDEXES]);
+	}
 
 	CM_InitBoxHull ();
 
