@@ -67,7 +67,7 @@ std::vector<S3L_Model3D>	scene3dmodels;
 #define S3L_POSZ(x) ((x)*S3L_POSMULT)
 #define S3L_ROTX(x) ((-x)*S3L_F/360)
 #define S3L_ROTY(y) ((-y)*S3L_F/360)
-#define S3L_ROTZ(y) ((-y)*S3L_F/360)
+#define S3L_ROTZ(z) ((-z)*S3L_F/360)
 //#define S3L_ROTX(x) ((-x)*S3L_F/360)
 //#define S3L_ROTY(y) ((-y)*S3L_F/360)
 //#define S3L_ROTZ(z) ((-z)*S3L_F/360)
@@ -5145,7 +5145,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						scene.camera.transform.rotation.x = S3L_ROTX(demo.cut.Cl.snap.ps.viewangles[0]);
 						scene.camera.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
-						scene.camera.transform.rotation.z = 0;// S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[1]);
+						scene.camera.transform.rotation.z = S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[2]);
 
 						scene.camera.focalLength = 300;
 
