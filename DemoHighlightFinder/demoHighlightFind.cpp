@@ -284,6 +284,7 @@ public:
 	bool doStrafeDeviation = false;
 	bool findjumpbugs = false;
 	bool makeVideo = false;
+	int videoMinMsec = 0;
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
 };
@@ -296,9 +297,18 @@ typedef struct videoFrame_s {
 std::vector<videoFrame_t> videoFrames;
 
 void saveVideo(const ExtraSearchOptions& opts) {
-	void* gmav = gmav_open(opts.videoPath.c_str(), VIDEOWIDTH, VIDEOHEIGHT, 24);
+	void* gmav = gmav_open(opts.videoPath.c_str(), VIDEOWIDTH, VIDEOHEIGHT, 1000);
+	int64_t lastTime = videoFrames.size() ? videoFrames.front().demoTime : 0;
 	for (auto it = videoFrames.begin(); it != videoFrames.end(); it++) {
+		while (it->demoTime - lastTime > 1) {
+			if (it->demoTime - lastTime > 100) {
+				lastTime = it->demoTime - 100;
+			}
+			gmav_add(gmav, NULL);
+			lastTime++;
+		}
 		gmav_add(gmav, it->image);
+		lastTime = it->demoTime;
 	}
 	gmav_finish(gmav);
 }
@@ -5127,8 +5137,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				if (opts.makeVideo) {
 					static int64_t lastDemoRenderFrameTime = -1000;
-
-					if (demoCurrentTime - lastDemoRenderFrameTime >= 42) {
+					//const int minmsecpassed = 90; // 42;
+					if (demoCurrentTime - lastDemoRenderFrameTime >= opts.videoMinMsec) {
 						lastDemoRenderFrameTime = demoCurrentTime;
 						scene3dmodels.clear();
 
@@ -9359,6 +9369,7 @@ int main(int argcO, char** argvO) {
 	auto Q = op.add<popl::Implicit<int>>("Q", "skip-stats", "1 = Avoids creating the statistics db, 2 = avoids strafe deviation calculation. Bitmask. Can combine.",1);
 	auto j = op.add<popl::Implicit<int>>("j", "find-jumpbugs", "Finds instances of jumpbugs in demos.",1);
 	auto v = op.add<popl::Value<std::string>>("v", "make-video", "Make a little preview video AVI.");
+	auto V = op.add<popl::Implicit<int>>("V", "video-maxfps", "Max FPS for video generation, default 1000", 1000);
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
 
 	
@@ -9460,6 +9471,7 @@ int main(int argcO, char** argvO) {
 	if (v->is_set()) {
 		opts.makeVideo = true;
 		opts.videoPath = v->value();
+		opts.videoMinMsec = 1000 / V->value();
 	}
 	if (b->is_set()) {
 		for (int i = 0; i < b->count(); i++) {

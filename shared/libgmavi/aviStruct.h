@@ -399,6 +399,10 @@ typedef struct	s_gmavi
 	uint32_t			moviSize;
 	uint32_t			maxFrames;
 	uint32_t			riffChunks;
+
+	uint64_t			newFramesSize;
+	uint64_t*			newFramesSizes;
+	uint64_t			newFrameIndex;
 }	gmavi_t;
 
 /*	Only pack these structs		*/

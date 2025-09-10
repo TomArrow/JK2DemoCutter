@@ -219,20 +219,22 @@ void		*gmav_open(
 static bool		gmav_finish_main(
 	gmavi_t	*avi, bool finalWrite)
 {
-	avi->moviSize = (avi->frameCount * avi->streamTickSize) + 4;
+	avi->moviSize = avi->newFramesSize /*(avi->frameCount * avi->streamTickSize)*/ + 4;
 	
 	avi->mainIndex.cb = STATIC_OLD_INDEX_OFFSET * avi->frameCount;
 	avi->riffSize += avi->moviSize + avi->mainIndex.cb + 4;
 	avi->mainIndexEntries = (AVIOLDINDEX_ENTRY *)calloc(1, avi->mainIndex.cb);
 	if (avi->mainIndexEntries == NULL)
 		return (gmav_error(avi, errno, NULL));
+	uint32_t framesOffset = 0;
 	for (uint32_t i = 0; i < avi->frameCount; i++) {
 		avi->mainIndexEntries[i] = (AVIOLDINDEX_ENTRY){
 			FCC('00db'),					/*	chunkId				*/
 			AVIF_HASINDEX,					/*	flags				*/
-			4 + avi->streamTickSize * i,	/*	offset				*/
-			avi->bitmapSize					/*	size				*/
+			4 + framesOffset /*avi->streamTickSize * i*/,	/*	offset				*/
+			avi->newFramesSizes[i]-8/*avi->bitmapSize*/					/*	size				*/
 		};
+		framesOffset += avi->newFramesSizes[i];
 	}
 
 	_fseeki64(avi->fileHandler, 0, SEEK_END);
@@ -277,9 +279,11 @@ static bool gmav_create_index(gmavi_t *avi, size_t size)
 	if (avi->ix00[avi->riffChunks].avixIndexEntries == NULL)
 		return (gmav_error(avi, errno, NULL));
 	
+	uint32_t framesOffset = 0;
 	for (uint32_t i = 0; i < size; i++) {
-		avi->ix00[avi->riffChunks].avixIndexEntries[i].dwOffset = avi->streamTickSize * i;
-		avi->ix00[avi->riffChunks].avixIndexEntries[i].dwSize = avi->bitmapSize;
+		avi->ix00[avi->riffChunks].avixIndexEntries[i].dwOffset = framesOffset/*avi->streamTickSize * i*/;
+		avi->ix00[avi->riffChunks].avixIndexEntries[i].dwSize = avi->newFramesSizes[i] - 8/*avi->bitmapSize*/;
+		framesOffset += avi->newFramesSizes[i];
 	}
 	return (true);
 }
@@ -293,10 +297,10 @@ static bool	gmav_add_avix_chunk(gmavi_t *avi)
 	}
 	else
 	{
-		uint32_t	moviSize = 4 + (avi->streamTickSize * avi->maxFrames);
+		uint32_t	moviSize = 4 + avi->newFramesSize; //+ (avi->streamTickSize * avi->maxFrames);
 		uint32_t	riffSize = moviSize + 12;
 
-		avi->fileSize += (avi->streamTickSize * avi->maxFrames);
+		avi->fileSize += avi->newFramesSize;//(avi->streamTickSize * avi->maxFrames);
 		_fseeki64(avi->fileHandler, avi->fileAddr.cbMain, SEEK_SET);
 		fwrite(&riffSize, sizeof(uint32_t), 1, avi->fileHandler);
 		_fseeki64(avi->fileHandler, 8, SEEK_CUR);
@@ -325,6 +329,8 @@ static bool	gmav_add_avix_chunk(gmavi_t *avi)
 	gmav_create_index(avi, avi->maxFrames);
 	avi->fileAddr.moviStart = avi->fileSize + 8;
 	avi->riffChunks += 1;
+	avi->newFramesSize = 0;
+	avi->newFrameIndex = 0;
 	return (true);
 }
 
@@ -337,8 +343,16 @@ bool	gmav_add(
 
 	if (avi == NULL)
 		return (gmav_error(avi, 0, "No gmavi_t struct specified (null)"));
-	if (buffer == NULL)
-		return (gmav_error(avi, 0, "No buffer specified (null)"));
+	//if (buffer == NULL) {
+	//	return (gmav_error(avi, 0, "No buffer specified (null)"));
+	//}
+
+	if (!avi->frameCount) {
+		avi->newFramesSizes = (uint64_t*)calloc(1, avi->maxFrames * sizeof(uint64_t));
+		if (avi->newFramesSizes == NULL)
+			return (gmav_error(avi, errno, NULL));
+		avi->newFrameIndex = 0;
+	}
 
 	if (avi->frameCount && avi->frameCount % avi->maxFrames == 0)
 		gmav_add_avix_chunk(avi);
@@ -346,17 +360,29 @@ bool	gmav_add(
 	avi->frameCount += 1;
 
 	_fseeki64(avi->fileHandler, 0, SEEK_END);
+	if (buffer == NULL) {
+		uint32_t zeroSize = 0;
+		fwrite(&fourcc_uncompressed, sizeof(uint32_t), 1, avi->fileHandler);
+		fwrite(&zeroSize, sizeof(uint32_t), 1, avi->fileHandler);
+		avi->newFramesSize += 8;
+		avi->newFramesSizes[avi->newFrameIndex++] = 8;
+		return (true);
+	}
 	if (avi->riffChunks != 0)
 	{
 		fwrite(&fourcc_uncompressed, sizeof(uint32_t), 1, avi->fileHandler);
 		fwrite(&avi->bitmapSize, sizeof(uint32_t), 1, avi->fileHandler);
 		fwrite(buffer, avi->bitmapSize, 1, avi->fileHandler);
+		avi->newFramesSize += avi->streamTickSize;
+		avi->newFramesSizes[avi->newFrameIndex++] = avi->streamTickSize;
 		return (true);
 	}
 
 	fwrite(&fourcc_uncompressed, sizeof(uint32_t), 1, avi->fileHandler);
 	fwrite(&avi->bitmapSize, sizeof(uint32_t), 1, avi->fileHandler);
 	fwrite(buffer, avi->bitmapSize, 1, avi->fileHandler);
+	avi->newFramesSize += avi->streamTickSize;
+	avi->newFramesSizes[avi->newFrameIndex++] = avi->streamTickSize;
 	return (true);
 }
 
@@ -392,7 +418,7 @@ bool		gmav_finish(
 	};
 	_fseeki64(avi->fileHandler, avi->fileAddr.superIndex, SEEK_SET);
 	fwrite(&superIndex, sizeof(AVISUPERINDEX), 1, avi->fileHandler);
-	avi->fileSize += avi->streamTickSize * framesLeft;
+	avi->fileSize += avi->newFramesSize;// avi->streamTickSize * framesLeft;
 	
 	for (uint32_t i = 0; i < avi->riffChunks; i++) {
 
@@ -421,7 +447,7 @@ bool		gmav_finish(
 	fwrite(&avi->ix00[avi->riffChunks].avixIndex, sizeof(AVISTDINDEX), 1, avi->fileHandler);
 	fwrite(avi->ix00[avi->riffChunks].avixIndexEntries, sizeof(AVISTDINDEX_ENTRY), framesLeft, avi->fileHandler);
 
-	uint32_t	riffSize = (avi->streamTickSize * framesLeft) + 16 + sizeof(AVISTDINDEX) * (avi->riffChunks + 1);
+	uint32_t	riffSize = avi->newFramesSize/* (avi->streamTickSize * framesLeft)*/ + 16 + sizeof(AVISTDINDEX) * (avi->riffChunks + 1);
 	riffSize += sizeof(AVISTDINDEX_ENTRY) * avi->maxFrames * avi->riffChunks;
 	riffSize += sizeof(AVISTDINDEX_ENTRY) * framesLeft;
 	uint32_t	moviSize = riffSize - 12;
