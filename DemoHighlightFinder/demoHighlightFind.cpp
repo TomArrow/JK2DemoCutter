@@ -5294,7 +5294,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								VectorSet(maxs, 15, 15, -8);
 								isDeadPlayer = true;
 							} 
-							else if (thisEs->solid) {
+							else if (!thisEs->solid) {
 								VectorSet(mins, -10, -10, -10);
 								VectorSet(maxs, 10, 10, 10);
 							}
