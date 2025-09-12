@@ -65,9 +65,9 @@ public:
 	static void InitSaberStates(const byte* input, const int elementCount, SaberAnimState_t* saberFrameInfos);
 
 	static SaberAnimState_t* GetSaberAnimState(int torsoAnim, int64_t animationTime, demoType_t demoType);
-	static void TransformRelativePositionByAngle(vec3_t pos, vec3_t angles, vec3_t out);
-	static qboolean GetSaberBaseAndTip(int torsoAnim, int64_t animationTime, vec3_t playerOrigin, vec3_t playerAngles, demoType_t demoType, vec3_t base, vec3_t tip);
-	static qboolean GetSaberSpritePos(int torsoAnim, int64_t animationTime, vec3_t playerOrigin, vec3_t playerAngles, float width, demoType_t demoType, vec3_t viewOrg, vec3_t points[6]);
+	static void TransformRelativePositionByAngle(const vec3_t pos, const vec3_t angles, vec3_t out);
+	static qboolean GetSaberBaseAndTip(int torsoAnim, int64_t animationTime, const vec3_t playerOrigin, const vec3_t playerAngles, demoType_t demoType, vec3_t base, vec3_t tip);
+	static qboolean GetSaberSpritePos(int torsoAnim, int64_t animationTime, const vec3_t playerOrigin, const vec3_t playerAngles, float width, demoType_t demoType, vec3_t viewOrg, vec3_t points[6]);
 };
 
 

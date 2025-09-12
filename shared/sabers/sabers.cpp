@@ -90,7 +90,7 @@ SaberAnimState_t* SaberAnimationStuff::GetSaberAnimState(int torsoAnim, int64_t 
 	return frames + desiredFrame;
 }
 
-void SaberAnimationStuff::TransformRelativePositionByAngle(vec3_t pos, vec3_t angles, vec3_t out) {
+void SaberAnimationStuff::TransformRelativePositionByAngle(const vec3_t pos, const vec3_t angles, vec3_t out) {
 	vec3_t forward, right, up;
 	AngleVectors(angles, forward, right, up);
 	VectorClear(out);
@@ -99,7 +99,7 @@ void SaberAnimationStuff::TransformRelativePositionByAngle(vec3_t pos, vec3_t an
 	VectorMA(out, pos[2], up, out);
 }
 
-qboolean SaberAnimationStuff::GetSaberBaseAndTip(int torsoAnim, int64_t animationTime, vec3_t playerOrigin, vec3_t playerAngles, demoType_t demoType, vec3_t base, vec3_t tip) {
+qboolean SaberAnimationStuff::GetSaberBaseAndTip(int torsoAnim, int64_t animationTime, const  vec3_t playerOrigin, const vec3_t playerAngles, demoType_t demoType, vec3_t base, vec3_t tip) {
 	SaberAnimState_t* saberFrame = GetSaberAnimState(torsoAnim, animationTime, demoType);
 	if (!saberFrame) return qfalse;
 
@@ -113,7 +113,7 @@ qboolean SaberAnimationStuff::GetSaberBaseAndTip(int torsoAnim, int64_t animatio
 	return qtrue;
 }
 
-qboolean SaberAnimationStuff::GetSaberSpritePos(int torsoAnim, int64_t animationTime, vec3_t playerOrigin, vec3_t playerAngles, float width, demoType_t demoType, vec3_t viewOrg, vec3_t points[6]) {
+qboolean SaberAnimationStuff::GetSaberSpritePos(int torsoAnim, int64_t animationTime, const  vec3_t playerOrigin, const  vec3_t playerAngles, float width, demoType_t demoType, vec3_t viewOrg, vec3_t points[6]) {
 	vec3_t start, end;
 	if (!GetSaberBaseAndTip(torsoAnim, animationTime, playerOrigin, playerAngles, demoType, start, end)) {
 		return qfalse;

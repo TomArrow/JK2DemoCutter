@@ -140,9 +140,9 @@ void drawPixel(S3L_PixelInfo* p)
 			c[2] = std::min(((int)c[2] * (int)scene3dmodelProperties[p->modelIndex].color[0]) >> 8, 255);
 		}
 		else {
-			c[0] = scene3dmodelProperties[p->modelIndex].color[0];
+			c[0] = scene3dmodelProperties[p->modelIndex].color[2];
 			c[1] = scene3dmodelProperties[p->modelIndex].color[1];
-			c[2] = scene3dmodelProperties[p->modelIndex].color[2];
+			c[2] = scene3dmodelProperties[p->modelIndex].color[0];
 		}
 
 		transparency = scene3dmodelProperties[p->modelIndex].transparent;
@@ -216,7 +216,8 @@ void sceneAdd3DSaberForPlayer(vec3_t playerOrigin, vec3_t playerAngles, int tors
 	int64_t animationTime = demoCurrentTime - lastTorsoAnimChange[entityNum];
 
 	vec3_t points[6];
-	if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, playerOrigin, playerAngles, 3, demoType, camerapos, points)) {
+	//if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, playerOrigin, playerAngles, 3, demoType, camerapos, points)) {
+	if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, vec3_origin, playerAngles, 3, demoType, camerapos, points)) {
 		int startIndex = scene3dmodelVertices.size();
 		std::vector<S3L_Unit> vertices;
 		vertices.reserve(6 * 3);
@@ -233,6 +234,9 @@ void sceneAdd3DSaberForPlayer(vec3_t playerOrigin, vec3_t playerAngles, int tors
 
 		S3L_Model3D saberModel;
 		S3L_model3DInit(scene3dmodelVertices.back().data(), 6, scene3dmodelTriangles.back().data(), 2, &saberModel);
+		saberModel.transform.translation.x = S3L_POSX(playerOrigin[1]);
+		saberModel.transform.translation.y = S3L_POSY(playerOrigin[2]);
+		saberModel.transform.translation.z = S3L_POSZ(playerOrigin[0]);
 		saberModel.config.backfaceCulling = 0;
 		scene3dmodels.push_back(saberModel);
 		drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
