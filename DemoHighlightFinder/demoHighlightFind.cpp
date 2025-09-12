@@ -1,5 +1,7 @@
+
 #include "demoCut.h"
 #include "otherGameStuff2.h"
+#include "../sabers/sabers.h"
 #define PCRE2_STATIC
 #include "jpcre2.hpp"
 #include <fstream>
@@ -62,6 +64,8 @@ S3L_Model3D cubeModel; // 3D model, has a geometry, position, rotation etc.
 S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
 typedef struct drawProperties3dModel_s {
 	byte	color[3];
+	bool	transparent;
+	bool	isCube;
 } drawProperties3dModel_t;
 std::vector<S3L_Unit>		mapVertices;
 std::vector<S3L_Unit>		mapUVs;
@@ -69,6 +73,8 @@ std::vector<S3L_Index>		mapTriangles;
 std::vector<lightmap_t>		mapLightmaps;
 std::vector<S3L_Model3D>	scene3dmodels;
 std::vector<drawProperties3dModel_t>	scene3dmodelProperties;
+std::vector<std::vector<S3L_Unit>>		scene3dmodelVertices;
+std::vector<std::vector<S3L_Index>>		scene3dmodelTriangles;
 #define S3L_POSX(y) ((y)*S3L_POSMULT)
 #define S3L_POSY(z) ((z)*S3L_POSMULT)
 #define S3L_POSZ(x) ((x)*S3L_POSMULT)
@@ -119,20 +125,27 @@ void drawPixel(S3L_PixelInfo* p)
 	}
 	else {
 
-		if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
-			p->triangleIndex == 4 || p->triangleIndex == 5)
-			c[0] = c[1] = c[2] = '#';
-		else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
-			p->triangleIndex == 6 || p->triangleIndex == 7)
-			c[0] = c[1] = c[2] = 'x';
-		else
-			c[0] = c[1] = c[2] = '.';
+		if (scene3dmodelProperties[p->modelIndex].isCube) {
+			if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
+				p->triangleIndex == 4 || p->triangleIndex == 5)
+				c[0] = c[1] = c[2] = '#';
+			else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
+				p->triangleIndex == 6 || p->triangleIndex == 7)
+				c[0] = c[1] = c[2] = 'x';
+			else
+				c[0] = c[1] = c[2] = '.';
 
-		c[0] = std::min(((int)c[0] * (int)scene3dmodelProperties[p->modelIndex].color[2]) >> 8, 255);
-		c[1] = std::min(((int)c[1] * (int)scene3dmodelProperties[p->modelIndex].color[1]) >> 8, 255);
-		c[2] = std::min(((int)c[2] * (int)scene3dmodelProperties[p->modelIndex].color[0]) >> 8, 255);
+			c[0] = std::min(((int)c[0] * (int)scene3dmodelProperties[p->modelIndex].color[2]) >> 8, 255);
+			c[1] = std::min(((int)c[1] * (int)scene3dmodelProperties[p->modelIndex].color[1]) >> 8, 255);
+			c[2] = std::min(((int)c[2] * (int)scene3dmodelProperties[p->modelIndex].color[0]) >> 8, 255);
+		}
+		else {
+			c[0] = scene3dmodelProperties[p->modelIndex].color[0];
+			c[1] = scene3dmodelProperties[p->modelIndex].color[1];
+			c[2] = scene3dmodelProperties[p->modelIndex].color[2];
+		}
 
-		transparency = true;
+		transparency = scene3dmodelProperties[p->modelIndex].transparent;
 	}
 
 	// draw to ASCII screen
@@ -145,12 +158,88 @@ void drawPixel(S3L_PixelInfo* p)
 		c[0] = std::min(((int)c[0] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3]) / 2, 255);
 		c[1] = std::min(((int)c[1] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1]) / 2, 255);
 		c[2] = std::min(((int)c[2] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2]) / 2, 255);
-		p->depth = p->previousZ;
+		S3L_zBufferWrite(p->x,p->y,p->previousZ);
 	}
 
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c[0];
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c[1];
 	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c[2];
+}
+template<unsigned int max_clients>
+void setModelColor(drawProperties3dModel_t* modelProps, int number) {
+
+	if (number < max_clients) {
+		switch (playerTeams[number]) {
+		case TEAM_FREE:
+			modelProps->color[0] = 0;
+			modelProps->color[1] = 255;
+			modelProps->color[2] = 0;
+			break;
+		case TEAM_RED:
+			modelProps->color[0] = 255;
+			modelProps->color[1] = 0;
+			modelProps->color[2] = 0;
+			break;
+		case TEAM_BLUE:
+			modelProps->color[0] = 0;
+			modelProps->color[1] = 0;
+			modelProps->color[2] = 255;
+			break;
+		case TEAM_SPECTATOR:
+			modelProps->color[0] = 255;
+			modelProps->color[1] = 255;
+			modelProps->color[2] = 0;
+			break;
+		default:
+			modelProps->color[0] = 255;
+			modelProps->color[1] = 255;
+			modelProps->color[2] = 255;
+			break;
+		}
+	}
+	else {
+		modelProps->color[0] = 255;
+		modelProps->color[1] = 255;
+		modelProps->color[2] = 255;
+	}
+}
+int64_t lastTorsoAnim[MAX_GENTITIES];
+int64_t lastTorsoAnimChange[MAX_GENTITIES];
+template<unsigned int max_clients>
+void sceneAdd3DSaberForPlayer(vec3_t playerOrigin, vec3_t playerAngles, int torsoAnim, vec3_t camerapos, demoType_t demoType, int entityNum, int64_t demoCurrentTime) {
+
+
+	if (lastTorsoAnim[entityNum] != torsoAnim) {
+		lastTorsoAnimChange[entityNum] = demoCurrentTime;
+		lastTorsoAnim[entityNum] = torsoAnim;
+	}
+	int64_t animationTime = demoCurrentTime - lastTorsoAnimChange[entityNum];
+
+	vec3_t points[6];
+	if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, playerOrigin, playerAngles, 3, demoType, camerapos, points)) {
+		int startIndex = scene3dmodelVertices.size();
+		std::vector<S3L_Unit> vertices;
+		vertices.reserve(6 * 3);
+		std::vector<S3L_Index> indices;
+		indices.reserve(6);
+		for (int i = 0; i < 6; i++) {
+			vertices.push_back(S3L_POSX(points[i][1]));
+			vertices.push_back(S3L_POSY(points[i][2]));
+			vertices.push_back(S3L_POSZ(points[i][0]));
+			indices.push_back(i);
+		}
+		scene3dmodelVertices.push_back(std::move(vertices));
+		scene3dmodelTriangles.push_back(std::move(indices));
+
+		S3L_Model3D saberModel;
+		S3L_model3DInit(scene3dmodelVertices.back().data(), 6, scene3dmodelTriangles.back().data(), 2, &saberModel);
+		saberModel.config.backfaceCulling = 0;
+		scene3dmodels.push_back(saberModel);
+		drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
+		setModelColor<max_clients>(modelProps2, entityNum);
+		modelProps2->transparent = false;
+		modelProps2->isCube = false;
+	}
 }
 
 
@@ -4544,44 +4633,6 @@ qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int 
 	}
 }
 
-template<unsigned int max_clients>
-void setModelProps(drawProperties3dModel_t* modelProps, int number) {
-
-	if (number < max_clients) {
-		switch (playerTeams[number]) {
-		case TEAM_FREE:
-			modelProps->color[0] = 0;
-			modelProps->color[1] = 255;
-			modelProps->color[2] = 0;
-			break;
-		case TEAM_RED:
-			modelProps->color[0] = 255;
-			modelProps->color[1] = 0;
-			modelProps->color[2] = 0;
-			break;
-		case TEAM_BLUE:
-			modelProps->color[0] = 0;
-			modelProps->color[1] = 0;
-			modelProps->color[2] = 255;
-			break;
-		case TEAM_SPECTATOR:
-			modelProps->color[0] = 255;
-			modelProps->color[1] = 255;
-			modelProps->color[2] = 0;
-			break;
-		default:
-			modelProps->color[0] = 255;
-			modelProps->color[1] = 255;
-			modelProps->color[2] = 255;
-			break;
-		}
-	}
-	else {
-		modelProps->color[0] = 255;
-		modelProps->color[1] = 255;
-		modelProps->color[2] = 255;
-	}
-}
 
 template<unsigned int max_clients>
 qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io, sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
@@ -4753,6 +4804,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 	if (opts.makeVideo) {
+		SaberAnimationStuff::init();
 		S3L_model3DInit(
 			cubeVertices,
 			S3L_CUBE_VERTEX_COUNT,
@@ -5199,7 +5251,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						lastDemoRenderFrameTime = demoCurrentTime;
 						scene3dmodels.clear();
 						scene3dmodelProperties.clear();
+						scene3dmodelVertices.clear();
+						scene3dmodelTriangles.clear();
 
+						// set up camera pos
+						vec3_t camerapos;
+						vec3_t forward;
+						AngleVectors(demo.cut.Cl.snap.ps.viewangles, forward, NULL, NULL);
+						VectorMA(demo.cut.Cl.snap.ps.origin, -80.0f, forward, camerapos);
+						camerapos[2] += demo.cut.Cl.snap.ps.viewheight;
+
+						// world/models
 						if (haveMapModel) {
 							renderingMap = true;
 							scene3dmodels.push_back(mapModel);
@@ -5210,15 +5272,31 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 						vec3_t mins, maxs;
 
+						int saberWeap = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_SABER_GENERAL,demoType);
+
 						for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 
 							entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 							//if (thisEs->number >= 32) break;
 							S3L_Model3D model = cubeModel;
+							int thisEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType, demoType);
+							bool isPlayerEnt = (thisEntityType == ET_PLAYER_GENERAL || thisEntityType == ET_GRAPPLE_GENERAL);
+							bool isDeadPlayer = false;
 
-							if (!thisEs->solid || thisEs->solid == SOLID_BMODEL) continue;
+							if ((!thisEs->solid && !isPlayerEnt && thisEntityType >= ET_EVENTS_GENERAL) || thisEs->solid == SOLID_BMODEL) continue;
 
-							IntegerToBoundingBox(thisEs->solid, mins, maxs, demoType);
+							if (isPlayerEnt && !thisEs->solid && (thisEs->eFlags & EF_DEAD)) {
+								VectorSet(mins, -15, -15, DEFAULT_MINS_2);
+								VectorSet(maxs, 15, 15, -8);
+								isDeadPlayer = true;
+							} 
+							else if (thisEs->solid) {
+								VectorSet(mins, -10, -10, -10);
+								VectorSet(maxs, 10, 10, 10);
+							}
+							else {
+								IntegerToBoundingBox(thisEs->solid, mins, maxs, demoType);
+							}
 							float zCenter = thisEs->pos.trBase[2];
 							zCenter += (mins[2] + maxs[2]) * 0.5f;
 
@@ -5231,14 +5309,31 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							scene3dmodels.push_back(model);
 							drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
-							setModelProps<max_clients>(modelProps, thisEs->number);
+							setModelColor<max_clients>(modelProps, thisEs->number);
+							if (isDeadPlayer) {
+								modelProps->color[0] >>= 2;
+								modelProps->color[1] >>= 2;
+								modelProps->color[2] >>= 2;
+							}
+							else if (!thisEs->solid) {
+								modelProps->color[0] >>= 4;
+								modelProps->color[1] >>= 4;
+								modelProps->color[2] >>= 4;
+							}
+							modelProps->transparent = isPlayerEnt;
+							modelProps->isCube = true;
+
+							if (isPlayerEnt && thisEs->weapon == saberWeap) {
+								// draw saber
+								sceneAdd3DSaberForPlayer<max_clients>(thisEs->pos.trBase,thisEs->apos.trBase,thisEs->torsoAnim,camerapos,demoType,thisEs->number,demoCurrentTime);
+							}
 						}
 
 						S3L_Model3D model = cubeModel;
 						float zCenter = demo.cut.Cl.snap.ps.origin[2];
 						if (demo.cut.Cl.snap.ps.viewheight >= DEFAULT_VIEWHEIGHT) {
 							maxs[2] = DEFAULT_MAXS_2;
-						} else if (demo.cut.Cl.snap.ps.viewheight >= DEFAULT_VIEWHEIGHT) {
+						} else if (demo.cut.Cl.snap.ps.viewheight >= CROUCH_VIEWHEIGHT) {
 							maxs[2] = CROUCH_MAXS_2;
 						} else {
 							maxs[2] = -8;
@@ -5253,7 +5348,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						scene3dmodels.push_back(model);
 						drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
-						setModelProps<max_clients>(modelProps, demo.cut.Cl.snap.ps.clientNum);
+						setModelColor<max_clients>(modelProps, demo.cut.Cl.snap.ps.clientNum);
+						modelProps->transparent = true;
+						modelProps->isCube = true;
+						if (demo.cut.Cl.snap.ps.weapon == saberWeap) {
+							// draw saber
+							sceneAdd3DSaberForPlayer<max_clients>(demo.cut.Cl.snap.ps.origin, demo.cut.Cl.snap.ps.viewangles, demo.cut.Cl.snap.ps.torsoAnim, camerapos, demoType, demo.cut.Cl.snap.ps.clientNum,demoCurrentTime);
+						}
 
 						S3L_Model3D* models = scene3dmodels.data();
 
@@ -5262,23 +5363,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							scene3dmodels.size(),
 							&scene);
 
-						// shift the camera a little bit backwards so that it's not inside the cube:
-
-						//scene.camera.transform.translation.z = -2 * S3L_F;
-						vec3_t camerapos;
-						vec3_t forward;
-						AngleVectors(demo.cut.Cl.snap.ps.viewangles, forward, NULL, NULL);
-						VectorMA(demo.cut.Cl.snap.ps.origin, -80.0f, forward, camerapos);
 						scene.camera.transform.translation.x = S3L_POSX(camerapos[1]);
-						scene.camera.transform.translation.y = S3L_POSY(camerapos[2] + demo.cut.Cl.snap.ps.viewheight);
+						scene.camera.transform.translation.y = S3L_POSY(camerapos[2]);
 						scene.camera.transform.translation.z = S3L_POSZ(camerapos[0]);
-
 
 						scene.camera.transform.rotation.x = S3L_ROTX(demo.cut.Cl.snap.ps.viewangles[0]);
 						scene.camera.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
 						scene.camera.transform.rotation.z = S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[2]);
 
 						scene.camera.focalLength = 300;
+
+						// shift the camera a little bit backwards so that it's not inside the cube:
+
+						//scene.camera.transform.translation.z = -2 * S3L_F;
 
 						memset(drawBuffer, 0, sizeof(drawBuffer));
 

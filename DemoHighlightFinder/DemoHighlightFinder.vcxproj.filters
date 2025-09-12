@@ -215,6 +215,12 @@
     <ClCompile Include="..\shared\CModel.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\sabers\sabers.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\sabers\sabersFiles.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -308,6 +314,9 @@
     </ClInclude>
     <ClInclude Include="..\shared\libgmavi\msaviriff.h">
       <Filter>libgmavi</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\sabers\sabers.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

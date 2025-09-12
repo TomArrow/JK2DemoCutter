@@ -3810,6 +3810,25 @@ void ByteToDir(int b, vec3_t dir) {
 	VectorCopy(bytedirs[b], dir);
 }
 
+void Matrix4x4Transform(vec4_t vec, float matrix[16], vec4_t out) {
+	for (int i = 0; i < 4; i++) {
+		out[i] =
+			vec[0] * matrix[i + 0 * 4] +
+			vec[1] * matrix[i + 1 * 4] +
+			vec[2] * matrix[i + 2 * 4] +
+			vec[3] * matrix[i + 3 * 4];
+	}
+}
+void Matrix4x4TransformOut3(vec4_t vec, float matrix[16], vec3_t out) {
+	for (int i = 0; i < 3; i++) {
+		out[i] =
+			vec[0] * matrix[i + 0 * 4] +
+			vec[1] * matrix[i + 1 * 4] +
+			vec[2] * matrix[i + 2 * 4] +
+			vec[3] * matrix[i + 3 * 4];
+	}
+}
+
 void vectoangles(const vec3_t value1, vec3_t angles) {
 	float	forward;
 	float	yaw, pitch;

@@ -4678,7 +4678,8 @@ float vectoyaw(const vec3_t vec);
 void AnglesSubtract(vec3_t v1, vec3_t v2, vec3_t v3); 
 float	AngleSubtract(float a1, float a2);
 
-
+void Matrix4x4Transform(vec4_t vec, float matrix[16], vec4_t out);
+void Matrix4x4TransformOut3(vec4_t vec, float matrix[16], vec3_t out);
 
 typedef enum {
 	WEAPON_READY,
