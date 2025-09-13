@@ -5546,7 +5546,8 @@ inline bool demoTypeIsMOHAA(demoType_t demoType) {
 
 int getMOHTeam(entityState_t* s);
 
-void IntegerToBoundingBox(int num, vec3_t mins, vec3_t maxs, demoType_t demoType);
+#define SHIELD_HALFTHICKNESS		4
+void IntegerToBoundingBox(int num, int forceFieldTime2, vec3_t mins, vec3_t maxs, demoType_t demoType);
 
 
 /*

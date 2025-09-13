@@ -2045,7 +2045,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	if (isMOHAADemo) {
 		if (s->solid) {
 			vec3_t mins, maxs;
-			IntegerToBoundingBox(s->solid, mins, maxs, demoType);
+			IntegerToBoundingBox(s->solid, 0, mins, maxs, demoType);
 			switch ((int)maxs[2]) { // Very bad way of doing this tbh. idk. different places of the code say different values. sigh
 			case 94:
 			case MAXS_Z_MOH:
@@ -6897,7 +6897,7 @@ void retimeEntityStep(entityState_t* entity, double newServerTime, demoType_t de
 			VectorCopy(entity->demoToolsData.maxs, maxs);
 		}
 		else {
-			IntegerToBoundingBox(entity->solid, mins, maxs, demoType);
+			IntegerToBoundingBox(entity->solid, generalizeGameValue<GMAP_ENTITYTYPE,UNSAFE>(entity->eType,demoType) == ET_SPECIAL_GENERAL && entity->modelindex == 2 && entity->time2 ? entity->time2 : 0 , mins, maxs, demoType);
 		}
 
 		// trace a line from the previous position to the current position
@@ -7098,18 +7098,37 @@ IntegerToBoundingBox (MOHAA)
 #define BBOX_MAX_BOTTOM_Z ( 1 << ( BBOX_ZBOTTOMBITS - 1 ) )
 #define BBOX_REALMAX_BOTTOM_Z ( 1 << BBOX_ZBOTTOMBITS )
 #define BBOX_MAX_TOP_Z ( 1 << BBOX_ZTOPBITS )
-void IntegerToBoundingBox(int num, vec3_t mins, vec3_t maxs, demoType_t demoType)
+void IntegerToBoundingBox(int num, int forceFieldTime2, vec3_t mins, vec3_t maxs, demoType_t demoType)
 {
 	if (!demoTypeIsMOHAA(demoType)) {
-		int x, zd, zu;
-		x = (num & 255);
-		zd = ((num >> 8) & 255);
-		zu = ((num >> 16) & 255) - 32;
+		if(forceFieldTime2) {
+			// special case for forcefield's non-symmetric bbox
+			int	solid = forceFieldTime2;
+			int xaxis = (solid >> 24) & 1;
+			int height = (solid >> 16) & 255;
+			int posWidth = (solid >> 8) & 255;
+			int negWidth = solid & 255;
 
-		mins[0] = mins[1] = -x;
-		maxs[0] = maxs[1] = x;
-		mins[2] = -zd;
-		maxs[2] = zu;
+			if (xaxis) {
+				VectorSet(mins, -negWidth, -SHIELD_HALFTHICKNESS, 0);
+				VectorSet(maxs, posWidth, SHIELD_HALFTHICKNESS, height);
+			}
+			else {
+				VectorSet(mins, -SHIELD_HALFTHICKNESS, -negWidth, 0);
+				VectorSet(maxs, SHIELD_HALFTHICKNESS, posWidth, height);
+			}
+		}
+		else {
+			int x, zd, zu;
+			x = (num & 255);
+			zd = ((num >> 8) & 255);
+			zu = ((num >> 16) & 255) - 32;
+
+			mins[0] = mins[1] = -x;
+			maxs[0] = maxs[1] = x;
+			mins[2] = -zd;
+			maxs[2] = zu;
+		}
 	}
 	else {
 		int x, y, zd, zu;
@@ -7479,7 +7498,7 @@ int G_GetHitLocation(entityState_t* target, vec3_t ppoint, demoType_t demoType)
 	AngleVectors(tangles, forward, right, up);
 
 	//get center of target
-	IntegerToBoundingBox(target->solid,mins,maxs, demoType);
+	IntegerToBoundingBox(target->solid, 0,mins,maxs, demoType);
 	GetAbsMinsMaxs(qboolean(target->solid== SOLID_BMODEL),target->pos.trBase,target->apos.trBase,mins,maxs,absmin,absmax);
 	VectorAdd(absmin, absmax, tcenter);
 	VectorScale(tcenter, 0.5, tcenter);

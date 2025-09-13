@@ -168,8 +168,9 @@ void drawPixel(S3L_PixelInfo* p)
 template<unsigned int max_clients>
 void setModelColor(drawProperties3dModel_t* modelProps, int number) {
 
-	if (number < max_clients) {
-		switch (playerTeams[number]) {
+	int team = number < 0 ? (-number) - 1 : (number < max_clients ? playerTeams[number] : -1);
+	if (team > -1) {
+		switch (team) {
 		case TEAM_FREE:
 			modelProps->color[0] = 0;
 			modelProps->color[1] = 255;
@@ -5347,6 +5348,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if ((!thisEs->solid && !isPlayerEnt && thisEntityType >= ET_EVENTS_GENERAL) || thisEs->solid == SOLID_BMODEL) continue;
 
+							bool isForceField = thisEntityType == ET_SPECIAL_GENERAL && thisEs->modelindex == 2 && thisEs->time2;
+
 							if (isPlayerEnt && !thisEs->solid && (thisEs->eFlags & EF_DEAD)) {
 								VectorSet(mins, -15, -15, DEFAULT_MINS_2);
 								VectorSet(maxs, 15, 15, -8);
@@ -5357,7 +5360,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								VectorSet(maxs, 10, 10, 10);
 							}
 							else {
-								IntegerToBoundingBox(thisEs->solid, mins, maxs, demoType);
+								IntegerToBoundingBox(thisEs->solid, isForceField ? thisEs->time2 : 0, mins, maxs, demoType); // thisEs->modelindex == 2  means HI_SHIELD
 							}
 							float zCenter = thisEs->pos.trBase[2];
 							zCenter += (mins[2] + maxs[2]) * 0.5f;
@@ -5371,7 +5374,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							scene3dmodels.push_back(model);
 							drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
-							setModelColor<max_clients>(modelProps, thisEs->number);
+							setModelColor<max_clients>(modelProps, isForceField ? -(thisEs->otherEntityNum2+1) : thisEs->number);
 							if (isDeadPlayer) {
 								modelProps->color[0] >>= 2;
 								modelProps->color[1] >>= 2;
@@ -5382,8 +5385,24 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								modelProps->color[1] >>= 4;
 								modelProps->color[2] >>= 4;
 							}
-							modelProps->transparent = isPlayerEnt;
+							modelProps->transparent = isPlayerEnt || isForceField;
 							modelProps->isCube = true;
+
+							if (isPlayerEnt && thisEs->powerups & ((1 << PW_REDFLAG) | (1 << PW_BLUEFLAG) | (1 << PW_NEUTRALFLAG))) {
+								// draw "flag"
+								int flagTeam = (thisEs->powerups & (1 << PW_REDFLAG)) ? TEAM_RED : ((thisEs->powerups & (1 << PW_BLUEFLAG)) ? TEAM_BLUE : TEAM_FREE);
+								zCenter += 35;
+								model.transform.translation.y = S3L_POSY(zCenter);
+								model.transform.scale.x = 10 * S3L_POSMULT;
+								model.transform.scale.y = 15 * S3L_POSMULT;
+								model.transform.scale.z = 2 * S3L_POSMULT;
+								model.transform.rotation.y = S3L_ROTY(thisEs->apos.trBase[1]);
+								scene3dmodels.push_back(model);
+								drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
+								setModelColor<max_clients>(modelProps2, -(flagTeam+1));
+								modelProps2->transparent = false;
+								modelProps2->isCube = true;
+							}
 
 							if (isPlayerEnt && thisEs->weapon == saberWeap) {
 								// draw saber
@@ -5413,6 +5432,23 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						setModelColor<max_clients>(modelProps, demo.cut.Cl.snap.ps.clientNum);
 						modelProps->transparent = true;
 						modelProps->isCube = true;
+
+						if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG] || demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG] || demo.cut.Cl.snap.ps.powerups[PW_NEUTRALFLAG]) {
+							// draw "flag"
+							int flagTeam = demo.cut.Cl.snap.ps.powerups[PW_REDFLAG] ? TEAM_RED : (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG] ? TEAM_BLUE : TEAM_FREE);
+							zCenter += 35;
+							model.transform.translation.y = S3L_POSY(zCenter);
+							model.transform.scale.x = 10 * S3L_POSMULT;
+							model.transform.scale.y = 15 * S3L_POSMULT;
+							model.transform.scale.z = 2 * S3L_POSMULT;
+							model.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
+							scene3dmodels.push_back(model);
+							drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
+							setModelColor<max_clients>(modelProps2, -(flagTeam + 1));
+							modelProps2->transparent = false;
+							modelProps2->isCube = true;
+						}
+
 						if (demo.cut.Cl.snap.ps.weapon == saberWeap) {
 							// draw saber
 							sceneAdd3DSaberForPlayer<max_clients>(demo.cut.Cl.snap.ps.origin, demo.cut.Cl.snap.ps.viewangles, demo.cut.Cl.snap.ps.torsoAnim, camerapos, demoType, demo.cut.Cl.snap.ps.clientNum,demoCurrentTime);
@@ -7859,7 +7895,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							const char* modString = logModString.c_str();
 
 							if (opts.makeVideo) {
-								videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) });
+								if (isSuicide) {
+									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s",playername.c_str(),modString) });
+								}
+								else {
+									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) });
+								}
 								if (attackerIsFollowed && !isSuicide) {
 									screenCenterText.push_back({ demoCurrentTime,va("^7%s ^7%s",modString,victimname.c_str()) });
 								}
@@ -8168,8 +8209,23 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// There is no weapon (at least in JK2) with higher splash radius I believe.
 							addMetaEventNearby<max_clients>(thisEs->pos.trBase, 256.0f + 50.0f, METAEVENT_EFFECT, demoCurrentTime, bufferTime, opts, bufferTime); 
 						}
-						/*else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
-							int playerNum = thisEs->trickedentindex;
+						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_GOT_FLAG) {
+							if (opts.makeVideo) {
+								int playerNum = thisEs->trickedentindex;
+								int flagTeam = thisEs->trickedentindex2;
+								std::string playername = "WEIRDONAME";
+								const char* playerInfo;
+								if (playerNum >= 0 && playerNum < max_clients) {
+									int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + playerNum];
+									playerInfo = demo.cut.Cl.gameState.stringData + offset;
+									playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+								}
+
+								if (opts.makeVideo) {
+									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7got the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
+								}
+							}
+							/*int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
 							// A bit pointless tbh because we reset it to -1 anyway before checking entities. 
 							// Let me rethink this some day TODO
@@ -8179,8 +8235,42 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}else if (flagTeam == TEAM_BLUE) {
 								blueFlagNewCarrierByEvent = playerNum;
 								//lastKnownBlueFlagCarrier = playerNum;
+							}*/
+						}
+						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_FRAGGED_FLAG_CARRIER) {
+							if (opts.makeVideo) {
+								int playerNum = thisEs->trickedentindex;
+								int flagTeam = thisEs->trickedentindex2;
+								std::string playername = "WEIRDONAME";
+								const char* playerInfo;
+								if (playerNum >= 0 && playerNum < max_clients) {
+									int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + playerNum];
+									playerInfo = demo.cut.Cl.gameState.stringData + offset;
+									playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+								}
+
+								if (opts.makeVideo) {
+									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7killed %s's flag carrier",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
+								}
 							}
-						}*/
+						}
+						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_RETURNED_FLAG) {
+							if (opts.makeVideo) {
+								int playerNum = thisEs->trickedentindex;
+								int flagTeam = thisEs->trickedentindex2;
+								std::string playername = "WEIRDONAME";
+								const char* playerInfo;
+								if (playerNum >= 0 && playerNum < max_clients) {
+									int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + playerNum];
+									playerInfo = demo.cut.Cl.gameState.stringData + offset;
+									playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+								}
+
+								if (opts.makeVideo) {
+									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7returned the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
+								}
+							}
+						}
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
 							//Capture.
 							int playerNum = thisEs->trickedentindex;
@@ -8364,6 +8454,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 
 							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
+
+							if (opts.makeVideo) {
+								videoConsole.push_back({ demoCurrentTime,va("^7%s ^7captured the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW"))});
+							}
 
 							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 							SQLDelayedQuery* query = &queryWrapper->query;
