@@ -7860,7 +7860,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (opts.makeVideo) {
 								videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) });
-								if (attackerIsFollowed) {
+								if (attackerIsFollowed && !isSuicide) {
 									screenCenterText.push_back({ demoCurrentTime,va("^7%s ^7%s",modString,victimname.c_str()) });
 								}
 							}
