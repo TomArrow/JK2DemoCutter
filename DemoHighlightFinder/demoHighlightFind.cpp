@@ -149,7 +149,7 @@ void drawPixel(S3L_PixelInfo* p)
 	}
 
 	// draw to ASCII screen
-	int y = S3L_RESOLUTION_Y - 1 - p->y;
+	int y = p->y;// S3L_RESOLUTION_Y - 1 - p->y;
 	int x = S3L_RESOLUTION_X - 1 - p->x;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3] = c;
 	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+1] = c;
@@ -246,6 +246,49 @@ void sceneAdd3DSaberForPlayer(vec3_t playerOrigin, vec3_t playerAngles, int tors
 	}
 }
 
+typedef struct color3ub_s {
+	byte b, g, r;
+} color3ub_t;
+color3ub_t whitefont = { 255,255,255 };
+#define blit_pixel color3ub_t
+#define blit16_ADJUST_COLOR_FUNC videoAdjustTextColor
+#include "../shared/blit-fonts/blit16.h"
+typedef std::tuple<int64_t, std::string> consoleText;
+std::deque<consoleText> videoConsole; // deque cuz i need to iterate over it for drawing, but rly just want a fifo.
+void videoDrawText(int64_t demoCurrentTime) {
+	while (videoConsole.size() && demoCurrentTime - std::get<0>(videoConsole.front()) > 3000LL) {
+		videoConsole.pop_front();
+	}
+	int y = 1;
+	for (auto it = videoConsole.begin(); it != videoConsole.end(); it++) {
+		y += blit16_ROW_ADVANCE*blit16_TextExplicit((color3ub_t*)drawBuffer, whitefont, 1, VIDEOWIDTH, VIDEOHEIGHT, 1, 1, y, std::get<1>(*it).c_str());
+	}
+}
+
+bool videoAdjustTextColor(color3ub_t* Value, int* i, const char* txt, int strLen) {
+	if (*i+1 < strLen) {
+		if (Q_IsColorStringHex(txt+1)) {
+			vec4_t color;
+			int skipCount;
+			if (Q_parseColorHex(txt+1, color, &skipCount)) {
+				*i += skipCount;
+				Value->r = (byte)std::min(color[0] * 255.0f, 255.0f);
+				Value->g = (byte)std::min(color[1] * 255.0f, 255.0f);
+				Value->b = (byte)std::min(color[2] * 255.0f, 255.0f);
+				return true;
+			}
+		}
+		else {
+			*i += 1;
+			int colorIndex = ColorIndex(txt[1]);
+			Value->r = (byte)std::min(g_color_table[colorIndex][0] * 255.0f, 255.0f);
+			Value->g = (byte)std::min(g_color_table[colorIndex][1] * 255.0f, 255.0f);
+			Value->b = (byte)std::min(g_color_table[colorIndex][2] * 255.0f, 255.0f);
+			return true;
+		}
+	}
+	return false;
+}
 
 CModel* cm = NULL;
 
@@ -5387,6 +5430,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						S3L_newFrame();        // has to be called before each frame
 						S3L_drawScene(scene);  /* This starts the scene rendering. The drawPixel
 													function will be called to draw it. */
+						videoDrawText(demoCurrentTime);
 
 						videoFrames.push_back({ demoCurrentTime,{0} });
 						memcpy(videoFrames.back().image, drawBuffer, sizeof(drawBuffer));
@@ -7799,6 +7843,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::string logModString = logModStringSS.str();
 							const char* modString = logModString.c_str();
 
+							if (opts.makeVideo) {
+								videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) });
+							}
+
 							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 							SQLDelayedQuery* query = &queryWrapper->query;
 
@@ -8963,6 +9011,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				std::string rawChatCommand = command;
 				std::string chatCommand = Q_StripColorAll(rawChatCommand);
 
+				if (opts.makeVideo) {
+					videoConsole.push_back({ demoCurrentTime,Cmd_Argv(1)});
+				}
+
 				// Detect a special chat search
 				if (opts.doChatSearch) {
 					if (strstr(rawChatCommand.c_str(),opts.chatSearch.c_str()) || strstr(chatCommand.c_str(), opts.chatSearch.c_str())) {
@@ -9104,6 +9156,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				defragRunInfo_t runInfo;
 
 				std::string printText = Cmd_Argv(1);
+
+				if (opts.makeVideo) {
+					videoConsole.push_back({ demoCurrentTime,printText });
+				}
 
 				if (opts.doPrintSearch) {
 					std::string strippedPrint = Q_StripColorAll(printText);

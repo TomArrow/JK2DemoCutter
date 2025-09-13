@@ -2049,6 +2049,36 @@ char* Cmd_ArgsFrom(int arg);
 
 
 
+
+
+
+
+// VIDEO STUFF
+#define COLOR_EXT_AMOUNT 16 // can be safely raised only to 32
+#define ColorIndex(c)	( ( (c) - '0' ) & 7 )
+#define ColorIndex_Extended(c) ( ( (c) - '0' ) & (COLOR_EXT_AMOUNT - 1) ) // compatible with 1.02, 'a' & 15 = 1
+
+#define Q_IsColorStringHex(p) ((Q_IsColorStringHexY((p))) || (Q_IsColorStringHexy((p))) || (Q_IsColorStringHexX((p))) || (Q_IsColorStringHexx((p)) ))
+#define Q_IsColorStringHexY(p) (p) && *(p)=='Y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6)) && Q_IsHex((p+7)) && Q_IsHex((p+8))
+#define Q_IsColorStringHexy(p) (p) && *(p)=='y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4))
+#define Q_IsColorStringHexX(p) (p) && *(p)=='X' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6))
+#define Q_IsColorStringHexx(p) (p) && *(p)=='x' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3))
+
+#define Q_IsHex(p) ((p) && ((*(p) >= '0' && *(p) <= '9') || (*(p) >= 'a' && *(p) <= 'f') || (*(p) >= 'A' && *(p) <= 'F')))
+
+qboolean Q_parseColorHex(const char* p, float* color, int* skipCount);
+extern const vec4_t	g_color_table[COLOR_EXT_AMOUNT];
+extern vec4_t	g_color_table_nt[128];
+
+
+
+
+
+
+
+
+
+
 enum fileCompressionScheme_t {
 	FILECOMPRESSION_NONE, // Normal default file handling
 	FILECOMPRESSION_RAW, // The special compressed file format but without actually using any compression

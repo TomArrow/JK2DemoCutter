@@ -154,7 +154,7 @@ void		*gmav_open(
 	contents.bitmapHeader = (BITMAPINFOHEADER){
 		STATIC_BITMAP_HEADER_SIZE,			/*	size				*/
 		width,								/*	width				*/
-		height,								/*	height				*/
+		-(int32_t)height,					/*	height (negative to be top-to-bottom)	*/
 		1,									/*	planes				*/
 		24,									/*	bitCount			*/
 		0,									/*	compression			*/
