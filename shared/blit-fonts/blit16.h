@@ -167,7 +167,7 @@ int blit16_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int Bu
 			}
 		}
 	}
-	return LinesPrinted;
+	return x == StartX ? LinesPrinted-1 : LinesPrinted;
 }
 
 #ifndef blit16_NO_HELPERS

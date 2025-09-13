@@ -252,9 +252,12 @@ typedef struct color3ub_s {
 color3ub_t whitefont = { 255,255,255 };
 #define blit_pixel color3ub_t
 #define blit16_ADJUST_COLOR_FUNC videoAdjustTextColor
+#define blit32_ADJUST_COLOR_FUNC videoAdjustTextColor
 #include "../shared/blit-fonts/blit16.h"
+#include "../shared/blit-fonts/blit32.h"
 typedef std::tuple<int64_t, std::string> consoleText;
 std::deque<consoleText> videoConsole; // deque cuz i need to iterate over it for drawing, but rly just want a fifo.
+std::deque<consoleText> screenCenterText; // deque cuz i need to iterate over it for drawing, but rly just want a fifo.
 void videoDrawText(int64_t demoCurrentTime) {
 	while (videoConsole.size() && demoCurrentTime - std::get<0>(videoConsole.front()) > 3000LL) {
 		videoConsole.pop_front();
@@ -262,6 +265,18 @@ void videoDrawText(int64_t demoCurrentTime) {
 	int y = 1;
 	for (auto it = videoConsole.begin(); it != videoConsole.end(); it++) {
 		y += blit16_ROW_ADVANCE*blit16_TextExplicit((color3ub_t*)drawBuffer, whitefont, 1, VIDEOWIDTH, VIDEOHEIGHT, 1, 1, y, std::get<1>(*it).c_str());
+	}
+	while (screenCenterText.size() && demoCurrentTime - std::get<0>(screenCenterText.front()) > 3000LL) {
+		screenCenterText.pop_front();
+	}
+	y = VIDEOHEIGHT/2-VIDEOHEIGHT/8;
+	for (auto it = screenCenterText.begin(); it != screenCenterText.end(); it++) {
+		char* cleanStr = new char[std::get<1>(*it).size() + 1];
+		Q_strncpyz(cleanStr, std::get<1>(*it).size() + 1, std::get<1>(*it).c_str(), std::get<1>(*it).size()+1);
+		Q_StripColorAll(cleanStr);
+		int x = VIDEOWIDTH / 2 - strlen(cleanStr)*blit32_ADVANCE/2;
+		delete[] cleanStr;
+		y += blit32_ROW_ADVANCE*blit32_TextExplicit((color3ub_t*)drawBuffer, whitefont, 1, VIDEOWIDTH, VIDEOHEIGHT, 1, x, y, std::get<1>(*it).c_str());
 	}
 }
 
@@ -7845,6 +7860,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (opts.makeVideo) {
 								videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) });
+								if (attackerIsFollowed) {
+									screenCenterText.push_back({ demoCurrentTime,va("^7%s ^7%s",modString,victimname.c_str()) });
+								}
 							}
 
 							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
@@ -9139,6 +9157,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				
 				std::cerr << "STUFFTEXT DUMP: " << Cmd_Argv(1) << "\n";
 
+			}
+			else if (opts.makeVideo && !strcmp(cmd, "cp"))
+			{
+				if (opts.makeVideo) {
+					screenCenterText.push_back({ demoCurrentTime,Cmd_Argv(1) });
+				}
 			}
 			else if (!strcmp(cmd, "print")) {
 				//Looking for 

@@ -22,6 +22,11 @@
 #define blit32_BASELINE_OFFSET (blit32_DESCENDER + 1)
 #define blit32_ROW_ADVANCE (blit32_HEIGHT + blit32_BASELINE_OFFSET)
 #define blit32_EXTRA_BITS(x) (((x) >> 30) & 3)
+#ifndef blit32_ADJUST_COLOR_FUNC
+#define blit32_ADJUST_COLOR_FUNC 0 // define this to take blit_pixel* Value, int* i, const char* txt, int strlen
+#else
+static inline bool blit32_ADJUST_COLOR_FUNC(blit_pixel* Value, int* i, const char* txt, int strLen);
+#endif
 
 typedef unsigned long blit32_glyph;
 
@@ -104,7 +109,7 @@ blit32_glyph blit32_Glyphs[blit_NUM_GLYPHS] =
 };
 
 /* StartX/Y refers to the top left corner of the glyph's bounding box */
-int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int BufWidth, int BufHeight, int Wrap, int StartX, int StartY, int StrLen, char *String)
+int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int BufWidth, int BufHeight, int Wrap, int StartX, int StartY, int StrLen, const char*String)
 {
 	int IsNegative = BufWidth < 0;
 	int DrawDir = IsNegative ? -1 : 1;
@@ -124,7 +129,7 @@ int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int Bu
 		int EndX = c == '\n' || c == '\r' ? StartX            :
 		               c == '\t' ? x + 4 * Scale * blit32_ADVANCE :
 		               c == '\b' ?       x - Scale * blit32_WIDTH :
-		               /* normal char */ x + Scale * blit32_WIDTH;
+		               /* normal const char*/ x + Scale * blit32_WIDTH;
 		int BufXMaxExceed = EndX > AbsBufWidth;
 
 		if(BufYMaxExceed) { break; } /* no point adding extra undrawable lines */
@@ -134,6 +139,10 @@ int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int Bu
 			else if(BufXMinExceed)         { c = ' '; }       /* skip past character without drawing */
 			switch(c)
 			{
+				case '^':
+					if (blit16_ADJUST_COLOR_FUNC(&Value, &i, &String[i], StrLen)) {
+						break;
+					}
 				default:                                                 /* normal character */
 				{
 					unsigned int glY, pxY, glX, pxX;
@@ -158,21 +167,21 @@ int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int Bu
 			}
 		}
 	}
-	return LinesPrinted;
+	return  x == StartX ? LinesPrinted - 1 : LinesPrinted;
 }
 
 #ifndef blit32_NO_HELPERS
 #ifndef blit32_MACRO_INLINE
 
-blit_inline int blit32_TextExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int BufWidth, int BufHeight, int Wrap, int StartX, int StartY, char *String)
+blit_inline int blit32_TextExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int BufWidth, int BufHeight, int Wrap, int StartX, int StartY, const char*String)
 { return blit32_TextNExplicit(Buffer, Value, Scale, BufWidth, BufHeight, Wrap, StartX, StartY, -1, String); }
-blit_inline int blit32_TextNProps(blit_props Props, int StartX, int StartY, int StrLen, char *String)
+blit_inline int blit32_TextNProps(blit_props Props, int StartX, int StartY, int StrLen, const char*String)
 { return blit32_TextNExplicit(Props.Buffer, Props.Value, Props.Scale, Props.BufWidth, Props.BufHeight, Props.Wrap, StartX, StartY, StrLen, String); }
-blit_inline int blit32_TextProps(blit_props Props, int StartX, int StartY, char *String)
+blit_inline int blit32_TextProps(blit_props Props, int StartX, int StartY, const char*String)
 { return blit32_TextNExplicit(Props.Buffer, Props.Value, Props.Scale, Props.BufWidth, Props.BufHeight, Props.Wrap, StartX, StartY, -1, String); }
-blit_inline int blit32_TextN(int StartX, int StartY, int StrLen, char *String)
+blit_inline int blit32_TextN(int StartX, int StartY, int StrLen, const char*String)
 { return blit32_TextNExplicit(Blit32.Props.Buffer, Blit32.Props.Value, Blit32.Props.Scale, Blit32.Props.BufWidth, Blit32.Props.BufHeight, Blit32.Props.Wrap, StartX, StartY, StrLen, String); }
-blit_inline int blit32_Text(int StartX, int StartY, char *String)
+blit_inline int blit32_Text(int StartX, int StartY, const char*String)
 { return blit32_TextNExplicit(Blit32.Props.Buffer, Blit32.Props.Value, Blit32.Props.Scale, Blit32.Props.BufWidth, Blit32.Props.BufHeight, Blit32.Props.Wrap, StartX, StartY, -1, String); }
 
 #else/*blit32_NO_INLINE*/
