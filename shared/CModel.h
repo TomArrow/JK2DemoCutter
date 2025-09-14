@@ -2,6 +2,7 @@
 #ifndef CMODEL_H
 #define CMODEL_H
 #include "demoCut.h"
+#include "tsl/htrie_map.h"
 
 
 class CModel;
@@ -322,6 +323,81 @@ typedef struct {
 	cplane_t	*plane;
 	int			children[2];		// negative numbers are leafs
 } cNode_t;
+#define	CONTENTS_NODE		-1
+typedef struct mnode_s {
+	// common with leaf and node
+	int			contents;		// -1 for nodes, to differentiate from leafs
+	int			visframe;		// node needs to be traversed if current
+	vec3_t		mins, maxs;		// for bounding box culling
+	struct mnode_s* parent;
+
+	// node specific
+	cplane_t* plane;
+	struct mnode_s* children[2];
+
+	// leaf specific
+	int			cluster;
+	int			area;
+
+	//msurface_t** firstmarksurface;
+	int*		firstmarksurface;
+	int			nummarksurfaces;
+} mnode_t;
+
+
+typedef struct {
+	//char		name[MAX_QPATH];		// ie: maps/tim_dm2.bsp
+	//char		baseName[MAX_QPATH];	// ie: tim_dm2
+
+	//int			dataSize;
+
+	//int			numShaders;
+	//dshader_t* shaders;
+
+	//bmodel_t* bmodels;
+
+	//int			numplanes;
+	//cplane_t* planes;
+
+	int			numnodes;		// includes leafs
+	int			numDecisionNodes;
+	mnode_t* nodes;
+
+	//int			numsurfaces;
+	//msurface_t* surfaces;
+
+	int			nummarksurfaces;
+	//msurface_t** marksurfaces;
+	int*		marksurfaces;
+
+	//int			numfogs;
+	//fog_t* fogs;
+	//int			globalFog;
+
+
+	//vec3_t		lightGridOrigin;
+	//vec3_t		lightGridSize;
+	//vec3_t		lightGridInverseSize;
+	//int			lightGridBounds[3];
+
+	//int			lightGridOffsets[8];
+
+	//vec3_t		lightGridStep;
+
+	//mgrid_t* lightGridData;
+	//word* lightGridArray;
+	//int			numGridArrayElements;
+
+
+	//int			numClusters;
+	//int			clusterBytes;
+	//const byte* vis;			// may be passed in by CM_LoadMap to save space
+
+	//byte* novis;			// clusterBytes of 0xff
+
+	//char* entityString;
+	//const char* entityParsePoint;
+} world_t;
 
 typedef struct {
 	int			planeNum;
@@ -599,14 +675,22 @@ class CModel {
 	bool	cm_noCurves = false;
 	bool	cm_playerCurveClip = true;
 	bool	r_debugSurfaceUpdate = true;
+	bool	r_lockpvs = false;
+	bool	r_showcluster = false;
+	bool	r_novis = false;
+	bool	r_nocull = false;
 
 	const patchCollide_t* debugPatchCollide;
 	const facet_t* debugFacet;
 	qboolean		debugBlock;
 	vec3_t		debugBlockPoints[4];
+	world_t		s_worldData;
 
 	int	c_removed;
 
+	int	viewCluster;
+	int visCount;
+	int viewCount;
 
 	// this "hunk" is disgusting but whatever. maybe replace it with a better system someday.
 	std::vector<void*> stuffToFree;
@@ -632,8 +716,15 @@ class CModel {
 
 	// render stuff (simplified)
 	void R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump);
-	void ParseFace(dsurface_t* ds, mapVert_t* verts,  int* indexes);
-	void R_LoadLightmaps(lump_t* l);
+	void ParseFace(dsurface_t* ds, mapVert_t* verts,  int* indexes, int surfaceNum);
+	void R_LoadLightmaps(lump_t* l); 
+	void R_LoadMarksurfaces(lump_t* l);
+	void R_SetParent(mnode_t* node, mnode_t* parent);
+	void R_LoadNodesAndLeafs(lump_t* nodeLump, lump_t* leafLump);
+	mnode_t* R_PointInLeaf(const vec3_t p);
+	bool R_MarkLeaves(vec3_t origin);
+	//int BoxOnPlaneSide(vec3_t emins, vec3_t emaxs, struct cplane_s* p);
+	void R_RecursiveWorldNode(mnode_t* node, int planeBits, unsigned int dlightBits);
 
 	// cm_test.c
 	int  CM_PointLeafnum_r(const vec3_t p, int num);
@@ -779,9 +870,12 @@ class CModel {
 	vec3_t groundPos = { 0,0,0 };
 
 	std::vector<int> indices;
+	std::vector<int> surfaceViewCount;
+	ankerl::unordered_dense::map<int, std::vector<int>, ankerl::unordered_dense::hash<int>> surfaceIndices; // same as indices but suvdivided by surfacenum.
 	//std::vector<triangle_t> faceTriangles;
 	std::vector<vertXYZ_t> faceVerts;
 	std::vector<lightmap_t> lightmaps;
+	std::vector<int> visFilteredIndices;
 public:
 
 	const std::vector<vertXYZ_t>& GetFaceVerts() const {
@@ -793,6 +887,7 @@ public:
 	const std::vector<lightmap_t>& GetLightmaps() const {
 		return lightmaps;
 	}
+	const std::vector<int>& GetVisFilteredFaceVertIndices(vec3_t origin);
 
 	static std::string GetMapPath(const char* filename, const std::vector<std::string>* bspPaths = NULL) {
 

@@ -70,6 +70,7 @@ typedef struct drawProperties3dModel_s {
 std::vector<S3L_Unit>		mapVertices;
 std::vector<S3L_Unit>		mapUVs;
 std::vector<S3L_Index>		mapTriangles;
+std::vector<S3L_Index>		mapTrianglesVisFiltered;
 std::vector<lightmap_t>		mapLightmaps;
 std::vector<S3L_Model3D>	scene3dmodels;
 std::vector<drawProperties3dModel_t>	scene3dmodelProperties;
@@ -100,7 +101,7 @@ void drawPixel(S3L_PixelInfo* p)
 		if (p->triangleID != previousTriangle)
 		{
 
-			S3L_getIndexedTriangleValues(p->triangleIndex, mapTriangles.data(), mapUVs.data(), 3, &uv0, &uv1, &uv2);
+			S3L_getIndexedTriangleValues(p->triangleIndex, mapTrianglesVisFiltered.data(), mapUVs.data(), 3, &uv0, &uv1, &uv2);
 			drawLightmapNum = uv0.z;
 			previousTriangle = p->triangleID;
 		}
@@ -5327,7 +5328,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						// world/models
 						if (haveMapModel) {
 							renderingMap = true;
-							scene3dmodels.push_back(mapModel);
+
+							S3L_Model3D visFilteredWorld = mapModel;
+							auto faceVertIndices = cm->GetVisFilteredFaceVertIndices(camerapos);
+							mapTrianglesVisFiltered.clear();
+							for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
+								mapTrianglesVisFiltered.push_back(*it);
+							}
+							S3L_model3DInit(mapVertices.data(), mapVertices.size() / 3, mapTrianglesVisFiltered.data(), mapTrianglesVisFiltered.size() / 3, &visFilteredWorld);
+							scene3dmodels.push_back(visFilteredWorld);
+							//scene3dmodels.push_back(mapModel);
 							scene3dmodelProperties.emplace_back();
 						}
 						else {

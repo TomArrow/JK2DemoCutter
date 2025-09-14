@@ -1042,7 +1042,7 @@ qboolean CModel::CM_DeleteCachedMap(qboolean bGuaranteedOkToDelete)
 }
 
 
-void CModel::ParseFace(dsurface_t* ds, mapVert_t* verts, int* indexes) {
+void CModel::ParseFace(dsurface_t* ds, mapVert_t* verts, int* indexes, int surfaceNum) {
 	int					i, j, k;
 	//srfSurfaceFace_t* cv;
 	int					numPoints, numIndexes;
@@ -1146,11 +1146,15 @@ void CModel::ParseFace(dsurface_t* ds, mapVert_t* verts, int* indexes) {
 		tri[1].lightmapNum = lightmapNum[0];
 		tri[2].lightmapNum = lightmapNum[0];
 		//faceTriangles.push_back(tri);
+		std::vector<int>* surfaceIndexVector = &surfaceIndices[surfaceNum];
 		indices.push_back((int)faceVerts.size());
+		surfaceIndexVector->push_back((int)faceVerts.size());
 		faceVerts.push_back(tri[0]);
 		indices.push_back((int)faceVerts.size());
+		surfaceIndexVector->push_back((int)faceVerts.size());
 		faceVerts.push_back(tri[1]);
 		indices.push_back((int)faceVerts.size());
+		surfaceIndexVector->push_back((int)faceVerts.size());
 		faceVerts.push_back(tri[2]);
 	}
 
@@ -1201,6 +1205,8 @@ void CModel::R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump) {
 		return;
 		//ri.Error(ERR_DROP, "LoadMap: funny lump size in %s", s_worldData.name);
 
+	surfaceViewCount.resize(count, -1);
+
 	//out = (struct msurface_s*)ri.Hunk_Alloc(count * sizeof(*out), h_low);
 
 	//s_worldData.surfaces = out;
@@ -1217,7 +1223,7 @@ void CModel::R_LoadSurfaces(lump_t* surfs, lump_t* verts, lump_t* indexLump) {
 			numTriSurfs++;
 			break;
 		case MST_PLANAR:
-			ParseFace(in, dv, indexes);
+			ParseFace(in, dv, indexes,i);
 			numFaces++;
 			break;
 		case MST_FLARE:
@@ -1270,6 +1276,367 @@ void CModel::R_LoadLightmaps(lump_t* l) {
 		lightmaps.push_back(lm);
 	}
 
+}
+
+void CModel::R_LoadMarksurfaces(lump_t* l)
+{
+	int		i, j, count;
+	int* in;
+	int* out;
+
+	in = (int*)(cmod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Com_Error(ERR_DROP, "LoadMap: funny lump size");
+	count = l->filelen / sizeof(*in);
+	//out = (struct msurface_s**)Hunk_Alloc(count * sizeof(*out), h_low);
+	out = (int*)Hunk_Alloc(count * sizeof(*out), h_low);
+
+	s_worldData.marksurfaces = out;
+	s_worldData.nummarksurfaces = count;
+
+	for (i = 0; i < count; i++)
+	{
+		j = LittleLong(in[i]);
+		out[i] = j;//s_worldData.surfaces + j;
+	}
+}
+
+void CModel::R_SetParent(mnode_t* node, mnode_t* parent)
+{
+	node->parent = parent;
+	if (node->contents != -1)
+		return;
+	R_SetParent(node->children[0], node);
+	R_SetParent(node->children[1], node);
+}
+void CModel::R_LoadNodesAndLeafs(lump_t* nodeLump, lump_t* leafLump) {
+	int			i, j, p;
+	dnode_t* in;
+	dleaf_t* inLeaf;
+	mnode_t* out;
+	int			numNodes, numLeafs;
+
+	in = (dnode_t*)(cmod_base + nodeLump->fileofs);
+	if (nodeLump->filelen % sizeof(dnode_t) ||
+		leafLump->filelen % sizeof(dleaf_t)) {
+		Com_Error(ERR_DROP, "LoadMap: funny lump size");
+	}
+	numNodes = nodeLump->filelen / sizeof(dnode_t);
+	numLeafs = leafLump->filelen / sizeof(dleaf_t);
+
+	out = (struct mnode_s*)Hunk_Alloc((numNodes + numLeafs) * sizeof(*out), h_low);
+
+	s_worldData.nodes = out;
+	s_worldData.numnodes = numNodes + numLeafs;
+	s_worldData.numDecisionNodes = numNodes;
+
+	// load nodes
+	for (i = 0; i < numNodes; i++, in++, out++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			out->mins[j] = LittleLong(in->mins[j]);
+			out->maxs[j] = LittleLong(in->maxs[j]);
+		}
+
+		p = LittleLong(in->planeNum);
+		out->plane = cm.planes + p;
+
+		out->contents = CONTENTS_NODE;	// differentiate from leafs
+
+		for (j = 0; j < 2; j++)
+		{
+			p = LittleLong(in->children[j]);
+			if (p >= 0)
+				out->children[j] = s_worldData.nodes + p;
+			else
+				out->children[j] = s_worldData.nodes + numNodes + (-1 - p);
+		}
+	}
+
+	// load leafs
+	inLeaf = (dleaf_t*)(cmod_base + leafLump->fileofs);
+	for (i = 0; i < numLeafs; i++, inLeaf++, out++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			out->mins[j] = LittleLong(inLeaf->mins[j]);
+			out->maxs[j] = LittleLong(inLeaf->maxs[j]);
+		}
+
+		out->cluster = LittleLong(inLeaf->cluster);
+		out->area = LittleLong(inLeaf->area);
+
+		if (out->cluster >= cm.numClusters) {
+			cm.numClusters = out->cluster + 1;
+		}
+
+		out->firstmarksurface = s_worldData.marksurfaces +
+			LittleLong(inLeaf->firstLeafSurface);
+		out->nummarksurfaces = LittleLong(inLeaf->numLeafSurfaces);
+	}
+
+	// chain decendants
+	R_SetParent(s_worldData.nodes, NULL);
+}
+mnode_t* CModel::R_PointInLeaf(const vec3_t p) {
+	mnode_t* node;
+	float		d;
+	cplane_t* plane;
+
+	//if (!s_worldData) {
+	//	ri.Error(ERR_DROP, "R_PointInLeaf: bad model");
+	//}
+
+	node = s_worldData.nodes;
+	while (1) {
+		if (node->contents != -1) {
+			break;
+		}
+		plane = node->plane;
+		d = DotProduct(p, plane->normal) - plane->dist;
+		if (d > 0) {
+			node = node->children[0];
+		}
+		else {
+			node = node->children[1];
+		}
+	}
+
+	return node;
+}
+
+bool CModel::R_MarkLeaves(vec3_t origin) {
+	const byte* vis;
+	mnode_t* leaf, * parent;
+	int		i;
+	int		cluster;
+
+	// lockpvs lets designers walk around to determine the
+	// extent of the current pvs
+	if (r_lockpvs) {
+		return false;
+	}
+
+	// current viewcluster
+	leaf = R_PointInLeaf(origin);
+	cluster = leaf->cluster;
+
+	// if the cluster is the same and the area visibility matrix
+	// hasn't changed, we don't need to mark everything again
+
+	// if r_showcluster was just turned on, remark everything
+	if (viewCluster == cluster /* &&!tr.refdef.areamaskModified && !tr.refdef.forceVisRefresh*/
+		&& !r_showcluster) {
+		return false;
+	}
+
+	//tr.refdef.forceVisRefresh = qfalse;
+
+	if (r_showcluster) {
+		r_showcluster = qfalse;
+		if (r_showcluster) {
+			Com_Printf("cluster:%i  area:%i\n", cluster, leaf->area);
+		}
+	}
+
+	visCount++;
+	viewCluster = cluster;
+
+	if (r_novis || viewCluster == -1) {
+		for (i = 0; i < s_worldData.numnodes; i++) {
+			if (s_worldData.nodes[i].contents != CONTENTS_SOLID) {
+				s_worldData.nodes[i].visframe = visCount;
+			}
+		}
+		return true;
+	}
+
+	//vis = R_ClusterPVS(tr.viewCluster);
+	vis = CM_ClusterPVS(viewCluster);
+
+	for (i = 0, leaf = s_worldData.nodes; i < s_worldData.numnodes; i++, leaf++) {
+		cluster = leaf->cluster;
+		if (cluster < 0 || cluster >= cm.numClusters) {
+			continue;
+		}
+
+		// check general pvs
+		if (!(vis[cluster >> 3] & (1 << (cluster & 7)))) {
+			continue;
+		}
+
+		// check for door connection
+		//if (!r_drawAllAreas->integer) {
+		//	if (leaf->area >= 8 * (int)ARRAY_LEN(tr.refdef.areamask) ||
+		//		(tr.refdef.areamask[leaf->area >> 3] & (1 << (leaf->area & 7)))) {
+		//		continue;		// not visible
+		//	}
+		//}
+
+		parent = leaf;
+		do {
+			if (parent->visframe == visCount)
+				break;
+			parent->visframe = visCount;
+			parent = parent->parent;
+		} while (parent);
+	}
+	return true;
+}
+
+
+void CModel::R_RecursiveWorldNode(mnode_t* node, int planeBits, unsigned int dlightBits) {
+
+	do {
+		unsigned int	newDlights[2];
+
+		// if the node wasn't marked as potentially visible, exit
+		if (node->visframe != visCount) {
+			return;
+		}
+
+		// if the bounding volume is outside the frustum, nothing
+		// inside can be visible OPTIMIZE: don't do this all the way to leafs?
+
+		/* // dont have a frustum rn so meh.
+		if (!r_nocull) {
+			int		r;
+
+			if (planeBits & 1) {
+				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[0]);
+				if (r == 2) {
+					return;						// culled
+				}
+				if (r == 1) {
+					planeBits &= ~1;			// all descendants will also be in front
+				}
+			}
+
+			if (planeBits & 2) {
+				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[1]);
+				if (r == 2) {
+					return;						// culled
+				}
+				if (r == 1) {
+					planeBits &= ~2;			// all descendants will also be in front
+				}
+			}
+
+			if (planeBits & 4) {
+				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[2]);
+				if (r == 2) {
+					return;						// culled
+				}
+				if (r == 1) {
+					planeBits &= ~4;			// all descendants will also be in front
+				}
+			}
+
+			if (planeBits & 8) {
+				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[3]);
+				if (r == 2) {
+					return;						// culled
+				}
+				if (r == 1) {
+					planeBits &= ~8;			// all descendants will also be in front
+				}
+			}
+
+		}*/
+
+		if (node->contents != -1) {
+			break;
+		}
+
+		// node is just a decision point, so go down both sides
+		// since we don't care about sort orders, just go positive to negative
+
+		// determine which dlights are needed
+		newDlights[0] = 0;
+		newDlights[1] = 0;
+		/*if (dlightBits) {
+			int	i;
+
+			for (i = 0; i < tr.refdef.num_dlights; i++) {
+				dlight_t* dl;
+				float		dist;
+
+				if (dlightBits & (1 << i)) {
+					dl = &tr.refdef.dlights[i];
+					dist = DotProduct(dl->origin, node->plane->normal) - node->plane->dist;
+
+					if (dist > -dl->radius) {
+						newDlights[0] |= (1 << i);
+					}
+					if (dist < dl->radius) {
+						newDlights[1] |= (1 << i);
+					}
+				}
+			}
+		}*/
+
+		// recurse down the children, front side first
+		R_RecursiveWorldNode(node->children[0], planeBits, newDlights[0]);
+
+		// tail recurse
+		node = node->children[1];
+		dlightBits = newDlights[1];
+	} while (1);
+
+	{
+		// leaf node, so add mark surfaces
+		int			c;
+		msurface_t* surf;// , ** mark;
+		int* mark;
+
+		//tr.pc.c_leafs++;
+
+		// add to z buffer bounds
+		/*if (node->mins[0] < tr.viewParms.visBounds[0][0]) {
+			tr.viewParms.visBounds[0][0] = node->mins[0];
+		}
+		if (node->mins[1] < tr.viewParms.visBounds[0][1]) {
+			tr.viewParms.visBounds[0][1] = node->mins[1];
+		}
+		if (node->mins[2] < tr.viewParms.visBounds[0][2]) {
+			tr.viewParms.visBounds[0][2] = node->mins[2];
+		}
+
+		if (node->maxs[0] > tr.viewParms.visBounds[1][0]) {
+			tr.viewParms.visBounds[1][0] = node->maxs[0];
+		}
+		if (node->maxs[1] > tr.viewParms.visBounds[1][1]) {
+			tr.viewParms.visBounds[1][1] = node->maxs[1];
+		}
+		if (node->maxs[2] > tr.viewParms.visBounds[1][2]) {
+			tr.viewParms.visBounds[1][2] = node->maxs[2];
+		}*/
+
+		// add the individual surfaces
+		mark = node->firstmarksurface;
+		c = node->nummarksurfaces;
+		while (c--) {
+			// the surface may have already been added if it
+			// spans multiple leafs
+			//surf = *mark;
+			//R_AddWorldSurface(surf, dlightBits);
+			if (surfaceViewCount[*mark] != viewCount) {
+				visFilteredIndices.insert(visFilteredIndices.end(), surfaceIndices[*mark].begin(), surfaceIndices[*mark].end());
+				surfaceViewCount[*mark] = viewCount;
+			}
+			mark++;
+		}
+	}
+
+}
+const std::vector<int>& CModel::GetVisFilteredFaceVertIndices(vec3_t origin) {
+	if (R_MarkLeaves(origin)) {
+		visFilteredIndices.clear();
+		viewCount++;
+		R_RecursiveWorldNode(s_worldData.nodes, 15, 0);
+	}
+	return visFilteredIndices;
 }
 
 
@@ -1374,8 +1741,13 @@ void CModel::CM_LoadMap_Actual( const char *name, qboolean clientload, int *chec
 		lightmaps.clear();
 		faceVerts.clear();
 		indices.clear();
+		surfaceViewCount.clear();
+		visFilteredIndices.clear();
+		surfaceIndices.clear();
 		R_LoadLightmaps(&header.lumps[LUMP_LIGHTMAPS]);
 		R_LoadSurfaces(&header.lumps[LUMP_SURFACES], &header.lumps[LUMP_DRAWVERTS], &header.lumps[LUMP_DRAWINDEXES]);
+		R_LoadMarksurfaces(&header.lumps[LUMP_LEAFSURFACES]);
+		R_LoadNodesAndLeafs(&header.lumps[LUMP_NODES], &header.lumps[LUMP_LEAFS]);
 	}
 
 	CM_InitBoxHull ();
