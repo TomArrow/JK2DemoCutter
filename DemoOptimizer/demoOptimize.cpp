@@ -59,17 +59,31 @@ int		 optimizeSnapsSafety = 10000; // make a non-delta every now and then to pro
 
 
 
-bool canUseOldSnap(clSnapshot_t* newSnap, clSnapshot_t* oldSnap, int nonIssueSnap) {
+inline bool canUseOldSnap(clSnapshot_t* newSnap, clSnapshot_t* oldSnap, int nonIssueSnap) {
 	bool canUse = qtrue;
 	canUse = canUse && !((oldSnap->snapFlags ^ newSnap->snapFlags) & SNAPFLAG_SERVERCOUNT); // make sure theyre from the same map
 	canUse = canUse && newSnap->messageNum > oldSnap->messageNum; // make sure we're in order. yea ik... shit happens
 	canUse = canUse && newSnap->serverTime > oldSnap->serverTime; // make sure we're in order. yea ik... shit happens
 	canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
-	canUse = canUse && oldSnap->valid && !oldSnap->snapIssues; // should be already covered but let's be safe
+	canUse = canUse && oldSnap->valid && !oldSnap->snapIssues && oldSnap->isNonIssueSnap && !oldSnap->snapSkipped; // should be already covered but let's be safe
 	canUse = canUse && (newSnap->messageNum - oldSnap->messageNum < PACKET_BACKUP_MIN); // don't delta from extremely old frames (was 100 but make it 32 so vanilla clients dont struggle)
 	canUse = canUse && (newSnap->serverTime - oldSnap->serverTime < 1000); // don't delta from extremely old frames
 	canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES_MIN - 128); // good old safety check from parsesnapshot
 	return canUse;
+}
+inline bool demoHasOldSnap(clSnapshot_t* newSnap, clSnapshot_t* oldSnap, int nonIssueSnap) {
+	bool canUse = qtrue;
+	canUse = canUse && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
+	canUse = canUse && oldSnap->valid && !oldSnap->snapSkipped; // make sure it wasnt skipped
+	//canUse = canUse && (newSnap->messageNum - oldSnap->messageNum < PACKET_BACKUP_MIN); // don't delta from extremely old frames (was 100 but make it 32 so vanilla clients dont struggle)
+	//canUse = canUse && !(demo.cut.Cl.parseEntitiesNum - oldSnap->parseEntitiesNum > MAX_PARSE_ENTITIES_MIN - 128); // good old safety check from parsesnapshot
+	return canUse;
+}
+inline bool demoSnapWasSkipped(clSnapshot_t* newSnap, clSnapshot_t* oldSnap, int nonIssueSnap) {
+	bool wasSkipped = qtrue;
+	wasSkipped = wasSkipped && oldSnap->messageNum == nonIssueSnap; // make sure it's the right snap and not gone
+	wasSkipped = wasSkipped && oldSnap->snapSkipped; // make sure it wasnt skipped
+	return wasSkipped;
 }
 
 
@@ -237,6 +251,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 
 	qboolean wasFirstCommandByte = qfalse;
 	qboolean firstCommandByteRead = qfalse;
+	
+	qboolean messageHadSnap = qfalse;
+
+	qboolean anySkipsDone = qfalse;
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	uint64_t skippableCmds = (1 << svc_serverCommand_general) | (1 << svc_EOF_general) | (1 << svc_snapshot_general);
@@ -244,6 +262,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 	while (oldSize > 0) {
 	cutcontinue:
 		uint64_t cmds = 0;
+		messageHadSnap = qfalse;
 		newServerCommands.clear();
 		bool skipMessage = false;
 		if (isCompressedFile) {
@@ -481,6 +500,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 					goto cuterror;
 				}
 				debugRead = false;
+				messageHadSnap = qtrue;
 
 				if(opts.minMsec || opts.commandTimeSlash){
 					int serverTimeDelta = demo.cut.Cl.snap.serverTime - lastWrittenServerTime;
@@ -493,6 +513,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 						// skip this message
 						skipMessage = true;
 					}
+
 					psCommandTime = demo.cut.Cl.snap.ps.commandTime;
 				}
 
@@ -539,6 +560,17 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 								}
 								if (smallestbit > oldbit) {
 									std::cerr << "Brute-force searched most efficient snapshot, but new snapshot bigger than old one, wtf. Old bit: " << oldbit << ", newbit: " << smallestbit << ", oldDelta: " << demo.cut.Cl.snap.deltaNum << ", newold : " << smallestBitNum << ", curSnap: " << demo.cut.Cl.snap.messageNum << "\n";
+								}
+							}
+							else if(anySkipsDone && demo.cut.Cl.snap.deltaNum != -1) { // safety measure.
+								// seems we can't do a delta, so gotta keep the normal demo message. BUT let's check that the original delta message is actually in the demo still in case we use any kind of skipping
+								clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[demo.cut.Cl.snap.deltaNum & PACKET_MASK];
+								if (demoSnapWasSkipped(&demo.cut.Cl.snap, oldSnap, demo.cut.Cl.snap.deltaNum)) { // TODO maybe make this more general with demoHasOldSnap, not just for skipped? but might open can of worms. want to stay faithful, not reinvent messages. if it was sorta invalid delta, don't act like it wasn't.
+									// gotta force a non-delta here, sad
+									newMsg = newMsgRemember;
+									demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, NULL, &demo.cut.Cl, demoType);
+									std::cerr << "Forcing non-delta at message " << demo.cut.Cl.snap.messageNum << " due to no suitable delta candidate and original message "  << demo.cut.Cl.snap.deltaNum << " missing (valid: "<< oldSnap->valid<< ", skipped: "<< oldSnap->snapSkipped << ").\n";
+									deltaSnapcount = 0;
 								}
 							}
 						}
@@ -603,6 +635,17 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 									}
 								}
 								deltaSnapcount++;
+							}
+							else if (anySkipsDone && demo.cut.Cl.snap.deltaNum != -1) { // safety measure.
+								// seems we can't do a delta, so gotta keep the normal demo message. BUT let's check that the original delta message is actually in the demo still in case we use any kind of skipping
+								clSnapshot_t* oldSnap = &demo.cut.Cl.snapshots[demo.cut.Cl.snap.deltaNum & PACKET_MASK];
+								if (demoSnapWasSkipped(&demo.cut.Cl.snap, oldSnap, demo.cut.Cl.snap.deltaNum)) { // TODO maybe make this more general with demoHasOldSnap, not just for skipped? but might open can of worms. want to stay faithful, not reinvent messages. if it was sorta invalid delta, don't act like it wasn't.
+									// gotta force a non-delta here, sad
+									newMsg = newMsgRemember;
+									demoCutWriteDeltaSnapshotActual(&newMsg, &demo.cut.Cl.snap, NULL, &demo.cut.Cl, demoType);
+									std::cerr << "Forcing non-delta at message " << demo.cut.Cl.snap.messageNum << " due to no suitable delta candidate and original message " << demo.cut.Cl.snap.deltaNum << " missing (valid: " << oldSnap->valid << ", skipped: " << oldSnap->snapSkipped << ").\n";
+									deltaSnapcount = 0;
+								}
 							}
 						}
 
@@ -727,6 +770,10 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 			for (auto it = newServerCommands.begin(); it != newServerCommands.end(); it++) {
 				serverCommandsToFlush.insert(*it);
 			}
+			if (messageHadSnap) {
+				demo.cut.Cl.snap.snapSkipped = demo.cut.Cl.snapshots[demo.cut.Cl.snap.messageNum & PACKET_MASK].snapSkipped = qtrue;
+			}
+			anySkipsDone = qtrue;
 			goto cutcontinue;
 		}
 

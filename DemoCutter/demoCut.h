@@ -1368,6 +1368,8 @@ typedef struct {
 
 	qboolean		isNonIssueSnap;			// confirmed to be delta-able from
 
+	qboolean		snapSkipped;			// for DemoOptimizer. to not delta from skipped snaps
+
 	int				serverCommandNum;		// execute all commands up to this before
 											// making the snapshot current
 
