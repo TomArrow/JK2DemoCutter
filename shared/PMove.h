@@ -160,13 +160,13 @@ typedef struct rollState_s {
 	int				lastRollEndedTime;	// last commandtime before roll ended
 } rollState_t;
 
-typedef struct raceStyle_s {
-	byte movementStyle; // jk2. maybe some day pjk2 => STAT_MOVEMENTSTYLE
-	short msec; // -1 if toggle, -2 if float (ignore float for now, its cringe anyway)
-	signed char jumpLevel; // 0=no force, -1 = ysal, -2 = ?, 4=jumpcharge?
-	short variant; // when we have map variants (invis walls and such). 0 =default (ignore for now)
-	short runFlags; // flags from runFlags_t => STAT_RUNFLAGS
-} raceStyle_t;
+//typedef struct raceStyle_s {
+//	byte movementStyle; // jk2. maybe some day pjk2 => STAT_MOVEMENTSTYLE
+//	short msec; // -1 if toggle, -2 if float (ignore float for now, its cringe anyway)
+//	signed char jumpLevel; // 0=no force, -1 = ysal, -2 = ?, 4=jumpcharge?
+//	short variant; // when we have map variants (invis walls and such). 0 =default (ignore for now)
+//	short runFlags; // flags from runFlags_t => STAT_RUNFLAGS
+//} raceStyle_t;
 
 
 

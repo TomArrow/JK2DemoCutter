@@ -544,6 +544,8 @@ jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on
 
 jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
 
+
+
 class defragRunInfo_t {
 public:
 	int milliseconds = 0;
@@ -566,6 +568,13 @@ public:
 	
 	// q3
 	bool checksumError = false;
+
+};
+
+class defragRunInfoFinal_t {
+public:
+	defragRunInfo_t	info;
+	defragRunMeta_t meta;	// final info for saving
 };
 
 
@@ -1591,6 +1600,156 @@ void updatePlayerDemoStatsArrayPointers(demoType_t demoType, const ExtraSearchOp
 	}
 }
 
+void freedomDefragFillInfo(defragRunInfo_t* info, finishedRunInfo_t* runInfo) {
+	info->milliseconds = runInfo->milliseconds;
+	if (runInfo->userId != -1) {
+		info->defragPlayerName = runInfo->username;
+	}
+	if (runInfo->pbStatus != -1 && runInfo->pbStatus & PB_LB) {
+		info->isNumber1 = (qboolean)(runInfo->rankLB == 1);
+		info->isLogged = (qboolean)(runInfo->userId != -1);
+		info->isPersonalBest = qtrue;
+		info->exactRank = runInfo->rankLB;
+	}
+	info->knownClientNum = runInfo->clientNum;
+	info->courseName = runInfo->subcoursename;
+	info->style = runInfo->stylename;
+	info->playerName = runInfo->playerName;
+}
+
+ankerl::unordered_dense::map< int, finishedRunInfo_t, ankerl::unordered_dense::hash<int>> freedomDefrag_unrankedRuns;
+template<unsigned int max_clients>
+qboolean findFreedomDefragRun(std::string printText, defragRunInfoFinal_t* info, qboolean flush, int64_t demoCurrentTime, int64_t lastGameStateChangeInDemoTime, demoType_t demoType, int CS_PLAYERS_here) {
+	if (flush) {
+		if (freedomDefrag_unrankedRuns.size() > 0) {
+			auto first = freedomDefrag_unrankedRuns.begin();
+			std::cerr << "Flushing run with id " << first->second.runId << ". No ranked variant exists.";
+			freedomDefragFillInfo(&info->info, &first->second);
+			info->meta = first->second.meta;
+			freedomDefrag_unrankedRuns.erase(first);
+			return qtrue;
+		}
+		return qfalse;
+	}
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+	const char* extraArg;
+	if (Cmd_Argc() < 3) {
+		return qfalse;
+	}
+	extraArg = (const char*)Cmd_Argv(2);
+	bool isRanked = !_stricmp(extraArg, "dffinish_ranked");
+	if (!_stricmp(extraArg, "dffinish") || isRanked) {
+		finishedRunInfo_t runInfo;
+		runInfo.runId = atoi(Cmd_Argv(3));
+		runInfo.clientNum = atoi(Cmd_Argv(4));
+		runInfo.userId = atoi(Cmd_Argv(5));
+		runInfo.milliseconds = atoi(Cmd_Argv(6));
+		runInfo.levelTimeStart = atoi(Cmd_Argv(7));
+		runInfo.levelTimeEnd = atoi(Cmd_Argv(8));
+		runInfo.endCommandTime = atoi(Cmd_Argv(9));
+		runInfo.startLessTime = atoi(Cmd_Argv(10));
+		runInfo.endLessTime = atoi(Cmd_Argv(11));
+		runInfo.warningFlags = atoi(Cmd_Argv(12));
+		runInfo.topspeed = atof(Cmd_Argv(13));
+		runInfo.average = atof(Cmd_Argv(14));
+		runInfo.distance = atof(Cmd_Argv(15));
+		runInfo.distanceXY = atof(Cmd_Argv(16));
+		runInfo.raceStyle.movementStyle = atoi(Cmd_Argv(17));
+		runInfo.raceStyle.msec = atoi(Cmd_Argv(18));
+		runInfo.raceStyle.jumpLevel = atoi(Cmd_Argv(19));
+		runInfo.raceStyle.variant = atoi(Cmd_Argv(20));
+		runInfo.raceStyle.runFlags = atoi(Cmd_Argv(21));
+		runInfo.savePosCount = atoi(Cmd_Argv(22));
+		runInfo.resposCount = atoi(Cmd_Argv(23));
+		runInfo.lostMsecCount = atoi(Cmd_Argv(24));
+		runInfo.lostPacketCount = atoi(Cmd_Argv(25));
+		runInfo.placeHolder1 = atoi(Cmd_Argv(26));
+		runInfo.placeHolder2 = atoi(Cmd_Argv(27));
+		runInfo.placeHolder3 = atoi(Cmd_Argv(28));
+		runInfo.placeHolder4 = atoi(Cmd_Argv(29));
+		runInfo.millisecondsSegmentedTotal = atoi(Cmd_Argv(30));
+		runInfo.rollSpeed = atof(Cmd_Argv(31));
+		runInfo.rollTakeoffClientSpeed = atoi(Cmd_Argv(32));
+		runInfo.startTriggerSpeed = atof(Cmd_Argv(33));
+		runInfo.pbStatus = atoi(Cmd_Argv(34));
+		runInfo.rankLB = atoi(Cmd_Argv(35));
+		strcpy_s(runInfo.coursename,sizeof(runInfo.coursename), Cmd_Argv(36));
+		strcpy_s(runInfo.username,sizeof(runInfo.username), Cmd_Argv(37));
+		runInfo.unixTimeStampShifted = atoi(Cmd_Argv(38));
+		runInfo.unixTimeStampShiftedBillionCount = atoi(Cmd_Argv(39));
+		runInfo.lbType = (mainLeaderboardType_t)atoi(Cmd_Argv(40));
+		strcpy_s(runInfo.subcoursename, sizeof(runInfo.subcoursename), Cmd_Argv(41)); 
+		
+		int stringOffsetB = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + runInfo.clientNum];
+		const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffsetB;
+		const char* playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffsetB, isMOHAADemo ? "name" : "n");
+		runInfo.playerName = std::string(playerName);
+
+		int offsetstylestart = 0;
+		int offsetstyleend = 0;
+		const char* thetext = printText.c_str();
+		while (*thetext && *thetext != '[') {
+			thetext++;
+			offsetstylestart++;
+		}
+		if (*thetext) {
+			thetext++;
+			offsetstylestart++;
+		}
+		offsetstyleend = offsetstylestart;
+		while (*thetext && *thetext != ']') {
+			thetext++;
+			offsetstyleend++;
+		}
+		if (offsetstylestart > 1 && offsetstyleend > 1 && offsetstylestart != offsetstyleend) {
+			runInfo.stylename = printText.substr(offsetstylestart, offsetstyleend- offsetstylestart);
+		}
+
+		auto existingRun = freedomDefrag_unrankedRuns.find(runInfo.runId);
+		if (isRanked) {
+
+			freedomDefragFillInfo(&info->info, &runInfo);
+			if (existingRun == freedomDefrag_unrankedRuns.end()) {
+				std::cerr << "WTF ranked freedom defrag run with id " << runInfo.runId << " is not known!";
+			}
+			else {
+				if (existingRun->second.clientNum != runInfo.clientNum || existingRun->second.levelTimeStart != runInfo.levelTimeStart || existingRun->second.userId != runInfo.userId || existingRun->second.levelTimeEnd != runInfo.levelTimeEnd || existingRun->second.milliseconds != runInfo.milliseconds) {
+					// just a few santiy checks
+					std::cerr << "WTF ranked freedom defrag run with id " << runInfo.runId << " mismatch with unranked version!";
+				}
+				else if(existingRun->second.meta.isSet) {
+					// get it from the original since the ranked one is delayed (async)
+					info->meta = existingRun->second.meta;
+					//runInfo.stylename = existingRun->second.stylename;
+					info->info.style = existingRun->second.stylename; // cuz the ranked can be blank sometimes with no text.
+				}
+				else {
+					std::cerr << "WTF ranked freedom defrag run with id " << runInfo.runId << " has an unranked version without meta!";
+				}
+				freedomDefrag_unrankedRuns.erase(existingRun);
+			}
+			if (!info->meta.isSet) { // oh well, can't help it, for some reason we only have the current info. so its all guesswork from here on out and could go horribly wrong
+				int64_t guessedDemoTimeOffset = std::min((int64_t)runInfo.levelTimeEnd - (int64_t)demo.cut.Cl.snap.serverTime, (int64_t)0);
+				int64_t guessedDemoTime= demoCurrentTime + guessedDemoTimeOffset;
+				int64_t guessedLastGameStateChangeInDemoTime = lastGameStateChangeInDemoTime < guessedDemoTime ? lastGameStateChangeInDemoTime : 0; // UGLY
+				GetRunMeta<max_clients>(info->info, info->meta, demoCurrentTime + guessedDemoTimeOffset, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here);
+			}
+			return qtrue;
+		}
+		else {
+			if (existingRun != freedomDefrag_unrankedRuns.end()) {
+				std::cerr << "WTF freedom defrag run with id " << runInfo.runId << " is already logged!";
+			}
+			freedomDefragFillInfo(&info->info, &runInfo); // just so we can properly get the runmeta
+			GetRunMeta<max_clients>(info->info, runInfo.meta, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here);
+			freedomDefrag_unrankedRuns[runInfo.runId] = runInfo;
+			return qfalse;
+		}
+
+	}
+	return qfalse;
+}
+
 qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 	jp::VecNum vec_num;
 	jp::RegexMatch rm;
@@ -1786,7 +1945,7 @@ qboolean findRazorDefragRun(std::string printText, defragRunInfo_t* info) {
 	return qfalse;
 }
 
-std::vector<defragRunInfo_t> DARKDefragRuns;
+std::vector<defragRunInfoFinal_t> DARKDefragRuns;
 
 qboolean findDARKDefragRun(std::string printText) {
 	jp::VecNum vec_num, vec_num2, vec_num3;
@@ -1799,20 +1958,20 @@ qboolean findDARKDefragRun(std::string printText) {
 
 	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
 		
-		defragRunInfo_t* info = &DARKDefragRuns.emplace_back();
+		defragRunInfoFinal_t* info = &DARKDefragRuns.emplace_back();
 
-		info->playerName = vec_num[matchNum][1];
+		info->info.playerName = vec_num[matchNum][1];
 
 		if (vec_num[matchNum][2] != "main") {
-			info->courseName = vec_num[matchNum][2];
+			info->info.courseName = vec_num[matchNum][2];
 		}
-		info->style = vec_num[matchNum][3];
+		info->info.style = vec_num[matchNum][3];
 
 		int hours = atoi(vec_num[matchNum][5].c_str());
 		int minutes = atoi(vec_num[matchNum][6].c_str());
 		int seconds = atoi(vec_num[matchNum][7].c_str());
 		int milliseconds = atoi(vec_num[matchNum][8].c_str());
-		info->milliseconds = milliseconds + seconds*1000 + minutes*60*1000 + hours*60*60*1000;
+		info->info.milliseconds = milliseconds + seconds*1000 + minutes*60*1000 + hours*60*60*1000;
 		/*info->playerName = vec_num[matchNum][1];
 		int seconds = atoi(vec_num[matchNum][6].c_str());
 		int pureMilliseconds = atoi(vec_num[matchNum][7].c_str());
@@ -1832,10 +1991,10 @@ qboolean findDARKDefragRun(std::string printText) {
 
 	for (int matchNum = 0; matchNum < vec_num2.size(); matchNum++) { // really its just going to be 1 but whatever
 		// It was pb. Modify existing run.
-		if (DARKDefragRuns.size() && DARKDefragRuns.back().playerName == vec_num2[matchNum][1] ) {
-			DARKDefragRuns.back().defragPlayerName = vec_num2[matchNum][2]; // Replace player name with username.
-			DARKDefragRuns.back().isPersonalBest = qtrue;
-			DARKDefragRuns.back().isLogged = qtrue;
+		if (DARKDefragRuns.size() && DARKDefragRuns.back().info.playerName == vec_num2[matchNum][1] ) {
+			DARKDefragRuns.back().info.defragPlayerName = vec_num2[matchNum][2]; // Replace player name with username.
+			DARKDefragRuns.back().info.isPersonalBest = qtrue;
+			DARKDefragRuns.back().info.isLogged = qtrue;
 		}
 		return qtrue;
 	}
@@ -1847,8 +2006,8 @@ qboolean findDARKDefragRun(std::string printText) {
 
 	for (int matchNum = 0; matchNum < vec_num3.size(); matchNum++) { // really its just going to be 1 but whatever
 		// It was pb. Modify existing run.
-		if (DARKDefragRuns.size() && DARKDefragRuns.back().defragPlayerName == vec_num3[matchNum][2] ) {
-			DARKDefragRuns.back().isNumber1 = qtrue;
+		if (DARKDefragRuns.size() && DARKDefragRuns.back().info.defragPlayerName == vec_num3[matchNum][2] ) {
+			DARKDefragRuns.back().info.isNumber1 = qtrue;
 		}
 		return qtrue;
 	}
@@ -2522,49 +2681,31 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 }
 
 template<unsigned int max_clients>
-qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& sharedVars,int64_t demoCurrentTime, const char* sourceDemoFile, const ioHandles_t& io, int bufferTime,int64_t lastGameStateChangeInDemoTime,  demoType_t demoType, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution, int CS_PLAYERS_here) {
-	
+void GetRunMeta(defragRunInfo_t& runInfo, defragRunMeta_t& meta, int64_t demoCurrentTime, int64_t lastGameStateChangeInDemoTime, demoType_t demoType, int CS_PLAYERS_here) {
+
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
 	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
-	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
-
+	meta.mapName = std::string(Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname"));
 	if (runInfo.courseName != "") {
 		std::stringstream ssMapName;
-		ssMapName << mapname << "(" << runInfo.courseName << ")";
-		mapname = ssMapName.str();
+		ssMapName << meta.mapName << "(" << runInfo.courseName << ")";
+		meta.mapName = ssMapName.str();
+	}
+	
+	meta.serverName = std::string(Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname"));
+
+
+	meta.playerName = runInfo.playerName;
+	if (runInfo.defragPlayerName.size()) {
+		meta.playerName = runInfo.defragPlayerName;
 	}
 
-	std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
-	//std::string playername = vec_num[matchNum][1];
-	std::string playername = runInfo.playerName;
-	//int minutes = atoi(vec_num[matchNum][2].c_str());
-	//std::string secondString = vec_num[matchNum][3];
-	//float seconds = atof(vec_num[matchNum][3].c_str());
-	//int milliSeconds = (1000.0f* seconds)+0.5f;
-	//int pureMilliseconds = milliSeconds % 1000;
-	//int pureSeconds = milliSeconds / 1000;
-
-	//bool isLogged = vec_num[matchNum][4].length() > 0;
-	//bool isNumberOne = vec_num[matchNum][6].length() > 0;
-	bool isLogged = runInfo.isLogged;
-	bool isNumberOne = runInfo.isNumber1;
-	bool isPersonalBest = runInfo.isPersonalBest;
-
-	//int totalSeconds = minutes * 60 + seconds;
-	//int totalMilliSeconds = minutes * 60000 + milliSeconds;
-	int totalMilliSeconds = runInfo.milliseconds;
-
-	int pureMilliseconds = totalMilliSeconds % 1000;
-	int tmpSeconds = totalMilliSeconds / 1000;
-	int pureSeconds = tmpSeconds % 60;
-	int minutes = tmpSeconds / 60;
-
 	// Find player
-	int playerNumber = -1;
+	meta.playerNum = -1;
 	if (runInfo.knownClientNum != -1) {
-		playerNumber = runInfo.knownClientNum;
+		meta.playerNum = runInfo.knownClientNum;
 	}
 	else {
 		for (int clientNum = 0; clientNum < max_clients; clientNum++) {
@@ -2572,31 +2713,66 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 			int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
 			const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			std::string playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
-			if (playerNameCompare == playername) {
-				playerNumber = clientNum;
+			if (playerNameCompare == meta.playerName) {
+				meta.playerNum = clientNum;
 			}
 		}
 	}
 
-	if (runInfo.defragPlayerName.size()) {
-		playername = runInfo.defragPlayerName;
+	if (meta.playerNum != -1) {
+		if (playerFirstFollowed[meta.playerNum] != -1 && playerFirstFollowed[meta.playerNum] < (demo.cut.Cl.snap.serverTime - runInfo.milliseconds)) {
+			meta.wasFollowed = true; // determine outside (because delayed PB/WR info)
+		}
+		if (playerFirstVisible[meta.playerNum] != -1 && playerFirstVisible[meta.playerNum] < (demo.cut.Cl.snap.serverTime - runInfo.milliseconds)) {
+			meta.wasVisible = true; // determine outside (because delayed PB/WR info)
+		}
+		if (playerFirstFollowedOrVisible[meta.playerNum] != -1 && playerFirstFollowedOrVisible[meta.playerNum] < (demo.cut.Cl.snap.serverTime - runInfo.milliseconds)) {
+			meta.wasVisibleOrFollowed = true; // determine outside (because delayed PB/WR info)
+		}
 	}
 
-	bool wasFollowed = false;
-	bool wasVisible = false;
-	bool wasVisibleOrFollowed = false;
-	if (playerNumber != -1) {
-		if (playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-			wasFollowed = true; // determine outside (because delayed PB/WR info)
-		}
-		if (playerFirstVisible[playerNumber] != -1 && playerFirstVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-			wasVisible = true; // determine outside (because delayed PB/WR info)
-		}
-		if (playerFirstFollowedOrVisible[playerNumber] != -1 && playerFirstFollowedOrVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-			wasVisibleOrFollowed = true; // determine outside (because delayed PB/WR info)
-		}
+
+	meta.demoTime = demoCurrentTime;
+	meta.serverTime = demo.cut.Cl.snap.serverTime;
+	meta.lastGameStateChangeInDemoTime = lastGameStateChangeInDemoTime;
+
+
+	// Do we have strafe deviation info?
+	int64_t runStart = meta.demoTime - runInfo.milliseconds;  // determine outside (because delayed PB/WR info)
+	int64_t measurementStartTimeOffset = (meta.playerNum != -1) ? abs(strafeDeviationsDefrag[meta.playerNum].lastReset - runStart) : 0;
+	meta.averageStrafeDeviationSet = false;
+	if (meta.wasVisibleOrFollowed && meta.playerNum != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
+		meta.averageStrafeDeviation = strafeDeviationsDefrag[meta.playerNum].averageHelper.sum / strafeDeviationsDefrag[meta.playerNum].averageHelper.divisor;
+		meta.averageStrafeDeviationSet = true;
 	}
-	int64_t runStart = demoCurrentTime - totalMilliSeconds;  // determine outside (because delayed PB/WR info)
+
+	meta.demoRecorderClientNum = demo.cut.Clc.clientNum;
+
+	meta.isSet = true;
+}
+
+template<unsigned int max_clients>
+qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVariables_t& sharedVars, const char* sourceDemoFile, const ioHandles_t& io, int bufferTime,  const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution) {
+	
+	if (!runInfoFinal.meta.isSet) {
+		throw std::exception("SaveDefragRun called with defragRunInfoFinal_t that has uninited run meta.");
+	}
+
+	const defragRunMeta_t* meta = &runInfoFinal.meta;
+	const defragRunInfo_t* runInfo = &runInfoFinal.info;
+
+
+	bool isLogged = runInfo->isLogged;
+	bool isNumberOne = runInfo->isNumber1;
+	bool isPersonalBest = runInfo->isPersonalBest;
+
+
+	int pureMilliseconds = runInfo->milliseconds % 1000;
+	int tmpSeconds = runInfo->milliseconds / 1000;
+	int pureSeconds = tmpSeconds % 60;
+	int minutes = tmpSeconds / 60;
+
+	int64_t runStart = meta->demoTime - runInfo->milliseconds;  // determine outside (because delayed PB/WR info)
 
 	std::stringstream formattedTime;
 	formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
@@ -2605,29 +2781,29 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 	SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 	SQLDelayedQuery* query = &queryWrapper->query;
 
-	SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
-	SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-	std::string serverNameStripped = Q_StripColorAll(serverName);
+	SQLBIND_DELAYED_TEXT(query, "@map", meta->mapName.c_str());
+	SQLBIND_DELAYED_TEXT(query, "@serverName", meta->serverName.c_str());
+	std::string serverNameStripped = Q_StripColorAll(meta->serverName);
 	SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
-	SQLBIND_DELAYED(query, int, "@totalMilliseconds", totalMilliSeconds);
-	SQLBIND_DELAYED_TEXT(query, "@playerName", playername.c_str());
-	if (runInfo.style != "") {
-		SQLBIND_DELAYED_TEXT(query, "@style", runInfo.style.c_str());
+	SQLBIND_DELAYED(query, int, "@totalMilliseconds", runInfo->milliseconds);
+	SQLBIND_DELAYED_TEXT(query, "@playerName", meta->playerName.c_str());
+	if (runInfo->style != "") {
+		SQLBIND_DELAYED_TEXT(query, "@style", runInfo->style.c_str());
 	}
 	else {
 		SQLBIND_DELAYED_NULL(query, "@style");
 	}
-	std::string playernameStripped = Q_StripColorAll(playername);
+	std::string playernameStripped = Q_StripColorAll(meta->playerName);
 	SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
-	SQLBIND_DELAYED(query, int, "@isTop10", isLogged);
-	SQLBIND_DELAYED(query, int, "@isNumber1", isNumberOne);
-	SQLBIND_DELAYED(query, int, "@isPersonalBest", isPersonalBest);
+	SQLBIND_DELAYED(query, int, "@isTop10", runInfo->isLogged);
+	SQLBIND_DELAYED(query, int, "@isNumber1", runInfo->isNumber1);
+	SQLBIND_DELAYED(query, int, "@isPersonalBest", runInfo->isPersonalBest);
 
-	if (runInfo.teleports || runInfo.checkpoints || runInfo.isProRun) {
-		SQLBIND_DELAYED(query, int, "@runTeleProRun", runInfo.isProRun);
-		SQLBIND_DELAYED(query, int, "@runTeleTeleports", runInfo.teleports);
-		SQLBIND_DELAYED(query, int, "@runTeleCheckpoints", runInfo.checkpoints);
+	if (runInfo->teleports || runInfo->checkpoints || runInfo->isProRun) {
+		SQLBIND_DELAYED(query, int, "@runTeleProRun", runInfo->isProRun);
+		SQLBIND_DELAYED(query, int, "@runTeleTeleports", runInfo->teleports);
+		SQLBIND_DELAYED(query, int, "@runTeleCheckpoints", runInfo->checkpoints);
 	}
 	else {
 		SQLBIND_DELAYED_NULL(query, "@runTeleProRun");
@@ -2636,36 +2812,35 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 	}
 	SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
-	SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);  // determine outside (because delayed PB/WR info)
-	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime); // determine outside (because delayed PB/WR info)
-	SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);  // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@demoTime", meta->demoTime);  // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", meta->lastGameStateChangeInDemoTime); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@serverTime", meta->serverTime);  // determine outside (because delayed PB/WR info)
 	SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
-	SQLBIND_DELAYED(query, int, "@wasVisible", wasVisible); // determine outside (because delayed PB/WR info)
-	SQLBIND_DELAYED(query, int, "@wasFollowed", wasFollowed); // determine outside (because delayed PB/WR info)
-	SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", wasVisibleOrFollowed); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@wasVisible", meta->wasVisible); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@wasFollowed", meta->wasFollowed); // determine outside (because delayed PB/WR info)
+	SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", meta->wasVisibleOrFollowed); // determine outside (because delayed PB/WR info)
 
 	// Do we have strafe deviation info?
-	int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
-	if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
-		SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum / strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
+	if (meta->averageStrafeDeviationSet) {
+		SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", meta->averageStrafeDeviation);
 	}
 	else {
 		SQLBIND_DELAYED_NULL(query, "@averageStrafeDeviation");
 	}
 
-	SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-	SQLBIND_DELAYED(query, int, "@runnerClientNum", playerNumber);
+	SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", meta->demoRecorderClientNum);
+	SQLBIND_DELAYED(query, int, "@runnerClientNum", meta->playerNum);
 
 	io.defragQueries->push_back(queryWrapper);
 
 	//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
 	//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-	if (!isNumberOne && (/*searchMode != SEARCH_TOP10_DEFRAG || */!isLogged) && searchMode != SEARCH_ALL_DEFRAG) return qfalse; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
+	if (!runInfo->isNumber1 && (/*searchMode != SEARCH_TOP10_DEFRAG || */!runInfo->isLogged) && searchMode != SEARCH_ALL_DEFRAG) return qfalse; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
 
 
 	int64_t startTime = runStart - bufferTime;
-	int64_t endTime = demoCurrentTime + bufferTime;
-	int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+	int64_t endTime = meta->demoTime + bufferTime;
+	int64_t earliestPossibleStart = meta->lastGameStateChangeInDemoTime + 1;
 	bool isTruncated = false;
 	int truncationOffset = 0;
 	if (earliestPossibleStart > startTime) {
@@ -2677,21 +2852,21 @@ qboolean SaveDefragRun(const defragRunInfo_t& runInfo,const sharedVariables_t& s
 
 
 	std::stringstream ss;
-	ss << mapname << (runInfo.style != "" ? va("___%s", runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo.isProRun ? "_RTPRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va("_RT%dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "___" << playername << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+	ss << meta->mapName << (runInfo->style != "" ? va("___%s", runInfo->style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo->isProRun ? "_RTPRO" : "") << ((runInfo->teleports || runInfo->checkpoints) ? va("_RT%dT%dC", runInfo->teleports, runInfo->checkpoints) : "") << "___" << meta->playerName << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (meta->wasFollowed ? "" : (meta->wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << meta->playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 	std::string targetFilename = ss.str();
 	char* targetFilenameFiltered = new char[targetFilename.length() + 1];
 	sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
 
 	std::stringstream batSS;
-	batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
-	batSS << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+	batSS << "\nrem demoCurrentTime: " << meta->demoTime;
+	batSS << "\n" << (meta->wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 	queryWrapper->batchString1 = batSS.str();
 	queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
 	delete[] targetFilenameFiltered;
 	//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
-	if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << (runInfo.isProRun ? " RUNTELE PRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va(" RUNTELE %dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "\n";
+	if (!opts.noFindOutput)  std::cout << meta->mapName << " " << meta->playerNum << " " << meta->playerName << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << meta->wasFollowed << " visible:" << meta->wasVisible << " visibleOrFollowed:" << meta->wasVisibleOrFollowed << (runInfo->isProRun ? " RUNTELE PRO" : "") << ((runInfo->teleports || runInfo->checkpoints) ? va(" RUNTELE %dT%dC", runInfo->teleports, runInfo->checkpoints) : "") << "\n";
 
 	return qtrue;
 }
@@ -6500,19 +6675,20 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								int lastFrameDefragInfo = lastFrameInfo.psStats12[i];
 								if ((thisFrameDefragInfo & 8) && !(thisFrameDefragInfo & 2) && (lastFrameDefragInfo & 2)) {
 									// IDK dont ask me rofl
-									defragRunInfo_t runInfo{};
-									runInfo.milliseconds = q3DefragInfo.calculateCorrectTime(&demo.cut.Cl.snap.ps, demo.cut.Cl.snap.serverTime,&runInfo.checksumError);
+									defragRunInfoFinal_t runInfo{};
+									runInfo.info.milliseconds = q3DefragInfo.calculateCorrectTime(&demo.cut.Cl.snap.ps, demo.cut.Cl.snap.serverTime,&runInfo.info.checksumError);
 									//runInfo.milliseconds = demo.cut.Cl.snap.ps.stats[7] * 65536 + (uint16_t)(int16_t)demo.cut.Cl.snap.ps.stats[8];
-									runInfo.knownClientNum = i;
-									runInfo.style = q3DefragInfo.promode ? "cpm" : "vq3";
+									runInfo.info.knownClientNum = i;
+									runInfo.info.style = q3DefragInfo.promode ? "cpm" : "vq3";
 
 									int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 									const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-									runInfo.playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "dfn");
-									if (!runInfo.playerName.size()) {
-										runInfo.playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
+									runInfo.info.playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "dfn");
+									if (!runInfo.info.playerName.size()) {
+										runInfo.info.playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "n");
 									}
-									qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars, demoCurrentTime, sourceDemoFile, io, bufferTime, lastGameStateChangeInDemoTime, demoType, opts, searchMode, wasDoingSQLiteExecution, CS_PLAYERS_here);
+									GetRunMeta<max_clients>(runInfo.info, runInfo.meta, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here);
+									qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars,sourceDemoFile, io, bufferTime, opts, searchMode, wasDoingSQLiteExecution);
 								}
 							}
 						}
@@ -9281,7 +9457,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				//jp::VecNum vec_num;
 				//jp::RegexMatch rm;
 				qboolean runFound = qfalse;
-				defragRunInfo_t runInfo;
+				defragRunInfoFinal_t runInfo;
 
 				std::string printText = Cmd_Argv(1);
 
@@ -9317,11 +9493,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 				}
 
-				if (findOCDefragRun(printText, &runInfo)) {
+				if (findFreedomDefragRun<max_clients>(printText,&runInfo, qfalse, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here)) {
 					runFound = qtrue;
-				} else if (findRazorDefragRun(printText, &runInfo)) {
+				} else if (findOCDefragRun(printText, &runInfo.info)) {
 					runFound = qtrue;
-				} else if (findJAProDefragRun<max_clients>(printText, &runInfo, demoType)) {
+				} else if (findRazorDefragRun(printText, &runInfo.info)) {
+					runFound = qtrue;
+				} else if (findJAProDefragRun<max_clients>(printText, &runInfo.info, demoType)) {
 					runFound = qtrue;
 				}
 				else {
@@ -9331,171 +9509,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				//for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
 				if (runFound) { // really its just going to be 1 but whatever
-					
-					qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars,demoCurrentTime, sourceDemoFile, io, bufferTime, lastGameStateChangeInDemoTime, demoType, opts, searchMode, wasDoingSQLiteExecution, CS_PLAYERS_here);
+
+					if (!runInfo.meta.isSet) {
+						GetRunMeta<max_clients>(runInfo.info, runInfo.meta, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here);
+					}
+					qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars, sourceDemoFile, io, bufferTime, opts, searchMode, wasDoingSQLiteExecution);
 					if (!result) continue;
-					/*int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-					const char * info = demo.cut.Cl.gameState.stringData + stringOffset;
-					std::string mapname = Info_ValueForKey(info,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset, "mapname");
-
-					if (runInfo.courseName != "") {
-						std::stringstream ssMapName;
-						ssMapName << mapname << "(" << runInfo.courseName << ")";
-						mapname = ssMapName.str();
-					}
-
-					std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
-					//std::string playername = vec_num[matchNum][1];
-					std::string playername = runInfo.playerName;
-					//int minutes = atoi(vec_num[matchNum][2].c_str());
-					//std::string secondString = vec_num[matchNum][3];
-					//float seconds = atof(vec_num[matchNum][3].c_str());
-					//int milliSeconds = (1000.0f* seconds)+0.5f;
-					//int pureMilliseconds = milliSeconds % 1000;
-					//int pureSeconds = milliSeconds / 1000;
-
-					//bool isLogged = vec_num[matchNum][4].length() > 0;
-					//bool isNumberOne = vec_num[matchNum][6].length() > 0;
-					bool isLogged = runInfo.isLogged;
-					bool isNumberOne = runInfo.isNumber1;
-					bool isPersonalBest = runInfo.isPersonalBest;
-
-					//int totalSeconds = minutes * 60 + seconds;
-					//int totalMilliSeconds = minutes * 60000 + milliSeconds;
-					int totalMilliSeconds = runInfo.milliseconds;
-
-					int pureMilliseconds = totalMilliSeconds % 1000;
-					int tmpSeconds = totalMilliSeconds / 1000;
-					int pureSeconds = tmpSeconds % 60;
-					int minutes = tmpSeconds / 60;
-					
-					// Find player
-					int playerNumber = -1;
-					if (runInfo.knownClientNum != -1) {
-						playerNumber = runInfo.knownClientNum;
-					} else {
-						for (int clientNum = 0; clientNum < max_clients; clientNum++) {
-
-							int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
-							const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-							std::string playerNameCompare = Info_ValueForKey(playerInfo,sizeof(demo.cut.Cl.gameState.stringData)- stringOffset,isMOHAADemo?"name": "n");
-							if (playerNameCompare == playername) {
-								playerNumber = clientNum;
-							}
-						}
-					}
-					
-					bool wasFollowed = false;
-					bool wasVisible = false;
-					bool wasVisibleOrFollowed = false;
-					if (playerNumber != -1) {
-						if (playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-							wasFollowed = true;
-						}
-						if (playerFirstVisible[playerNumber] != -1 && playerFirstVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-							wasVisible = true;
-						}
-						if (playerFirstFollowedOrVisible[playerNumber] != -1 && playerFirstFollowedOrVisible[playerNumber] < (demo.cut.Cl.snap.serverTime - totalMilliSeconds)) {
-							wasVisibleOrFollowed = true;
-						}
-					}
-					int64_t runStart = demoCurrentTime - totalMilliSeconds;
-
-					std::stringstream formattedTime;
-					formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
-					std::string formattedTimeString = formattedTime.str();
-
-					SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
-					SQLDelayedQuery* query = &queryWrapper->query;
-
-					SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
-					SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-					std::string serverNameStripped = Q_StripColorAll(serverName);
-					SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
-					SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
-					SQLBIND_DELAYED(query, int, "@totalMilliseconds", totalMilliSeconds);
-					SQLBIND_DELAYED_TEXT(query, "@playerName", playername.c_str());
-					if (runInfo.style != "") {
-						SQLBIND_DELAYED_TEXT(query, "@style", runInfo.style.c_str());
-					}
-					else {
-						SQLBIND_DELAYED_NULL(query, "@style");
-					}
-					std::string playernameStripped = Q_StripColorAll(playername);
-					SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
-					SQLBIND_DELAYED(query, int, "@isTop10", isLogged);
-					SQLBIND_DELAYED(query, int, "@isNumber1", isNumberOne);
-					SQLBIND_DELAYED(query, int, "@isPersonalBest", isPersonalBest);
-
-					if (runInfo.teleports || runInfo.checkpoints || runInfo.isProRun) {
-						SQLBIND_DELAYED(query, int, "@runTeleProRun", runInfo.isProRun);
-						SQLBIND_DELAYED(query, int, "@runTeleTeleports", runInfo.teleports);
-						SQLBIND_DELAYED(query, int, "@runTeleCheckpoints", runInfo.checkpoints);
-					}
-					else {
-						SQLBIND_DELAYED_NULL(query, "@runTeleProRun");
-						SQLBIND_DELAYED_NULL(query, "@runTeleTeleports");
-						SQLBIND_DELAYED_NULL(query, "@runTeleCheckpoints");
-					}
-					SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
-					SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
-					SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
-					SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
-					SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
-					SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
-					SQLBIND_DELAYED(query, int, "@wasVisible", wasVisible);
-					SQLBIND_DELAYED(query, int, "@wasFollowed", wasFollowed);
-					SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", wasVisibleOrFollowed);
-
-					// Do we have strafe deviation info?
-					int64_t measurementStartTimeOffset = abs(strafeDeviationsDefrag[playerNumber].lastReset - runStart);
-					if (wasVisibleOrFollowed && playerNumber != -1 && measurementStartTimeOffset < DEFRAG_STRAFEDEVIATION_SAMPLE_START_TIME_MAX_OFFSET) {
-						SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", strafeDeviationsDefrag[playerNumber].averageHelper.sum/strafeDeviationsDefrag[playerNumber].averageHelper.divisor);
-					}
-					else {
-						SQLBIND_DELAYED_NULL(query, "@averageStrafeDeviation");
-					}
-
-					SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
-					SQLBIND_DELAYED(query, int, "@runnerClientNum", playerNumber);
-
-					io.defragQueries->push_back(queryWrapper);
-
-					//if (searchMode != SEARCH_INTERESTING && searchMode != SEARCH_ALL && searchMode != SEARCH_TOP10_DEFRAG) continue;
-					//if (!isNumberOne && (searchMode != SEARCH_TOP10_DEFRAG || !isLogged)) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-					if (!isNumberOne && (!isLogged) && searchMode != SEARCH_ALL_DEFRAG) continue; // If it's not #1 and not logged, we cannot tell if it's a top 10 time.
-					
-
-					int64_t startTime = runStart - bufferTime;
-					int64_t endTime = demoCurrentTime + bufferTime;
-					int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
-					bool isTruncated = false;
-					int truncationOffset = 0;
-					if (earliestPossibleStart > startTime) {
-						truncationOffset = earliestPossibleStart - startTime;
-						startTime = earliestPossibleStart;
-						isTruncated = true;
-					}
-					//startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
-					
-
-					std::stringstream ss;
-					ss << mapname << (runInfo.style != "" ? va("___%s",runInfo.style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo.isProRun ? "_RTPRO": "") << ((runInfo.teleports || runInfo.checkpoints) ? va("_RT%dT%dC", runInfo.teleports, runInfo.checkpoints): "") << "___" << playername << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNumber << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
-
-					std::string targetFilename = ss.str();
-					char* targetFilenameFiltered = new char[targetFilename.length()+1];
-					sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
-
-					std::stringstream batSS;
-					batSS << "\nrem demoCurrentTime: "<< demoCurrentTime;
-					batSS << "\n"<< (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \""<<sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
-					queryWrapper->batchString1 = batSS.str();
-					queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
-
-					delete[] targetFilenameFiltered;
-					//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
-					if (!opts.noFindOutput)  std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << (runInfo.isProRun ? " RUNTELE PRO" : "") << ((runInfo.teleports || runInfo.checkpoints) ? va(" RUNTELE %dT%dC", runInfo.teleports, runInfo.checkpoints) : "") << "\n";
-					*/
 				}
 
 				
@@ -9509,7 +9528,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			// So we first get the info about the time, then info about PB, then info about record. 
 			// So we store all found runs in an array and just update it from later messages. Then we store it all.
 			for (int i = 0; i < DARKDefragRuns.size();i++) {
-				SaveDefragRun<max_clients>(DARKDefragRuns[i], sharedVars, demoCurrentTime, sourceDemoFile, io, bufferTime, lastGameStateChangeInDemoTime, demoType, opts, searchMode, wasDoingSQLiteExecution, CS_PLAYERS_here);
+				GetRunMeta<max_clients>(DARKDefragRuns[i].info, DARKDefragRuns[i].meta, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here);
+				SaveDefragRun<max_clients>(DARKDefragRuns[i], sharedVars, sourceDemoFile, io, bufferTime, opts, searchMode, wasDoingSQLiteExecution);
 			}
 			DARKDefragRuns.clear();
 		}
@@ -9627,7 +9647,11 @@ cuterror:
 	checkSaveLaughs(demoCurrentTime,bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution,opts);
 
 
-	
+	defragRunInfoFinal_t runInfo;
+	while (findFreedomDefragRun<max_clients>("", &runInfo, qtrue, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here)) {
+		// we might have a few runs that didnt end up getting a ranked result in time before the demo ended. save them as such then.
+		SaveDefragRun<max_clients>(runInfo, sharedVars, sourceDemoFile, io, bufferTime, opts, searchMode, wasDoingSQLiteExecution);
+	}
 
 
 

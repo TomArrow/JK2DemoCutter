@@ -5837,6 +5837,117 @@ struct MetaEventItem {
 
 
 
+
+// Freedomdefrag
+#define MAX_COURSE_COUNT 200
+#define COURSENAME_MAX_LEN 100
+#define USERNAME_MIN_LEN 3
+#define USERNAME_MAX_LEN 10
+#define PASSWORD_MIN_LEN 6
+#define PASSWORD_MAX_LEN 50 
+#define MAX_NETNAME_FREEDOMDEFRAG			64		// was 36
+typedef struct raceStyle_s {
+	byte movementStyle; // jk2. maybe some day pjk2 => STAT_MOVEMENTSTYLE
+	short msec; // -1 if toggle, -2 if float (ignore float for now, its cringe anyway)
+	signed char jumpLevel; // 0=no force, -1 = ysal, -2 = ?, 4=jumpcharge?
+	short variant; // when we have map variants (invis walls and such). 0 =default (ignore for now)
+	short runFlags; // flags from runFlags_t => STAT_RUNFLAGS
+} raceStyle_t;
+typedef enum mainLeaderboardType_s {
+	LB_MAIN,
+	LB_NOJUMPBUG, // main fps but nojumpbug
+	LB_CUSTOM, // other fps, segmented, etc
+	LB_SEGMENTED, // main fps with or without jumpbug, segmented
+	LB_CHEAT, // strafebot, tas
+	LB_TYPES_COUNT
+} mainLeaderboardType_t;
+typedef enum pbFlags_s { // bit flags
+	PB_FIRSTRUN_SPECIFICSTYLE = 1,
+	PB_NEWPB_SPECIFICSTYLE = 2,
+	PB_LB = 4, // Leaderboards sum up various style ranges. e.g. main LB allows 125 and 142 fps runs etc. so pb in ultra specific style is not same as lb pb
+} pbFlags_t;
+class defragRunMeta_t {
+public:
+	bool		isSet = false;
+	int64_t		demoTime = 0;
+	int64_t		lastGameStateChangeInDemoTime = 0;
+	int			playerNum = -1;
+	bool		wasFollowed = false;
+	bool		wasVisible = false;
+	bool		wasVisibleOrFollowed = false;
+	int			serverTime = 0;
+	int			demoRecorderClientNum;
+	std::string	serverName;
+	std::string mapName;
+	std::string playerName;
+	double		averageStrafeDeviation = 0.0f;
+	bool		averageStrafeDeviationSet = false;
+};
+typedef class finishedRunInfo_t {
+public:
+	int			runId = 0;
+	int			clientNum = 0;
+	int			userId = 0;
+	int			milliseconds = 0;
+	int			levelTimeStart = 0;
+	int			levelTimeEnd = 0;
+	int			endCommandTime = 0;
+	int			startLessTime = 0;
+	int			endLessTime = 0;
+	int			warningFlags = 0;
+	float		topspeed = 0;
+	float		average = 0; // excluding dropped time (due
+	float		distance = 0;
+	float		distanceXY = 0;
+	raceStyle_t raceStyle = { 0 };
+	int			savePosCount = 0;
+	int			resposCount = 0;
+	int			lostMsecCount = 0;
+	int			lostPacketCount = 0;
+	int			placeHolder1 = 0;
+	int			placeHolder2 = 0;
+	int			placeHolder3 = 0;
+	int			placeHolder4 = 0;
+	int			millisecondsSegmentedTotal = 0;
+	float		rollSpeed = 0;
+	int			rollTakeoffClientSpeed = 0;
+	float		startTriggerSpeed = 0;
+	int			pbStatus = 0; // see pbFlags_t
+	int			rankLB = 0;
+	char		coursename[COURSENAME_MAX_LEN + 1] = { 0 };
+	char		subcoursename[COURSENAME_MAX_LEN + 1] = { 0 };
+	char		username[USERNAME_MAX_LEN + 1] = { 0 };
+	int			unixTimeStampShifted = 0;
+	int			unixTimeStampShiftedBillionCount = 0;
+	char		netname[MAX_NETNAME_FREEDOMDEFRAG] = { 0 };
+	mainLeaderboardType_t lbType = LB_MAIN;
+	char		tempDemoName[MAX_QPATH] = { 0 };
+	char		fpsString[255 + 1] = {0};
+	int			checksumBsp = 0;
+	int			checksumPak = 0;
+
+	// demotools
+	std::string	stylename;
+	std::string	playerName;
+	defragRunMeta_t	meta;
+};
+// Freedomdefrag end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #include "whereami.h" // cringe but cba adding it to every project just to get a stupid path. thanks for the neat library tho
 
 
