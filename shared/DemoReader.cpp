@@ -1856,6 +1856,11 @@ SnapshotEntities DemoReader::GetEntitiesAtTime(double time, double * translatedT
 		}
 	}
 	
+	if (lastPastSnap == -1) {
+		// can happen when seeking into the past using delays and such?
+		return SnapshotEntities();
+	}
+
 	if (sourceSnapNum) {
 		*sourceSnapNum = lastPastSnap;
 	}
