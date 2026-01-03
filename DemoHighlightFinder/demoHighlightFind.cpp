@@ -321,11 +321,13 @@ public:
 	std::string batchString1 = ""; // Main text to appear in batch (part1) In parts so we can add something to the target filename.
 	std::string batchString2 = ""; // Main text to appear in batch (part2)
 	std::stringstream batchMiddlePart; // Something to insert into the middle of the target cut filename. Not the most intuitive variable name but that's what this comment is for
+	int	databaseIndex = 0; // so we can split finds based on maps or other things
 };
 
-typedef std::vector<SQLDelayedQueryWrapper_t*> queryCollection;
-struct ioHandles_t {
-	// Killdb
+#define MAX_KILLDBS 32
+
+struct ioHandlesKillDb_t {
+
 	sqlite3* killDb;
 	sqlite3_stmt* insertLaughsStatement;
 	sqlite3_stmt* insertDefragRunStatement;
@@ -336,6 +338,12 @@ struct ioHandles_t {
 	sqlite3_stmt* insertDemoDatabaseProperty;
 	sqlite3_stmt* insertDemoMeta;
 	sqlite3_stmt* selectLastInsertRowIdStatement;
+};
+
+typedef std::vector<SQLDelayedQueryWrapper_t*> queryCollection;
+struct ioHandles_t {
+	// Killdb
+	ioHandlesKillDb_t killDb[MAX_KILLDBS];
 
 	// statsDb
 	sqlite3* statsDb;
@@ -458,6 +466,8 @@ public:
 	int videoMinMsec = 0;
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
+
+	int	killDbsCount = 1;
 };
 
 typedef struct videoFrame_s {
@@ -3018,327 +3028,382 @@ void logSpecialThing(const char* specialType, std::string details, std::string c
 
 void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
+	char* preparedStatementText;
 	int sqlResult = 0;
 	int readonlyResult = 0;
-	while ((sqlResult = sqlite3_open("killDatabase.db", &io.killDb)) != SQLITE_OK || (readonlyResult=sqlite3_db_readonly(io.killDb, "main"))) {
-		std::cerr << DPrintFLocation << ":" << "error opening killDatabase.db for read/write ("<< sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb) << ". Trying again in 1000ms." << "\n";
-		sqlite3_close(io.killDb);
-		io.killDb = NULL;
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	for (int i = 0; i < opts.killDbsCount; i++) {
+		const char* killDbName = opts.killDbsCount > 1 ? va("killDatabase%d.db",i) : "killDatabase.db"; // todo dont create databases we end up not needing
+		while ((sqlResult = sqlite3_open(killDbName, &io.killDb[i].killDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.killDb[i].killDb, "main"))) {
+			std::cerr << DPrintFLocation << ":" << "error opening "<< killDbName << " for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb[i].killDb) << ". Trying again in 1000ms." << "\n";
+			sqlite3_close(io.killDb[i].killDb);
+			io.killDb[i].killDb = NULL;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
+
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE kills ("
+			"hash	TEXT,"
+			"shorthash	TEXT,"
+			"map	TEXT NOT NULL,"
+			"killerName	TEXT NOT NULL,"
+			"killerNameStripped	TEXT NOT NULL,"
+			"victimName	TEXT NOT NULL,"
+			"victimNameStripped	TEXT NOT NULL,"
+			"killerTeam	INTEGER,"
+			"victimTeam	INTEGER NOT NULL,"
+			"redScore INTEGER,"
+			"blueScore INTEGER,"
+			"otherFlagStatus INTEGER,"
+			"redPlayerCount INTEGER,"
+			"bluePlayerCount INTEGER,"
+			"sumPlayerCount INTEGER,"
+			"killerClientNum	INTEGER NOT NULL,"
+			"victimClientNum	INTEGER NOT NULL,"
+			"isDoomKill	BOOLEAN NOT NULL,"
+			"isExplosion	BOOLEAN NOT NULL,"
+			"isSuicide	BOOLEAN NOT NULL,"
+			"isModSuicide	BOOLEAN NOT NULL,"
+			"meansOfDeath	INTEGER NOT NULL,"
+			"positionX	REAL,"
+			"positionY	REAL,"
+			"positionZ	REAL,"
+			"PRIMARY KEY(hash)"
+			"); ",
+			NULL, NULL, NULL);
+
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE killAngles ("
+			"hash	TEXT,"
+			"shorthash	TEXT,"
+			"map	TEXT NOT NULL,"
+			"serverName	TEXT NOT NULL," // Because of our dumb decision to mark processed demos in the serverName, we need to save this here to be able to distinguish them...
+			"serverNameStripped	TEXT NOT NULL,"
+			"killerIsFlagCarrier	BOOLEAN NOT NULL,"
+			"isReturn	BOOLEAN NOT NULL,"
+			"isTeamKill	BOOLEAN NOT NULL,"
+			"victimCapperKills INTEGER,"
+			"victimCapperRets INTEGER,"
+			"victimCapperWasFollowedOrVisible	BOOLEAN,"
+
+			"victimCapperMaxNearbyEnemyCount	REAL,"
+			"victimCapperMoreThanOneNearbyEnemyTimePercent	REAL," // Percentage
+			"victimCapperAverageNearbyEnemyCount	REAL,"
+			"victimCapperMaxVeryCloseEnemyCount	REAL,"
+			"victimCapperAnyVeryCloseEnemyTimePercent	REAL," // Percentage
+			"victimCapperMoreThanOneVeryCloseEnemyTimePercent	REAL," // Percentage
+			"victimCapperAverageVeryCloseEnemyCount	REAL,"
+
+			"victimFlagPickupSource	INTEGER,"
+			"victimFlagHoldTime	INTEGER,"
+			"targetIsVisible	BOOLEAN NOT NULL,"
+			"targetIsFollowed	BOOLEAN NOT NULL,"
+			"targetIsFollowedOrVisible	BOOLEAN NOT NULL,"
+			"isSuicide	BOOLEAN NOT NULL,"
+			"isModSuicide	BOOLEAN NOT NULL,"
+			"attackerIsVisible	BOOLEAN NOT NULL,"
+			"attackerIsFollowed	BOOLEAN NOT NULL,"
+			"attackerIsFollowedOrVisible	BOOLEAN NOT NULL,"
+			"demoRecorderClientnum	INTEGER NOT NULL,"
+
+			"boosts	TEXT,"
+			"boostCountTotal	INTEGER NOT NULL,"
+			"boostCountAttacker	INTEGER NOT NULL,"
+			"boostCountVictim	INTEGER NOT NULL,"
+
+			"projectileWasAirborne	BOOLEAN,"
+
+			"sameFrameRet	BOOLEAN,"
+
+			"baseFlagDistance	REAL,"
+			"headJumps	INTEGER,"
+			"specialJumps	INTEGER,"
+			"timeSinceLastSelfSentryJump	INTEGER,"
+
+			"lastSneak	INTEGER,"
+			"lastSneakDuration	INTEGER,"
+
+			"resultingCaptures INTEGER,"
+			"resultingSelfCaptures INTEGER,"
+			"resultingLaughs INTEGER,"
+			"metaEvents	TEXT,"
+
+			"maxAngularSpeedAttacker	REAL,"
+			"maxAngularAccelerationAttacker	REAL,"
+			"maxAngularJerkAttacker	REAL,"
+			"maxAngularSnapAttacker	REAL,"
+
+			"maxSpeedAttacker	REAL,"
+			"maxSpeedTarget	REAL,"
+			"currentSpeedAttacker	REAL,"
+			"currentSpeedTarget	REAL,"
+			"lastSaberMoveChangeSpeed	REAL,"
+			"timeSinceLastSaberMoveChange INTEGER,"
+			"timeSinceLastBackflip INTEGER,"
+			"meansOfDeathString	TEXT NOT NULL,"
+			"nearbyPlayers	TEXT,"
+			"nearbyPlayerCount	INTEGER NOT NULL,"
+			"probableKillingWeapon	INTEGER NOT NULL,"
+
+			"attackerJumpHeight	REAL,"
+			"victimJumpHeight	REAL,"
+
+			"directionX	REAL,"
+			"directionY	REAL,"
+			"directionZ	REAL,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoTime INTEGER NOT NULL,"
+			"lastGamestateDemoTime INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE captures ("
+			"id	INTEGER PRIMARY KEY,"
+			"map	TEXT NOT NULL,"
+			"serverName	TEXT NOT NULL,"
+			"serverNameStripped	TEXT NOT NULL,"
+			"flagHoldTime	INTEGER NOT NULL,"
+			"flagPickupSource	INTEGER NOT NULL,"
+			"capperName	TEXT NOT NULL,"
+			"capperNameStripped	TEXT NOT NULL,"
+			"capperClientNum INTEGER NOT NULL,"
+			"capperIsVisible	BOOLEAN NOT NULL,"
+			"capperIsFollowed	BOOLEAN NOT NULL,"
+			"capperIsFollowedOrVisible	BOOLEAN NOT NULL,"
+			"capperWasVisible	BOOLEAN NOT NULL,"
+			"capperWasFollowed	BOOLEAN NOT NULL,"
+			"capperWasFollowedOrVisible	BOOLEAN NOT NULL,"
+			"demoRecorderClientnum	INTEGER NOT NULL,"
+			"flagTeam	INTEGER NOT NULL,"
+			"capperKills INTEGER NOT NULL,"
+			"capperRets INTEGER NOT NULL,"
+			"sameFrameCap	BOOLEAN NOT NULL,"
+			"redScore INTEGER,"
+			"blueScore INTEGER,"
+			"redPlayerCount INTEGER,"
+			"bluePlayerCount INTEGER,"
+			"sumPlayerCount INTEGER,"
+			"maxSpeedCapperLastSecond	REAL,"
+			"maxSpeedCapper	REAL,"
+			"averageSpeedCapper	REAL,"
+			"metaEvents	TEXT,"
+			"nearbyPlayers	TEXT,"
+			"nearbyPlayerCount	INTEGER NOT NULL,"
+			"nearbyEnemies	TEXT,"
+			"nearbyEnemyCount	INTEGER NOT NULL,"
+			"maxNearbyEnemyCount	REAL NOT NULL,"
+			"moreThanOneNearbyEnemyTimePercent	REAL NOT NULL," // Percentage
+			"averageNearbyEnemyCount	REAL NOT NULL,"
+			"maxVeryCloseEnemyCount	REAL NOT NULL,"
+			"anyVeryCloseEnemyTimePercent	REAL NOT NULL," // Percentage
+			"moreThanOneVeryCloseEnemyTimePercent	REAL NOT NULL," // Percentage
+			"averageVeryCloseEnemyCount	REAL NOT NULL,"
+			"directionX	REAL,"
+			"directionY	REAL,"
+			"directionZ	REAL,"
+			"positionX	REAL,"
+			"positionY	REAL,"
+			"positionZ	REAL,"
+			"resultingLaughs INTEGER,"
+			"resultingLaughsAfter INTEGER,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoTime INTEGER NOT NULL,"
+			"lastGamestateDemoTime INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE defragRuns ("
+			"map	TEXT NOT NULL,"
+			"serverName	TEXT NOT NULL,"
+			"serverNameStripped	TEXT NOT NULL,"
+			"readableTime TEXT NOT NULL,"
+			"totalMilliseconds	INTEGER,"
+			"style	TEXT,"
+			"playerName	TEXT NOT NULL,"
+			"playerNameStripped	TEXT NOT NULL,"
+			"isTop10	BOOLEAN NOT NULL,"
+			"isNumber1	BOOLEAN NOT NULL,"
+			"isPersonalBest	BOOLEAN NOT NULL,"
+			"runTeleProRun	BOOLEAN,"
+			"runTeleTeleports	INTEGER,"
+			"runTeleCheckpoints	INTEGER,"
+			"wasVisible	BOOLEAN NOT NULL,"
+			"wasFollowed	BOOLEAN NOT NULL,"
+			"wasFollowedOrVisible	BOOLEAN NOT NULL,"
+			"averageStrafeDeviation REAL,"
+			"runnerClientNum	INTEGER NOT NULL,"
+			"resultingLaughs	INTEGER,"
+			"demoRecorderClientnum	INTEGER NOT NULL,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoTime INTEGER NOT NULL,"
+			"lastGamestateDemoTime INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE laughs ("
+			"id	INTEGER PRIMARY KEY,"
+			"map	TEXT NOT NULL,"
+			"serverName	TEXT NOT NULL,"
+			"serverNameStripped	TEXT NOT NULL,"
+			"laughs	TEXT NOT NULL,"
+			"chatlog	TEXT NOT NULL,"
+			"chatlogStripped	TEXT NOT NULL,"
+			"laughCount	INTEGER NOT NULL,"
+			"demoRecorderClientnum	INTEGER NOT NULL,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"duration INTEGER NOT NULL,"
+			"demoTime INTEGER NOT NULL,"
+			"lastGamestateDemoTime INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE killSprees ("
+			"hash	TEXT,"
+			"shorthash	TEXT,"
+			"maxDelay	INTEGER NOT NULL,"
+			"maxDelayActual	INTEGER NOT NULL,"
+			"map	TEXT NOT NULL,"
+			"serverName	TEXT NOT NULL,"
+			"serverNameStripped	TEXT NOT NULL,"
+			"killerName	TEXT NOT NULL,"
+			"killerNameStripped	TEXT NOT NULL,"
+			"victimNames	TEXT NOT NULL,"
+			"victimNamesStripped	TEXT NOT NULL,"
+			"killTypes	TEXT NOT NULL,"
+			"killTypesCount	INTEGER NOT NULL,"
+			"killHashes	TEXT NOT NULL,"
+			"killerClientNum	INTEGER NOT NULL,"
+			"victimClientNums	TEXT NOT NULL,"
+			"countKills	INTEGER NOT NULL,"
+			"countRets	INTEGER NOT NULL,"
+			"countTeamKills	INTEGER NOT NULL,"
+			"countUniqueTargets	INTEGER NOT NULL,"
+			"countDooms	INTEGER NOT NULL,"
+			"countExplosions	INTEGER NOT NULL,"
+			"countThirdPersons	INTEGER NOT NULL,"
+			"countInvisibles	INTEGER NOT NULL,"
+			"nearbyPlayers	TEXT,"
+			"nearbyPlayerCount	INTEGER NOT NULL,"
+			"demoRecorderClientnum	INTEGER NOT NULL,"
+			"maxSpeedAttacker	REAL,"
+			"maxSpeedTargets	REAL,"
+			"resultingCaptures INTEGER,"
+			"resultingSelfCaptures INTEGER,"
+			"resultingCapturesAfter INTEGER,"
+			"resultingSelfCapturesAfter INTEGER,"
+			"resultingLaughs INTEGER,"
+			"resultingLaughsAfter INTEGER,"
+			"metaEvents	TEXT,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoTime INTEGER NOT NULL,"
+			"lastGamestateDemoTime INTEGER NOT NULL,"
+			"duration INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"//,"
+			//"PRIMARY KEY(hash)"
+			"); ",
+			NULL, NULL, NULL);
+
+
+
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE demoDatabaseProperties ("
+			"propertyName	TEXT NOT NULL,"
+			"value	TEXT NOT NULL,"
+			"PRIMARY KEY(propertyName)"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE demoMeta ("
+			"demoName	TEXT NOT NULL,"
+			"demoPath	TEXT NOT NULL,"
+			"fileSize INTEGER NOT NULL,"
+			"demoTimeDuration INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL,"
+			"PRIMARY KEY(demoPath)"
+			"); ",
+			NULL, NULL, NULL);
+
+		/*char* preparedStatementText = "INSERT INTO kills"
+			"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, targetIsVisible,attackerIsVisible,"
+			"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
+			"positionY, positionZ,demoName,demoTime, serverTime, demoDateTime)"
+			"VALUES "
+			"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @targetIsVisible,@attackerIsVisible,"
+			"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
+			"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
+		preparedStatementText = "INSERT INTO kills"
+			"(hash,shorthash,map,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
+			"VALUES "
+			"(@hash,@shorthash,@map,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
+		;
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertStatement, NULL);
+		preparedStatementText = "INSERT INTO killAngles"
+			"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,sameFrameRet,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+			"VALUES "
+			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
+		preparedStatementText = "INSERT INTO captures"
+			"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"VALUES "
+			"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertCaptureStatement, NULL);
+		preparedStatementText = "INSERT INTO defragRuns"
+			"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"VALUES "
+			"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@style,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDefragRunStatement, NULL);
+		preparedStatementText = "INSERT INTO laughs"
+			"(map,serverName,serverNameStripped,laughs,chatlog,chatlogStripped,laughCount,demoRecorderClientnum,demoName,demoPath,duration,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"VALUES "
+			"(@map,@serverName,@serverNameStripped,@laughs,@chatlog,@chatlogStripped,@laughCount,@demoRecorderClientnum,@demoName,@demoPath,@duration,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertLaughsStatement, NULL);
+		preparedStatementText = "INSERT INTO killSprees "
+			"( hash, shorthash,maxDelay,maxDelayActual, map,serverName,serverNameStripped,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
+			" countThirdPersons, countInvisibles, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,resultingLaughs,resultingLaughsAfter,metaEvents,demoName,demoPath,demoTime,lastGamestateDemoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
+			" VALUES "
+			"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map,@serverName,@serverNameStripped, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
+			" @countThirdPersons, @countInvisibles, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@resultingLaughs,@resultingLaughsAfter,@metaEvents,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertSpreeStatement, NULL);
+		preparedStatementText = "INSERT INTO demoDatabaseProperties "
+			"( propertyName, value )"
+			" VALUES "
+			"( @propertyName, @value )";
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoDatabaseProperty, NULL);
+
+		preparedStatementText = "INSERT INTO demoMeta "
+			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime )"
+			" VALUES "
+			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime )";
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoMeta, NULL);
+
+		preparedStatementText = "SELECT last_insert_rowid();";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].selectLastInsertRowIdStatement, NULL);
+
+		sqlite3_exec(io.killDb[i].killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillAngles','1');", NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillSpree','1');", NULL, NULL, NULL);
+
+
 	}
 
 	if (opts.doStatsDb) {
 		while ((sqlResult = sqlite3_open("statistics.db", &io.statsDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.statsDb, "main"))) {
-			std::cerr << DPrintFLocation << ":" << "error opening stats.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb) << ". Trying again in 1000ms." << "\n";
+			std::cerr << DPrintFLocation << ":" << "error opening stats.db for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.statsDb) << ". Trying again in 1000ms." << "\n";
 			sqlite3_close(io.statsDb);
 			io.statsDb = NULL;
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
-	}
-	else {
-		io.statsDb = NULL;
-	}
-	/*sqlite3_exec(io.killDb, "CREATE TABLE kills ("
-		"hash	TEXT,"
-		"shorthash	TEXT,"
-		"map	TEXT NOT NULL,"
-		"killerName	TEXT NOT NULL,"
-		"victimName	TEXT NOT NULL,"
-		"killerClientNum	INTEGER NOT NULL,"
-		"victimClientNum	INTEGER NOT NULL,"
-		"isReturn	BOOLEAN NOT NULL,"
-		"isDoomKill	BOOLEAN NOT NULL,"
-		"isExplosion	BOOLEAN NOT NULL,"
-		"isSuicide	BOOLEAN NOT NULL,"
-		"targetIsVisible	BOOLEAN NOT NULL,"
-		"attackerIsVisible	BOOLEAN NOT NULL,"
-		"isFollowed	BOOLEAN NOT NULL,"
-		"meansOfDeath	INTEGER NOT NULL,"
-		"demoRecorderClientnum	INTEGER NOT NULL,"
-		"maxSpeedAttacker	REAL,"
-		"maxSpeedTarget	REAL,"
-		"meansOfDeathString	TEXT NOT NULL,"
-		"probableKillingWeapon	INTEGER NOT NULL,"
-		"positionX	REAL,"
-		"positionY	REAL,"
-		"positionZ	REAL,"
-		"demoName TEXT NOT NULL,"
-		"demoTime INTEGER NOT NULL,"
-		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL,"
-		"PRIMARY KEY(hash)"
-		"); ",
-		NULL,NULL,NULL);*/
-	sqlite3_exec(io.killDb, "CREATE TABLE kills ("
-		"hash	TEXT,"
-		"shorthash	TEXT,"
-		"map	TEXT NOT NULL,"
-		"killerName	TEXT NOT NULL,"
-		"killerNameStripped	TEXT NOT NULL,"
-		"victimName	TEXT NOT NULL,"
-		"victimNameStripped	TEXT NOT NULL,"
-		"killerTeam	INTEGER,"
-		"victimTeam	INTEGER NOT NULL,"
-		"redScore INTEGER,"
-		"blueScore INTEGER,"
-		"otherFlagStatus INTEGER,"
-		"redPlayerCount INTEGER,"
-		"bluePlayerCount INTEGER,"
-		"sumPlayerCount INTEGER,"
-		"killerClientNum	INTEGER NOT NULL,"
-		"victimClientNum	INTEGER NOT NULL,"
-		"isDoomKill	BOOLEAN NOT NULL,"
-		"isExplosion	BOOLEAN NOT NULL,"
-		"isSuicide	BOOLEAN NOT NULL,"
-		"isModSuicide	BOOLEAN NOT NULL,"
-		"meansOfDeath	INTEGER NOT NULL,"
-		"positionX	REAL,"
-		"positionY	REAL,"
-		"positionZ	REAL,"
-		"PRIMARY KEY(hash)"
-		"); ",
-		NULL, NULL, NULL);
-
-	sqlite3_exec(io.killDb, "CREATE TABLE killAngles ("
-		"hash	TEXT,"
-		"shorthash	TEXT,"
-		"map	TEXT NOT NULL,"
-		"serverName	TEXT NOT NULL," // Because of our dumb decision to mark processed demos in the serverName, we need to save this here to be able to distinguish them...
-		"serverNameStripped	TEXT NOT NULL,"
-		"killerIsFlagCarrier	BOOLEAN NOT NULL,"
-		"isReturn	BOOLEAN NOT NULL,"
-		"isTeamKill	BOOLEAN NOT NULL,"
-		"victimCapperKills INTEGER,"
-		"victimCapperRets INTEGER,"
-		"victimCapperWasFollowedOrVisible	BOOLEAN,"
-
-		"victimCapperMaxNearbyEnemyCount	REAL,"
-		"victimCapperMoreThanOneNearbyEnemyTimePercent	REAL," // Percentage
-		"victimCapperAverageNearbyEnemyCount	REAL,"
-		"victimCapperMaxVeryCloseEnemyCount	REAL,"
-		"victimCapperAnyVeryCloseEnemyTimePercent	REAL," // Percentage
-		"victimCapperMoreThanOneVeryCloseEnemyTimePercent	REAL," // Percentage
-		"victimCapperAverageVeryCloseEnemyCount	REAL,"
-
-		"victimFlagPickupSource	INTEGER,"
-		"victimFlagHoldTime	INTEGER,"
-		"targetIsVisible	BOOLEAN NOT NULL,"
-		"targetIsFollowed	BOOLEAN NOT NULL,"
-		"targetIsFollowedOrVisible	BOOLEAN NOT NULL,"
-		"isSuicide	BOOLEAN NOT NULL,"
-		"isModSuicide	BOOLEAN NOT NULL,"
-		"attackerIsVisible	BOOLEAN NOT NULL,"
-		"attackerIsFollowed	BOOLEAN NOT NULL,"
-		"attackerIsFollowedOrVisible	BOOLEAN NOT NULL,"
-		"demoRecorderClientnum	INTEGER NOT NULL,"
-
-		"boosts	TEXT,"
-		"boostCountTotal	INTEGER NOT NULL,"
-		"boostCountAttacker	INTEGER NOT NULL,"
-		"boostCountVictim	INTEGER NOT NULL,"
-
-		"projectileWasAirborne	BOOLEAN,"
-
-		"sameFrameRet	BOOLEAN,"
-
-		"baseFlagDistance	REAL,"
-		"headJumps	INTEGER,"
-		"specialJumps	INTEGER,"
-		"timeSinceLastSelfSentryJump	INTEGER,"
-
-		"lastSneak	INTEGER,"
-		"lastSneakDuration	INTEGER,"
-
-		"resultingCaptures INTEGER,"
-		"resultingSelfCaptures INTEGER,"
-		"resultingLaughs INTEGER,"
-		"metaEvents	TEXT,"
-
-		"maxAngularSpeedAttacker	REAL,"
-		"maxAngularAccelerationAttacker	REAL,"
-		"maxAngularJerkAttacker	REAL,"
-		"maxAngularSnapAttacker	REAL,"
-
-		"maxSpeedAttacker	REAL,"
-		"maxSpeedTarget	REAL,"
-		"currentSpeedAttacker	REAL,"
-		"currentSpeedTarget	REAL,"
-		"lastSaberMoveChangeSpeed	REAL,"
-		"timeSinceLastSaberMoveChange INTEGER,"
-		"timeSinceLastBackflip INTEGER,"
-		"meansOfDeathString	TEXT NOT NULL,"
-		"nearbyPlayers	TEXT,"
-		"nearbyPlayerCount	INTEGER NOT NULL,"
-		"probableKillingWeapon	INTEGER NOT NULL,"
-
-		"attackerJumpHeight	REAL,"
-		"victimJumpHeight	REAL,"
-
-		"directionX	REAL,"
-		"directionY	REAL,"
-		"directionZ	REAL,"
-		"demoName TEXT NOT NULL,"
-		"demoPath TEXT NOT NULL,"
-		"demoTime INTEGER NOT NULL,"
-		"lastGamestateDemoTime INTEGER NOT NULL,"
-		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL"
-		"); ",
-		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE captures ("
-		"id	INTEGER PRIMARY KEY,"
-		"map	TEXT NOT NULL,"
-		"serverName	TEXT NOT NULL,"
-		"serverNameStripped	TEXT NOT NULL,"
-		"flagHoldTime	INTEGER NOT NULL,"
-		"flagPickupSource	INTEGER NOT NULL,"
-		"capperName	TEXT NOT NULL,"
-		"capperNameStripped	TEXT NOT NULL,"
-		"capperClientNum INTEGER NOT NULL,"
-		"capperIsVisible	BOOLEAN NOT NULL,"
-		"capperIsFollowed	BOOLEAN NOT NULL,"
-		"capperIsFollowedOrVisible	BOOLEAN NOT NULL,"
-		"capperWasVisible	BOOLEAN NOT NULL,"
-		"capperWasFollowed	BOOLEAN NOT NULL,"
-		"capperWasFollowedOrVisible	BOOLEAN NOT NULL,"
-		"demoRecorderClientnum	INTEGER NOT NULL,"
-		"flagTeam	INTEGER NOT NULL,"
-		"capperKills INTEGER NOT NULL,"
-		"capperRets INTEGER NOT NULL,"
-		"sameFrameCap	BOOLEAN NOT NULL,"
-		"redScore INTEGER,"
-		"blueScore INTEGER,"
-		"redPlayerCount INTEGER,"
-		"bluePlayerCount INTEGER,"
-		"sumPlayerCount INTEGER,"
-		"maxSpeedCapperLastSecond	REAL,"
-		"maxSpeedCapper	REAL,"
-		"averageSpeedCapper	REAL,"
-		"metaEvents	TEXT,"
-		"nearbyPlayers	TEXT,"
-		"nearbyPlayerCount	INTEGER NOT NULL,"
-		"nearbyEnemies	TEXT,"
-		"nearbyEnemyCount	INTEGER NOT NULL,"
-		"maxNearbyEnemyCount	REAL NOT NULL,"
-		"moreThanOneNearbyEnemyTimePercent	REAL NOT NULL," // Percentage
-		"averageNearbyEnemyCount	REAL NOT NULL,"
-		"maxVeryCloseEnemyCount	REAL NOT NULL,"
-		"anyVeryCloseEnemyTimePercent	REAL NOT NULL," // Percentage
-		"moreThanOneVeryCloseEnemyTimePercent	REAL NOT NULL," // Percentage
-		"averageVeryCloseEnemyCount	REAL NOT NULL,"
-		"directionX	REAL,"
-		"directionY	REAL,"
-		"directionZ	REAL,"
-		"positionX	REAL,"
-		"positionY	REAL,"
-		"positionZ	REAL,"
-		"resultingLaughs INTEGER,"
-		"resultingLaughsAfter INTEGER,"
-		"demoName TEXT NOT NULL,"
-		"demoPath TEXT NOT NULL,"
-		"demoTime INTEGER NOT NULL,"
-		"lastGamestateDemoTime INTEGER NOT NULL,"
-		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL"
-		"); ",
-		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE defragRuns ("
-		"map	TEXT NOT NULL,"
-		"serverName	TEXT NOT NULL,"
-		"serverNameStripped	TEXT NOT NULL,"
-		"readableTime TEXT NOT NULL,"
-		"totalMilliseconds	INTEGER,"
-		"style	TEXT,"
-		"playerName	TEXT NOT NULL,"
-		"playerNameStripped	TEXT NOT NULL,"
-		"isTop10	BOOLEAN NOT NULL,"
-		"isNumber1	BOOLEAN NOT NULL,"
-		"isPersonalBest	BOOLEAN NOT NULL,"
-		"runTeleProRun	BOOLEAN,"
-		"runTeleTeleports	INTEGER,"
-		"runTeleCheckpoints	INTEGER,"
-		"wasVisible	BOOLEAN NOT NULL,"
-		"wasFollowed	BOOLEAN NOT NULL,"
-		"wasFollowedOrVisible	BOOLEAN NOT NULL,"
-		"averageStrafeDeviation REAL,"
-		"runnerClientNum	INTEGER NOT NULL,"
-		"resultingLaughs	INTEGER,"
-		"demoRecorderClientnum	INTEGER NOT NULL,"
-		"demoName TEXT NOT NULL,"
-		"demoPath TEXT NOT NULL,"
-		"demoTime INTEGER NOT NULL,"
-		"lastGamestateDemoTime INTEGER NOT NULL,"
-		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL"
-		"); ",
-		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE laughs ("
-		"id	INTEGER PRIMARY KEY,"
-		"map	TEXT NOT NULL,"
-		"serverName	TEXT NOT NULL,"
-		"serverNameStripped	TEXT NOT NULL,"
-		"laughs	TEXT NOT NULL,"
-		"chatlog	TEXT NOT NULL,"
-		"chatlogStripped	TEXT NOT NULL,"
-		"laughCount	INTEGER NOT NULL,"
-		"demoRecorderClientnum	INTEGER NOT NULL,"
-		"demoName TEXT NOT NULL,"
-		"demoPath TEXT NOT NULL,"
-		"duration INTEGER NOT NULL,"
-		"demoTime INTEGER NOT NULL,"
-		"lastGamestateDemoTime INTEGER NOT NULL,"
-		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL"
-		"); ",
-		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE killSprees ("
-		"hash	TEXT,"
-		"shorthash	TEXT,"
-		"maxDelay	INTEGER NOT NULL,"
-		"maxDelayActual	INTEGER NOT NULL,"
-		"map	TEXT NOT NULL,"
-		"serverName	TEXT NOT NULL,"
-		"serverNameStripped	TEXT NOT NULL,"
-		"killerName	TEXT NOT NULL,"
-		"killerNameStripped	TEXT NOT NULL,"
-		"victimNames	TEXT NOT NULL,"
-		"victimNamesStripped	TEXT NOT NULL,"
-		"killTypes	TEXT NOT NULL,"
-		"killTypesCount	INTEGER NOT NULL,"
-		"killHashes	TEXT NOT NULL,"
-		"killerClientNum	INTEGER NOT NULL,"
-		"victimClientNums	TEXT NOT NULL,"
-		"countKills	INTEGER NOT NULL,"
-		"countRets	INTEGER NOT NULL,"
-		"countTeamKills	INTEGER NOT NULL,"
-		"countUniqueTargets	INTEGER NOT NULL,"
-		"countDooms	INTEGER NOT NULL,"
-		"countExplosions	INTEGER NOT NULL,"
-		"countThirdPersons	INTEGER NOT NULL,"
-		"countInvisibles	INTEGER NOT NULL,"
-		"nearbyPlayers	TEXT,"
-		"nearbyPlayerCount	INTEGER NOT NULL,"
-		"demoRecorderClientnum	INTEGER NOT NULL,"
-		"maxSpeedAttacker	REAL,"
-		"maxSpeedTargets	REAL,"
-		"resultingCaptures INTEGER,"
-		"resultingSelfCaptures INTEGER,"
-		"resultingCapturesAfter INTEGER,"
-		"resultingSelfCapturesAfter INTEGER,"
-		"resultingLaughs INTEGER,"
-		"resultingLaughsAfter INTEGER,"
-		"metaEvents	TEXT,"
-		"demoName TEXT NOT NULL,"
-		"demoPath TEXT NOT NULL,"
-		"demoTime INTEGER NOT NULL,"
-		"lastGamestateDemoTime INTEGER NOT NULL,"
-		"duration INTEGER NOT NULL,"
-		"serverTime INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL"//,"
-		//"PRIMARY KEY(hash)"
-		"); ",
-		NULL, NULL, NULL);
-	if (opts.doStatsDb) {
 
 		sqlite3_exec(io.statsDb, "CREATE TABLE playerModels ("
 			"map	TEXT NOT NULL,"
@@ -3369,87 +3434,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			//"PRIMARY KEY(playerName,clientNum,map,demoPath)"
 			"); ",
 			NULL, NULL, NULL);
-	}
 
-	sqlite3_exec(io.killDb, "CREATE TABLE demoDatabaseProperties ("
-		"propertyName	TEXT NOT NULL,"
-		"value	TEXT NOT NULL,"
-		"PRIMARY KEY(propertyName)"
-		"); ",
-		NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "CREATE TABLE demoMeta ("
-		"demoName	TEXT NOT NULL,"
-		"demoPath	TEXT NOT NULL,"
-		"fileSize INTEGER NOT NULL,"
-		"demoTimeDuration INTEGER NOT NULL,"
-		"demoDateTime TIMESTAMP NOT NULL,"
-		"PRIMARY KEY(demoPath)"
-		"); ",
-		NULL, NULL, NULL);
+		preparedStatementText = "SELECT last_insert_rowid();";
 
-	/*char* preparedStatementText = "INSERT INTO kills"
-		"(hash, shorthash, map, killerName, victimName, killerClientNum, victimClientNum, isReturn, isDoomKill, isExplosion, isSuicide, targetIsVisible,attackerIsVisible,"
-		"isFollowed, meansOfDeath, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTarget, meansOfDeathString, probableKillingWeapon, positionX, "
-		"positionY, positionZ,demoName,demoTime, serverTime, demoDateTime)"
-		"VALUES "
-		"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @targetIsVisible,@attackerIsVisible,"
-		"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
-		"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
-	char* preparedStatementText = "INSERT INTO kills"
-		"(hash,shorthash,map,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
-		"VALUES "
-		"(@hash,@shorthash,@map,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
-	;
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertStatement, NULL);
-	preparedStatementText = "INSERT INTO killAngles"
-		"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,sameFrameRet,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
-		"VALUES "
-		"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
-
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAngleStatement, NULL);
-	preparedStatementText = "INSERT INTO captures"
-		"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
-		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
-
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertCaptureStatement, NULL);
-	preparedStatementText = "INSERT INTO defragRuns"
-		"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
-		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@readableTime,@totalMilliseconds,@style,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
-
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDefragRunStatement, NULL);
-	preparedStatementText = "INSERT INTO laughs"
-		"(map,serverName,serverNameStripped,laughs,chatlog,chatlogStripped,laughCount,demoRecorderClientnum,demoName,demoPath,duration,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
-		"VALUES "
-		"(@map,@serverName,@serverNameStripped,@laughs,@chatlog,@chatlogStripped,@laughCount,@demoRecorderClientnum,@demoName,@demoPath,@duration,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
-
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertLaughsStatement, NULL);
-	preparedStatementText = "INSERT INTO killSprees "
-		"( hash, shorthash,maxDelay,maxDelayActual, map,serverName,serverNameStripped,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
-		" countThirdPersons, countInvisibles, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,resultingLaughs,resultingLaughsAfter,metaEvents,demoName,demoPath,demoTime,lastGamestateDemoTime,duration,serverTime,demoDateTime,nearbyPlayers,nearbyPlayerCount)"
-		" VALUES "
-		"( @hash, @shorthash, @maxDelay, @maxDelayActual,@map,@serverName,@serverNameStripped, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
-		" @countThirdPersons, @countInvisibles, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@resultingLaughs,@resultingLaughsAfter,@metaEvents,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@duration,@serverTime,@demoDateTime,@nearbyPlayers,@nearbyPlayerCount)";
-
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertSpreeStatement, NULL);
-	preparedStatementText = "INSERT INTO demoDatabaseProperties "
-		"( propertyName, value )"
-		" VALUES "
-		"( @propertyName, @value )";
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDemoDatabaseProperty, NULL);
-
-	preparedStatementText = "INSERT INTO demoMeta "
-		"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime )"
-		" VALUES "
-		"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime )";
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertDemoMeta, NULL);
-
-	preparedStatementText = "SELECT last_insert_rowid();";
-
-	sqlite3_prepare_v2(io.killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectLastInsertRowIdStatement, NULL);
-
-	if(opts.doStatsDb){
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectStatsLastInsertRowIdStatement, NULL);
 
 		preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
@@ -3465,21 +3452,17 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
 
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
+
+		sqlite3_exec(io.statsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 	}
 	else {
+		io.statsDb = NULL;
 		io.selectStatsLastInsertRowIdStatement = NULL;
 		io.insertPlayerModelStatement = NULL;
 		io.updatePlayerModelCountStatement = NULL;
 		io.insertPlayerDemoStatsStatement = NULL;
 	}
 
-	sqlite3_exec(io.killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-	if (opts.doStatsDb) {
-		sqlite3_exec(io.statsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-	}
-
-	sqlite3_exec(io.killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillAngles','1');", NULL, NULL, NULL);
-	sqlite3_exec(io.killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillSpree','1');", NULL, NULL, NULL);
 
 	if (opts.writeDemoPacketStats) {
 
@@ -3708,66 +3691,66 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	// Kills
 	for (auto it = io.killQueries->begin(); it != io.killQueries->end(); it++) {
-		(*it)->query.bind(io.insertStatement);
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertStatement);
 		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertStatement);
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertStatement);
 		if (queryResult != SQLITE_DONE) {
 #ifndef DEBUG
 			if (queryResult != SQLITE_CONSTRAINT)
 #endif
-				std::cerr << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb) << " (" << queryResult << ")" << "(" << DPrintFLocation << ")" << "\n";
+				std::cerr << "Error inserting kill into database: " << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << " (" << queryResult << ")" << "(" << DPrintFLocation << ")" << "\n";
 		}
-		sqlite3_reset(io.insertStatement);
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertStatement);
 		//wasDoingSQLiteExecution = false;
 	}
 
 	// Kill angles
 	for (auto it = io.killAngleQueries->begin(); it != io.killAngleQueries->end(); it++) {
-		(*it)->query.bind(io.insertAngleStatement);
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertAngleStatement);
 		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertAngleStatement);
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertAngleStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting kill angle into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error inserting kill angle into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
-		sqlite3_reset(io.insertAngleStatement);
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertAngleStatement);
 		//wasDoingSQLiteExecution = false;
 		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandle) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Sprees
 	for (auto it = io.spreeQueries->begin(); it != io.spreeQueries->end(); it++) {
-		(*it)->query.bind(io.insertSpreeStatement);
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 
 		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertSpreeStatement);
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting killing spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error inserting killing spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
-		sqlite3_reset(io.insertSpreeStatement);
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 		//wasDoingSQLiteExecution = false;
 		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandleKillSprees) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Captures
 	for (auto it = io.captureQueries->begin(); it != io.captureQueries->end(); it++) {
-		(*it)->query.bind(io.insertCaptureStatement);
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertCaptureStatement);
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		uint64_t insertedId = -1;
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting capture into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error inserting capture into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		else {
-			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
+			queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement);
 			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-				std::cerr << "Error retrieving inserted capture id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+				std::cerr << "Error retrieving inserted capture id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 			}
 			else {
-				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
+				insertedId = sqlite3_column_int64(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement, 0);
 			}
-			sqlite3_reset(io.selectLastInsertRowIdStatement);
+			sqlite3_reset(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement);
 		}
-		sqlite3_reset(io.insertCaptureStatement);
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		//wasDoingSQLiteExecution = false;
 
 		if((*it)->batchString1.size() || (*it)->batchString1.size()) (*io.outputBatHandleCaptures) << "\nrem insertid" << insertedId;
@@ -3776,38 +3759,38 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 	// Defrag
 	for (auto it = io.defragQueries->begin(); it != io.defragQueries->end(); it++) {
-		(*it)->query.bind(io.insertDefragRunStatement);
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertDefragRunStatement);
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting defrag run into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error inserting defrag run into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
-		sqlite3_reset(io.insertDefragRunStatement);
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		//wasDoingSQLiteExecution = false;
 		if((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleDefrag) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
 	// Laughs
 	for (auto it = io.laughQueries->begin(); it != io.laughQueries->end(); it++) {
-		(*it)->query.bind(io.insertLaughsStatement);
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertLaughsStatement);
 
 		//wasDoingSQLiteExecution = true;
-		int queryResult = sqlite3_step(io.insertLaughsStatement);
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertLaughsStatement);
 		uint64_t insertedId = -1;
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting laugh spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error inserting laugh spree into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		else {
-			queryResult = sqlite3_step(io.selectLastInsertRowIdStatement);
+			queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement);
 			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
-				std::cerr << "Error retrieving inserted laughs id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+				std::cerr << "Error retrieving inserted laughs id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 			}
 			else {
-				insertedId = sqlite3_column_int64(io.selectLastInsertRowIdStatement, 0);
+				insertedId = sqlite3_column_int64(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement, 0);
 			}
-			sqlite3_reset(io.selectLastInsertRowIdStatement);
+			sqlite3_reset(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement);
 		}
-		sqlite3_reset(io.insertLaughsStatement);
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertLaughsStatement);
 		//wasDoingSQLiteExecution = false;
 				
 		if ((*it)->batchString1.size() || (*it)->batchString2.size()) (*io.outputBatHandleLaughs) << "\nrem insertid" << insertedId;
@@ -3925,12 +3908,12 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.insertPlayerModelStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error inserting player model into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error inserting player model into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.insertPlayerModelStatement);
 		queryResult = sqlite3_step(io.updatePlayerModelCountStatement);
 		if (queryResult != SQLITE_DONE) {
-			std::cerr << "Error updating player model count in database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+			std::cerr << "Error updating player model count in database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
 		}
 		sqlite3_reset(io.updatePlayerModelCountStatement);
 		//wasDoingSQLiteExecution = false;
@@ -4089,18 +4072,20 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 #endif
 
 	// Save demo stats
-	const char* demoNameCStr = sharedVars.oldBasename.c_str();
-	SQLBIND_NONDELAYED_TEXT(io.insertDemoMeta, "@demoName", demoNameCStr);
-	const char* demoPathCStr = sharedVars.oldPath.c_str();
-	SQLBIND_NONDELAYED_TEXT(io.insertDemoMeta, "@demoPath", demoPathCStr);
-	SQLBIND_NONDELAYED(io.insertDemoMeta, int64, "@fileSize", sharedVars.demoFilesize);
-	SQLBIND_NONDELAYED(io.insertDemoMeta, int64, "@demoTimeDuration", demoCurrentTime);
-	SQLBIND_NONDELAYED(io.insertDemoMeta, int64, "@demoDateTime", sharedVars.oldDemoDateModified);
-	int queryResult = sqlite3_step(io.insertDemoMeta);
-	if (queryResult != SQLITE_DONE) {
-		std::cerr << "Error inserting demo meta into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb) << "(" << DPrintFLocation << ")" << "\n";
+	for (int i = 0; i < opts.killDbsCount; i++) {
+		const char* demoNameCStr = sharedVars.oldBasename.c_str();
+		SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoName", demoNameCStr);
+		const char* demoPathCStr = sharedVars.oldPath.c_str();
+		SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoPath", demoPathCStr);
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@fileSize", sharedVars.demoFilesize);
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@demoTimeDuration", demoCurrentTime);
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@demoDateTime", sharedVars.oldDemoDateModified);
+		int queryResult = sqlite3_step(io.killDb[i].insertDemoMeta);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting demo meta into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[i].killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(io.killDb[i].insertDemoMeta);
 	}
-	sqlite3_reset(io.insertDemoMeta);
 
 	executeAllQueries(io, opts);
 
@@ -4134,26 +4119,26 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		sqlite3_close(io.debugStatsDb);
 #endif
 
+		for (int i = 0; i < opts.killDbsCount; i++) {
+			sqlite3_exec(io.killDb[i].killDb, "COMMIT;", NULL, NULL, NULL);
+			sqlite3_finalize(io.killDb[i].insertLaughsStatement);
+			sqlite3_finalize(io.killDb[i].insertDefragRunStatement);
+			sqlite3_finalize(io.killDb[i].insertCaptureStatement);
+			sqlite3_finalize(io.killDb[i].insertSpreeStatement);
+			sqlite3_finalize(io.killDb[i].insertStatement);
+			sqlite3_finalize(io.killDb[i].insertAngleStatement);
+			sqlite3_finalize(io.killDb[i].insertDemoDatabaseProperty);
+			sqlite3_finalize(io.killDb[i].insertDemoMeta);
+			sqlite3_finalize(io.killDb[i].selectLastInsertRowIdStatement);
+			sqlite3_close(io.killDb[i].killDb);
+		}
 
-		sqlite3_exec(io.killDb, "COMMIT;", NULL, NULL, NULL);
 		if (opts.doStatsDb) {
 			sqlite3_exec(io.statsDb, "COMMIT;", NULL, NULL, NULL);
-		}
-		sqlite3_finalize(io.insertLaughsStatement);
-		sqlite3_finalize(io.insertDefragRunStatement);
-		sqlite3_finalize(io.insertCaptureStatement);
-		sqlite3_finalize(io.insertSpreeStatement);
-		sqlite3_finalize(io.insertStatement);
-		sqlite3_finalize(io.insertAngleStatement);
-		sqlite3_finalize(io.insertDemoDatabaseProperty);
-		sqlite3_finalize(io.insertDemoMeta);
-		sqlite3_finalize(io.insertPlayerModelStatement);
-		sqlite3_finalize(io.updatePlayerModelCountStatement);
-		sqlite3_finalize(io.selectLastInsertRowIdStatement);
-		sqlite3_finalize(io.selectStatsLastInsertRowIdStatement);
-		sqlite3_finalize(io.insertPlayerDemoStatsStatement);
-		sqlite3_close(io.killDb);
-		if (opts.doStatsDb) {
+			sqlite3_finalize(io.insertPlayerModelStatement);
+			sqlite3_finalize(io.updatePlayerModelCountStatement);
+			sqlite3_finalize(io.selectStatsLastInsertRowIdStatement);
+			sqlite3_finalize(io.insertPlayerDemoStatsStatement);
 			sqlite3_close(io.statsDb);
 		}
 
