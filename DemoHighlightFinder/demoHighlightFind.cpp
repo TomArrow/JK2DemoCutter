@@ -9846,7 +9846,7 @@ int main(int argcO, char** argvO) {
 	auto v = op.add<popl::Value<std::string>>("v", "make-video", "Make a little preview video AVI.");
 	auto V = op.add<popl::Implicit<int>>("V", "video-maxfps", "Max FPS for video generation, default 1000", 1000);
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
-	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one without parameter to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]");
+	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
 
 	
 	op.parse(argcO, argvO);
@@ -9962,9 +9962,12 @@ int main(int argcO, char** argvO) {
 			std::vector<std::string> filterparts = splitString(filterstring, ":", true, false);
 			ResultFilter newFilter;
 			bool isvalid = false;
-			if (filterparts.size() == 0) {
-				newFilter.type = ResultFilter::Type::FILTER_ALLGOES;
-				isvalid = true;
+			if (filterparts.size() == 1) {
+				const char* part1 = filterparts[0].c_str();
+				if (!_stricmp(part1, "all") || !_stricmp(part1, "rest") || !_stricmp(part1, "*")) {
+					newFilter.type = ResultFilter::Type::FILTER_ALLGOES;
+					isvalid = true;
+				}
 			}
 			else if(filterparts.size() > 1) {
 				const char* part1 = filterparts[0].c_str();
