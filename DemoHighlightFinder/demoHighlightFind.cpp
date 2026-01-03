@@ -418,6 +418,24 @@ struct teleportInfo_t {
 
 std::vector<teleportInfo_t> teleports; // teleport analysis. if we want to fast forward repeated attempts of stuff. (-A option)
 
+class ResultFilter {
+public:
+	typedef enum Type {
+		FILTER_GAMETYPE,
+		FILTER_MAP,
+		FILTER_ALLGOES
+	};
+	Type type = FILTER_ALLGOES;
+
+	// gametype
+	int64_t matchValue = 0; // e.g. the gametype.
+	
+	// mapname or other string filters
+	std::string matchString;
+	bool matchStart = true; // match the start (user didnt use *)
+	bool matchEnd = true; // match the end (user didnt use *)
+
+};
 
 class ExtraSearchOptions {
 public:
@@ -467,7 +485,8 @@ public:
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
 
-	int	killDbsCount = 1;
+	std::vector<ResultFilter> filters;
+	int	killDbsCount = 1; // pretty much sorta just filters.size() but minimum 1 always gg
 };
 
 typedef struct videoFrame_s {
@@ -2059,13 +2078,16 @@ void updateForcePowersInfo(clientActive_t* clCut) { // TODO: make this adapt to 
 }
 
 int g_gametype = 0;
+int g_gametype_general = 0;
+int activeKillDatabase = 0; // right now we dont have kill-specific filters, only global ones based on gametype or mapname and such. so we can optimize this and save it globally. 
 
-void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make this adapt to JKA
+void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts) { // TODO: make this adapt to JKA
 	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
 	const char* serverInfo = clCut->gameState.stringData + stringOffset;
 
 	int g_weaponDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
 	g_gametype = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_gametype"));
+	g_gametype_general = generalizeGameValue<GMAP_GAMETYPE,SAFE>(g_gametype,demoType);
 	gameIsQ3Defrag = false;
 	if (demoType == DM_68) {
 		const char* gamename = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
@@ -2078,6 +2100,56 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType) { // TODO: make 
 			q3DefragInfo.gameType = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_gametype"));
 			q3DefragInfo.online = q3DefragInfo.gameType > 4;
 
+		}
+	}
+
+	activeKillDatabase = 0;
+	if (opts.filters.size()) {
+		activeKillDatabase = -1; // kinda ugly since i have to check it but meh
+		const char* curMapname = Info_ValueForKey(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+		bool foundMatch = false;
+		for (int i = 0; i < opts.filters.size(); i++) {
+			const ResultFilter* fitler = &opts.filters[i];
+			switch (fitler->type) {
+				case ResultFilter::Type::FILTER_ALLGOES:
+					foundMatch = true;
+					break;
+				case ResultFilter::Type::FILTER_GAMETYPE:
+					if (fitler->matchValue & (1 << g_gametype_general)) {
+						foundMatch = true;
+					}
+					break;
+				case ResultFilter::Type::FILTER_MAP:
+					{
+						const char* search = fitler->matchString.c_str();
+						const int maplen = strlen(curMapname);
+						const int searchlen = strlen(search);
+						if (fitler->matchStart && fitler->matchEnd) {
+							foundMatch = !_stricmp(curMapname, search);
+						}
+						else if (fitler->matchStart) {
+							foundMatch = !_strnicmp(curMapname, search, searchlen);
+						}
+						else if (fitler->matchEnd) {
+							if (maplen >= searchlen) {
+								const char* maptest = curMapname + (maplen- searchlen);
+								foundMatch = !_stricmp(maptest, search);
+							}
+						}
+						else {
+							const char* maptest = curMapname;
+							while (*maptest && !foundMatch) {
+								foundMatch = !_strnicmp(maptest, search, searchlen);
+								maptest++;
+							}
+						}
+					}
+					break;
+			}
+			if (foundMatch) {
+				activeKillDatabase = i;
+				break;
+			}
 		}
 	}
 
@@ -2628,7 +2700,13 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 		SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
 
-		io.spreeQueries->push_back(queryWrapper);
+		if (activeKillDatabase != -1) {
+			queryWrapper->databaseIndex = activeKillDatabase;
+			io.spreeQueries->push_back(queryWrapper);
+		}
+		else {
+			delete queryWrapper;
+		}
 
 		if (clientNumAttacker >= 0 && clientNumAttacker < max_clients) {
 			MetaEventTracker* killSpreeME = new MetaEventTracker(spreeInfo->lastKillTime, queryWrapper, metaEventTrackers[METRACKER_KILLSPREES][clientNumAttacker], bufferTime, spreeInfo->totalTime, resultingMetaEventTracking[METRACKER_KILLSPREES]);
@@ -2917,7 +2995,13 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 			SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
 			SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 
-			io.laughQueries->push_back(queryWrapper);
+			if (activeKillDatabase != -1) {
+				queryWrapper->databaseIndex = activeKillDatabase;
+				io.laughQueries->push_back(queryWrapper);
+			}
+			else {
+				delete queryWrapper;
+			}
 
 			int64_t startTime = firstLaugh - LAUGHS_CUT_PRE_TIME - bufferTime;
 			int64_t endTime = lastLaugh + bufferTime;
@@ -3032,7 +3116,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	int sqlResult = 0;
 	int readonlyResult = 0;
 	for (int i = 0; i < opts.killDbsCount; i++) {
-		const char* killDbName = opts.killDbsCount > 1 ? va("killDatabase%d.db",i) : "killDatabase.db"; // todo dont create databases we end up not needing
+		const char* killDbName = opts.filters.size() ? va("killDatabase%d.db",i) : "killDatabase.db"; // todo dont create databases we end up not needing
 		while ((sqlResult = sqlite3_open(killDbName, &io.killDb[i].killDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.killDb[i].killDb, "main"))) {
 			std::cerr << DPrintFLocation << ":" << "error opening "<< killDbName << " for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb[i].killDb) << ". Trying again in 1000ms." << "\n";
 			sqlite3_close(io.killDb[i].killDb);
@@ -5383,7 +5467,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				CheckForNameChanges<max_clients>(&demo.cut.Cl,io,demoType,wasDoingSQLiteExecution,opts);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				updateForcePowersInfo(&demo.cut.Cl);
-				updateGameInfo(&demo.cut.Cl, demoType);
+				updateGameInfo(&demo.cut.Cl, demoType,opts);
 				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
 					std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
 					goto cutcomplete;
@@ -8119,7 +8203,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, double, "@positionY", thisEs->pos.trBase[1]);
 							SQLBIND_DELAYED(query, double, "@positionZ", thisEs->pos.trBase[2]);
 
-							io.killQueries->push_back(queryWrapper);
+							if (activeKillDatabase != -1) {
+								queryWrapper->databaseIndex = activeKillDatabase;
+								io.killQueries->push_back(queryWrapper);
+							}
+							else {
+								delete queryWrapper;
+							}
 
 							SQLDelayedQueryWrapper_t* angleQueryWrapper = new SQLDelayedQueryWrapper_t();
 							SQLDelayedQuery* angleQuery = &angleQueryWrapper->query;
@@ -8280,7 +8370,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
-							io.killAngleQueries->push_back(angleQueryWrapper);
+							if (activeKillDatabase != -1) {
+								queryWrapper->databaseIndex = activeKillDatabase;
+								io.killAngleQueries->push_back(angleQueryWrapper);
+							}
+							else {
+								delete queryWrapper;
+							}
 
 
 							addMetaEvent(METAEVENT_DEATH, demoCurrentTime, target, bufferTime, opts,bufferTime);
@@ -8699,7 +8795,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
-							io.captureQueries->push_back(queryWrapper);
+							if (activeKillDatabase != -1) {
+								queryWrapper->databaseIndex = activeKillDatabase;
+								io.captureQueries->push_back(queryWrapper);
+							}
+							else {
+								delete queryWrapper;
+							}
 
 							int enemyTeam = flagTeam;
 							int playerTeam = flagTeam == TEAM_RED ? TEAM_BLUE : TEAM_RED;
@@ -9523,7 +9625,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution,opts);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			updateForcePowersInfo(&demo.cut.Cl);
-			updateGameInfo(&demo.cut.Cl,demoType);
+			updateGameInfo(&demo.cut.Cl,demoType,opts);
 			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
 				std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
 				goto cutcomplete;
@@ -9744,6 +9846,7 @@ int main(int argcO, char** argvO) {
 	auto v = op.add<popl::Value<std::string>>("v", "make-video", "Make a little preview video AVI.");
 	auto V = op.add<popl::Implicit<int>>("V", "video-maxfps", "Max FPS for video generation, default 1000", 1000);
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
+	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one without parameter to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]");
 
 	
 	op.parse(argcO, argvO);
@@ -9851,6 +9954,88 @@ int main(int argcO, char** argvO) {
 			std::string dir = b->value(i);
 			dir = dir.erase(dir.find_last_not_of("/\\\"") + 1); // " also because uh ... someone might do -b "path\" .. xd
 			opts.bspDirectories.push_back(dir);
+		}
+	}
+	if (f->is_set()) {
+		for (int i = 0; i < f->count(); i++) {
+			std::string filterstring = f->value(i);
+			std::vector<std::string> filterparts = splitString(filterstring, ":", true, false);
+			ResultFilter newFilter;
+			bool isvalid = false;
+			if (filterparts.size() == 0) {
+				newFilter.type = ResultFilter::Type::FILTER_ALLGOES;
+				isvalid = true;
+			}
+			else if(filterparts.size() > 1) {
+				const char* part1 = filterparts[0].c_str();
+				if (!_stricmp(part1,"gametype")) {
+					newFilter.type = ResultFilter::Type::FILTER_GAMETYPE;
+					int64_t gameTypeBitMask = 0;
+					for (int j = 1; j < filterparts.size(); j++) {
+						const char* gametype = filterparts[j].c_str();
+						if (!_stricmp(gametype, "ffa"))				gameTypeBitMask |= (1<<GT_FFA_GENERAL);
+						else if (!_stricmp(gametype, "holocron"))	gameTypeBitMask |= (1 << GT_HOLOCRON_GENERAL);
+						else if (!_stricmp(gametype, "jedimaster"))	gameTypeBitMask |= (1 << GT_JEDIMASTER_GENERAL);
+						else if (!_stricmp(gametype, "duel"))		gameTypeBitMask |= (1 << GT_TOURNAMENT_GENERAL);
+						else if (!_stricmp(gametype, "powerduel"))	gameTypeBitMask |= (1 << GT_POWERDUEL_GENERAL);
+						//else if (_stricmp(gametype, "sp"))			gameTypeBitMask |= GT_CTF_GENERAL;
+						else if (!_stricmp(gametype, "tffa"))		gameTypeBitMask |= (1 << GT_TEAM_GENERAL);
+						else if (!_stricmp(gametype, "siege"))		gameTypeBitMask |= (1 << GT_SAGA_SIEGE_GENERAL);
+						else if (!_stricmp(gametype, "cty"))		gameTypeBitMask |= (1 << GT_CTY_GENERAL);
+						else if (!_stricmp(gametype, "ctf"))		gameTypeBitMask |= (1 << GT_CTF_GENERAL);
+						else if (!_stricmp(gametype, "1flagctf"))	gameTypeBitMask |= (1 << GT_1FCTF_GENERAL);
+						else if (!_stricmp(gametype, "obelisk"))	gameTypeBitMask |= (1 << GT_OBELISK_GENERAL);
+						else if (!_stricmp(gametype, "harvester"))	gameTypeBitMask |= (1 << GT_HARVESTER_GENERAL);
+						else if (!_stricmp(gametype, "teamrounds"))	gameTypeBitMask |= (1 << GT_TEAM_ROUNDS_GENERAL);
+						else if (!_stricmp(gametype, "objective"))	gameTypeBitMask |= (1 << GT_OBJECTIVE_GENERAL);
+						else if (!_stricmp(gametype, "tow"))		gameTypeBitMask |= (1 << GT_TOW_GENERAL);
+						else if (!_stricmp(gametype, "liberation"))	gameTypeBitMask |= (1 << GT_LIBERATION_GENERAL);
+						else {
+							std::cerr << "Error: gametype filter "<< gametype<<" not recognized\n";
+#ifdef DEBUG
+							std::cin.get();
+#endif
+							return 1;
+						}
+					}
+					if (gameTypeBitMask) {
+						isvalid = true;
+						newFilter.matchValue = gameTypeBitMask;
+					}
+				}
+				else if (!_stricmp(part1,"map") || !_stricmp(part1, "mapname")) {
+					newFilter.type = ResultFilter::Type::FILTER_MAP;
+					const char* mapnameFilter = filterparts[1].c_str();
+					// TODO regex someday?
+					int startindex = 0, count = filterparts[1].size();
+					if (*mapnameFilter == '*') {
+						newFilter.matchStart = false;
+						startindex++;
+						count--;
+						mapnameFilter++;
+					}
+					if (mapnameFilter[count-1] == '*') {
+						newFilter.matchEnd = false;
+						count--;
+					}
+					newFilter.matchString = filterparts[1].substr(startindex,count);
+
+					if (newFilter.matchString.size()) {
+						isvalid = true;
+					}
+				}
+			}
+			if (!isvalid) {
+				std::cerr << "Error: invalid filters\n";
+#ifdef DEBUG
+				std::cin.get();
+#endif
+				return 1;
+			}
+			opts.filters.push_back(newFilter);
+		}
+		if (opts.filters.size() > 1) {
+			opts.killDbsCount = opts.filters.size();
 		}
 	}
 
