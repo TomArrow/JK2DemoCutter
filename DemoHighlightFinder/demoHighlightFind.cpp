@@ -795,6 +795,8 @@ struct playerDemoStats_t {
 	averageHelper_t strafeDeviationNoSaberMove;
 	averageHelper_t strafeDeviationNoSaberMoveBuckets[STRAFE_ANALYSIS_BUCKET_COUNT];
 
+	averageHelper_t	groundFrameQuality;
+
 	int64_t hitBySaberCount;
 	int64_t hitBySaberBlockableCount;
 	int64_t parryCount;
@@ -1537,7 +1539,7 @@ int specialJumpCount[MAX_CLIENTS_MAX]; // Jumps over items in certain situations
 #define TRACK_GROUNDFRAME_DEBUG 1
 #if TRACK_GROUNDFRAME
 #define GROUNDFRAME_MINDURATION 10 // arbitrary?
-#define GROUNDFRAME_MAXDURATION 500 // arbitrary?
+#define GROUNDFRAME_MAXDURATION 250 // arbitrary? (1-t*6)^(1/t) shows that remaining speed of groundframe at 0.3s is like 0.165 or so. like 0.3 at 0.2s. lets go in the middle. slower than that and we may as well be walking
 #define GROUNDFRAME_MAXPASTCOUNT 1000 // arbitrary?
 int64_t lastGroundFrame[MAX_CLIENTS_MAX]; 
 int64_t lastPreGroundFrameAir[MAX_CLIENTS_MAX]; // commandtime
@@ -3547,6 +3549,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"averageStrafeDeviationNoSaberMove REAL,"
 			"averageStrafeDeviationNoSaberMoveBucketsJSON TEXT,"
 			"strafeNoSaberMoveSampleCount INTEGER NOT NULL,"
+#if TRACK_GROUNDFRAME
+			"averageGroundFrameQuality REAL,"
+			"groundFrameSampleCount INTEGER NOT NULL,"
+#endif
 			"hitBySaberCount INTEGER NOT NULL,"
 			"hitBySaberBlockableCount INTEGER NOT NULL,"
 			"parryCount INTEGER NOT NULL,"
@@ -3570,9 +3576,17 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
 
 		preparedStatementText = "INSERT INTO playerDemoStats "
-			"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON,strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
+			"(map,playerName,playerNameStripped,clientNum,averageStrafeDeviation,averageStrafeDeviationBucketsJSON,averageStrafeDeviationNoSaberMove,averageStrafeDeviationNoSaberMoveBucketsJSON"
+#if TRACK_GROUNDFRAME
+			",averageGroundFrameQuality,groundFrameSampleCount"
+#endif
+			",strafeSampleCount,strafeNoSaberMoveSampleCount,hitBySaberCount,hitBySaberBlockableCount,parryCount,attackFromParryCount,demoName,demoPath,demoDateTime)"
 			" VALUES "
-			"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON,@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
+			"( @map,@playerName,@playerNameStripped,@clientNum,@averageStrafeDeviation,@averageStrafeDeviationBucketsJSON,@averageStrafeDeviationNoSaberMove,@averageStrafeDeviationNoSaberMoveBucketsJSON"
+#if TRACK_GROUNDFRAME
+			",@averageGroundFrameQuality,@groundFrameSampleCount"
+#endif
+			",@strafeSampleCount,@strafeNoSaberMoveSampleCount,@hitBySaberCount,@hitBySaberBlockableCount,@parryCount,@attackFromParryCount,@demoName,@demoPath,@demoDateTime)";
 
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerDemoStatsStatement, NULL);
 
@@ -4801,6 +4815,8 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 			double strafeDeviationNoSaberMove = it->second.strafeDeviationNoSaberMove.sum / it->second.strafeDeviationNoSaberMove.divisor;
 			int64_t strafeSampleCount = it->second.strafeDeviation.divisor + 0.5;
 			int64_t strafeNoSaberMoveSampleCount = it->second.strafeDeviationNoSaberMove.divisor + 0.5;
+			double groundFrameQuality = it->second.groundFrameQuality.sum / it->second.groundFrameQuality.divisor;
+			int64_t groundFrameSampleCount = it->second.groundFrameQuality.divisor + 0.5;
 			SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 			SQLBIND_DELAYED_TEXT(query, "@playerName", playerName.c_str());
 			std::string playernameStripped = Q_StripColorAll(playerName);
@@ -4863,6 +4879,9 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 
 			SQLBIND_DELAYED(query, int, "@strafeSampleCount", strafeSampleCount);
 			SQLBIND_DELAYED(query, int, "@strafeNoSaberMoveSampleCount", strafeNoSaberMoveSampleCount);
+
+			SQLBIND_DELAYED(query, double, "@averageGroundFrameQuality", groundFrameQuality);
+			SQLBIND_DELAYED(query, int, "@groundFrameSampleCount", groundFrameSampleCount);
 
 			SQLBIND_DELAYED(query, int, "@hitBySaberCount", it->second.hitBySaberCount);
 			SQLBIND_DELAYED(query, int, "@hitBySaberBlockableCount", it->second.hitBySaberBlockableCount);
@@ -6822,6 +6841,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										float oldSpeedInNewDir = DotProduct(oldVel,newdir);
 										lastGroundFrame[i] = demoCurrentTime;
 										lastGroundFrameQuality[i] = newspeed / oldSpeedInNewDir;
+										if (playerDemoStatsPointers[i] && newspeed > 430.0f && oldspeed > 430.0f && lastGroundFrameQuality[i] <= 1.0f && lastGroundFrameQuality[i] >= 0.0 && fpclassify(lastGroundFrameQuality[i]) != FP_NAN) { // just to keep this relevant for stats
+											playerDemoStatsPointers[i]->everUsed = qtrue;
+											playerDemoStatsPointers[i]->groundFrameQuality.sum += lastGroundFrameQuality[i];
+											playerDemoStatsPointers[i]->groundFrameQuality.divisor += 1.0;
+										}
 #if TRACK_GROUNDFRAME_DEBUG
 										lastGroundFrameDebug[i].newSpeed = newspeed;
 										lastGroundFrameDebug[i].oldSpeed = oldspeed;
@@ -8240,6 +8264,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										if (!boosts[i].checkFacingTowards(target)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
 
 										boostCountAttacker++;
+										//if (groundFrameQuality != -1 && lastGroundFrame[attacker] ) {
+										// TODO somehow make boosts not be counted as giga groundframes?
+										//}
 										doThis = qtrue;
 										boostsStringStream << "[KILLER by";
 									}
