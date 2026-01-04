@@ -88,6 +88,20 @@ vec_t VectorNormalize(vec3_t v) {
 
 	return length;
 }
+vec_t Vector2Normalize(vec2_t v) {
+	float	length, ilength;
+
+	length = v[0] * v[0] + v[1] * v[1];
+	length = sqrt(length);
+
+	if (length) {
+		ilength = 1 / length;
+		v[0] *= ilength;
+		v[1] *= ilength;
+	}
+
+	return length;
+}
 vec_t VectorNormalize2(const vec3_t v, vec3_t out) {
 	float	length, ilength;
 

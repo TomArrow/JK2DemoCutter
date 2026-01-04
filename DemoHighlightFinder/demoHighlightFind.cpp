@@ -1329,6 +1329,8 @@ struct samplePoint_t {
 
 
 struct frameInfo_t {
+	int64_t demoTime;
+	int serverTime;
 	qboolean isAlive[MAX_CLIENTS_MAX];
 	qboolean canBlockSimplified[MAX_CLIENTS_MAX];
 	qboolean entityExists[MAX_GENTITIES];
@@ -1529,6 +1531,32 @@ int64_t lastSelfSentryJump[MAX_CLIENTS_MAX];
 
 int headJumpCount[MAX_CLIENTS_MAX]; // Jumps over player heads
 int specialJumpCount[MAX_CLIENTS_MAX]; // Jumps over items in certain situations (over top of forcefield or midair sentry for example). Not yet implemented.
+
+// groundframe tracking
+#define TRACK_GROUNDFRAME 1
+#define TRACK_GROUNDFRAME_DEBUG 1
+#if TRACK_GROUNDFRAME
+#define GROUNDFRAME_MINDURATION 10 // arbitrary?
+#define GROUNDFRAME_MAXDURATION 500 // arbitrary?
+#define GROUNDFRAME_MAXPASTCOUNT 1000 // arbitrary?
+int64_t lastGroundFrame[MAX_CLIENTS_MAX]; 
+int64_t lastPreGroundFrameAir[MAX_CLIENTS_MAX]; // commandtime
+vec3_t lastPreGroundFrameVelocity[MAX_CLIENTS_MAX];
+vec3_t lastPreGroundFramePosition[MAX_CLIENTS_MAX];
+float lastGroundFrameQuality[MAX_CLIENTS_MAX];
+#if TRACK_GROUNDFRAME_DEBUG
+typedef struct groundframeDebug_t {
+	float	oldSpeed;
+	float	oldSpeedInNewDir;
+	float	newSpeed;
+	vec3_t	oldVel;
+	vec3_t	newVel;
+	vec3_t	lastGroundVel;
+	float	groundFrameDurationEstimate;
+};
+groundframeDebug_t lastGroundFrameDebug[MAX_CLIENTS_MAX];
+#endif
+#endif
 
 //int64_t walkDetectedTime[max_clients];
 std::vector<int64_t> walkDetectedTimes[MAX_CLIENTS_MAX];
@@ -3200,6 +3228,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"headJumps	INTEGER,"
 			"specialJumps	INTEGER,"
 			"timeSinceLastSelfSentryJump	INTEGER,"
+#if TRACK_GROUNDFRAME
+			"groundFrameQuality	REAL,"
+#endif
 
 			"lastSneak	INTEGER,"
 			"lastSneakDuration	INTEGER,"
@@ -3427,9 +3458,17 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		;
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertStatement, NULL);
 		preparedStatementText = "INSERT INTO killAngles"
-			"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,sameFrameRet,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+			"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,sameFrameRet,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump"
+#if TRACK_GROUNDFRAME
+",groundFrameQuality"
+#endif
+			",lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 			"VALUES "
-			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
+#if TRACK_GROUNDFRAME
+",@groundFrameQuality"
+#endif	
+",@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
@@ -5019,9 +5058,20 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	for (int i = 0; i < max_clients; i++) {
 		lastBackflip[i] = -1;
 		lastSelfSentryJump[i] = -1;
+#if TRACK_GROUNDFRAME
+		lastGroundFrame[i] = -1;
+		lastPreGroundFrameAir[i] = -1;
+#endif
 	}
 	Com_Memset(&specialJumpCount, 0, sizeof(specialJumpCount));
 	Com_Memset(&headJumpCount, 0, sizeof(headJumpCount));
+#if TRACK_GROUNDFRAME
+	Com_Memset(&lastPreGroundFrameVelocity, 0, sizeof(lastPreGroundFrameVelocity));
+	Com_Memset(&lastGroundFrameQuality, 0, sizeof(lastGroundFrameQuality));
+#if TRACK_GROUNDFRAME_DEBUG
+	Com_Memset(&lastGroundFrameDebug, 0, sizeof(lastGroundFrameDebug));
+#endif
+#endif
 	//for (int i = 0; i < max_clients; i++) {
 	//	walkDetectedTime[i] = -1;
 	//}
@@ -5152,6 +5202,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 		Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
 		Com_Memset(&jumpDetected, 0, sizeof(jumpDetected));
+
+		thisFrameInfo.demoTime = demoCurrentTime; // temporary, until snapshot assigns. bad? but i think we always use this inside snapshot anyway.
+		thisFrameInfo.serverTime = demo.cut.Cl.snap.serverTime; // temporary, until snapshot assigns. bad? but i think we always use this inside snapshot anyway.
 
 		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
 		float playerStateStrafeDeviationThisFrame = 0;
@@ -5524,6 +5577,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}
 				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
+				thisFrameInfo.demoTime = demoCurrentTime;
+				thisFrameInfo.serverTime = demo.cut.Cl.snap.serverTime;
 				if (demoCurrentTime < 0) {
 					std::cerr << "demoCurrentTime negative wtf?! demoOldTime "<< demoOldTime << ", demoCurrentTime " << demoCurrentTime  << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
 				}
@@ -6677,6 +6732,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				//
 				// Also while we're at it, manage special jumps (over player heads for now)
 				// 
+				// Also while at it, do groundframe tracking
+				// 
 				// While at it, if requested, log stuff for strafe CSV output.
 				for (int i = 0; i < max_clients;i++) {
 					if (thisFrameInfo.entityExists[i]) {
@@ -6684,6 +6741,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						if (thisFrameInfo.commandTime[i] != lastFrameInfo.commandTime[i]) {
 							playerVisibleClientFrames[i]++;
 						}
+
+						// special jumps/headjumps tracking
 						if (thisFrameInfo.groundEntityNum[i] == ENTITYNUM_WORLD) {
 							lastGroundHeight[i] = thisFrameInfo.playerPositions[i][2];
 							specialJumpCount[i] = 0; 
@@ -6703,6 +6762,81 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 						}
+
+						// groundframe tracking
+#if TRACK_GROUNDFRAME
+						if (lastFrameInfo.entityExists[i]) {
+							if (lastFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && thisFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
+								lastPreGroundFrameAir[i] = lastFrameInfo.commandTime[i] == -1 ? lastFrameInfo.serverTime : lastFrameInfo.commandTime[i];//lastFrameInfo.demoTime;
+								VectorCopy(lastFrameInfo.playerVelocities[i], lastPreGroundFrameVelocity[i]);
+								VectorCopy(lastFrameInfo.playerPositions[i], lastPreGroundFramePosition[i]);
+							}
+							else if (lastFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE && thisFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && lastPreGroundFrameAir[i] != -1) {
+								//JUMP_VELOCITY
+								// do a naive calc to determine the exaact length of the groundframe based on time it would take to land, and time it would take to reach current height.
+								int64_t curTime = thisFrameInfo.commandTime[i] == -1 ? thisFrameInfo.serverTime : thisFrameInfo.commandTime[i];
+								float baseDiff = (curTime - lastPreGroundFrameAir[i]);
+								float groundHeight = lastFrameInfo.playerPositions[i][2];
+								//float preDelta = std::max(0,lastPreGroundFramePosition[i][2] - groundHeight);
+								//float postDelta = std::max(0, thisFrameInfo.playerPositions[i][2] - groundHeight);
+								float preHeight = std::max(groundHeight,lastPreGroundFramePosition[i][2]);
+								float postHeight = std::max(groundHeight,thisFrameInfo.playerPositions[i][2]);
+								// startpos - 0.5*time*time*800 = endpos
+								// startpos-endpos = 0.5*time*time*800
+								// time = sqrt(2*(startpos-endpos)/800);
+								// moar
+								// startpos - vel*time - 0.5*time*time*800 = endpos
+								// startpos - endps = 0.5*time*time*800 + vel*time 
+								// s - f = 0.5*t*t*g + v*t
+								float fallspeed = -lastPreGroundFrameVelocity[i][2];
+								float fallspeed2 = -thisFrameInfo.playerVelocities[i][2];
+								float gravity = DEFAULT_GRAVITY;
+								//float preTime = -(sqrtf(-2.0f* groundHeight* gravity + 2.0f* gravity*preHeight+fallspeed*fallspeed) + fallspeed) / gravity; (this is the other result of the curve in the past)
+								float preTime = (sqrtf(-2.0f* groundHeight* gravity + 2.0f* gravity*preHeight+fallspeed*fallspeed) - fallspeed) / gravity;
+								//float postTime = (sqrtf(-2.0f* groundHeight* gravity + 2.0f* gravity* postHeight + fallspeed2*fallspeed2) + fallspeed2) / gravity;
+								// force jump maintains at least JUMP_VELOCITY while jump is held so this all kinda falls apart a bit.
+								// lets do a naive alternate calculation where we assume just constant JUMP_VELOCITY
+								// startpos + jumpvel*time = endpos
+								// (startpos-endpos)/jumpvel = time
+								float postTimeForceJump = (postHeight-groundHeight)/(float)JUMP_VELOCITY;
+								
+
+								baseDiff -= preTime * 1000.0f + postTimeForceJump * 1000.0f;
+
+
+								if(baseDiff < GROUNDFRAME_MAXDURATION && baseDiff > GROUNDFRAME_MINDURATION){
+									vec3_t newdir;
+									float oldspeed = VectorLength2(lastPreGroundFrameVelocity[i]);
+									float newspeed = VectorLength2(thisFrameInfo.playerVelocities[i]);
+									if (oldspeed < 325.0f || newspeed < 325.0f) {
+										lastPreGroundFrameAir[i] = -1; // This is about walking speed before or after. or we somehow gained speed. ignore.
+									}
+									else {
+										// TODO how to prevent detecting groundframes on slopes that boost?
+										VectorCopy(thisFrameInfo.playerVelocities[i], newdir);
+										newdir[2] = 0;
+										Vector2Normalize(newdir);
+										vec3_t oldVel;
+										VectorCopy(lastPreGroundFrameVelocity[i], oldVel);
+										oldVel[2] = 0;
+										float oldSpeedInNewDir = DotProduct(oldVel,newdir);
+										lastGroundFrame[i] = demoCurrentTime;
+										lastGroundFrameQuality[i] = newspeed / oldSpeedInNewDir;
+#if TRACK_GROUNDFRAME_DEBUG
+										lastGroundFrameDebug[i].newSpeed = newspeed;
+										lastGroundFrameDebug[i].oldSpeed = oldspeed;
+										lastGroundFrameDebug[i].oldSpeedInNewDir = oldSpeedInNewDir;
+										lastGroundFrameDebug[i].groundFrameDurationEstimate = baseDiff;
+										VectorCopy(lastPreGroundFrameVelocity[i], lastGroundFrameDebug[i].oldVel);
+										VectorCopy(thisFrameInfo.playerVelocities[i], lastGroundFrameDebug[i].newVel);
+										VectorCopy(lastFrameInfo.playerVelocities[i], lastGroundFrameDebug[i].lastGroundVel);
+#endif
+									}
+
+								}
+							}
+						}
+#endif
 
 						if (opts.playerCSVDump) {
 							playerDumpCSVPoint_t newPoint;
@@ -6769,6 +6903,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						lastGroundHeight[i] = 99999999; // What's the point of remembering the ground height if the player may suddenly appear already in air and we have an old value and wrongly detect Air 2 Air kills?
 						specialJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
 						headJumpCount[i] = 0; // If we can't see the player we can't tell if he's jumping over other stuff so don't track
+#if TRACK_GROUNDFRAME
+						lastPreGroundFrameAir[i] = -1; // If we can't see the player we can't tell if he's on the ground or not
+#endif
 
 						if (opts.strafeCSVSyncPoint) { // Strafe CSV logging is enabled. Player not visible. Reset this run.
 							strafeCSVResetPlayer(i,opts);
@@ -7132,6 +7269,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							int64_t timeSinceLastSelfSentryJump = isWorldKill ? -1 : (lastSelfSentryJump[attacker] >= 0 ? (demoCurrentTime - lastSelfSentryJump[attacker]) : -1);
 							
 							int64_t timeSinceLastSneak = isWorldKill ? -1 : (demoCurrentTime - lastSneak[attacker]);
+
+							float groundFrameQuality = (isWorldKill || (demoCurrentTime- lastGroundFrame[attacker]) > GROUNDFRAME_MAXPASTCOUNT) ? -1 : (lastGroundFrameQuality[attacker]);
 
 							// This is the place that had all the continues originally.
 							
@@ -8297,6 +8436,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL(angleQuery, "@timeSinceLastSelfSentryJump");
 							}
 
+#if TRACK_GROUNDFRAME
+							if (!isWorldKill && groundFrameQuality != -1) {
+								SQLBIND_DELAYED(angleQuery, double, "@groundFrameQuality", groundFrameQuality);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(angleQuery, "@groundFrameQuality");
+							}
+#endif
+
 							if (!isWorldKill && timeSinceLastSneak < 10000 && timeSinceLastSneak != -1) {
 								SQLBIND_DELAYED(angleQuery, int, "@lastSneak", timeSinceLastSneak);
 								SQLBIND_DELAYED(angleQuery, int, "@lastSneakDuration", lastSneakDuration[attacker]);
@@ -8371,11 +8519,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 
 							if (activeKillDatabase != -1) {
-								queryWrapper->databaseIndex = activeKillDatabase;
+								angleQueryWrapper->databaseIndex = activeKillDatabase;
 								io.killAngleQueries->push_back(angleQueryWrapper);
 							}
 							else {
-								delete queryWrapper;
+								delete angleQueryWrapper;
 							}
 
 
