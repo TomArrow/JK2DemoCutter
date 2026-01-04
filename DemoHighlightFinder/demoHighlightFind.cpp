@@ -1546,6 +1546,7 @@ int64_t lastPreGroundFrameAir[MAX_CLIENTS_MAX]; // commandtime
 vec3_t lastPreGroundFrameVelocity[MAX_CLIENTS_MAX];
 vec3_t lastPreGroundFramePosition[MAX_CLIENTS_MAX];
 float lastGroundFrameQuality[MAX_CLIENTS_MAX];
+float lastGroundFrameAngleChange[MAX_CLIENTS_MAX];
 #if TRACK_GROUNDFRAME_DEBUG
 typedef struct groundframeDebug_t {
 	float	oldSpeed;
@@ -3232,6 +3233,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"timeSinceLastSelfSentryJump	INTEGER,"
 #if TRACK_GROUNDFRAME
 			"groundFrameQuality	REAL,"
+			"groundFrameAngleChange	REAL,"
 #endif
 
 			"lastSneak	INTEGER,"
@@ -3462,13 +3464,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		preparedStatementText = "INSERT INTO killAngles"
 			"(hash,shorthash,killerIsFlagCarrier,isReturn,isTeamKill,victimCapperKills,victimCapperRets,victimCapperWasFollowedOrVisible,victimCapperMaxNearbyEnemyCount,victimCapperMoreThanOneNearbyEnemyTimePercent,victimCapperAverageNearbyEnemyCount,victimCapperMaxVeryCloseEnemyCount,victimCapperAnyVeryCloseEnemyTimePercent,victimCapperMoreThanOneVeryCloseEnemyTimePercent,victimCapperAverageVeryCloseEnemyCount,victimFlagPickupSource,victimFlagHoldTime,targetIsVisible,targetIsFollowed,targetIsFollowedOrVisible,attackerIsVisible,attackerIsFollowed,demoRecorderClientnum,boosts,boostCountTotal,boostCountAttacker,boostCountVictim,projectileWasAirborne,sameFrameRet,baseFlagDistance,headJumps,specialJumps,timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
-",groundFrameQuality"
+",groundFrameQuality,groundFrameAngleChange"
 #endif
 			",lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 			"VALUES "
 			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
-",@groundFrameQuality"
+",@groundFrameQuality,@groundFrameAngleChange"
 #endif	
 ",@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
@@ -5087,6 +5089,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #if TRACK_GROUNDFRAME
 	Com_Memset(&lastPreGroundFrameVelocity, 0, sizeof(lastPreGroundFrameVelocity));
 	Com_Memset(&lastGroundFrameQuality, 0, sizeof(lastGroundFrameQuality));
+	Com_Memset(&lastGroundFrameAngleChange, 0, sizeof(lastGroundFrameAngleChange));
 #if TRACK_GROUNDFRAME_DEBUG
 	Com_Memset(&lastGroundFrameDebug, 0, sizeof(lastGroundFrameDebug));
 #endif
@@ -6824,23 +6827,27 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 								if(baseDiff < GROUNDFRAME_MAXDURATION && baseDiff > GROUNDFRAME_MINDURATION){
-									vec3_t newdir;
 									float oldspeed = VectorLength2(lastPreGroundFrameVelocity[i]);
 									float newspeed = VectorLength2(thisFrameInfo.playerVelocities[i]);
 									if (oldspeed < 325.0f || newspeed < 325.0f) {
 										lastPreGroundFrameAir[i] = -1; // This is about walking speed before or after. or we somehow gained speed. ignore.
 									}
 									else {
+										vec3_t olddir,newdir;
 										// TODO how to prevent detecting groundframes on slopes that boost?
 										VectorCopy(thisFrameInfo.playerVelocities[i], newdir);
+										VectorCopy(lastPreGroundFrameVelocity[i], olddir);
 										newdir[2] = 0;
 										Vector2Normalize(newdir);
+										olddir[2] = 0;
+										Vector2Normalize(olddir);
 										vec3_t oldVel;
 										VectorCopy(lastPreGroundFrameVelocity[i], oldVel);
 										oldVel[2] = 0;
 										float oldSpeedInNewDir = DotProduct(oldVel,newdir);
 										lastGroundFrame[i] = demoCurrentTime;
 										lastGroundFrameQuality[i] = newspeed / oldSpeedInNewDir;
+										lastGroundFrameAngleChange[i] = acosf(DotProduct(olddir,newdir))*180.0f/M_PI;
 										if (playerDemoStatsPointers[i] && newspeed > 430.0f && oldspeed > 430.0f && lastGroundFrameQuality[i] <= 1.0f && lastGroundFrameQuality[i] >= 0.0 && fpclassify(lastGroundFrameQuality[i]) != FP_NAN) { // just to keep this relevant for stats
 											playerDemoStatsPointers[i]->everUsed = qtrue;
 											playerDemoStatsPointers[i]->groundFrameQuality.sum += lastGroundFrameQuality[i];
@@ -7295,6 +7302,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							int64_t timeSinceLastSneak = isWorldKill ? -1 : (demoCurrentTime - lastSneak[attacker]);
 
 							float groundFrameQuality = (isWorldKill || (demoCurrentTime- lastGroundFrame[attacker]) > GROUNDFRAME_MAXPASTCOUNT) ? -1 : (lastGroundFrameQuality[attacker]);
+							float groundFrameAnglechange = groundFrameQuality != -1 ? lastGroundFrameAngleChange[attacker] : -1;
 
 							// This is the place that had all the continues originally.
 							
@@ -8466,9 +8474,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #if TRACK_GROUNDFRAME
 							if (!isWorldKill && groundFrameQuality != -1) {
 								SQLBIND_DELAYED(angleQuery, double, "@groundFrameQuality", groundFrameQuality);
+								SQLBIND_DELAYED(angleQuery, double, "@groundFrameAngleChange", groundFrameAnglechange);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(angleQuery, "@groundFrameQuality");
+								SQLBIND_DELAYED_NULL(angleQuery, "@groundFrameAngleChange");
 							}
 #endif
 
