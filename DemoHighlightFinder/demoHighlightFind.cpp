@@ -484,6 +484,7 @@ public:
 	int videoMinMsec = 0;
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
+	int throughWallChecks = 0; // 1 = all kills, 2 = only saber
 
 	std::vector<ResultFilter> filters;
 	int	killDbsCount = 1; // pretty much sorta just filters.size() but minimum 1 always gg
@@ -3235,6 +3236,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"groundFrameQuality	REAL,"
 			"groundFrameAngleChange	REAL,"
 #endif
+			"throughWallNormal	REAL,"
+			"throughWallOcclusion	INTEGER,"
 
 			"lastSneak	INTEGER,"
 			"lastSneakDuration	INTEGER,"
@@ -3466,13 +3469,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #if TRACK_GROUNDFRAME
 ",groundFrameQuality,groundFrameAngleChange"
 #endif
-			",lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
+			",throughWallNormal,throughWallOcclusion,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,map,serverName,serverNameStripped,isSuicide,isModSuicide,attackerIsFollowedOrVisible)"
 			"VALUES "
 			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
 ",@groundFrameQuality,@groundFrameAngleChange"
 #endif	
-",@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
+",@throughWallNormal,@throughWallOcclusion,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@map,@serverName,@serverNameStripped,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
@@ -5478,7 +5481,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0),SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
 					goto cuterror;
 				}
-				if (opts.makeVideo) {
+				if (opts.makeVideo || opts.throughWallChecks) {
 
 					char mapname[MAX_STRING_CHARS_MAX];
 					if (cm) {
@@ -5500,34 +5503,37 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							std::string mappath = CModel::GetMapPath(mapname, &opts.bspDirectories);
 							if (mappath.size() > 0) {
-								cm = new CModel(mappath.c_str(),true);
-								auto faceVerts = cm->GetFaceVerts();
-								auto faceVertIndices = cm->GetFaceVertIndices();
-								auto lightmaps = cm->GetLightmaps();
-								mapVertices.clear();
-								mapUVs.clear();
-								mapLightmaps.clear();
-								for (auto it = lightmaps.begin(); it != lightmaps.end(); it++) {
-									mapLightmaps.push_back(*it);
+								cm = new CModel(mappath.c_str(), opts.makeVideo);
+								if (opts.makeVideo) {
+
+									auto faceVerts = cm->GetFaceVerts();
+									auto faceVertIndices = cm->GetFaceVertIndices();
+									auto lightmaps = cm->GetLightmaps();
+									mapVertices.clear();
+									mapUVs.clear();
+									mapLightmaps.clear();
+									for (auto it = lightmaps.begin(); it != lightmaps.end(); it++) {
+										mapLightmaps.push_back(*it);
+									}
+									//if (!mapLightmaps.size()) {
+									//	mapLightmaps.emplace_back();
+									//}
+									for (auto it = faceVerts.begin(); it != faceVerts.end(); it++) {
+										mapVertices.push_back(S3L_POSX(it->xyz[1]));
+										mapVertices.push_back(S3L_POSY(it->xyz[2]));
+										mapVertices.push_back(S3L_POSZ(it->xyz[0]));
+										mapUVs.push_back(it->lightmapSt[0] * LIGHTMAP_SIZE);
+										mapUVs.push_back(it->lightmapSt[1] * LIGHTMAP_SIZE);
+										mapUVs.push_back(it->lightmapNum >= mapLightmaps.size() ? mapLightmaps.size() - 1 : it->lightmapNum);
+									}
+									mapTriangles.clear();
+									for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
+										mapTriangles.push_back(*it);
+									}
+									S3L_model3DInit(mapVertices.data(), mapVertices.size() / 3, mapTriangles.data(), mapTriangles.size() / 3, &mapModel);
+									//mapModel.config.backfaceCulling = 1;
+									haveMapModel = true;
 								}
-								//if (!mapLightmaps.size()) {
-								//	mapLightmaps.emplace_back();
-								//}
-								for (auto it = faceVerts.begin(); it != faceVerts.end(); it++) {
-									mapVertices.push_back(S3L_POSX(it->xyz[1]));
-									mapVertices.push_back(S3L_POSY(it->xyz[2]));
-									mapVertices.push_back(S3L_POSZ(it->xyz[0]));
-									mapUVs.push_back(it->lightmapSt[0]*LIGHTMAP_SIZE);
-									mapUVs.push_back(it->lightmapSt[1]*LIGHTMAP_SIZE);
-									mapUVs.push_back(it->lightmapNum >= mapLightmaps.size() ? mapLightmaps.size()-1 : it->lightmapNum);
-								}
-								mapTriangles.clear();
-								for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
-									mapTriangles.push_back(*it);
-								}
-								S3L_model3DInit(mapVertices.data(),mapVertices.size()/3,mapTriangles.data(),mapTriangles.size() / 3,&mapModel);
-								//mapModel.config.backfaceCulling = 1;
-								haveMapModel = true;
 							}
 						}
 					}
@@ -8034,17 +8040,87 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								modInfo << "_A2A";
 							}
 
-
 							if (baseFlagDistanceKnownAndApplicable && baseFlagDistance < ALMOST_CAPTURE_DISTANCE) {
 								modInfo << "_AC" << (int)baseFlagDistance;
 							}
 
-							if (isSaberKill && attackerIsFollowed && !targetIsVisibleOrFollowed) {
+							bool willDoWallchecks = !isWorldKill && attackerIsVisibleOrFollowed && (opts.throughWallChecks == 2 && isSaberKill || opts.throughWallChecks == 1) && cm;
+							
+							if (isSaberKill && attackerIsFollowed && !targetIsVisibleOrFollowed && !willDoWallchecks) {
 								modInfo << "_TW"; // Through wall. Meh, not very universal. But decent?
 							}
 
 							if (sameFrameRet) {
 								modInfo << "_SFR"; 
+							}
+
+							bool throughWall = false;
+							float throughWallNormal = 0;
+							int throughWallOcclusion = 0;
+							if (willDoWallchecks) {
+								trace_t trace;
+								vec3_t startpos;
+								vec3_t endpos;
+								static const vec3_t playerMins = { -15, -15, DEFAULT_MINS_2 + 1 }; // do +1 in case there's any issues with being in solid or whatever.
+								static const vec3_t playerMaxs = { 15, 15, DEFAULT_MAXS_2 -1  }; // do -1 in case there's any issues with being in solid or whatever.
+								static const vec3_t playerMaxsCrouch = { 15, 15, CROUCH_MAXS_2 -1  }; // do -1 in case there's any issues with being in solid or whatever.
+								// do a trace through the center. if its blocked. do a trace from "hitbox edges" do determine just how occluded it really is.
+								// why hitbox edges? because we know they must fit into the level. or at least are reasonably likely to.
+								// might cause issues with crouched situations tho? do we just go for crouched size as a compromise?
+								// or do we just do a boxtrace on a fixed location to figure out if they can stand?
+								VectorCopy(thisFrameInfo.playerPositions[attacker], startpos);
+								VectorCopy(thisEs->pos.trBase, endpos);
+								// first check if we can stand
+								float attackerMaxZ = DEFAULT_MAXS_2;
+								float victimMaxZ = DEFAULT_MAXS_2;
+								memset(&trace, 0, sizeof(trace));
+								cm->CM_BoxTrace(&trace, startpos, startpos, playerMins, playerMaxs,0, MASK_PLAYERSOLID,qfalse);
+								if (trace.allsolid || trace.startsolid) {
+									attackerMaxZ = CROUCH_MAXS_2;
+								}
+								memset(&trace,0,sizeof(trace));
+								cm->CM_BoxTrace(&trace, endpos, endpos, playerMins, playerMaxs, 0, MASK_PLAYERSOLID, qfalse);
+								if (trace.allsolid || trace.startsolid) {
+									victimMaxZ = CROUCH_MAXS_2;
+								}
+
+								// i'd say do the first trace as high as possible to avoid obstacles on the floor, for starters.
+								startpos[2] += attackerMaxZ;
+								endpos[2] += victimMaxZ;
+
+								memset(&trace, 0, sizeof(trace));
+								cm->CM_BoxTrace(&trace, startpos, endpos,NULL,NULL,0, MASK_PLAYERSOLID,qfalse);
+								if (trace.fraction < 1.0f || trace.allsolid || trace.startsolid) {
+									// ok there is some obstacle. lets calculate an "occlusion" amount for it by doing a few traces and checking the percentage of them that get blocked.
+									int occludedTests = 0;
+									int occluding = 0;
+									throughWall = true;
+									throughWallNormal = trace.plane.normal[2];
+									// for each dimension we try the low and high val
+									for (int x = 0; x < 2; x++) {
+										startpos[0] = thisFrameInfo.playerPositions[attacker][0] - 15.0f + x * (15.0f + 15.0f);
+										endpos[0] = thisEs->pos.trBase[0] - 15.0f + x * (15.0f + 15.0f);
+										for (int y = 0; y < 2; y++) {
+											startpos[1] = thisFrameInfo.playerPositions[attacker][1] - 15.0f + x * (15.0f + 15.0f);
+											endpos[1] = thisEs->pos.trBase[1] - 15.0f + x * (15.0f + 15.0f);
+											for (int z = 0; z < 2; z++) {
+												startpos[2] = thisFrameInfo.playerPositions[attacker][2] + (float)DEFAULT_MINS_2 + z * (-DEFAULT_MINS_2 + attackerMaxZ);
+												endpos[2] = thisEs->pos.trBase[2] + (float)DEFAULT_MINS_2 + z * (-DEFAULT_MINS_2 + victimMaxZ);
+												memset(&trace, 0, sizeof(trace));
+												cm->CM_BoxTrace(&trace, startpos, endpos, NULL, NULL, 0, MASK_PLAYERSOLID, qfalse);
+												if (trace.allsolid || trace.startsolid) {
+													std::cerr << "Through-Wall occlusion testing: Trace returned solid but shouldn't since we tested the box.\n";
+												}
+												else {
+													occludedTests++;
+													occluding += (trace.fraction < 1.0f) ? 1 : 0;
+												}
+											}
+										}
+									}
+									throughWallOcclusion = 100 * occluding / occludedTests; // very rough percentage, doesnt need to be super precise since it's just 8 tests anyway
+									modInfo << "_TW" << (int)((throughWallNormal)*100.0f); // Through wall. Meh, not very universal. But decent?
+								}
 							}
 
 
@@ -8481,6 +8557,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL(angleQuery, "@groundFrameAngleChange");
 							}
 #endif
+
+							if (throughWall) {
+								SQLBIND_DELAYED(angleQuery, double, "@throughWallNormal", throughWallNormal);
+								SQLBIND_DELAYED(angleQuery, int, "@throughWallOcclusion", throughWallOcclusion);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(angleQuery, "@throughWallNormal");
+								SQLBIND_DELAYED_NULL(angleQuery, "@throughWallOcclusion");
+							}
+
 
 							if (!isWorldKill && timeSinceLastSneak < 10000 && timeSinceLastSneak != -1) {
 								SQLBIND_DELAYED(angleQuery, int, "@lastSneak", timeSinceLastSneak);
@@ -10032,6 +10118,7 @@ int main(int argcO, char** argvO) {
 	auto V = op.add<popl::Implicit<int>>("V", "video-maxfps", "Max FPS for video generation, default 1000", 1000);
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
 	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
+	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
 
 	
 	op.parse(argcO, argvO);
@@ -10116,6 +10203,8 @@ int main(int argcO, char** argvO) {
 		}
 	}
 	opts.playerCSVDumpCommandTimeDupeSkip = y->is_set() ? y->value() == 1 : false;
+
+	opts.throughWallChecks = o->is_set() ? (o->value() == 0 ? 1 : 2)  : 0;
 
 	if (C->is_set()) {
 		opts.doChatSearch = true;
