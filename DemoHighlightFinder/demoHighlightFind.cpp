@@ -332,6 +332,7 @@ struct ioHandlesKillDb_t {
 	sqlite3_stmt* insertLaughsStatement;
 	sqlite3_stmt* insertDefragRunStatement;
 	sqlite3_stmt* insertCaptureStatement;
+	sqlite3_stmt* insertFlagGrabStatement;
 	sqlite3_stmt* insertSpreeStatement;
 	sqlite3_stmt* insertStatement;
 	sqlite3_stmt* insertAngleStatement;
@@ -383,6 +384,7 @@ struct ioHandles_t {
 	queryCollection* laughQueries;
 	queryCollection* defragQueries;
 	queryCollection* captureQueries;
+	queryCollection* flagGrabQueries;
 	queryCollection* spreeQueries;
 	queryCollection* killQueries;
 	queryCollection* killAngleQueries;
@@ -399,6 +401,7 @@ struct ioHandles_t {
 	std::ostream* outputBatHandleKillSprees;
 	std::ostream* outputBatHandleDefrag;
 	std::ostream* outputBatHandleCaptures;
+	std::ostream* outputBatHandleFlagGrabs;
 	std::ostream* outputBatHandleLaughs;
 	std::ostream* outputBatHandleSpecial;
 	std::ostream* outputBatHandleMarks;
@@ -747,6 +750,12 @@ q3DefragInfo_t q3DefragInfo;
 bool gameIsQ3Defrag = false;
 
 
+typedef struct flagPosition_t {
+	qboolean known;
+	vec3_t pos;
+};
+flagPosition_t	baseFlagPositions[MAX_TEAMS]{};
+
 int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
 int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
 int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
@@ -1055,6 +1064,8 @@ public:
 			int ledToCapturesAfter = 0;
 			int ledToTeamCaptures = 0;
 			int ledToTeamCapturesAfter = 0;
+			int ledToEnemyTeamCaptures = 0;
+			int ledToEnemyTeamCapturesAfter = 0;
 			
 			int ledToLaughs = 0;
 			int ledToLaughsAfter = 0;
@@ -1076,6 +1087,12 @@ public:
 						ledToTeamCaptures++;
 						if (it->relativeTime >= 0) {
 							ledToTeamCapturesAfter++;
+						}
+					}
+					if (it->type == METAEVENT_ENEMYTEAMCAPTURE && (trackResultingMetaEventsBitMask & (1 << METAEVENT_ENEMYTEAMCAPTURE)) && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_CAPTURE_TRACKING_MAX_DELAY) { // Track enemy team captures resulting from thing.
+						ledToEnemyTeamCaptures++;
+						if (it->relativeTime >= 0) {
+							ledToEnemyTeamCapturesAfter++;
 						}
 					}
 					if (it->type == METAEVENT_LAUGH && (trackResultingMetaEventsBitMask & (1 << METAEVENT_LAUGH)) && (demoTime + it->relativeTime) > demoTimeStart && it->relativeTime < METAEVENT_RESULTING_LAUGH_TRACKING_MAX_DELAY) { // Track team captures resulting from thing.
@@ -1161,6 +1178,32 @@ public:
 			else {
 				queryWrapper->query.add("@resultingCaptures", SQLDelayedValue_NULL);
 				queryWrapper->query.add("@resultingCapturesAfter", SQLDelayedValue_NULL);
+			}
+			if (ledToEnemyTeamCaptures >= 1) {
+				queryWrapper->batchMiddlePart << "_LTEC";
+				if (ledToEnemyTeamCaptures == ledToEnemyTeamCapturesAfter) {
+					queryWrapper->batchMiddlePart << "A";
+					if (ledToEnemyTeamCaptures > 1) {
+						queryWrapper->batchMiddlePart << ledToEnemyTeamCaptures;
+					}
+				}
+				else {
+					if (ledToEnemyTeamCaptures > 1) {
+						queryWrapper->batchMiddlePart << ledToEnemyTeamCaptures;
+					}
+					if (ledToEnemyTeamCapturesAfter > 0) {
+						queryWrapper->batchMiddlePart << "_LTECA";
+						if (ledToEnemyTeamCapturesAfter > 1) {
+							queryWrapper->batchMiddlePart << ledToEnemyTeamCapturesAfter;
+						}
+					}
+				}
+				queryWrapper->query.add("@resultingEnemyCaptures", ledToEnemyTeamCaptures);
+				queryWrapper->query.add("@resultingEnemyCapturesAfter", ledToEnemyTeamCapturesAfter);
+			}
+			else {
+				queryWrapper->query.add("@resultingEnemyCaptures", SQLDelayedValue_NULL);
+				queryWrapper->query.add("@resultingEnemyCapturesAfter", SQLDelayedValue_NULL);
 			}
 			if (ledToLaughs >= 1) {
 				queryWrapper->batchMiddlePart << "_LGH";
@@ -1252,6 +1295,7 @@ typedef enum MetaEventTrackerType { // We're not gonna do it for defrag becaue w
 	METRACKER_KILLS,
 	METRACKER_KILLSPREES,
 	METRACKER_CAPTURES,
+	METRACKER_FLAGGRABS,
 	//METRACKER_LAUGHS, // No laugh cuts with metaevents for now as they're a bit different. They aren't specific to individual players. Might wanna include at least kills at some point but we won't for now as it would complicate stuff.
 	METRACKER_TOTAL_COUNT
 };
@@ -1260,6 +1304,7 @@ int resultingMetaEventTracking[METRACKER_TOTAL_COUNT] = {
 	(1 << METAEVENT_CAPTURE) | (1 << METAEVENT_TEAMCAPTURE) | (1 << METAEVENT_LAUGH),
 	(1 << METAEVENT_CAPTURE) | (1 << METAEVENT_TEAMCAPTURE) | (1 << METAEVENT_LAUGH),
 	(1 << METAEVENT_LAUGH),
+	(1 << METAEVENT_CAPTURE) | (1 << METAEVENT_TEAMCAPTURE) | (1 << METAEVENT_ENEMYTEAMCAPTURE) | (1 << METAEVENT_LAUGH), // todo track deaths/rets as well for flaggrabs? idk
 };
 
 int64_t requiredMetaEventAges[METRACKER_TOTAL_COUNT][MAX_CLIENTS_MAX]; // demotimes of how far back we need to keep metaevents (to have enough info for full demos) for each type of metaevent tracker. the oldest is always the one that is applied so make sure to keep this up to date.
@@ -2112,7 +2157,7 @@ void updateForcePowersInfo(clientActive_t* clCut) { // TODO: make this adapt to 
 int g_gametype = 0;
 int g_gametype_general = 0;
 int activeKillDatabase = 0; // right now we dont have kill-specific filters, only global ones based on gametype or mapname and such. so we can optimize this and save it globally. 
-
+std::string currentMapName = "";
 void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts) { // TODO: make this adapt to JKA
 	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
 	const char* serverInfo = clCut->gameState.stringData + stringOffset;
@@ -2133,6 +2178,12 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 			q3DefragInfo.online = q3DefragInfo.gameType > 4;
 
 		}
+	}
+
+	const char* theNewMapname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname");
+	if (stricmp(theNewMapname,currentMapName.c_str())) {
+		// map changed. null the base flag positions.
+		Com_Memset(&baseFlagPositions, 0, sizeof(baseFlagPositions));
 	}
 
 	activeKillDatabase = 0;
@@ -2387,6 +2438,70 @@ entityState_t* findEntity(int number) {
 	}
 	return NULL;
 }
+
+class NearbyPlayerInfo {
+public:
+	std::string nearbyPlayersString;
+	std::string nearbyEnemiesString;
+	int nearbyPlayersCount = 0;
+	int nearbyEnemiescount = 0;
+	int veryClosePlayersCount = 0;
+	int verycloseEnemiescount = 0;
+};
+
+template <unsigned int max_clients>
+inline NearbyPlayerInfo* getNearbyPlayersInfo(vec3_t position, int excludeNum) {
+	NearbyPlayerInfo* retVal = new NearbyPlayerInfo();
+
+	// Find nearby players.
+	std::stringstream nearbyPlayersSS;
+	std::vector<int> nearbyPlayers;
+	std::vector<int> nearbyPlayersDistances;
+	for (int subPe = demo.cut.Cl.snap.parseEntitiesNum; subPe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; subPe++) {
+		entityState_t* thisEntitySub = &demo.cut.Cl.parseEntities[subPe & (MAX_PARSE_ENTITIES - 1)];
+		if (thisEntitySub->number >= 0 && thisEntitySub->number < max_clients && thisEntitySub->number != excludeNum) {
+			float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, position);
+			if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+				nearbyPlayersSS << (retVal->nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " (" << (int)nearbyPlayerDistance << ")";
+				nearbyPlayers.push_back(thisEntitySub->number);
+				nearbyPlayersDistances.push_back(nearbyPlayerDistance);
+			}
+		}
+	}
+	if (demo.cut.Cl.snap.ps.clientNum != excludeNum) {
+		float nearbyPlayerDistance = VectorDistance(demo.cut.Cl.snap.ps.origin, position);
+		if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+			nearbyPlayersSS << (retVal->nearbyPlayersCount++ == 0 ? "" : ",") << demo.cut.Cl.snap.ps.clientNum << " (" << (int)nearbyPlayerDistance << ")";
+			nearbyPlayers.push_back(demo.cut.Cl.snap.ps.clientNum);
+			nearbyPlayersDistances.push_back(nearbyPlayerDistance);
+		}
+	}
+
+	retVal->nearbyPlayersString = nearbyPlayersSS.str();
+
+	// Find nearby enemies
+	std::stringstream nearbyEnemiesSS;
+	//int nearbyEnemiescount = 0;
+	//int veryClosePlayersCount = 0;
+	//int verycloseEnemiescount = 0;
+	for (int nearV = 0; nearV < nearbyPlayers.size(); nearV++) {
+		int nearbyPlayerHere = nearbyPlayers[nearV];
+		if (playerTeams[nearbyPlayerHere] != playerTeams[excludeNum]) {
+			nearbyEnemiesSS << (retVal->nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[nearV] << ")";
+			if (nearbyPlayersDistances[nearV] <= VERYCLOSE_PLAYER_MAX_DISTANCE) {
+				retVal->verycloseEnemiescount++;
+			}
+		}
+		if (nearbyPlayersDistances[nearV] <= VERYCLOSE_PLAYER_MAX_DISTANCE) {
+			retVal->veryClosePlayersCount++;
+		}
+	}
+	retVal->nearbyEnemiesString = nearbyEnemiesSS.str();
+
+	return retVal;
+}
+
+
 
 template<float Speed::*thingie>
 inline float getMaxSpeedThingForClientinTimeFrame(int clientNum, int fromTime, int toTime) {
@@ -3335,6 +3450,87 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoDateTime TIMESTAMP NOT NULL"
 			"); ",
 			NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE flaggrabs ("
+			"id	INTEGER PRIMARY KEY,"
+			"map	TEXT NOT NULL,"
+			"serverName	TEXT NOT NULL,"
+			"serverNameStripped	TEXT NOT NULL,"
+			"enemyFlagHoldTime	INTEGER,"
+			"flagPickupSource	INTEGER NOT NULL,"
+			"grabberName	TEXT NOT NULL,"
+			"grabberNameStripped	TEXT NOT NULL,"
+			"capperName	TEXT,"
+			"capperNameStripped	TEXT,"
+			"grabberClientNum INTEGER NOT NULL,"
+			"capperClientNum INTEGER,"
+			"grabberIsVisible	BOOLEAN NOT NULL,"
+			"grabberIsFollowed	BOOLEAN NOT NULL,"
+			"grabberIsFollowedOrVisible	BOOLEAN NOT NULL,"
+			"capperIsVisible	BOOLEAN,"
+			"capperIsFollowed	BOOLEAN,"
+			"capperIsFollowedOrVisible	BOOLEAN,"
+			"capperWasVisible	BOOLEAN,"
+			"capperWasFollowed	BOOLEAN,"
+			"capperWasFollowedOrVisible	BOOLEAN,"
+			"demoRecorderClientnum	INTEGER NOT NULL,"
+			"flagTeam	INTEGER NOT NULL,"
+			"capperKills INTEGER,"
+			"capperRets INTEGER,"
+			"redScore INTEGER,"
+			"blueScore INTEGER,"
+			"redPlayerCount INTEGER,"
+			"bluePlayerCount INTEGER,"
+			"sumPlayerCount INTEGER,"
+			"maxSpeedGrabberLastSecond	REAL,"
+			"maxSpeedCapperLastSecond	REAL,"
+			"maxSpeedCapper	REAL,"
+			"averageSpeedCapper	REAL,"
+			"metaEvents	TEXT,"
+			"nearbyPlayers	TEXT,"
+			"nearbyPlayerCount	INTEGER NOT NULL,"
+			"nearbyEnemies	TEXT,"
+			"nearbyEnemyCount	INTEGER NOT NULL,"
+			"veryCloseEnemyCount	INTEGER NOT NULL,"
+			"veryClosePlayersCount	INTEGER NOT NULL,"
+			"padNearbyPlayers	TEXT," // for swoops
+			"padNearbyPlayerCount	INTEGER NOT NULL," // for swoops
+			"padNearbyEnemies	TEXT," // for swoops
+			"padNearbyEnemyCount	INTEGER NOT NULL," // for swoops
+			"padVeryCloseEnemyCount	INTEGER NOT NULL," // for swoops
+			"padVeryClosePlayersCount	INTEGER NOT NULL," // for swoops
+			"maxNearbyEnemyCount	REAL,"
+			"moreThanOneNearbyEnemyTimePercent	REAL," // Percentage
+			"averageNearbyEnemyCount	REAL,"
+			"maxVeryCloseEnemyCount	REAL,"
+			"anyVeryCloseEnemyTimePercent	REAL," // Percentage
+			"moreThanOneVeryCloseEnemyTimePercent	REAL," // Percentage
+			"averageVeryCloseEnemyCount	REAL,"
+			"capperPadDistance	REAL,"
+			"capperTimeToCap	INTEGER,"
+			"directionX	REAL,"
+			"directionY	REAL,"
+			"directionZ	REAL,"
+			"positionX	REAL,"
+			"positionY	REAL,"
+			"positionZ	REAL,"
+			"capperDirectionX	REAL,"
+			"capperDirectionY	REAL,"
+			"capperDirectionZ	REAL,"
+			"capperPositionX	REAL,"
+			"capperPositionY	REAL,"
+			"capperPositionZ	REAL,"
+			"resultingCaptures INTEGER,"
+			"resultingSelfCaptures INTEGER,"
+			"resultingEnemyCaptures INTEGER,"
+			"resultingLaughs INTEGER,"
+			"demoName TEXT NOT NULL,"
+			"demoPath TEXT NOT NULL,"
+			"demoTime INTEGER NOT NULL,"
+			"lastGamestateDemoTime INTEGER NOT NULL,"
+			"serverTime INTEGER NOT NULL,"
+			"demoDateTime TIMESTAMP NOT NULL"
+			"); ",
+			NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE defragRuns ("
 			"map	TEXT NOT NULL,"
 			"serverName	TEXT NOT NULL,"
@@ -3484,6 +3680,15 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertCaptureStatement, NULL);
+
+		preparedStatementText = "INSERT INTO flaggrabs"
+			"(id,map,serverName,serverNameStripped,enemyFlagHoldTime,flagPickupSource,grabberName,grabberNameStripped,capperName,capperNameStripped,grabberClientNum,capperClientNum,grabberIsVisible,grabberIsFollowed,grabberIsFollowedOrVisible,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedGrabberLastSecond,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,veryCloseEnemyCount,veryClosePlayersCount,padNearbyPlayers,padNearbyPlayerCount,padNearbyEnemies,padNearbyEnemyCount,padVeryCloseEnemyCount,padVeryClosePlayersCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,capperPadDistance,capperTimeToCap,directionX,directionY,directionZ,positionX,positionY,positionZ,capperDirectionX,capperDirectionY,capperDirectionZ,capperPositionX,capperPositionY,capperPositionZ,resultingCaptures,resultingSelfCaptures,resultingEnemyCaptures,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"VALUES "
+			"(@id,@map,@serverName,@serverNameStripped,@enemyFlagHoldTime,@flagPickupSource,@grabberName,@grabberNameStripped,@capperName,@capperNameStripped,@grabberClientNum,@capperClientNum,@grabberIsVisible,@grabberIsFollowed,@grabberIsFollowedOrVisible,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedGrabberLastSecond,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@veryCloseEnemyCount,@veryClosePlayersCount,@padNearbyPlayers,@padNearbyPlayerCount,@padNearbyEnemies,@padNearbyEnemyCount,@padVeryCloseEnemyCount,@padVeryClosePlayersCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@capperPadDistance,@capperTimeToCap,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@capperDirectionX,@capperDirectionY,@capperDirectionZ,@capperPositionX,@capperPositionY,@capperPositionZ,@resultingCaptures,@resultingSelfCaptures,@resultingEnemyCaptures,@resultingLaughs,@demoName,@demoPath,@demoTime,@lastGamestateDemoTime,@serverTime,@demoDateTime);";
+
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertFlagGrabStatement, NULL);
+
 		preparedStatementText = "INSERT INTO defragRuns"
 			"(map,serverName,serverNameStripped,readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 			"VALUES "
@@ -3899,6 +4104,32 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandleCaptures) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
 	}
 
+	// FlagGrabs
+	for (auto it = io.flagGrabQueries->begin(); it != io.flagGrabQueries->end(); it++) {
+		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		//wasDoingSQLiteExecution = true;
+		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		uint64_t insertedId = -1;
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting flag grab into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		else {
+			queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement);
+			if (queryResult != SQLITE_DONE && queryResult != SQLITE_ROW) {
+				std::cerr << "Error retrieving inserted flaggrab id from database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[(*it)->databaseIndex].killDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			else {
+				insertedId = sqlite3_column_int64(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement, 0);
+			}
+			sqlite3_reset(io.killDb[(*it)->databaseIndex].selectLastInsertRowIdStatement);
+		}
+		sqlite3_reset(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		//wasDoingSQLiteExecution = false;
+
+		if((*it)->batchString1.size() || (*it)->batchString1.size()) (*io.outputBatHandleFlagGrabs) << "\nrem insertid" << insertedId;
+		if ((*it)->batchString1.size() || (*it)->batchString2.size())  (*io.outputBatHandleFlagGrabs) << (*it)->batchPrefix << (*it)->batchString1 << (*it)->batchMiddlePart.str() << (*it)->batchString2 << (*it)->batchSuffix << "\n";
+	}
+
 	// Defrag
 	for (auto it = io.defragQueries->begin(); it != io.defragQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
@@ -4099,7 +4330,7 @@ inline size_t streamsize(std::ostream* stream) {
 }
 
 template<unsigned int max_clients>
-qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const char* outputBatFileMarks, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
+qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileFlagGrabs, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const char* outputBatFileMarks, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 
 	ioHandles_t io;
 
@@ -4112,6 +4343,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.laughQueries = new queryCollection();
 	io.defragQueries = new queryCollection();
 	io.captureQueries = new queryCollection();
+	io.flagGrabQueries = new queryCollection();
 	io.spreeQueries = new queryCollection();
 	io.killQueries = new queryCollection();
 	io.killAngleQueries = new queryCollection();
@@ -4176,6 +4408,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	std::stringstream outputBatSSKillSprees;
 	std::stringstream outputBatSSDefrag;
 	std::stringstream outputBatSSCaptures;
+	std::stringstream outputBatSSFlagGrabs;
 	std::stringstream outputBatSSLaughs;
 	std::stringstream outputBatSSSpecial;
 	std::stringstream outputBatSSMarks;
@@ -4184,6 +4417,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleKillSprees = &outputBatSSKillSprees;
 	io.outputBatHandleDefrag = &outputBatSSDefrag;
 	io.outputBatHandleCaptures = &outputBatSSCaptures;
+	io.outputBatHandleFlagGrabs = &outputBatSSFlagGrabs;
 	io.outputBatHandleLaughs = &outputBatSSLaughs;
 	io.outputBatHandleSpecial = &outputBatSSSpecial;
 	io.outputBatHandleMarks = &outputBatSSMarks;
@@ -4355,6 +4589,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		outputBatHandleCaptures.open(outputBatFileCaptures, std::ios_base::app); // append instead of overwrite
 		outputBatHandleCaptures << io.outputBatHandleCaptures->rdbuf();
 		outputBatHandleCaptures.close();
+	}
+	if (streamsize(io.outputBatHandleFlagGrabs)) {
+		std::ofstream outputBatHandleFlagGrabs;
+		outputBatHandleFlagGrabs.open(outputBatFileFlagGrabs, std::ios_base::app); // append instead of overwrite
+		outputBatHandleFlagGrabs << io.outputBatHandleFlagGrabs->rdbuf();
+		outputBatHandleFlagGrabs.close();
 	}
 	if (streamsize(io.outputBatHandleLaughs)) {
 		std::ofstream outputBatHandleLaughs;
@@ -5005,6 +5245,7 @@ qboolean inline demoHighlightFindExceptWrapper2(const char* sourceDemoFile, int 
 }
 
 
+
 template<unsigned int max_clients>
 qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime, const highlightSearchMode_t searchMode, const ExtraSearchOptions& opts, int64_t& demoCurrentTime, bool& wasDoingSQLiteExecution, const ioHandles_t& io, sharedVariables_t& sharedVars, bool& SEHExceptionCaught) {
 	fileHandle_t	oldHandle = 0;
@@ -5211,8 +5452,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	// If dropped or base flag entities exist, we track them so we can detect "almost captures"
 	// Array is sized for teams, with the number corresponding to clientinfo string TEAM_FREE, TEAM_RED, TEAM_BLUE, TEAM_SPECTATOR enum values.
 	// I was using NUM_TEAMS_MAX first but I'm not sure if some mods might not assign too high team values for random reasons. So this is safer.
-	entityState_t* droppedFlagEntities[MAX_TEAMS]{};
-	entityState_t* baseFlagEntities[MAX_TEAMS]{};
+	entityState_t*	droppedFlagEntities[MAX_TEAMS]{};
+	entityState_t*	baseFlagEntities[MAX_TEAMS]{};
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
 
@@ -6104,16 +6345,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						
 						bool isDroppedFlag = thisEs->eFlags & EF_BOUNCE_HALF; // This does NOT work in JKA. EF_BOUNCE_HALF doesn't even exist there. It does work in Q3. (or ought to)
 						entityState_t** relevantArray = isDroppedFlag ? droppedFlagEntities : baseFlagEntities;
+						team_t flagTeam;
 						switch (tmpItemListGeneralValue) {
 							case ITEMLIST_TEAM_CTF_REDFLAG_GENERAL:
-								relevantArray[TEAM_RED] = thisEs;
+								flagTeam = TEAM_RED;
 								break;
 							case ITEMLIST_TEAM_CTF_BLUEFLAG_GENERAL:
-								relevantArray[TEAM_BLUE] = thisEs;
+								flagTeam = TEAM_BLUE;
 								break;
 							case ITEMLIST_TEAM_CTF_NEUTRALFLAG_GENERAL:
-								relevantArray[TEAM_FREE] = thisEs;
+								flagTeam = TEAM_FREE;
 								break;
+						}
+						relevantArray[(int)flagTeam] = thisEs;
+						if (!isDroppedFlag) {
+							baseFlagPositions[flagTeam].known = qtrue;
+							VectorCopy(thisEs->pos.trBase, baseFlagPositions[flagTeam].pos);
 						}
 					}
 					else if (isMOHAADemo && thisEs->parent > 0 && thisEs->parent < max_clients && generalizedEntityType == ET_ITEM_GENERAL && (thisEs->eFlags & EF_SENTIENT_MOH)/* && && (thisEs->eFlags & EF_WEAPON_MOH)*/) { // Don't ask me why weapons have EF_SENTIENT and not EF_WEAPON...
@@ -7094,7 +7341,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							int victimFlagTeam = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? TEAM_BLUE : TEAM_RED) : -1;
 							int attackerFlagTeam = attackerIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? TEAM_BLUE : TEAM_RED) : -1;
 
-							int victimCarrierLastPickupOrigin = victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+							int victimCarrierLastPickupOrigin = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
 
 							if (!victimIsFlagCarrier) {
 								// Victim acquired the flag on this frame/snap
@@ -8763,6 +9010,556 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7got the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
 								}
 							}
+							//Flaggrab.
+							int grabberPlayerNum = thisEs->trickedentindex;
+							int flagTeam = thisEs->trickedentindex2;
+
+							int playerNum = -1;// we track info about both the grabber and the enemy team capper
+							// TODO i might need to overthink this some more at some point re. whether i have the correct capper.
+							// but let's call it a day for now since this is mainly about the flag grab.
+							switch (flagTeam) {
+							case TEAM_FREE: // Is this correct?
+								//victimCarrierLastPickupOrigin = cgs.yellowflagLastPickupOrigin;
+								break;
+							case TEAM_RED:
+								//victimCarrierLastPickupOrigin = cgs.redFlagLastPickupOrigin;
+								playerNum = lastKnownBlueFlagCarrier; // if we picked red flag, we wanna know who (if anyone) carries blue flag
+								break;
+							case TEAM_BLUE:
+								//victimCarrierLastPickupOrigin = cgs.blueFlagLastPickupOrigin;
+								playerNum = lastKnownRedFlagCarrier; // if we picked blue flag, we wanna know who (if anyone) carries red flag
+								break;
+							}
+
+							//bool sameFrameCap = false;
+
+							int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+							const char* info = demo.cut.Cl.gameState.stringData + offset;
+							std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "mapname");
+							std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - offset, "sv_hostname");
+							std::string grabberplayername = "WEIRDONAME";
+							std::string playername = "WEIRDONAME";
+							const char* playerInfo;
+							if (grabberPlayerNum >= 0 && grabberPlayerNum < max_clients) {
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + grabberPlayerNum];
+								playerInfo = demo.cut.Cl.gameState.stringData + offset;
+								grabberplayername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+							}
+							if (playerNum >= 0 && playerNum < max_clients) {
+								offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + playerNum];
+								playerInfo = demo.cut.Cl.gameState.stringData + offset;
+								playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+							}
+
+							float capperPadDistance = -1; // if other capper, how far is he from pad?
+							int capperTimeToCap = -1; // if other capper, based on his current speed, how long until he caps?
+
+
+							bool grabberPlayerIsVisible = false;
+							entityState_t* grabberPlayerEntity = findEntity(grabberPlayerNum);
+							if (grabberPlayerEntity) {
+								grabberPlayerIsVisible = true;
+							}
+							bool grabberPlayerIsFollowed = demo.cut.Cl.snap.ps.clientNum == grabberPlayerNum;
+							bool grabberPlayerIsVisibleOrFollowed = grabberPlayerIsFollowed || grabberPlayerIsVisible;
+
+
+							bool playerIsVisible = false;
+							entityState_t* playerEntity = playerNum != -1 ? findEntity(playerNum) : NULL;
+							if (playerEntity) {
+								playerIsVisible = true;
+							}
+							bool playerIsFollowed = demo.cut.Cl.snap.ps.clientNum == playerNum;
+							bool playerIsVisibleOrFollowed = playerIsFollowed || playerIsVisible;
+
+							int flagHoldTime = playerNum != -1 ? recentFlagHoldTimes[playerNum] : 0;
+
+							if (playerNum != -1) {
+								if (redFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+									// Player got the flag on this exact frame. Flag hold time is going to be wrong. Set to 0 manually.
+									flagHoldTime = 0;
+									//sameFrameCap = true;
+								}
+								else if (blueFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+									flagHoldTime = 0;
+									//sameFrameCap = true;
+								}
+							}
+
+							bool wasFollowed = false;
+							bool wasVisible = false;
+							bool wasVisibleOrFollowed = false;
+							if (playerNum != -1) {
+
+								if (playerFirstFollowed[playerNum] != -1 && playerFirstFollowed[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime)) {
+									wasFollowed = true;
+								}
+								if (playerFirstVisible[playerNum] != -1 && playerFirstVisible[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime)) {
+									wasVisible = true;
+								}
+								if (playerFirstFollowedOrVisible[playerNum] != -1 && playerFirstFollowedOrVisible[playerNum] < (demo.cut.Cl.snap.serverTime - flagHoldTime)) {
+									wasVisibleOrFollowed = true;
+								}
+							}
+
+							float maxSpeedGrabberLastSecond = getMaxSpeedForClientinTimeFrame(grabberPlayerNum, demoCurrentTime - 1000, demoCurrentTime);
+							float maxSpeedCapperLastSecond = playerNum != -1 ? getMaxSpeedForClientinTimeFrame(playerNum, demoCurrentTime - 1000, demoCurrentTime) : -1;
+
+							// See if he had any kills/rets as carrier. (did he fight valiantly before he died?)
+							if (playerNum != -1 && recentKillsDuringFlagHold[playerNum].lastKillDemoTime < demoCurrentTime - recentFlagHoldTimes[playerNum]) {
+								// If the last capping related kill of this capper was before he even got the flag, reset before adding to the count
+								Com_Memset(&recentKillsDuringFlagHold[playerNum], 0, sizeof(CapperKillsInfo));
+							}
+							int flagCarrierKillCount = playerNum != -1 ? recentKillsDuringFlagHold[playerNum].kills : 0;
+							int flagCarrierRetCount = playerNum != -1 ? recentKillsDuringFlagHold[playerNum].rets : 0;
+							int flagCarrierSaberKillCount = playerNum != -1 ? recentKillsDuringFlagHold[playerNum].saberkills : 0;
+
+
+							vec3_t currentPos;
+							vec3_t currentDir;
+							vec3_t currentPosCapper;
+							vec3_t currentDirCapper;
+
+							NearbyPlayerInfo* nearbyInfo = NULL;
+							if (grabberPlayerIsVisibleOrFollowed) {
+								if (grabberPlayerEntity) {
+									VectorCopy(grabberPlayerEntity->pos.trBase, currentPos); // This is also useful in general.
+									VectorCopy(grabberPlayerEntity->pos.trDelta, currentDir); // This is also useful in general.
+								}
+								else {
+									VectorCopy(demo.cut.Cl.snap.ps.origin, currentPos);
+									VectorCopy(demo.cut.Cl.snap.ps.velocity, currentDir);
+								}
+								nearbyInfo = getNearbyPlayersInfo<max_clients>(currentPos, grabberPlayerNum);
+							}
+
+
+							// Pickup origin
+							int pickupOrigin = -1;// victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+							switch (flagTeam) {
+							case TEAM_FREE: // Is this correct?
+								pickupOrigin = cgs.yellowflagLastPickupOrigin;
+								break;
+							case TEAM_RED:
+								pickupOrigin = cgs.redFlagLastPickupOrigin;
+								break;
+							case TEAM_BLUE:
+								pickupOrigin = cgs.blueFlagLastPickupOrigin;
+								break;
+							}
+
+							NearbyPlayerInfo* nearbyInfoPad = NULL;
+							if (pickupOrigin == 2 && baseFlagPositions[flagTeam].known) {
+								nearbyInfoPad = getNearbyPlayersInfo<max_clients>(baseFlagPositions[flagTeam].pos, grabberPlayerNum);
+							}
+
+
+							// Find nearby players.
+							/*std::stringstream nearbyPlayersSS;
+							std::vector<int> nearbyPlayers;
+							std::vector<int> nearbyPlayersDistances;
+							int nearbyPlayersCount = 0;
+							if (grabberPlayerIsVisibleOrFollowed) {
+								if (grabberPlayerEntity) {
+									VectorCopy(grabberPlayerEntity->pos.trBase, currentPos); // This is also useful in general.
+									VectorCopy(grabberPlayerEntity->pos.trDelta, currentDir); // This is also useful in general.
+								}
+								else {
+									VectorCopy(demo.cut.Cl.snap.ps.origin, currentPos);
+									VectorCopy(demo.cut.Cl.snap.ps.velocity, currentDir);
+								}
+								for (int subPe = demo.cut.Cl.snap.parseEntitiesNum; subPe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; subPe++) {
+									entityState_t* thisEntitySub = &demo.cut.Cl.parseEntities[subPe & (MAX_PARSE_ENTITIES - 1)];
+									if (thisEntitySub->number >= 0 && thisEntitySub->number < max_clients && thisEntitySub->number != grabberPlayerNum) {
+										float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, currentPos);
+										if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+											nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " (" << (int)nearbyPlayerDistance << ")";
+											nearbyPlayers.push_back(thisEntitySub->number);
+											nearbyPlayersDistances.push_back(nearbyPlayerDistance);
+										}
+									}
+								}
+								if (demo.cut.Cl.snap.ps.clientNum != grabberPlayerNum) {
+									float nearbyPlayerDistance = VectorDistance(demo.cut.Cl.snap.ps.origin, currentPos);
+									if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
+										nearbyPlayersSS << (nearbyPlayersCount++ == 0 ? "" : ",") << demo.cut.Cl.snap.ps.clientNum << " (" << (int)nearbyPlayerDistance << ")";
+										nearbyPlayers.push_back(demo.cut.Cl.snap.ps.clientNum);
+										nearbyPlayersDistances.push_back(nearbyPlayerDistance);
+									}
+								}
+							}
+							
+							std::string nearbyPlayersString = nearbyPlayersSS.str();
+
+							// Find nearby enemies
+							std::stringstream nearbyEnemiesSS;
+							int nearbyEnemiescount = 0;
+							int veryClosePlayersCount = 0;
+							int verycloseEnemiescount = 0;
+							for (int nearV = 0; nearV < nearbyPlayers.size(); nearV++) {
+								int nearbyPlayerHere = nearbyPlayers[nearV];
+								if (playerTeams[nearbyPlayerHere] != playerTeams[grabberPlayerNum]) {
+									nearbyEnemiesSS << (nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[nearV] << ")";
+									if (nearbyPlayersDistances[nearV] <= VERYCLOSE_PLAYER_MAX_DISTANCE) {
+										verycloseEnemiescount++;
+									}
+								}
+								if (nearbyPlayersDistances[nearV] <= VERYCLOSE_PLAYER_MAX_DISTANCE) {
+									veryClosePlayersCount++;
+								}
+							}
+							std::string nearbyEnemiesString = nearbyEnemiesSS.str();
+							
+							
+							*/
+
+
+							if (playerIsVisibleOrFollowed) {
+								if (playerEntity) {
+									VectorCopy(playerEntity->pos.trBase, currentPosCapper); // This is also useful in general.
+									VectorCopy(playerEntity->pos.trDelta, currentDirCapper); // This is also useful in general.
+								}
+								else {
+									VectorCopy(demo.cut.Cl.snap.ps.origin, currentPosCapper);
+									VectorCopy(demo.cut.Cl.snap.ps.velocity, currentDirCapper);
+								}
+
+								if (baseFlagPositions[flagTeam].known) {
+									capperPadDistance = VectorDistance(baseFlagPositions[flagTeam].pos, currentPosCapper);
+									vec3_t vectorToFlag;
+									VectorSubtract(baseFlagPositions[flagTeam].pos, currentPosCapper, vectorToFlag);
+									VectorNormalize(vectorToFlag);
+									float velToFlag = DotProduct(vectorToFlag, currentDirCapper);
+									capperTimeToCap = 0;
+									if (velToFlag < 250) {
+										// we're not even moving enough towards the flag, but let's say we could turn towards the flag within 1 second and then move at minimum 250 ups
+										capperTimeToCap = (250.0f- velToFlag)/250.0f*500.0f;
+										velToFlag = 250;
+									}
+									capperTimeToCap += 1000.0f*(capperPadDistance / velToFlag);
+								}
+							}
+
+
+							// Stats about speed
+							if (playerNum != -1 && recentFlagHoldVariousInfo[playerNum].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[playerNum]) {
+								// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
+								Com_Memset(&recentFlagHoldVariousInfo[playerNum], 0, sizeof(VariousCappingInfo));
+								recentFlagHoldVariousInfo[playerNum].lastUpdateTime = demoCurrentTime;
+							}
+							float maxSpeedCapper = playerNum != -1? recentFlagHoldVariousInfo[playerNum].maxSpeedThisRun : 0;
+							float averageSpeedCapper = playerNum != -1? (recentFlagHoldVariousInfo[playerNum].divisorSpeeds == 0 ? 0 : recentFlagHoldVariousInfo[playerNum].sumSpeeds / recentFlagHoldVariousInfo[playerNum].divisorSpeeds) : 0;
+
+
+
+
+							// Stats about nearby enemy count throughout run
+							float maxNearbyEnemyCount = 0, moreThanOneNearbyEnemyTimePercent = 0, averageNearbyEnemyCount = -1, maxVeryCloseEnemyCount = 0, anyVeryCloseEnemyTimePercent = 0, moreThanOneVeryCloseEnemyTimePercent = 0, averageVeryCloseEnemyCount = -1;
+							// Resets if necessary.
+							if (playerNum != -1 && recentFlagHoldEnemyNearbyTimes[playerNum].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[playerNum]) {
+								// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
+								Com_Memset(&recentFlagHoldEnemyNearbyTimes[playerNum], 0, sizeof(EnemyNearbyInfo));
+								recentFlagHoldEnemyNearbyTimes[playerNum].lastUpdateTime = demoCurrentTime;
+							}
+							averageHelper_t nearbyHelper, veryCloseHelper;
+							Com_Memset(&nearbyHelper, 0, sizeof(nearbyHelper));
+							Com_Memset(&veryCloseHelper, 0, sizeof(veryCloseHelper));
+							if(playerNum != -1){
+								for (int nearbyCount = 0; nearbyCount < max_clients; nearbyCount++) { // You'd think here it should be <= MAX_CLIENTS because 32 is a valid number, BUT with max of 32 players you can only have a max of 31 enemies. 32 is actually a valid index though, for "unknown", but we aren't currently tracking that. We just track for the time that the flag carrier WAS visible.
+									int nearbyTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[playerNum].enemyNearbyTimes[nearbyCount];
+									int veryCloseTimeOfThisCount = recentFlagHoldEnemyNearbyTimes[playerNum].enemyVeryCloseTimes[nearbyCount];
+
+									// If this count happened even for the shortest amount of time, that was the max amount of near/very close enemies.
+									if (nearbyTimeOfThisCount && nearbyCount > maxNearbyEnemyCount) maxNearbyEnemyCount = nearbyCount;
+									if (veryCloseTimeOfThisCount && nearbyCount > maxVeryCloseEnemyCount) maxVeryCloseEnemyCount = nearbyCount;
+
+									nearbyHelper.sum += nearbyCount * nearbyTimeOfThisCount;
+									nearbyHelper.divisor += nearbyTimeOfThisCount;
+									veryCloseHelper.sum += nearbyCount * veryCloseTimeOfThisCount;
+									veryCloseHelper.divisor += veryCloseTimeOfThisCount;
+
+									if (nearbyCount > 0) {
+										anyVeryCloseEnemyTimePercent += veryCloseTimeOfThisCount;
+										if (nearbyCount > 1) {
+											moreThanOneNearbyEnemyTimePercent += nearbyTimeOfThisCount;
+											moreThanOneVeryCloseEnemyTimePercent += veryCloseTimeOfThisCount;
+										}
+									}
+								}
+							}
+							averageNearbyEnemyCount = nearbyHelper.divisor == 0 ? 0 : nearbyHelper.sum / nearbyHelper.divisor;
+							averageVeryCloseEnemyCount = veryCloseHelper.divisor == 0 ? 0 : veryCloseHelper.sum / veryCloseHelper.divisor;
+							moreThanOneNearbyEnemyTimePercent *= nearbyHelper.divisor == 0 ? 0 : 100.0f / nearbyHelper.divisor;
+							moreThanOneVeryCloseEnemyTimePercent *= veryCloseHelper.divisor == 0 ? 0 : 100.0f / veryCloseHelper.divisor;
+							anyVeryCloseEnemyTimePercent *= veryCloseHelper.divisor == 0 ? 0 : 100.0f / veryCloseHelper.divisor;
+							// END Stats about nearby enemy count throughout run
+
+
+
+							// TODO handle this:
+							// someone swoops flag, dies on same frame, you pick up the flag on pad.
+							// it would rn show u as having swooped it, but in reality you got it on the pad
+							// very niche scenario but maybe worth handling someday
+
+
+							//if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
+
+
+							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
+							SQLDelayedQuery* query = &queryWrapper->query;
+
+							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
+							std::string serverNameStripped = Q_StripColorAll(serverName);
+							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
+							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
+							SQLBIND_DELAYED(query, int, "@flagPickupSource", pickupOrigin);
+							SQLBIND_DELAYED_TEXT(query, "@grabberName", grabberplayername.c_str());
+							std::string grabbernameStripped = Q_StripColorAll(grabberplayername);
+							SQLBIND_DELAYED_TEXT(query, "@grabberNameStripped", grabbernameStripped.c_str());
+							SQLBIND_DELAYED(query, int, "@grabberClientNum", grabberPlayerNum);
+							if (playerNum != -1) {
+								SQLBIND_DELAYED(query, int, "@enemyFlagHoldTime", flagHoldTime);
+								SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
+								SQLBIND_DELAYED_TEXT(query, "@capperName", playername.c_str());
+								std::string playernameStripped = Q_StripColorAll(playername);
+								SQLBIND_DELAYED_TEXT(query, "@capperNameStripped", playernameStripped.c_str());
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@enemyFlagHoldTime");
+								SQLBIND_DELAYED_NULL(query, "@capperClientNum");
+								SQLBIND_DELAYED_NULL(query, "@capperName");
+								SQLBIND_DELAYED_NULL(query, "@capperNameStripped");
+							}
+							SQLBIND_DELAYED(query, int, "@grabberIsVisible", grabberPlayerIsVisible);
+							SQLBIND_DELAYED(query, int, "@grabberIsFollowed", grabberPlayerIsFollowed);
+							SQLBIND_DELAYED(query, int, "@grabberIsFollowedOrVisible", grabberPlayerIsVisibleOrFollowed);
+							if (playerNum != -1) {
+								SQLBIND_DELAYED(query, int, "@capperIsVisible", playerIsVisible);
+								SQLBIND_DELAYED(query, int, "@capperIsFollowed", playerIsFollowed);
+								SQLBIND_DELAYED(query, int, "@capperIsFollowedOrVisible", playerIsVisibleOrFollowed);
+								SQLBIND_DELAYED(query, int, "@capperWasVisible", wasVisible);
+								SQLBIND_DELAYED(query, int, "@capperWasFollowed", wasFollowed);
+								SQLBIND_DELAYED(query, int, "@capperWasFollowedOrVisible", wasVisibleOrFollowed);
+								SQLBIND_DELAYED(query, int, "@capperKills", flagCarrierKillCount);
+								SQLBIND_DELAYED(query, int, "@capperRets", flagCarrierRetCount);
+								SQLBIND_DELAYED(query, double, "@maxSpeedCapper", maxSpeedCapper);
+								SQLBIND_DELAYED(query, double, "@averageSpeedCapper", averageSpeedCapper);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@capperIsVisible");
+								SQLBIND_DELAYED_NULL(query, "@capperIsFollowed");
+								SQLBIND_DELAYED_NULL(query, "@capperIsFollowedOrVisible");
+								SQLBIND_DELAYED_NULL(query, "@capperWasVisible");
+								SQLBIND_DELAYED_NULL(query, "@capperWasFollowed");
+								SQLBIND_DELAYED_NULL(query, "@capperWasFollowedOrVisible");
+								SQLBIND_DELAYED_NULL(query, "@capperKills");
+								SQLBIND_DELAYED_NULL(query, "@capperRets");
+								SQLBIND_DELAYED_NULL(query, "@maxSpeedCapper");
+								SQLBIND_DELAYED_NULL(query, "@averageSpeedCapper");
+							}
+							SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
+							SQLBIND_DELAYED(query, int, "@flagTeam", flagTeam);
+							//SQLBIND_DELAYED(query, int, "@sameFrameCap", sameFrameCap);
+							SQLBIND_DELAYED(query, int, "@redScore", teamInfo[TEAM_RED].score);
+							SQLBIND_DELAYED(query, int, "@blueScore", teamInfo[TEAM_BLUE].score);
+							SQLBIND_DELAYED(query, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
+							SQLBIND_DELAYED(query, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
+							SQLBIND_DELAYED(query, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
+							if (grabberPlayerIsVisibleOrFollowed) {
+								SQLBIND_DELAYED(query, double, "@maxSpeedGrabberLastSecond", maxSpeedGrabberLastSecond);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@maxSpeedGrabberLastSecond");
+							}
+							if (playerIsVisibleOrFollowed) {
+								SQLBIND_DELAYED(query, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@maxSpeedCapperLastSecond");
+							}
+
+							if (nearbyInfo) {
+								SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyInfo->nearbyPlayersString.c_str());
+								SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyInfo->nearbyPlayersCount);
+								SQLBIND_DELAYED_TEXT(query, "@nearbyEnemies", nearbyInfo->nearbyEnemiesString.c_str());
+								SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", nearbyInfo->nearbyEnemiescount);
+								SQLBIND_DELAYED(query, int, "@veryCloseEnemyCount", nearbyInfo->verycloseEnemiescount);
+								SQLBIND_DELAYED(query, int, "@veryClosePlayersCount", nearbyInfo->veryClosePlayersCount);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@nearbyPlayers");
+								SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", 0);
+								SQLBIND_DELAYED_NULL(query, "@nearbyEnemies");
+								SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", 0);
+								SQLBIND_DELAYED(query, int, "@veryCloseEnemyCount", 0);
+								SQLBIND_DELAYED(query, int, "@veryClosePlayersCount", 0);
+							}
+							if (nearbyInfoPad) {
+								SQLBIND_DELAYED_TEXT(query, "@padNearbyPlayers", nearbyInfoPad->nearbyPlayersString.c_str());
+								SQLBIND_DELAYED(query, int, "@padNearbyPlayerCount", nearbyInfoPad->nearbyPlayersCount);
+								SQLBIND_DELAYED_TEXT(query, "@padNearbyEnemies", nearbyInfoPad->nearbyEnemiesString.c_str());
+								SQLBIND_DELAYED(query, int, "@padNearbyEnemyCount", nearbyInfoPad->nearbyEnemiescount);
+								SQLBIND_DELAYED(query, int, "@padVeryCloseEnemyCount", nearbyInfoPad->verycloseEnemiescount);
+								SQLBIND_DELAYED(query, int, "@padVeryClosePlayersCount", nearbyInfoPad->veryClosePlayersCount);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@padNearbyPlayers");
+								SQLBIND_DELAYED(query, int, "@padNearbyPlayerCount", 0);
+								SQLBIND_DELAYED_NULL(query, "@padNearbyEnemies");
+								SQLBIND_DELAYED(query, int, "@padNearbyEnemyCount", 0);
+								SQLBIND_DELAYED(query, int, "@padVeryCloseEnemyCount", 0);
+								SQLBIND_DELAYED(query, int, "@padVeryClosePlayersCount", 0);
+							}
+
+							if (playerNum != -1) {
+								SQLBIND_DELAYED(query, double, "@maxNearbyEnemyCount", maxNearbyEnemyCount);
+								SQLBIND_DELAYED(query, double, "@moreThanOneNearbyEnemyTimePercent", moreThanOneNearbyEnemyTimePercent);
+								SQLBIND_DELAYED(query, double, "@averageNearbyEnemyCount", averageNearbyEnemyCount);
+								SQLBIND_DELAYED(query, double, "@maxVeryCloseEnemyCount", maxVeryCloseEnemyCount);
+								SQLBIND_DELAYED(query, double, "@anyVeryCloseEnemyTimePercent", anyVeryCloseEnemyTimePercent);
+								SQLBIND_DELAYED(query, double, "@moreThanOneVeryCloseEnemyTimePercent", moreThanOneVeryCloseEnemyTimePercent);
+								SQLBIND_DELAYED(query, double, "@averageVeryCloseEnemyCount", averageVeryCloseEnemyCount);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@maxNearbyEnemyCount");
+								SQLBIND_DELAYED_NULL(query, "@moreThanOneNearbyEnemyTimePercent");
+								SQLBIND_DELAYED_NULL(query, "@averageNearbyEnemyCount");
+								SQLBIND_DELAYED_NULL(query, "@maxVeryCloseEnemyCount");
+								SQLBIND_DELAYED_NULL(query, "@anyVeryCloseEnemyTimePercent");
+								SQLBIND_DELAYED_NULL(query, "@moreThanOneVeryCloseEnemyTimePercent");
+								SQLBIND_DELAYED_NULL(query, "@averageVeryCloseEnemyCount");
+							}
+
+							if (playerIsVisibleOrFollowed) {
+								SQLBIND_DELAYED(query, double, "@capperPadDistance", capperPadDistance);
+								SQLBIND_DELAYED(query, int, "@capperTimeToCap", capperTimeToCap);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@capperPadDistance");
+								SQLBIND_DELAYED_NULL(query, "@capperTimeToCap");
+							}
+
+							if (grabberPlayerIsVisibleOrFollowed) {
+								SQLBIND_DELAYED(query, double, "@positionX", currentPos[0]);
+								SQLBIND_DELAYED(query, double, "@positionY", currentPos[1]);
+								SQLBIND_DELAYED(query, double, "@positionZ", currentPos[2]);
+								SQLBIND_DELAYED(query, double, "@directionX", currentDir[0]);
+								SQLBIND_DELAYED(query, double, "@directionY", currentDir[1]);
+								SQLBIND_DELAYED(query, double, "@directionZ", currentDir[2]);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@positionX");
+								SQLBIND_DELAYED_NULL(query, "@positionY");
+								SQLBIND_DELAYED_NULL(query, "@positionZ");
+								SQLBIND_DELAYED_NULL(query, "@directionX");
+								SQLBIND_DELAYED_NULL(query, "@directionY");
+								SQLBIND_DELAYED_NULL(query, "@directionZ");
+							}
+							if (playerIsVisibleOrFollowed) {
+								SQLBIND_DELAYED(query, double, "@capperPositionX", currentPosCapper[0]);
+								SQLBIND_DELAYED(query, double, "@capperPositionY", currentPosCapper[1]);
+								SQLBIND_DELAYED(query, double, "@capperPositionZ", currentPosCapper[2]);
+								SQLBIND_DELAYED(query, double, "@capperDirectionX", currentDirCapper[0]);
+								SQLBIND_DELAYED(query, double, "@capperDirectionY", currentDirCapper[1]);
+								SQLBIND_DELAYED(query, double, "@capperDirectionZ", currentDirCapper[2]);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(query, "@capperPositionX");
+								SQLBIND_DELAYED_NULL(query, "@capperPositionY");
+								SQLBIND_DELAYED_NULL(query, "@capperPositionZ");
+								SQLBIND_DELAYED_NULL(query, "@capperDirectionX");
+								SQLBIND_DELAYED_NULL(query, "@capperDirectionY");
+								SQLBIND_DELAYED_NULL(query, "@capperDirectionZ");
+							}
+							SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
+							SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
+							SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
+							SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
+							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+
+							if (activeKillDatabase != -1) {
+								queryWrapper->databaseIndex = activeKillDatabase;
+								io.flagGrabQueries->push_back(queryWrapper);
+							}
+							else {
+								delete queryWrapper;
+							}
+
+							/*
+							int enemyTeam = flagTeam;
+							int playerTeam = flagTeam == TEAM_RED ? TEAM_BLUE : TEAM_RED;
+							for (int client = 0; client < max_clients; client++) {
+								if (playerTeams[client] == playerTeam && client != playerNum) {
+									addMetaEvent(METAEVENT_TEAMCAPTURE, demoCurrentTime, client, bufferTime, opts, bufferTime);
+								}
+								else if (playerTeams[client] == enemyTeam) {
+									addMetaEvent(METAEVENT_ENEMYTEAMCAPTURE, demoCurrentTime, client, bufferTime, opts, bufferTime);
+								}
+							}*/
+							// Meta event tracker for flaggrab
+							MetaEventTracker* grabME = new MetaEventTracker(demoCurrentTime, queryWrapper, metaEventTrackers[METRACKER_FLAGGRABS][grabberPlayerNum], bufferTime, 0, resultingMetaEventTracking[METRACKER_FLAGGRABS]);
+							bool wasFollowedThroughBufferTime = playerFirstFollowed[grabberPlayerNum] != -1 && playerFirstFollowed[grabberPlayerNum] < (demo.cut.Cl.snap.serverTime - bufferTime);
+							grabME->needsReframe = opts.reframeIfNeeded && !wasFollowedThroughBufferTime;
+							grabME->reframeClientNum = grabberPlayerNum;
+							grabME->addPastEvents(playerPastMetaEvents[grabberPlayerNum], getMinimumMetaEventBufferTime(grabberPlayerNum, bufferTime, demoCurrentTime));
+							addMetaEvent(METAEVENT_FLAGGRAB, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
+							metaEventTrackers[METRACKER_FLAGGRABS][grabberPlayerNum] = grabME;
+
+
+							if (!grabberPlayerIsVisibleOrFollowed /* && !wasVisibleOrFollowed*/) continue; // No need to cut out those who were not visible at all in any way.
+							if (searchMode == SEARCH_MY_CTF_RETURNS && grabberPlayerNum != demo.cut.Cl.snap.ps.clientNum) continue; // Only cut your own for SEARCH_MY_CTF_RETURNS
+
+							//int64_t runStart = demoCurrentTime - flagHoldTime;
+							int64_t startTime = demoCurrentTime - bufferTime;
+							int64_t endTime = demoCurrentTime + bufferTime;
+							int64_t earliestPossibleStart = lastGameStateChangeInDemoTime + 1;
+							bool isTruncated = false;
+							int truncationOffset = 0;
+							if (earliestPossibleStart > startTime) {
+								truncationOffset = earliestPossibleStart - startTime;
+								startTime = earliestPossibleStart;
+								isTruncated = true;
+							}
+							//startTime = std::max(lastGameStateChangeInDemoTime+1, startTime); // We can't start before 0 or before the last gamestate change. +1 to be safe, not sure if necessary.
+
+							//int milliSeconds = flagHoldTime;
+							//int pureMilliseconds = milliSeconds % 1000;
+							//int seconds = milliSeconds / 1000;
+							//int pureSeconds = seconds % 60;
+							//int minutes = seconds / 60;
+
+							// TODO track kills during flaggrab?
+
+							std::stringstream ss;
+							std::stringstream ss2;
+							// what we need: danger of grabbing, closeness of enemy capper to scoring (always compare to base flag pos cuz swoops)
+							// << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___"
+							// << "_" << (int)maxSpeedCapperLastSecond
+							ss << mapname << std::setfill('0') << "___FLAGGRAB" << (flagCarrierKillCount > 0 ? va("%dK", flagCarrierKillCount) : "") << (flagCarrierRetCount > 0 ? va("%dR", flagCarrierRetCount) : "");
+							ss2 << std::setfill('0') << "___" << "" << "___" << playername << "___P" << pickupOrigin << "T" << flagTeam << "___" << (nearbyInfo ? nearbyInfo->verycloseEnemiescount : 0)  << "DANGER" << (nearbyInfo ? nearbyInfo->nearbyEnemiescount : 0) << "___" << (int)maxSpeedGrabberLastSecond  << "ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << grabberPlayerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+
+							std::string targetFilename = ss.str();
+							std::string targetFilename2 = ss2.str();
+							char* targetFilenameFiltered = new char[targetFilename.length() + 1];
+							char* targetFilenameFiltered2 = new char[targetFilename2.length() + 1];
+							sanitizeFilename(targetFilename.c_str(), targetFilenameFiltered);
+							sanitizeFilename(targetFilename2.c_str(), targetFilenameFiltered2);
+
+							std::stringstream batSS;
+							std::stringstream batSS2;
+							batSS << "\nrem demoCurrentTime: " << demoCurrentTime;
+							batSS << "\n" << (wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered;
+							batSS2 << targetFilenameFiltered2 << "\" " << startTime << " " << endTime;
+							batSS2 << (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
+							queryWrapper->batchString1 = batSS.str();
+							queryWrapper->batchString2 = batSS2.str();
+
+							delete[] targetFilenameFiltered;
+							if (!opts.noFindOutput)  std::cout << targetFilename << targetFilename2 << "\n";
+
+
 							/*int playerNum = thisEs->trickedentindex;
 							int flagTeam = thisEs->trickedentindex2;
 							// A bit pointless tbh because we reset it to -1 anyway before checking entities. 
@@ -10027,7 +10824,7 @@ cuterror:
 
 
 
-qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const char* outputBatFileMarks, highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
+qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const char* outputBatFile, const char* outputBatFileKillSprees, const char* outputBatFileDefrag, const char* outputBatFileCaptures, const char* outputBatFileFlagGrabs, const char* outputBatFileLaughs, const char* outputBatFileSpecial, const char* outputBatFileMarks, highlightSearchMode_t searchMode, const ExtraSearchOptions& opts) {
 	char			ext[7]{};
 	demoType_t		demoType;
 	qboolean		isCompressedFile = qfalse;
@@ -10035,13 +10832,13 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 	int maxClientsHere = getMAX_CLIENTS(demoType);
 	switch (maxClientsHere) {
 	case 1: // JK 2 SP
-		return demoHighlightFindExceptWrapper<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
+		return demoHighlightFindExceptWrapper<1>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileFlagGrabs, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
 		break;
 	case 32:
-		return demoHighlightFindExceptWrapper<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
+		return demoHighlightFindExceptWrapper<32>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileFlagGrabs, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
 		break;
 	case 64:
-		return demoHighlightFindExceptWrapper<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
+		return demoHighlightFindExceptWrapper<64>(sourceDemoFile, bufferTime, outputBatFile, outputBatFileKillSprees, outputBatFileDefrag, outputBatFileCaptures, outputBatFileFlagGrabs, outputBatFileLaughs, outputBatFileSpecial, outputBatFileMarks, searchMode, opts);
 		break;
 	default:
 		throw std::exception("unsupported MAX_CLIENTS count.");
@@ -10374,7 +11171,7 @@ int main(int argcO, char** argvO) {
 	Com_Printf("Looking at %s.\n", demoName); 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	DPrintFLocation = demoName;
-	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptLaughs.bat","highlightExtractionScriptSpecial.bat","highlightExtractionScriptMarks.bat", searchMode, opts)) {
+	if (demoHighlightFind(demoName, bufferTime,"highlightExtractionScript.bat","highlightExtractionScriptKillSprees.bat","highlightExtractionScriptDefrag.bat","highlightExtractionScriptCaptures.bat","highlightExtractionScriptFlagGrabs.bat","highlightExtractionScriptLaughs.bat","highlightExtractionScriptSpecial.bat","highlightExtractionScriptMarks.bat", searchMode, opts)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Highlights successfully found in %.5f seconds.\n",seconds);

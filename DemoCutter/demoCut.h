@@ -5826,6 +5826,7 @@ typedef enum metaEventType_t {
 	METAEVENT_EFFECT, // effect event of any sort
 	METAEVENT_LAUGH, // effect event of any sort
 	//METAEVENT_HIGHLIGHT, // highlight of the demo. not really used, internal for democutter tools for merging and such
+	METAEVENT_FLAGGRAB, // effect event of any sort
 	METAEVENT_COUNT
 };
 

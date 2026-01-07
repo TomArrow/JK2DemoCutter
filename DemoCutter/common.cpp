@@ -8791,6 +8791,7 @@ const char* metaEventKeyNames[METAEVENT_COUNT] = {
 	"ef",
 	"l",
 	//"hl" // not really used, internal for democutter toools
+	"fg",
 };
 
 
