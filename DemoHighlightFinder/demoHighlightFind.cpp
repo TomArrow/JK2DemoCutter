@@ -8470,7 +8470,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										}
 									}
 									throughWallOcclusion = 100 * occluding / occludedTests; // very rough percentage, doesnt need to be super precise since it's just 8 tests anyway
-									modInfo << "_TW" << (int)((throughWallNormal)*100.0f); // Through wall. Meh, not very universal. But decent?
+									if (throughWallOcclusion == 100) {
+										modInfo << "_TW" << (int)((throughWallNormal) * 100.0f); // Through wall. Meh, not very universal. But decent?
+									}
+									else {
+										modInfo << "_PTW" << throughWallOcclusion << "N" << (int)((throughWallNormal) * 100.0f); // Through wall. Meh, not very universal. But decent?
+									}
 								}
 							}
 
