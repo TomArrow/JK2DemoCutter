@@ -2043,6 +2043,7 @@ typedef enum {
 } errorParm_t;
 
 void	Q_strncpyz(char* dest, int destCapacity, const char* src, int destsize);
+char* Q_stristr(const char* str, char* charset);
 char* QDECL va(const char* format, ...);
 
 int		Cmd_Argc(void);

@@ -164,6 +164,21 @@ void Q_strncpyz(char* dest, int destCapacity, const char* src, int destsize) {
 	dest[destsize - 1] = 0;
 }
 
+char* Q_stristr(const char* str, char* charset) {
+	int i;
+
+	while (*str) {
+		for (i = 0; charset[i] && str[i]; i++) {
+			if (toupper(charset[i]) != toupper(str[i])) break;
+		}
+		if (!charset[i]) {
+			return (char*)str;
+		}
+		str++;
+	}
+	return NULL;
+}
+
 void QDECL Com_Printf(const char* fmt, ...) {
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
