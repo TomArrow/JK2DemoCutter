@@ -1,0 +1,1 @@
+SELECT demoName,demoPath,fileSize,demoTimeDuration,DATETIME(MIN(demoDateTime), 'unixepoch') as whentime, demoRecorderNamesStripped FROM demoMeta GROUP BY demoName,fileSize ORDER BY whentime
