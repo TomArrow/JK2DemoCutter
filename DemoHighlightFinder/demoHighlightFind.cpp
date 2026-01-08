@@ -2601,6 +2601,12 @@ float getMaxAngularSnapForClientinTimeFrame(int clientNum, int64_t fromTime, int
 	//return maxSnap;
 }
 
+const char* getPlayerName(int clientNum, int CS_PLAYERS_here, bool isMOHAADemo) {
+	int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+	const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+	return Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+}
+
 template <unsigned int max_clients>
 void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 	int stringOffset;
@@ -3192,7 +3198,7 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 }
 
 // TODO Optimize this a bit more with the random usage of std::string/const char etc?
-void logSpecialThing(const char* specialType, std::string details, std::string comment, std::string playerNameIfExists, int reframeClientNum, int altClientNum, int64_t demoCurrentTime, int duration, int bufferTime, int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath,int oldDemoDateModified, const char* sourceDemoFile,  qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts, highlightSearchMode_t searchMode) {
+void logSpecialThing(const char* specialType, const std::string details, const std::string comment, const std::string playerNameIfExists, const int reframeClientNum, const int altClientNum, const int64_t demoCurrentTime, const int duration, const int bufferTime, const int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath, const int oldDemoDateModified, const char* sourceDemoFile, const qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,const demoType_t demoType) {
 	
 	SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 	SQLDelayedQuery* query = &queryWrapper->query;
@@ -3215,11 +3221,17 @@ void logSpecialThing(const char* specialType, std::string details, std::string c
 	else {
 		SQLBIND_DELAYED_NULL(query, "@clientNum");
 	}
-	if (altClientNum != -1) {
+	if (altClientNum != -1 && altClientNum != reframeClientNum) {
 		SQLBIND_DELAYED_TEXT(query, "@clientNumAlt", altClientNum);
+		const char* playerNameAlt = getPlayerName(altClientNum,getCS_PLAYERS(demoType),demoTypeIsMOHAA(demoType));
+		SQLBIND_DELAYED_TEXT(query, "@playerNameAlt", playerNameAlt);
+		std::string playerNameAltStripped = Q_StripColorAll(playerNameAlt);
+		SQLBIND_DELAYED_TEXT(query, "@playerNameAltStripped", playerNameAltStripped.c_str());
 	}
 	else {
 		SQLBIND_DELAYED_NULL(query, "@clientNumAlt");
+		SQLBIND_DELAYED_NULL(query, "@playerNameAlt");
+		SQLBIND_DELAYED_NULL(query, "@playerNameAltStripped");
 	}
 	if (playerNameIfExists.size()) {
 		SQLBIND_DELAYED_TEXT(query, "@playerName", playerNameIfExists.c_str());
@@ -3640,6 +3652,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"clientNumAlt	INTEGER,"
 			"playerName	TEXT,"
 			"playerNameStripped	TEXT,"
+			"playerNameAlt	TEXT,"
+			"playerNameAltStripped	TEXT,"
 			"details	TEXT,"
 			"detailsStripped	TEXT,"
 			"comment	TEXT,"
@@ -3780,9 +3794,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertLaughsStatement, NULL);
 
 		preparedStatementText = "INSERT INTO special"
-			"(id,map,serverName,serverNameStripped,type,clientNum,clientNumAlt,playerName,playerNameStripped,details,detailsStripped,comment,commentStripped,demoRecorderClientnum,demoName,demoPath,duration,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"(id,map,serverName,serverNameStripped,type,clientNum,clientNumAlt,playerName,playerNameStripped,playerNameAlt,playerNameAltStripped,details,detailsStripped,comment,commentStripped,demoRecorderClientnum,demoName,demoPath,duration,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 			"VALUES "
-			"(@id,@map,@serverName,@serverNameStripped,@type,@clientNum,@clientNumAlt,@playerName,@playerNameStripped,@details,@detailsStripped,@comment,@commentStripped,@demoRecorderClientnum,@demoName,@demoPath,@duration,@demoTime,@lastGamestateDemoTime,@serverTime,@demoDateTime);";
+			"(@id,@map,@serverName,@serverNameStripped,@type,@clientNum,@clientNumAlt,@playerName,@playerNameStripped,@playerNameAlt,@playerNameAltStripped,@details,@detailsStripped,@comment,@commentStripped,@demoRecorderClientnum,@demoName,@demoPath,@duration,@demoTime,@lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertSpecialStatement, NULL);
 
@@ -6596,7 +6610,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + demo.cut.Cl.snap.ps.clientNum];
 						const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
 						const char* playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
-						logSpecialThing("JUMPBUGSEARCH", "", "", playerName, demo.cut.Cl.snap.ps.clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode);
+						logSpecialThing("JUMPBUGSEARCH", "", "", playerName, demo.cut.Cl.snap.ps.clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}
 
 					// Backflip detection
@@ -10603,7 +10617,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
 						msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
 					}
-					logSpecialThing("STRINGSEARCH", msgInfo.isValid? msgInfo.message : opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode);
+					logSpecialThing("STRINGSEARCH", msgInfo.isValid? msgInfo.message : opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 				}
 			}
 
@@ -10677,7 +10691,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 							if (isMark) {
-								logSpecialThing("MARK", msgInfo.message, rawChatCommand, playerName, reframeClientNum, msgInfo.playerNum, demoCurrentTime, duration, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode);
+								logSpecialThing("MARK", msgInfo.message, rawChatCommand, playerName, reframeClientNum, msgInfo.playerNum, demoCurrentTime, duration, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 							}
 
 						}
@@ -10690,7 +10704,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doChatSearch) {
 					if (strstr(rawChatCommand.c_str(),opts.chatSearch.c_str()) || strstr(chatCommand.c_str(), opts.chatSearch.c_str())) {
 						parsedChatMessage_t msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
-						logSpecialThing("CHATSEARCH", msgInfo.isValid ? msgInfo.message : opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode);
+						logSpecialThing("CHATSEARCH", msgInfo.isValid ? msgInfo.message : opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}
 				}
 				if (opts.writeChatsUnique) {
@@ -10841,7 +10855,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doPrintSearch) {
 					std::string strippedPrint = Q_StripColorAll(printText);
 					if (strstr(printText.c_str(), opts.printSearch.c_str()) || strstr(strippedPrint.c_str(), opts.printSearch.c_str())) {
-						logSpecialThing("PRINTSEARCH", opts.printSearch, printText,"", -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode);
+						logSpecialThing("PRINTSEARCH", opts.printSearch, printText,"", -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}
 				}
 
