@@ -3481,6 +3481,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"redPlayerCount INTEGER,"
 			"bluePlayerCount INTEGER,"
 			"sumPlayerCount INTEGER,"
+			"boosts	TEXT,"
+			"boostCount	INTEGER NOT NULL,"
 			"maxSpeedCapperLastSecond	REAL,"
 			"maxSpeedCapper	REAL,"
 			"averageSpeedCapper	REAL,"
@@ -3543,6 +3545,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"redPlayerCount INTEGER,"
 			"bluePlayerCount INTEGER,"
 			"sumPlayerCount INTEGER,"
+			"boosts	TEXT,"
+			"boostCount	INTEGER NOT NULL,"
 			"maxSpeedGrabberLastSecond	REAL,"
 			"maxSpeedCapperLastSecond	REAL,"
 			"maxSpeedCapper	REAL,"
@@ -3765,16 +3769,16 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
-			"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 			"VALUES "
-			"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+			"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertCaptureStatement, NULL);
 
 		preparedStatementText = "INSERT INTO flaggrabs"
-			"(id,map,serverName,serverNameStripped,enemyFlagHoldTime,flagPickupSource,grabberName,grabberNameStripped,capperName,capperNameStripped,grabberClientNum,capperClientNum,grabberIsVisible,grabberIsFollowed,grabberIsFollowedOrVisible,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,maxSpeedGrabberLastSecond,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,veryCloseEnemyCount,veryClosePlayersCount,padNearbyPlayers,padNearbyPlayerCount,padNearbyEnemies,padNearbyEnemyCount,padVeryCloseEnemyCount,padVeryClosePlayersCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,capperPadDistance,capperTimeToCap,directionX,directionY,directionZ,positionX,positionY,positionZ,capperDirectionX,capperDirectionY,capperDirectionZ,capperPositionX,capperPositionY,capperPositionZ,resultingCaptures,resultingSelfCaptures,resultingEnemyCaptures,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"(id,map,serverName,serverNameStripped,enemyFlagHoldTime,flagPickupSource,grabberName,grabberNameStripped,capperName,capperNameStripped,grabberClientNum,capperClientNum,grabberIsVisible,grabberIsFollowed,grabberIsFollowedOrVisible,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedGrabberLastSecond,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,veryCloseEnemyCount,veryClosePlayersCount,padNearbyPlayers,padNearbyPlayerCount,padNearbyEnemies,padNearbyEnemyCount,padVeryCloseEnemyCount,padVeryClosePlayersCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,capperPadDistance,capperTimeToCap,directionX,directionY,directionZ,positionX,positionY,positionZ,capperDirectionX,capperDirectionY,capperDirectionZ,capperPositionX,capperPositionY,capperPositionZ,resultingCaptures,resultingSelfCaptures,resultingEnemyCaptures,resultingLaughs,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 			"VALUES "
-			"(@id,@map,@serverName,@serverNameStripped,@enemyFlagHoldTime,@flagPickupSource,@grabberName,@grabberNameStripped,@capperName,@capperNameStripped,@grabberClientNum,@capperClientNum,@grabberIsVisible,@grabberIsFollowed,@grabberIsFollowedOrVisible,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@maxSpeedGrabberLastSecond,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@veryCloseEnemyCount,@veryClosePlayersCount,@padNearbyPlayers,@padNearbyPlayerCount,@padNearbyEnemies,@padNearbyEnemyCount,@padVeryCloseEnemyCount,@padVeryClosePlayersCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@capperPadDistance,@capperTimeToCap,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@capperDirectionX,@capperDirectionY,@capperDirectionZ,@capperPositionX,@capperPositionY,@capperPositionZ,@resultingCaptures,@resultingSelfCaptures,@resultingEnemyCaptures,@resultingLaughs,@demoName,@demoPath,@demoTime,@lastGamestateDemoTime,@serverTime,@demoDateTime);";
+			"(@id,@map,@serverName,@serverNameStripped,@enemyFlagHoldTime,@flagPickupSource,@grabberName,@grabberNameStripped,@capperName,@capperNameStripped,@grabberClientNum,@capperClientNum,@grabberIsVisible,@grabberIsFollowed,@grabberIsFollowedOrVisible,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedGrabberLastSecond,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@veryCloseEnemyCount,@veryClosePlayersCount,@padNearbyPlayers,@padNearbyPlayerCount,@padNearbyEnemies,@padNearbyEnemyCount,@padVeryCloseEnemyCount,@padVeryClosePlayersCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@capperPadDistance,@capperTimeToCap,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@capperDirectionX,@capperDirectionY,@capperDirectionZ,@capperPositionX,@capperPositionY,@capperPositionZ,@resultingCaptures,@resultingSelfCaptures,@resultingEnemyCaptures,@resultingLaughs,@demoName,@demoPath,@demoTime,@lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertFlagGrabStatement, NULL);
@@ -9278,6 +9282,55 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								nearbyInfoPad = getNearbyPlayersInfo<max_clients>(baseFlagPositions[flagTeam].pos, grabberPlayerNum);
 							}
 
+							// Boosts that led to this cap
+							std::stringstream boostsStringStream;
+							int boostCountGrabber = 0;
+							if (true) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
+
+								//int64_t excludeAttackerBoostsAfter = INT64_MAX; // todo exclude anything that happened on this frame? so we ignore boosts that happened after or right during cap? meh
+								// oh btw... could use pm_time for boost detection. check if it was set since last frame.
+
+								for (int i = 0; i < boosts.size(); i++) {
+									if ((demoCurrentTime - boosts[i].demoTime) > BOOST_DETECT_MAX_AGE) continue; // meh
+									qboolean doThis = qfalse;
+									// find out if we should even bother
+									if (boosts[i].boostedClientNum == playerNum) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+
+										//if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
+
+										// Ignore mini boosts?
+										if (!boosts[i].confirmed && !boosts[i].checkDistanceTraveled(thisFrameInfo.playerPositions[boosts[i].boostedClientNum])) continue;
+
+										//if (!boosts[i].checkFacingTowards(target)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
+
+										boostCountGrabber++;
+										doThis = qtrue;
+										boostsStringStream << "[CAPPER by";
+									}
+									if (!doThis) continue;
+
+									// ok let's bother
+									std::string boosterName = "";
+									if (boosts[i].boosterClientNum != -1) {
+										int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + boosts[i].boosterClientNum];
+										const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+										boosterName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+									}
+									if (boosts[i].isEnemyBoost != -1) {
+										boostsStringStream << (boosts[i].isEnemyBoost ?  " ENEMY]" : (boosts[i].boosterClientNum == grabberPlayerNum ? " SELF]" : " TEAM]"));
+										//boostsStringStream << (boosts[i].isEnemyBoost ? (target == boosts[i].boosterClientNum ? " VICTIM]" : " ENEMY]") : (boosts[i].boosterClientNum == attacker ? " SELF]" : " TEAM]"));
+									}
+									else {
+										boostsStringStream << " UNKNOWN]";
+									}
+									if (boosterName.size() > 0) {
+										boostsStringStream << " " << boosterName;
+									}
+									boostsStringStream << " (" << (boosts[i].demoTime - demoCurrentTime) << ", ~" << boosts[i].estimatedStrength << ")";
+									boostsStringStream << "\n";
+								}
+							}
+							std::string boostsString = boostsStringStream.str();
 
 							// Find nearby players.
 							/*std::stringstream nearbyPlayersSS;
@@ -9491,6 +9544,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
 							SQLBIND_DELAYED(query, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
 							SQLBIND_DELAYED(query, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount + teamInfo[TEAM_RED].playerCount);
+							SQLBIND_DELAYED_TEXT(query, "@boosts", (boostCountGrabber > 0 ? boostsString.c_str() : NULL));
+							SQLBIND_DELAYED(query, int, "@boostCount", boostCountGrabber);
 							if (grabberPlayerIsVisibleOrFollowed) {
 								SQLBIND_DELAYED(query, double, "@maxSpeedGrabberLastSecond", maxSpeedGrabberLastSecond);
 							}
@@ -9671,7 +9726,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// what we need: danger of grabbing, closeness of enemy capper to scoring (always compare to base flag pos cuz swoops)
 							// << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___"
 							// << "_" << (int)maxSpeedCapperLastSecond
-							ss << mapname << std::setfill('0') << "___FLAGGRAB" << (flagCarrierKillCount > 0 ? va("%dK", flagCarrierKillCount) : "") << (flagCarrierRetCount > 0 ? va("%dR", flagCarrierRetCount) : "");
+							std::string boostString = boostCountGrabber > 0 ? va("_BST%d", boostCountGrabber) : "";
+							ss << mapname << std::setfill('0') << "___FLAGGRAB" << (flagCarrierKillCount > 0 ? va("%dK", flagCarrierKillCount) : "") << (flagCarrierRetCount > 0 ? va("%dR", flagCarrierRetCount) : "") << boostString;
 							ss2 << std::setfill('0') << "___" << "" << "___" << playername << "___P" << pickupOrigin << "T" << flagTeam << "___" << (nearbyInfo ? nearbyInfo->verycloseEnemiescount : 0)  << "DANGER" << (nearbyInfo ? nearbyInfo->nearbyEnemiescount : 0) << "___" << (int)maxSpeedGrabberLastSecond  << "ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << grabberPlayerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
@@ -9823,6 +9879,57 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								nearbyInfo = getNearbyPlayersInfo<max_clients>(currentPos, playerNum);
 							}
 
+
+							// Boosts that led to this cap
+							std::stringstream boostsStringStream;
+							int boostCountCapper = 0;
+							if ( true) { // If it's a literal "/kill" console command, let's just ignore boosts. Why bother.
+
+								//int64_t excludeAttackerBoostsAfter = INT64_MAX; // todo exclude anything that happened on this frame? so we ignore boosts that happened after or right during cap? meh
+								// oh btw... could use pm_time for boost detection. check if it was set since last frame.
+
+								for (int i = 0; i < boosts.size(); i++) {
+									if ((demoCurrentTime - boosts[i].demoTime) > BOOST_DETECT_MAX_AGE) continue; // meh
+									qboolean doThis = qfalse;
+									// find out if we should even bother
+									if (boosts[i].boostedClientNum == playerNum) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+
+										//if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
+
+										// Ignore mini boosts?
+										if (!boosts[i].confirmed && !boosts[i].checkDistanceTraveled(thisFrameInfo.playerPositions[boosts[i].boostedClientNum])) continue;
+
+										//if (!boosts[i].checkFacingTowards(target)) continue; // This ONLY affects entity based boost detects (check code of checkFacingTowards) and is a patchwork solution to missing boosterClientNum.
+
+										boostCountCapper++;
+										doThis = qtrue;
+										boostsStringStream << "[CAPPER by";
+									}
+									if (!doThis) continue;
+
+									// ok let's bother
+									std::string boosterName = "";
+									if (boosts[i].boosterClientNum != -1) {
+										int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + boosts[i].boosterClientNum];
+										const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+										boosterName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+									}
+									if (boosts[i].isEnemyBoost != -1) {
+										boostsStringStream << (boosts[i].isEnemyBoost ? " ENEMY]" : (boosts[i].boosterClientNum == playerNum ? " SELF]" : " TEAM]"));
+										//boostsStringStream << (boosts[i].isEnemyBoost ? (target == boosts[i].boosterClientNum ? " VICTIM]" : " ENEMY]") : (boosts[i].boosterClientNum == attacker ? " SELF]" : " TEAM]"));
+									}
+									else {
+										boostsStringStream << " UNKNOWN]";
+									}
+									if (boosterName.size() > 0) {
+										boostsStringStream << " " << boosterName;
+									}
+									boostsStringStream << " (" << (boosts[i].demoTime - demoCurrentTime) << ", ~" << boosts[i].estimatedStrength << ")";
+									boostsStringStream << "\n";
+								}
+							}
+							std::string boostsString = boostsStringStream.str();
+
 							// Find nearby players.
 							/*std::stringstream nearbyPlayersSS;
 							std::vector<int> nearbyPlayers;
@@ -9971,6 +10078,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@redPlayerCount", teamInfo[TEAM_RED].playerCount);
 							SQLBIND_DELAYED(query, int, "@bluePlayerCount", teamInfo[TEAM_BLUE].playerCount);
 							SQLBIND_DELAYED(query, int, "@sumPlayerCount", teamInfo[TEAM_FREE].playerCount + teamInfo[TEAM_BLUE].playerCount+teamInfo[TEAM_RED].playerCount);
+
+							SQLBIND_DELAYED_TEXT(query, "@boosts", (boostCountCapper > 0 ? boostsString.c_str() : NULL));
+							SQLBIND_DELAYED(query, int, "@boostCount", boostCountCapper);
+
 							SQLBIND_DELAYED(query, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
 							SQLBIND_DELAYED(query, double, "@maxSpeedCapper", maxSpeedCapper);
 							SQLBIND_DELAYED(query, double, "@averageSpeedCapper", averageSpeedCapper);
@@ -10076,7 +10187,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							std::stringstream ss;
 							std::stringstream ss2;
-							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"");
+							std::string boostString = boostCountCapper > 0 ? va("_BST%d", boostCountCapper) : "";
+							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << boostString;
 							ss2 << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<(int)averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
