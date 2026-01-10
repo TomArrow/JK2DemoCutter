@@ -9364,7 +9364,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									if ((demoCurrentTime - boosts[i].demoTime) > BOOST_DETECT_MAX_AGE) continue; // meh
 									qboolean doThis = qfalse;
 									// find out if we should even bother
-									if (boosts[i].boostedClientNum == playerNum) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
+									if (boosts[i].boostedClientNum == grabberPlayerNum) { // Avoid detecting mutual boosts between killer and victin. Could have been swordfight. TODO: Allow very strong boosts
 
 										//if (boosts[i].demoTime > excludeAttackerBoostsAfter) continue;
 
@@ -9375,7 +9375,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 										boostCountGrabber++;
 										doThis = qtrue;
-										boostsStringStream << "[CAPPER by";
+										boostsStringStream << "[GRABBER by";
 									}
 									if (!doThis) continue;
 
