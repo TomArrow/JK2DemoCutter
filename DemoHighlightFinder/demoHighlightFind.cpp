@@ -757,6 +757,68 @@ typedef struct flagPosition_t {
 };
 flagPosition_t	baseFlagPositions[MAX_TEAMS]{};
 
+#define MAX_PAST_SPIRAL_LOCATIONS 512 // i think we dont need more do we?
+typedef struct playerSpiralLocationInfo_t {
+	spiralLocation_t	locs[MAX_PAST_SPIRAL_LOCATIONS];
+	int64_t				nextLoc;
+};
+playerSpiralLocationInfo_t	playerSpiralLocations[MAX_CLIENTS_MAX]; // coulda gone for std::vector or sth but i think 512 past locations is good enough. theres practically no circumstance where we'd want to save more into the past. that would imply, guesstimating, traveling 256,000 units while holding the flag. i guess it might happen in theory on very long holds but keeping that much info isnt practical anyway...
+std::string getPlayerSpiralLocationsString(int clientNum, int64_t sinceTime, int maxItems) {
+	if (playerSpiralLocations[clientNum].nextLoc == 0) {
+		return "";
+	}
+	int64_t firstIndex = playerSpiralLocations[clientNum].nextLoc;
+	int64_t lowestPossibleIndex = std::max(0LL, playerSpiralLocations[clientNum].nextLoc-MAX_PAST_SPIRAL_LOCATIONS);
+	spiralLocation_t* locInfo = NULL;
+	int maxLocation = 0;
+	do {
+		firstIndex--;
+		locInfo = &playerSpiralLocations[clientNum].locs[firstIndex % MAX_PAST_SPIRAL_LOCATIONS];
+		if (locInfo->encodedLocation > maxLocation) {
+			maxLocation = locInfo->encodedLocation;
+		}
+	} while (locInfo->demoTime > sinceTime && firstIndex > lowestPossibleIndex);
+	// figure out the amount of base91 chars we need to encode the largest number.
+	int digitsneeded = 0;
+	int maxLocationLimit = maxLocation;
+	while (maxLocation) {
+		maxLocation /= 91;
+		digitsneeded++;
+	}
+
+	if (digitsneeded > 4) { // thats already insane. doubt we should ever go over 2.
+		digitsneeded = 4;
+		maxLocationLimit = 91 * 91 * 91 * 91 - 1;
+	}
+
+	if (!digitsneeded) {
+		return "0"; // its literally just a location at 0,0, shrug.
+	}
+
+	std::stringstream str;
+	str << (char)('0' + digitsneeded);  // we always start with a control character to signal the version of encoding we use, in case we ever want to improve/change it. for now, 0-9 is reserved as a 500-distance spiral encoding with 0-9 base91 chars to encode the individual location.
+
+	int itemCount = playerSpiralLocations[clientNum].nextLoc - firstIndex;
+	float skip = itemCount > maxItems ? ((float)(itemCount - 1) / (float)(maxItems - 1)) : 1.0f; // if needed, we "thin out" a bit.
+
+	int roundedIndex = 0;
+	for (float index = firstIndex; roundedIndex < playerSpiralLocations[clientNum].nextLoc; index += skip) {
+		roundedIndex = roundf(index) + 0.25f;
+		spiralLocation_t* locInfo = &playerSpiralLocations[clientNum].locs[roundedIndex % MAX_PAST_SPIRAL_LOCATIONS];
+		// decompose the encoded location into base91 chars
+		int loc = locInfo->encodedLocation;
+		if (loc > maxLocationLimit) continue;
+		for (int digit = 0; digit < digitsneeded; digit++) {
+			int number = loc % 91;
+			str << (char)base91BasicAlphabet_[number];
+			loc /= 91;
+		}
+	}
+
+	return str.str();
+}
+
+
 int mohaaPlayerWeaponModelIndexThisFrame[MAX_CLIENTS_MAX];
 int mohaaPlayerWeaponModelIndex[MAX_CLIENTS_MAX];
 int mohaaPlayerWeapon[MAX_CLIENTS_MAX];
@@ -1877,7 +1939,7 @@ qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 		int minutes = atoi(vec_num[matchNum][2].c_str());
 		//std::string secondString = vec_num[matchNum][3];
 		float seconds = atof(vec_num[matchNum][3].c_str());
-		int milliSeconds = (1000.0f * seconds) + 0.5f;
+		int milliSeconds = (1000.0f * seconds) + 0.25f;
 		int pureMilliseconds = milliSeconds % 1000;
 		int pureSeconds = milliSeconds / 1000;
 
@@ -3506,6 +3568,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"positionZ	REAL,"
 			"resultingLaughs INTEGER,"
 			"resultingLaughsAfter INTEGER,"
+			"pastLocations	TEXT," // special rough tracking of locations during the run.
 			"demoName TEXT NOT NULL,"
 			"demoPath TEXT NOT NULL,"
 			"demoTime INTEGER NOT NULL,"
@@ -3769,9 +3832,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
-			"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
+			"(map,serverName,serverNameStripped,flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,pastLocations,demoName,demoPath,demoTime,lastGamestateDemoTime,serverTime,demoDateTime)"
 			"VALUES "
-			"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
+			"(@map,@serverName,@serverNameStripped,@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@pastLocations,@demoName,@demoPath,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertCaptureStatement, NULL);
 
@@ -5402,6 +5465,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 	
 
+	Com_Memset(playerSpiralLocations,0,sizeof(playerSpiralLocations));
 	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
 	Com_Memset(playerVisibleFrames,0,sizeof(playerVisibleFrames));
 	Com_Memset(playerVisibleClientFrames,0,sizeof(playerVisibleClientFrames));
@@ -7139,6 +7203,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							playerVisibleClientFrames[i]++;
 						}
 
+						// rough location tracking (restrict to cappers?)
+						if (encodeNewLocation(thisFrameInfo.playerPositions[i],playerSpiralLocations[i].nextLoc ? &playerSpiralLocations[i].locs[(playerSpiralLocations[i].nextLoc-1) % MAX_PAST_SPIRAL_LOCATIONS] : NULL, &playerSpiralLocations[i].locs[playerSpiralLocations[i].nextLoc % MAX_PAST_SPIRAL_LOCATIONS])) {
+							playerSpiralLocations[i].locs[playerSpiralLocations[i].nextLoc % MAX_PAST_SPIRAL_LOCATIONS].demoTime = demoCurrentTime;
+							playerSpiralLocations[i].nextLoc++;
+						}
+
 						// special jumps/headjumps tracking
 						if (thisFrameInfo.groundEntityNum[i] == ENTITYNUM_WORLD) {
 							lastGroundHeight[i] = thisFrameInfo.playerPositions[i][2];
@@ -8470,8 +8540,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										startpos[0] = thisFrameInfo.playerPositions[attacker][0] - 15.0f + x * (15.0f + 15.0f);
 										endpos[0] = thisEs->pos.trBase[0] - 15.0f + x * (15.0f + 15.0f);
 										for (int y = 0; y < 2; y++) {
-											startpos[1] = thisFrameInfo.playerPositions[attacker][1] - 15.0f + x * (15.0f + 15.0f);
-											endpos[1] = thisEs->pos.trBase[1] - 15.0f + x * (15.0f + 15.0f);
+											startpos[1] = thisFrameInfo.playerPositions[attacker][1] - 15.0f + y * (15.0f + 15.0f);
+											endpos[1] = thisEs->pos.trBase[1] - 15.0f + y * (15.0f + 15.0f);
 											for (int z = 0; z < 2; z++) {
 												startpos[2] = thisFrameInfo.playerPositions[attacker][2] + (float)DEFAULT_MINS_2 + z * (-DEFAULT_MINS_2 + attackerMaxZ);
 												endpos[2] = thisEs->pos.trBase[2] + (float)DEFAULT_MINS_2 + z * (-DEFAULT_MINS_2 + victimMaxZ);
@@ -10128,6 +10198,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+							std::string pastLocationsString = getPlayerSpiralLocationsString(playerNum,demoCurrentTime-flagHoldTime,15);
+							SQLBIND_DELAYED_TEXT(query, "@pastLocations", pastLocationsString.c_str());
 
 							if (nearbyInfo) {
 								delete nearbyInfo;

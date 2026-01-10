@@ -58,6 +58,9 @@ vec_t VectorLength2(const vec2_t v) {
 vec_t VectorLengthSquared(const vec3_t v) {
 	return (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 }
+vec_t Vector2LengthSquared(const vec2_t v) {
+	return (v[0] * v[0] + v[1] * v[1]);
+}
 
 vec_t Distance(const vec3_t p1, const vec3_t p2) {
 	vec3_t	v;
@@ -134,6 +137,214 @@ void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross) {
 	cross[1] = v1[2] * v2[0] - v1[0] * v2[2];
 	cross[2] = v1[0] * v2[1] - v1[1] * v2[0];
 }
+
+
+
+
+
+
+//
+//
+// past location encoding to get a ROUGH idea of the path a capper took.
+//
+
+
+// 
+// from:https://github.com/wecand0/base91
+/*
+MIT License
+
+Copyright (c) 2024 Vadim
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+const char base91BasicAlphabet_[91] = {
+		'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', //00..12
+		'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', //13..25
+		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', //26..38
+		'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', //39..51
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '!', '#', '$', //52..64
+		'%', '&', '(', ')', '*', '+', ',', '.', '/', ':', ';', '-', '=', //65..77
+		'\\', '?', '@', '[', ']', '^', '_', '`', '{', '|', '}', '~', '\''//78..90
+};
+
+const uint8_t base91DecAlphabet_[256] = {
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//000..015
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//016..031
+		91, 62, 91, 63, 64, 65, 66, 90, 67, 68, 69, 70, 71, 76, 72, 73,//032..047 // @34: ", @39: ', @45: -
+		52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 74, 75, 91, 77, 91, 79,//048..063 // @60: <, @62: >
+		80, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,          //064..079
+		15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 81, 78, 82, 83, 84,//080..095 // @92: slash
+		85, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,//096..111
+		41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 86, 87, 88, 89, 91,//112..127
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//128..143
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//144..159
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//160..175
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//176..191
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//192..207
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//208..223
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,//224..239
+		91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91 //240..255
+};
+// END from https://github.com/wecand0/base91
+
+
+// 
+// from: https://github.com/chmike/fpsqrt (MIT license)
+/*
+MIT License
+
+Copyright (c) 2019 Christophe Meessen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+// sqrt_i64 computes the squrare root of a 64bit integer and returns
+// a 64bit integer value. It requires that v is positive.
+int64_t sqrt_i64(int64_t v) {
+	uint64_t b = ((uint64_t)1) << 62, q = 0, r = v;
+	while (b > r)
+		b >>= 2;
+	while (b > 0) {
+		uint64_t t = q + b;
+		q >>= 1;
+		if (r >= t) {
+			r -= t;
+			q += b;
+		}
+		b >>= 2;
+	}
+	return q;
+}
+// fpsqrt end
+
+
+int encode2dspiral(int x, int y) { // sudely there has to be a more efficient way...
+	if (!x && !y) return 0;
+	int ring = std::max(std::abs(x), std::abs(y));
+	int sidelen = (ring - 1) * 2 + 1;
+	int index = sidelen * sidelen;
+	sidelen += 2;
+	int premultiplier = sidelen - 1;
+
+	if (x == ring) {
+		index += (ring - y);
+	}
+	else if (y == -ring) {
+		index += premultiplier + (ring - x);
+	}
+	else if (x == -ring) {
+		index += premultiplier * 2 + (y + ring);
+	}
+	else {
+		index += premultiplier * 3 + (x + ring);
+	}
+
+	return index;
+}
+
+void decode2dspiral(int index, int* x, int* y) {
+	if (!index) {
+		*x = 0;
+		*y = 0;
+		return;
+	}
+	int ring = sqrt_i64(index);
+	ring = ((ring - 1) / 2) + 1;
+	int sidelen = (ring - 1) * 2 + 1;
+	index -= sidelen * sidelen;
+	sidelen += 2;
+
+	int premultiplier = sidelen - 1;
+
+	if (index >= premultiplier * 3) {
+		*y = ring;
+		*x = index - premultiplier * 3 - ring;
+	}
+	else if (index >= premultiplier * 2) {
+		*y = index - premultiplier * 2 - ring;
+		*x = -ring;
+	}
+	else if (index > premultiplier) {
+		*x = premultiplier + ring - index;
+		*y = -ring;
+	}
+	else {
+		*x = ring;
+		*y = ring - index;
+	}
+
+}
+qboolean encodeNewLocation(vec_t* origin, spiralLocation_t* oldLocation, spiralLocation_t* newLocation) {
+	if (oldLocation && Vector2DistanceSquared(origin, oldLocation->actualLocation) < LOCATIONSPIRAL_GRIDSIZE_MINDISTANCE_SQUARED) {
+		return qfalse;
+	}
+	veci2_t newLoc;
+	newLoc[0] = roundf(origin[0] * LOCATIONSPIRAL_GRID_MULTIPLIER)+0.5f*copysignf(1.0f, origin[0]);
+	newLoc[1] = roundf(origin[1] * LOCATIONSPIRAL_GRID_MULTIPLIER) + 0.5f * copysignf(1.0f, origin[1]);
+	if (oldLocation && newLoc[0]==oldLocation->roughLocation[0] && newLoc[1] == oldLocation->roughLocation[1]) {
+		return qfalse;
+	}
+	newLocation->actualLocation[0] = origin[0];
+	newLocation->actualLocation[1] = origin[1];
+	newLocation->roughLocation[0] = newLoc[0];
+	newLocation->roughLocation[1] = newLoc[1];
+	newLocation->encodedLocation = encode2dspiral(newLoc[0],newLoc[1]);
+	return qtrue;
+}
+
+//
+//
+// END past location encoding to get a ROUGH idea of the path a capper took.
+//
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2682,6 +2893,14 @@ float Vector2Distance(vec2_t v1, vec2_t v2)
 
 	Vector2Subtract(v2, v1, dir);
 	return VectorLength2(dir);
+} 
+
+float Vector2DistanceSquared(vec2_t v1, vec2_t v2)
+{
+	vec2_t dir;
+
+	Vector2Subtract(v2, v1, dir);
+	return Vector2LengthSquared(dir);
 } 
 
 

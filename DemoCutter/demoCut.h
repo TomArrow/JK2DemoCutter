@@ -593,6 +593,14 @@ typedef vec_t vec3_t[3];
 typedef vec_t vec4_t[4];
 typedef vec_t vec5_t[5];
 
+
+typedef int veci_t;
+typedef veci_t veci2_t[2];
+typedef veci_t veci3_t[3];
+typedef veci_t veci4_t[4];
+typedef veci_t veci5_t[5];
+
+
 #define Square(x) ((x)*(x))
 
 vec_t VectorLength(const vec3_t v);
@@ -602,9 +610,30 @@ vec_t Vector2Normalize(vec2_t v);
 vec_t VectorNormalize2(const vec3_t v, vec3_t out);
 void VectorInverse(vec3_t v);
 vec_t VectorLengthSquared(const vec3_t v);
+vec_t Vector2LengthSquared(const vec2_t v);
 vec_t Distance(const vec3_t p1, const vec3_t p2);
 vec_t DistanceSquared(const vec3_t p1, const vec3_t p2);
 void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross);
+
+
+// past location encoding to get a ROUGH idea of the path a capper took.
+#define LOCATIONSPIRAL_GRIDSIZE 500 // distance between points on the grid. we encode the closest point to ourselves
+#define LOCATIONSPIRAL_GRIDSIZE_MINDISTANCE (LOCATIONSPIRAL_GRIDSIZE/2) // distance between points on the grid. we encode the closest point to ourselves
+static constexpr float LOCATIONSPIRAL_GRIDSIZE_MINDISTANCE_SQUARED = (float)LOCATIONSPIRAL_GRIDSIZE_MINDISTANCE * (float)LOCATIONSPIRAL_GRIDSIZE_MINDISTANCE; // if we stand right at the transition between two locations and move back and forth, that shouldn't trigger a new location or we spam it.
+static constexpr float LOCATIONSPIRAL_GRID_MULTIPLIER = 1.0f/(float)LOCATIONSPIRAL_GRIDSIZE; //multiply by this instead of dividing. ezier
+typedef struct spiralLocation_t {
+	int		encodedLocation;
+	int64_t	demoTime;
+	vec2_t	actualLocation;
+	veci2_t	roughLocation;
+};
+extern const char base91BasicAlphabet_[91]; // base91
+extern const uint8_t base91DecAlphabet_[256]; // base91
+int encode2dspiral(int x, int y);
+void decode2dspiral(int index, int* x, int* y);
+qboolean encodeNewLocation(vec_t* origin, spiralLocation_t* oldLocation, spiralLocation_t* newLocation);
+// END past location encoding to get a ROUGH idea of the path a capper took.
+
 
 inline float AngleDelta(float angle1, float angle2);
 inline float AngleNormalize180(float angle);
@@ -4260,6 +4289,7 @@ int getLikelyStanceFromTorsoAnim(int torsoAnim, demoType_t demoType, byte* proba
 
 float VectorDistance(vec3_t v1, vec3_t v2);
 float Vector2Distance(vec2_t v1, vec2_t v2);
+float Vector2DistanceSquared(vec2_t v1, vec2_t v2);
 
 
 
