@@ -9798,7 +9798,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// << "_" << (int)maxSpeedCapperLastSecond
 							std::string boostString = boostCountGrabber > 0 ? va("_BST%d", boostCountGrabber) : "";
 							ss << mapname << std::setfill('0') << "___FLAGGRAB" << (flagCarrierKillCount > 0 ? va("%dK", flagCarrierKillCount) : "") << (flagCarrierRetCount > 0 ? va("%dR", flagCarrierRetCount) : "") << boostString;
-							ss2 << std::setfill('0') << "___" << "" << "___" << playername << "___P" << pickupOrigin << "T" << flagTeam << "___" << (nearbyInfo ? nearbyInfo->verycloseEnemiescount : 0)  << "DANGER" << (nearbyInfo ? nearbyInfo->nearbyEnemiescount : 0) << "___" << (int)maxSpeedGrabberLastSecond  << "ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << grabberPlayerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+							ss2 << std::setfill('0') << "___" << /*"" << "___"<<*/  grabberplayername << "___P" << pickupOrigin << "T" << flagTeam << "___" << (nearbyInfo ? nearbyInfo->verycloseEnemiescount : 0)  << "DANGER" << (nearbyInfo ? nearbyInfo->nearbyEnemiescount : 0) << "___" << (int)maxSpeedGrabberLastSecond  << "ups" << (grabberPlayerIsFollowed ? "" : (grabberPlayerIsVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << grabberPlayerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
 							std::string targetFilename2 = ss2.str();
