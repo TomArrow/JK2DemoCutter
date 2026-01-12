@@ -802,8 +802,7 @@ std::string getPlayerSpiralLocationsString(int clientNum, int64_t sinceTime, int
 	float skip = itemCount > maxItems ? ((float)(itemCount - 1) / (float)(maxItems - 1)) : 1.0f; // if needed, we "thin out" a bit.
 
 	int roundedIndex = 0;
-	for (float index = firstIndex; roundedIndex < playerSpiralLocations[clientNum].nextLoc; index += skip) {
-		roundedIndex = roundf(index) + 0.25f;
+	for (float index = firstIndex; (roundedIndex = roundf(index) + 0.25f) < playerSpiralLocations[clientNum].nextLoc; index += skip) {
 		spiralLocation_t* locInfo = &playerSpiralLocations[clientNum].locs[roundedIndex % MAX_PAST_SPIRAL_LOCATIONS];
 		// decompose the encoded location into base91 chars
 		int loc = locInfo->encodedLocation;
