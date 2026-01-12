@@ -1739,6 +1739,25 @@ tsl::htrie_map<char, int> playerNamesToClientNums;
 qboolean clientNameIsDuplicate[MAX_CLIENTS_MAX];
 std::set<std::string>	recorderPlayerNames;
 
+#define DERR_SEH				(1<<0)
+#define DERR_OPENFAIL			(1<<1)
+#define DERR_FAILREADSEQNUM		(1<<2)
+#define DERR_DUPEMSGNUM			(1<<3)
+#define DERR_MSGSIZEOVERMAX		(1<<4)
+#define DERR_FAILREADMSG		(1<<5)
+#define DERR_READPASTEND		(1<<6)
+#define DERR_ILLEGIBLESRVMSG	(1<<7)
+#define DERR_FAILPARSECMDSTR	(1<<8)
+#define DERR_FAILPARSEGAMESTATE	(1<<9)
+#define DERR_FAILPARSESNAP		(1<<10)
+#define DERR_SNAPMALFORMED		(1<<11)
+#define DERR_ERRORCNFSTRMOD		(1<<12)
+#define DERR_WEIRDMSGSIZE		(1<<13)
+#define DERR_MSGSIZEENDBUTLEFT	(1<<14)
+//#define DERR_THRGHWALLBOXSOLID	(1<<15) // kill-based
+int	demoErrorFlags = 0;
+std::stringstream	demoErrors;
+
 // This also updates the playerNamesToClientNums trie
 template<unsigned int max_clients>
 void updatePlayerDemoStatsArrayPointers(demoType_t demoType, const ExtraSearchOptions& opts) {
@@ -3524,6 +3543,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoTime INTEGER NOT NULL,"
 			"lastGamestateDemoTime INTEGER NOT NULL,"
 			"serverTime INTEGER NOT NULL,"
+			"errorFlags INTEGER NOT NULL,"
 			"entryMeta INTEGER NOT NULL"
 			"); ",
 			NULL, NULL, NULL);
@@ -3786,6 +3806,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoDateTime TIMESTAMP NOT NULL,"
 			"demoRecorderNames	TEXT NOT NULL,"
 			"demoRecorderNamesStripped	TEXT NOT NULL,"
+			"demoErrorFlags INTEGER NOT NULL,"
+			"demoErrors	TEXT,"
 			"PRIMARY KEY(demoPath)"
 			"); ",
 			NULL, NULL, NULL);
@@ -3833,13 +3855,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #if TRACK_GROUNDFRAME
 ",groundFrameQuality,groundFrameAngleChange"
 #endif
-			",throughWallNormal,throughWallOcclusion,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,entryMeta)"
+			",throughWallNormal,throughWallOcclusion,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
 			"VALUES "
 			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
 ",@groundFrameQuality,@groundFrameAngleChange"
 #endif	
-",@throughWallNormal,@throughWallOcclusion,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@entryMeta);";
+",@throughWallNormal,@throughWallOcclusion,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
@@ -3903,9 +3925,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoDatabaseProperty, NULL);
 
 		preparedStatementText = "INSERT INTO demoMeta "
-			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped )"
+			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors )"
 			" VALUES "
-			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped)";
+			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors)";
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoMeta, NULL);
 
 		preparedStatementText = "SELECT last_insert_rowid();";
@@ -4702,6 +4724,26 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	io.outputBatHandleMarks->open(outputBatFileMarks, std::ios_base::app); // append instead of overwrite
 #endif
 
+
+	if (SEHExceptionCaught || !successStatisticsSave) { // this was after executeAllQueries(io, opts); originally. dunno why? but i want it to add to demoErrors in demoMeta
+		// This demo errored. Remember it.
+		// We are catching access violations and such.
+		//
+		SEHExceptionCaught = true; // Actually it can be normal exception too but whatever.
+		if (wasDoingSQLiteExecution) { // If there was access violation while doing sqlite writess, maybe its not safe to wanna preserve the data.  Just ditch it.
+			doFinalizeSQLite = false;
+		}
+
+		std::ofstream exceptionOutputHandle;
+
+		exceptionOutputHandle.open("highlightExtractionExceptions.log", std::ios_base::app); // append instead of overwrite
+		demoErrors << "SEH: " << demoCurrentTime << ";" << wasDoingSQLiteExecution << ";" << errorInfo << "\n";
+		demoErrorFlags |= DERR_SEH;
+		exceptionOutputHandle << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << ";" << errorInfo << "\n";
+		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << "\n\n" << errorInfo << "\n\n\n\n\n";
+		exceptionOutputHandle.close();
+	}
+
 	// Save demo stats
 	for (int i = 0; i < opts.killDbsCount; i++) {
 		const char* demoNameCStr = sharedVars.oldBasename.c_str();
@@ -4711,6 +4753,9 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@fileSize", sharedVars.demoFilesize);
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@demoTimeDuration", demoCurrentTime);
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@demoDateTime", sharedVars.oldDemoDateModified);
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@demoErrorFlags", demoErrorFlags);
+		std::string demoErrorsString = demoErrors.str();
+		SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoErrors", demoErrorsString.c_str());
 
 		std::stringstream recorderNames;
 		std::stringstream recorderNamesStripped;
@@ -4739,23 +4784,6 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 	executeAllQueries(io, opts);
 
-	if (SEHExceptionCaught || !successStatisticsSave) {
-		// This demo errored. Remember it.
-		// We are catching access violations and such.
-		//
-		SEHExceptionCaught = true; // Actually it can be normal exception too but whatever.
-		if (wasDoingSQLiteExecution) { // If there was access violation while doing sqlite writess, maybe its not safe to wanna preserve the data.  Just ditch it.
-			doFinalizeSQLite = false;
-		}
-
-		std::ofstream exceptionOutputHandle;
-
-		exceptionOutputHandle.open("highlightExtractionExceptions.log", std::ios_base::app); // append instead of overwrite
-		exceptionOutputHandle << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution << ";" << errorInfo << "\n";
-		std::cout << "\n\n\n\n\nHORRIBLE EXCEPTION! Demo caused something really bad to happen. (I kid, you'll live but maybe send me the demo to investigate). Details: \n\n" << sharedVars.oldPath << ";" << demoCurrentTime << ";" << wasDoingSQLiteExecution<< "\n\n"<< errorInfo << "\n\n\n\n\n";
-		exceptionOutputHandle.close();
-	}
-
 	if (doFinalizeSQLite) {
 #ifdef DEBUGSTATSDB
 		sqlite3_exec(io.debugStatsDb, "COMMIT;", NULL, NULL, NULL);
@@ -4781,6 +4809,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			sqlite3_finalize(io.killDb[i].insertDemoMeta);
 			sqlite3_finalize(io.killDb[i].selectLastInsertRowIdStatement);
 			sqlite3_finalize(io.killDb[i].insertEntryMetaStatement);
+			sqlite3_finalize(io.killDb[i].insertPlayerNameStatement);
 			sqlite3_close(io.killDb[i].killDb);
 		}
 
@@ -5679,7 +5708,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	}*/
 	sharedVars.demoFilesize = oldSize = FS_FOpenFileRead(va("%s%s", oldName, ext), &oldHandle, qtrue, isCompressedFile);
 	if (!oldHandle) {
+		demoErrorFlags |= DERR_OPENFAIL;
 		Com_DPrintf("Failed to open %s for reading.\n", oldName);
+		demoErrors << "Failed to open for reading.\n";
 		return qfalse;
 	}
 
@@ -5773,8 +5804,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		oldSequenceNum = demo.cut.Clc.serverMessageSequence;
 
 		/* Read the sequence number */
-		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
+		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4) {
+			demoErrorFlags |= DERR_FAILREADSEQNUM;
+			demoErrors << "Failed to read sequence number.\n";
 			goto cuterror;
+		}
 
 		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
 
@@ -5782,7 +5816,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		sequenceNumOrderChanged = false;
 		if (demo.cut.Clc.serverMessageSequence == oldSequenceNum) {
+			demoErrorFlags |= DERR_DUPEMSGNUM;
 			std::cerr << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
+			demoErrors << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << ")\n";
 		}
 		else if (demo.cut.Clc.serverMessageSequence < oldSequenceNum) {
 			sequenceNumOrderChanged = true;
@@ -5801,8 +5837,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		oldSize -= 4;
 		/* Read the message size */
-		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
+		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4) {
 			goto cuterror;
+		}
 		oldMsg.cursize = LittleLong(oldMsg.cursize);
 		oldSize -= 4;
 		/* Negative size signals end of demo */
@@ -5813,26 +5850,38 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	|| true
 #endif
 					) {
+					demoErrorFlags |= DERR_MSGSIZEENDBUTLEFT;
+					demoErrors << "Message size changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
 					std::cout << "Message size changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
 				}
 			}
 			else {
+				demoErrorFlags |= DERR_WEIRDMSGSIZE;
+				demoErrors << "Message size changed to weird value: "<< oldMsg.cursize << ". Treating as end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
 				std::cout << "Message size changed to weird value: "<< oldMsg.cursize << ". Treating as end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
 			}
 			break;
 		}
-		if (oldMsg.cursize > oldMsg.maxsize)
+		if (oldMsg.cursize > oldMsg.maxsize) {
+			demoErrorFlags |= DERR_MSGSIZEOVERMAX;
+			demoErrors << "Message size above maxsize.\n";
 			goto cuterror;
+		}
 		/* Read the actual message */
 		if (oldMsg.raw) {
 			oldMsg.dataRaw->resize(oldMsg.cursize);
 			if (FS_Read(oldMsg.dataRaw->data(), oldMsg.cursize, oldHandle) != oldMsg.cursize) {
+				demoErrorFlags |= DERR_FAILREADMSG;
+				demoErrors << "Failed to read entire message (raw).\n";
 				goto cuterror;
 			}
 		}
 		else {
-			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
+			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize) {
+				demoErrorFlags |= DERR_FAILREADMSG;
+				demoErrors << "Failed to read entire message.\n";
 				goto cuterror;
+			}
 		}
 		oldSize -= oldMsg.cursize;
 
@@ -5859,7 +5908,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 			byte cmd, ocmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
+				demoErrorFlags |= DERR_READPASTEND;
 				Com_DPrintf("Demo cutter, read past end of server message.\n");
+				demoErrors << "Read past end of server message\n";
 				goto cuterror;
 			}
 			ocmd = MSG_ReadByte(&oldMsg);
@@ -5888,7 +5939,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					break;
 				}
 			default:
+				demoErrorFlags |= DERR_ILLEGIBLESRVMSG;
 				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message %d (%d); previous: %d (%d) \n",cmd,ocmd,previouscmd,previousOcmd);
+				demoErrors << "ERROR: CL_ParseServerMessage: Illegible server message "<< cmd<<" ("<< ocmd<<"); previous: "<< previouscmd<<" ("<< previousOcmd <<") \n";
 				if (isMOHAADemo && readGamestate == 0) {
 					goto cutcontinue; // Uh I made some silly oopsie
 				}
@@ -5897,6 +5950,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				break;
 			case svc_serverCommand_general:
 				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType,SEHExceptionCaught)) {
+					demoErrorFlags |= DERR_FAILPARSECMDSTR;
+					demoErrors << "Failed to parse command string\n";
 					goto cuterror;
 				}
 				currentPacketPeriodStats.totalServerCommandSize += oldMsg.readcount - oldMsgOffset;
@@ -5996,6 +6051,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				//	goto cutcomplete;
 				//}
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0),SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
+					demoErrorFlags |= DERR_FAILPARSEGAMESTATE;
+					demoErrors << "Failed to parse gamestate\n";
 					goto cuterror;
 				}
 				if (opts.makeVideo || opts.throughWallChecks) {
@@ -6083,7 +6140,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				malformedMessageCaught = false;
 				GlobalDebugDemoTime = demoCurrentTime;
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType,SEHExceptionCaught, malformedMessageCaught,qtrue)) {
+					demoErrorFlags |= DERR_FAILPARSESNAP;
+					demoErrors << "Failed to parse snapshot\n";
 					if (malformedMessageCaught) {
+						demoErrorFlags |= DERR_SNAPMALFORMED;
+						demoErrors << "Trying to continue after malformed message...\n";
 						std::cout << "Trying to continue after malformed message...\n";
 						goto cutcontinue;
 					}
@@ -7590,6 +7651,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							bool			targetIsVisibleOrFollowed = false;
 							bool			attackerIsVisible = false;
 							bool			isSaberKill = false; // In case we want to avoid non-saber kills to save space with huge demo collections
+#define KAEF_OCCLUSION_SOLID_AFTER_BOXTEST	(1<<0)
+							int				errorFlags = 0;
 							qboolean		sameFrameRet = qfalse;
 							if (target < 0 || target >= max_clients) {
 								std::cout << "CG_Obituary: target out of range. This should never happen really.";
@@ -8638,7 +8701,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 												memset(&trace, 0, sizeof(trace));
 												cm->CM_BoxTrace(&trace, startpos, endpos, NULL, NULL, 0, MASK_PLAYERSOLID, qfalse);
 												if (trace.allsolid || trace.startsolid) {
-													std::cerr << "Through-Wall occlusion testing: Trace returned solid but shouldn't since we tested the box.\n";
+													errorFlags |= KAEF_OCCLUSION_SOLID_AFTER_BOXTEST;
+													std::cout << "Through-Wall occlusion testing: Trace returned solid but shouldn't since we tested the box.\n";
 												}
 												else {
 													occludedTests++;
@@ -9175,6 +9239,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 							SQLBIND_DELAYED(angleQuery, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+							SQLBIND_DELAYED(angleQuery, int, "@errorFlags", errorFlags);
 
 							if (activeKillDatabase != -1) {
 								angleQueryWrapper->databaseIndex = activeKillDatabase;
@@ -11028,6 +11093,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			}
 			else if (!strcmp(cmd, "cs")) {
 				if (!demoCutConfigstringModified(&demo.cut.Cl,demoType)) {
+					demoErrorFlags |= DERR_ERRORCNFSTRMOD;
+					demoErrors << "Error calling configstringModified\n";
 					goto cuterror;
 				}
 
