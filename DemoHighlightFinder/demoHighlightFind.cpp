@@ -313,6 +313,15 @@ CModel* cm = NULL;
 std::queue<entityState_t*> parsedEventEntities;
 
 
+
+
+// flags for sql fields so we dont need to do dumb string comparisons
+#define QF_PLAYERNAME0				(1<<0)
+#define QF_PLAYERNAME0STRIPPED		(1<<1)
+#define QF_PLAYERNAME1				(1<<2)
+#define QF_PLAYERNAME1STRIPPED		(1<<3)
+
+
 typedef class SQLDelayedQueryWrapper_t {
 public:
 	SQLDelayedQuery query;
@@ -329,6 +338,7 @@ public:
 struct ioHandlesKillDb_t {
 
 	sqlite3* killDb;
+	sqlite3_stmt* insertPlayerNameStatement;
 	sqlite3_stmt* insertEntryMetaStatement;
 	sqlite3_stmt* insertSpecialStatement;
 	sqlite3_stmt* insertLaughsStatement;
@@ -954,8 +964,11 @@ ankerl::unordered_dense::map< frameInfoViewModelAnimSimpleKey, int, ankerl::unor
 #define SQLBIND_NONDELAYED_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
 
 #define SQLBIND_DELAYED(delayedQuery,type,name,value) delayedQuery->add(name,value)
+#define SQLBIND_DELAYED_FLAGS(delayedQuery,type,name,value,flags) delayedQuery->add(name,value,flags)
 #define SQLBIND_DELAYED_NULL(delayedQuery,name) delayedQuery->add(name,SQLDelayedValue_NULL)
+#define SQLBIND_DELAYED_NULL_FLAGS(delayedQuery,name,flags) delayedQuery->add(name,SQLDelayedValue_NULL,flags)
 #define SQLBIND_DELAYED_TEXT(delayedQuery,name,value) delayedQuery->add(name,value)
+#define SQLBIND_DELAYED_TEXT_FLAGS(delayedQuery,name,value,flags) delayedQuery->add(name,value,flags)
 
 #define NEARBY_PLAYER_MAX_DISTANCE 1000.0f
 #define VERYCLOSE_PLAYER_MAX_DISTANCE 300.0f
@@ -2888,9 +2901,9 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
 		std::string serverNameStripped = Q_StripColorAll(serverName);
 		SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
-		SQLBIND_DELAYED_TEXT(query, "@killerName", playername.c_str());
+		SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerName", playername.c_str(), QF_PLAYERNAME0);
 		std::string playernameStripped = Q_StripColorAll(playername);
-		SQLBIND_DELAYED_TEXT(query, "@killerNameStripped", playernameStripped.c_str());
+		SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 		SQLBIND_DELAYED_TEXT(query, "@victimNames", victimsString.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@victimNamesStripped", victimsStringStripped.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@killTypes", killTypesString.c_str());
@@ -3097,7 +3110,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 	SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
 	SQLBIND_DELAYED(query, int, "@totalMilliseconds", runInfo->milliseconds);
-	SQLBIND_DELAYED_TEXT(query, "@playerName", meta->playerName.c_str());
+	SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerName", meta->playerName.c_str(), QF_PLAYERNAME0);
 	if (runInfo->style != "") {
 		SQLBIND_DELAYED_TEXT(query, "@style", runInfo->style.c_str());
 	}
@@ -3105,7 +3118,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 		SQLBIND_DELAYED_NULL(query, "@style");
 	}
 	std::string playernameStripped = Q_StripColorAll(meta->playerName);
-	SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
+	SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME1);
 	SQLBIND_DELAYED(query, int, "@isTop10", runInfo->isLogged);
 	SQLBIND_DELAYED(query, int, "@isNumber1", runInfo->isNumber1);
 	SQLBIND_DELAYED(query, int, "@isPersonalBest", runInfo->isPersonalBest);
@@ -3286,23 +3299,23 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	if (altClientNum != -1 && altClientNum != reframeClientNum) {
 		SQLBIND_DELAYED_TEXT(query, "@clientNumAlt", altClientNum);
 		const char* playerNameAlt = getPlayerName(altClientNum,getCS_PLAYERS(demoType),demoTypeIsMOHAA(demoType));
-		SQLBIND_DELAYED_TEXT(query, "@playerNameAlt", playerNameAlt);
+		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameAlt", playerNameAlt, QF_PLAYERNAME1);
 		std::string playerNameAltStripped = Q_StripColorAll(playerNameAlt);
-		SQLBIND_DELAYED_TEXT(query, "@playerNameAltStripped", playerNameAltStripped.c_str());
+		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameAltStripped", playerNameAltStripped.c_str(), QF_PLAYERNAME1STRIPPED);
 	}
 	else {
 		SQLBIND_DELAYED_NULL(query, "@clientNumAlt");
-		SQLBIND_DELAYED_NULL(query, "@playerNameAlt");
-		SQLBIND_DELAYED_NULL(query, "@playerNameAltStripped");
+		SQLBIND_DELAYED_NULL_FLAGS(query, "@playerNameAlt",QF_PLAYERNAME1);
+		SQLBIND_DELAYED_NULL_FLAGS(query, "@playerNameAltStripped", QF_PLAYERNAME1STRIPPED);
 	}
 	if (playerNameIfExists.size()) {
-		SQLBIND_DELAYED_TEXT(query, "@playerName", playerNameIfExists.c_str());
+		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerName", playerNameIfExists.c_str(),QF_PLAYERNAME0);
 		std::string playerNameIfExistsStripped = Q_StripColorAll(playerNameIfExists);
-		SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playerNameIfExistsStripped.c_str());
+		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameStripped", playerNameIfExistsStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 	}
 	else {
-		SQLBIND_DELAYED_NULL(query, "@playerName");
-		SQLBIND_DELAYED_NULL(query, "@playerNameStripped");
+		SQLBIND_DELAYED_NULL_FLAGS(query, "@playerName", QF_PLAYERNAME0);
+		SQLBIND_DELAYED_NULL_FLAGS(query, "@playerNameStripped", QF_PLAYERNAME0STRIPPED);
 	}
 	if (details.size()) {
 		SQLBIND_DELAYED_TEXT(query, "@details", details.c_str());
@@ -3399,10 +3412,12 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"hash	TEXT,"
 			"shorthash	TEXT,"
 			"map	TEXT NOT NULL,"
-			"killerName	TEXT NOT NULL,"
-			"killerNameStripped	TEXT NOT NULL,"
-			"victimName	TEXT NOT NULL,"
-			"victimNameStripped	TEXT NOT NULL,"
+			"killerId	INTEGER NOT NULL," // player table
+			"victimId	INTEGER NOT NULL," // player table
+			//"killerName	TEXT NOT NULL,"
+			//"killerNameStripped	TEXT NOT NULL,"
+			//"victimName	TEXT NOT NULL,"
+			//"victimNameStripped	TEXT NOT NULL,"
 			"killerTeam	INTEGER,"
 			"victimTeam	INTEGER NOT NULL,"
 			"redScore INTEGER,"
@@ -3516,8 +3531,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"id	INTEGER PRIMARY KEY,"
 			"flagHoldTime	INTEGER NOT NULL,"
 			"flagPickupSource	INTEGER NOT NULL,"
-			"capperName	TEXT NOT NULL,"
-			"capperNameStripped	TEXT NOT NULL,"
+			"capperId INTEGER NOT NULL,"
+			//"capperName	TEXT NOT NULL,"
+			//"capperNameStripped	TEXT NOT NULL,"
 			"capperClientNum INTEGER NOT NULL,"
 			"capperIsVisible	BOOLEAN NOT NULL,"
 			"capperIsFollowed	BOOLEAN NOT NULL,"
@@ -3571,10 +3587,12 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"id	INTEGER PRIMARY KEY,"
 			"enemyFlagHoldTime	INTEGER,"
 			"flagPickupSource	INTEGER NOT NULL,"
-			"grabberName	TEXT NOT NULL,"
-			"grabberNameStripped	TEXT NOT NULL,"
-			"capperName	TEXT,"
-			"capperNameStripped	TEXT,"
+			"grabberId INTEGER NOT NULL,"
+			"capperId INTEGER,"
+			//"grabberName	TEXT NOT NULL,"
+			//"grabberNameStripped	TEXT NOT NULL,"
+			//"capperName	TEXT,"
+			//"capperNameStripped	TEXT,"
 			"grabberClientNum INTEGER NOT NULL,"
 			"capperClientNum INTEGER,"
 			"grabberIsVisible	BOOLEAN NOT NULL,"
@@ -3649,8 +3667,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"readableTime TEXT NOT NULL,"
 			"totalMilliseconds	INTEGER,"
 			"style	TEXT,"
-			"playerName	TEXT NOT NULL,"
-			"playerNameStripped	TEXT NOT NULL,"
+			"playerId	INTEGER NOT NULL,"
+			//"playerName	TEXT NOT NULL,"
+			//"playerNameStripped	TEXT NOT NULL,"
 			"isTop10	BOOLEAN NOT NULL,"
 			"isNumber1	BOOLEAN NOT NULL,"
 			"isPersonalBest	BOOLEAN NOT NULL,"
@@ -3689,10 +3708,12 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"type	TEXT NOT NULL,"
 			"clientNum	INTEGER,"
 			"clientNumAlt	INTEGER,"
-			"playerName	TEXT,"
-			"playerNameStripped	TEXT,"
-			"playerNameAlt	TEXT,"
-			"playerNameAltStripped	TEXT,"
+			"playerId	INTEGER,"
+			"playerIdAlt	INTEGER,"
+			//"playerName	TEXT,"
+			//"playerNameStripped	TEXT,"
+			//"playerNameAlt	TEXT,"
+			//"playerNameAltStripped	TEXT,"
 			"details	TEXT,"
 			"detailsStripped	TEXT,"
 			"comment	TEXT,"
@@ -3710,8 +3731,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"shorthash	TEXT,"
 			"maxDelay	INTEGER NOT NULL,"
 			"maxDelayActual	INTEGER NOT NULL,"
-			"killerName	TEXT NOT NULL,"
-			"killerNameStripped	TEXT NOT NULL,"
+			"killerId	INTEGER NOT NULL,"
+			//"killerName	TEXT NOT NULL,"
+			//"killerNameStripped	TEXT NOT NULL,"
 			"victimNames	TEXT NOT NULL,"
 			"victimNamesStripped	TEXT NOT NULL,"
 			"killTypes	TEXT NOT NULL,"
@@ -3780,6 +3802,16 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"); ",
 			NULL, NULL, NULL);
 
+
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE playerNames ("
+			"id	INTEGER PRIMARY KEY,"
+			"playerName	TEXT NOT NULL,"
+			"playerNameStripped	TEXT NOT NULL,"
+			"count INTEGER NOT NULL,"
+			"UNIQUE(playerName,playerNameStripped)"
+			"); ",
+			NULL, NULL, NULL);
+
 // TODO: Would be more efficient to do the inserts manually somewhere and then inject the id. but lets keep it like this for now so we can quickly adapt the code without major restructuring
 
 		/*char* preparedStatementText = "INSERT INTO kills"
@@ -3791,9 +3823,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 			"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
 		preparedStatementText = "INSERT INTO kills"
-			"(hash,shorthash,map,killerName,killerNameStripped,victimName,victimNameStripped,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
+			"(hash,shorthash,map,killerId,victimId,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
 			"VALUES "
-			"(@hash,@shorthash,@map,@killerName,@killerNameStripped,@victimName,@victimNameStripped,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
+			"(@hash,@shorthash,@map,@killerId,@victimId,@killerTeam,@victimTeam,@redScore,@blueScore,@otherFlagStatus,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@killerClientNum,@victimClientNum,@isDoomKill,@isExplosion,@isSuicide,@isModSuicide,@meansOfDeath,@positionX,@positionY,@positionZ);";
 		;
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertStatement, NULL);
 		preparedStatementText = "INSERT INTO killAngles"
@@ -3811,24 +3843,24 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
-			"(flagHoldTime,flagPickupSource,capperName,capperNameStripped,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,pastLocations,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
+			"(flagHoldTime,flagPickupSource,capperId,capperClientNum,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,sameFrameCap,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,directionX,directionY,directionZ,positionX,positionY,positionZ,resultingLaughs,resultingLaughsAfter,pastLocations,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
 			"VALUES "
-			"(@flagHoldTime,@flagPickupSource,@capperName,@capperNameStripped,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@pastLocations,@demoTime, @lastGamestateDemoTime,@serverTime,@entryMeta);";
+			"(@flagHoldTime,@flagPickupSource,@capperId,@capperClientNum,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@sameFrameCap,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@resultingLaughs,@resultingLaughsAfter,@pastLocations,@demoTime, @lastGamestateDemoTime,@serverTime,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertCaptureStatement, NULL);
 
 		preparedStatementText = "INSERT INTO flaggrabs"
-			"(enemyFlagHoldTime,flagPickupSource,grabberName,grabberNameStripped,capperName,capperNameStripped,grabberClientNum,capperClientNum,grabberIsVisible,grabberIsFollowed,grabberIsFollowedOrVisible,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedGrabberLastSecond,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,veryCloseEnemyCount,veryClosePlayersCount,padNearbyPlayers,padNearbyPlayerCount,padNearbyEnemies,padNearbyEnemyCount,padVeryCloseEnemyCount,padVeryClosePlayersCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,capperPadDistance,capperTimeToCap,directionX,directionY,directionZ,positionX,positionY,positionZ,capperDirectionX,capperDirectionY,capperDirectionZ,capperPositionX,capperPositionY,capperPositionZ,resultingCaptures,resultingSelfCaptures,resultingEnemyCaptures,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
+			"(enemyFlagHoldTime,flagPickupSource,grabberId,capperId,grabberClientNum,capperClientNum,grabberIsVisible,grabberIsFollowed,grabberIsFollowedOrVisible,capperIsVisible,capperIsFollowed,capperIsFollowedOrVisible,capperWasVisible,capperWasFollowed,capperWasFollowedOrVisible,demoRecorderClientnum,flagTeam,capperKills,capperRets,redScore,blueScore,redPlayerCount,bluePlayerCount,sumPlayerCount,boosts,boostCount,maxSpeedGrabberLastSecond,maxSpeedCapperLastSecond,maxSpeedCapper,averageSpeedCapper,metaEvents,nearbyPlayers,nearbyPlayerCount,nearbyEnemies,nearbyEnemyCount,veryCloseEnemyCount,veryClosePlayersCount,padNearbyPlayers,padNearbyPlayerCount,padNearbyEnemies,padNearbyEnemyCount,padVeryCloseEnemyCount,padVeryClosePlayersCount,maxNearbyEnemyCount,moreThanOneNearbyEnemyTimePercent,averageNearbyEnemyCount,maxVeryCloseEnemyCount,anyVeryCloseEnemyTimePercent,moreThanOneVeryCloseEnemyTimePercent,averageVeryCloseEnemyCount,capperPadDistance,capperTimeToCap,directionX,directionY,directionZ,positionX,positionY,positionZ,capperDirectionX,capperDirectionY,capperDirectionZ,capperPositionX,capperPositionY,capperPositionZ,resultingCaptures,resultingSelfCaptures,resultingEnemyCaptures,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
 			"VALUES "
-			"(@enemyFlagHoldTime,@flagPickupSource,@grabberName,@grabberNameStripped,@capperName,@capperNameStripped,@grabberClientNum,@capperClientNum,@grabberIsVisible,@grabberIsFollowed,@grabberIsFollowedOrVisible,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedGrabberLastSecond,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@veryCloseEnemyCount,@veryClosePlayersCount,@padNearbyPlayers,@padNearbyPlayerCount,@padNearbyEnemies,@padNearbyEnemyCount,@padVeryCloseEnemyCount,@padVeryClosePlayersCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@capperPadDistance,@capperTimeToCap,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@capperDirectionX,@capperDirectionY,@capperDirectionZ,@capperPositionX,@capperPositionY,@capperPositionZ,@resultingCaptures,@resultingSelfCaptures,@resultingEnemyCaptures,@resultingLaughs,@demoTime,@lastGamestateDemoTime,@serverTime,@entryMeta);";
+			"(@enemyFlagHoldTime,@flagPickupSource,@grabberId,@capperId,@grabberClientNum,@capperClientNum,@grabberIsVisible,@grabberIsFollowed,@grabberIsFollowedOrVisible,@capperIsVisible,@capperIsFollowed,@capperIsFollowedOrVisible,@capperWasVisible,@capperWasFollowed,@capperWasFollowedOrVisible,@demoRecorderClientnum,@flagTeam,@capperKills,@capperRets,@redScore,@blueScore,@redPlayerCount,@bluePlayerCount,@sumPlayerCount,@boosts,@boostCount,@maxSpeedGrabberLastSecond,@maxSpeedCapperLastSecond,@maxSpeedCapper,@averageSpeedCapper,@metaEvents,@nearbyPlayers,@nearbyPlayerCount,@nearbyEnemies,@nearbyEnemyCount,@veryCloseEnemyCount,@veryClosePlayersCount,@padNearbyPlayers,@padNearbyPlayerCount,@padNearbyEnemies,@padNearbyEnemyCount,@padVeryCloseEnemyCount,@padVeryClosePlayersCount,@maxNearbyEnemyCount,@moreThanOneNearbyEnemyTimePercent,@averageNearbyEnemyCount,@maxVeryCloseEnemyCount,@anyVeryCloseEnemyTimePercent,@moreThanOneVeryCloseEnemyTimePercent,@averageVeryCloseEnemyCount,@capperPadDistance,@capperTimeToCap,@directionX,@directionY,@directionZ,@positionX,@positionY,@positionZ,@capperDirectionX,@capperDirectionY,@capperDirectionZ,@capperPositionX,@capperPositionY,@capperPositionZ,@resultingCaptures,@resultingSelfCaptures,@resultingEnemyCaptures,@resultingLaughs,@demoTime,@lastGamestateDemoTime,@serverTime,@entryMeta);";
 
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertFlagGrabStatement, NULL);
 
 		preparedStatementText = "INSERT INTO defragRuns"
-			"(readableTime,totalMilliseconds,style,playerName,playerNameStripped,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
+			"(readableTime,totalMilliseconds,style,playerId,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
 			"VALUES "
-			"(@readableTime,@totalMilliseconds,@style,@playerName,@playerNameStripped,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@entryMeta);";
+			"(@readableTime,@totalMilliseconds,@style,@playerId,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDefragRunStatement, NULL);
 
@@ -3845,18 +3877,22 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertEntryMetaStatement, NULL);
 
+		preparedStatementText = "INSERT INTO playerNames (playerName,playerNameStripped,count) VALUES (@playerName,@playerNameStripped,1) ON CONFLICT (playerName,playerNameStripped) DO UPDATE SET count=count+1 RETURNING id;";
+
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertPlayerNameStatement, NULL);
+
 		preparedStatementText = "INSERT INTO special"
-			"(type,clientNum,clientNumAlt,playerName,playerNameStripped,playerNameAlt,playerNameAltStripped,details,detailsStripped,comment,commentStripped,demoRecorderClientnum,duration,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
+			"(type,clientNum,clientNumAlt,playerId,playerIdAlt,details,detailsStripped,comment,commentStripped,demoRecorderClientnum,duration,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
 			"VALUES "
-			"(@type,@clientNum,@clientNumAlt,@playerName,@playerNameStripped,@playerNameAlt,@playerNameAltStripped,@details,@detailsStripped,@comment,@commentStripped,@demoRecorderClientnum,@duration,@demoTime,@lastGamestateDemoTime,@serverTime,@entryMeta);";
+			"(@type,@clientNum,@clientNumAlt,@playerId,@playerIdAlt,@details,@detailsStripped,@comment,@commentStripped,@demoRecorderClientnum,@duration,@demoTime,@lastGamestateDemoTime,@serverTime,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertSpecialStatement, NULL);
 
 		preparedStatementText = "INSERT INTO killSprees "
-			"( hash, shorthash,maxDelay,maxDelayActual,killerName,killerNameStripped, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
+			"( hash, shorthash,maxDelay,maxDelayActual,killerId, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
 			" countThirdPersons, countInvisibles, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,resultingLaughs,resultingLaughsAfter,metaEvents,demoTime,lastGamestateDemoTime,duration,serverTime,nearbyPlayers,nearbyPlayerCount,entryMeta)"
 			" VALUES "
-			"( @hash, @shorthash, @maxDelay, @maxDelayActual, @killerName,@killerNameStripped, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
+			"( @hash, @shorthash, @maxDelay, @maxDelayActual, @killerId, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
 			" @countThirdPersons, @countInvisibles, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@resultingLaughs,@resultingLaughsAfter,@metaEvents,@demoTime, @lastGamestateDemoTime,@duration,@serverTime,@nearbyPlayers,@nearbyPlayerCount,@entryMeta)";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertSpreeStatement, NULL);
@@ -3880,6 +3916,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillAngles','1');", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillSpree','1');", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('entryMetaTable','1');", NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('playerNamesTable','1');", NULL, NULL, NULL);
 
 
 	}
@@ -4146,6 +4183,37 @@ void handleKillDbPreQueries(SQLDelayedQuery* mainQuery, ioHandlesKillDb_t* killD
 	}
 	sqlite3_reset(killDbHandle->insertEntryMetaStatement);
 }
+void handleKillDbPlayerPreQuery(const char* nameField,int fieldFlag, int fieldFlagStripped,SQLDelayedQuery* mainQuery, ioHandlesKillDb_t* killDbHandle, sqlite3_stmt* mainStatement) {
+
+	SQLDelayedValue* valRaw = mainQuery->getValueByFlag(fieldFlag);
+	SQLDelayedValue* valStrip = mainQuery->getValueByFlag(fieldFlagStripped);
+
+	if (valRaw->getType() == SQLVALUE_TYPE_NULL || valStrip->getType() == SQLVALUE_TYPE_NULL) {
+
+		SQLDelayedValue val(nameField, SQLDelayedValue_NULL);
+		val.bind(mainStatement);
+	}
+	else {
+		valRaw->bindOverrideName(killDbHandle->insertPlayerNameStatement, "@playerName");
+		valStrip->bindOverrideName(killDbHandle->insertPlayerNameStatement, "@playerNameStripped");
+
+		int queryResult = sqlite3_step(killDbHandle->insertPlayerNameStatement);
+		if (queryResult != SQLITE_ROW) {
+			std::cerr << "Error getting player id from database: " << queryResult << ":" << sqlite3_errmsg(killDbHandle->killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		else {
+			int64_t id = sqlite3_column_int64(killDbHandle->insertPlayerNameStatement, 0);
+			SQLDelayedValue val(nameField, id);
+			val.bind(mainStatement);
+		}
+		queryResult = sqlite3_step(killDbHandle->insertPlayerNameStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting player name into database: " << queryResult << ":" << sqlite3_errmsg(killDbHandle->killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(killDbHandle->insertPlayerNameStatement);
+	}
+	
+}
 
 void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
@@ -4210,6 +4278,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Kills
 	for (auto it = io.killQueries->begin(); it != io.killQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertStatement);
+		handleKillDbPlayerPreQuery("@killerId",QF_PLAYERNAME0,QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertStatement);
+		handleKillDbPlayerPreQuery("@victimId",QF_PLAYERNAME1,QF_PLAYERNAME1STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertStatement);
 		if (queryResult != SQLITE_DONE) {
@@ -4240,6 +4310,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.spreeQueries->begin(); it != io.spreeQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
+		handleKillDbPlayerPreQuery("@killerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
@@ -4255,6 +4326,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.captureQueries->begin(); it != io.captureQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
+		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		uint64_t insertedId = -1;
@@ -4282,6 +4354,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.flagGrabQueries->begin(); it != io.flagGrabQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		handleKillDbPlayerPreQuery("@grabberId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		uint64_t insertedId = -1;
@@ -4309,6 +4383,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.defragQueries->begin(); it != io.defragQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
+		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		if (queryResult != SQLITE_DONE) {
@@ -4352,6 +4427,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		// TODO put in database
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
+		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
+		handleKillDbPlayerPreQuery("@playerIdAlt", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertSpecialStatement);
@@ -8875,12 +8952,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT(query, "@hash", hash_hex_string.c_str());
 							SQLBIND_DELAYED_TEXT(query, "@shorthash", shorthash.c_str());
 							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
-							SQLBIND_DELAYED_TEXT(query, "@killerName", playername.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerName", playername.c_str(), QF_PLAYERNAME0);
 							std::string playernameStripped = Q_StripColorAll(playername);
-							SQLBIND_DELAYED_TEXT(query, "@killerNameStripped", playernameStripped.c_str());
-							SQLBIND_DELAYED_TEXT(query, "@victimName", victimname.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@victimName", victimname.c_str(), QF_PLAYERNAME1);
 							std::string victimnameStripped = Q_StripColorAll(victimname);
-							SQLBIND_DELAYED_TEXT(query, "@victimNameStripped", victimnameStripped.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@victimNameStripped", victimnameStripped.c_str(), QF_PLAYERNAME1STRIPPED);
 							if (isWorldKill) {
 								SQLBIND_DELAYED_NULL(query, "@killerTeam");
 							}
@@ -9575,22 +9652,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
 							SQLBIND_DELAYED(query, int, "@flagPickupSource", pickupOrigin);
-							SQLBIND_DELAYED_TEXT(query, "@grabberName", grabberplayername.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@grabberName", grabberplayername.c_str(), QF_PLAYERNAME0);
 							std::string grabbernameStripped = Q_StripColorAll(grabberplayername);
-							SQLBIND_DELAYED_TEXT(query, "@grabberNameStripped", grabbernameStripped.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@grabberNameStripped", grabbernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 							SQLBIND_DELAYED(query, int, "@grabberClientNum", grabberPlayerNum);
 							if (playerNum != -1) {
 								SQLBIND_DELAYED(query, int, "@enemyFlagHoldTime", flagHoldTime);
 								SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
-								SQLBIND_DELAYED_TEXT(query, "@capperName", playername.c_str());
+								SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperName", playername.c_str(), QF_PLAYERNAME1);
 								std::string playernameStripped = Q_StripColorAll(playername);
-								SQLBIND_DELAYED_TEXT(query, "@capperNameStripped", playernameStripped.c_str());
+								SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperNameStripped", playernameStripped.c_str(), QF_PLAYERNAME1STRIPPED);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(query, "@enemyFlagHoldTime");
 								SQLBIND_DELAYED_NULL(query, "@capperClientNum");
-								SQLBIND_DELAYED_NULL(query, "@capperName");
-								SQLBIND_DELAYED_NULL(query, "@capperNameStripped");
+								SQLBIND_DELAYED_NULL_FLAGS(query, "@capperName",QF_PLAYERNAME1);
+								SQLBIND_DELAYED_NULL_FLAGS(query, "@capperNameStripped", QF_PLAYERNAME1STRIPPED);
 							}
 							SQLBIND_DELAYED(query, int, "@grabberIsVisible", grabberPlayerIsVisible);
 							SQLBIND_DELAYED(query, int, "@grabberIsFollowed", grabberPlayerIsFollowed);
@@ -10141,9 +10218,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@flagHoldTime", flagHoldTime);
 							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
 							SQLBIND_DELAYED(query, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
-							SQLBIND_DELAYED_TEXT(query, "@capperName", playername.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperName", playername.c_str(), QF_PLAYERNAME0);
 							std::string playernameStripped = Q_StripColorAll(playername);
-							SQLBIND_DELAYED_TEXT(query, "@capperNameStripped", playernameStripped.c_str());
+							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 							SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
 							SQLBIND_DELAYED(query, int, "@capperIsVisible", playerIsVisible);
 							SQLBIND_DELAYED(query, int, "@capperIsFollowed", playerIsFollowed);

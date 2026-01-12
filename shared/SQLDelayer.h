@@ -35,14 +35,22 @@ class SQLDelayedValue {
 		double doubleValue;
 	};
 	std::string* columnNameValue = NULL;
+	int flags = 0;
 public:
+
+	inline const int getFlags() {
+		return flags;
+	}
+	inline const SQLDelayedValueType getType() {
+		return type;
+	}
 
 	std::string* getColumnName() {
 		return columnNameValue;
 	}
 	
 	template<class T>
-	SQLDelayedValue(char* columnName, T valueA) {
+	SQLDelayedValue(const char* columnName, T valueA) {
 		if constexpr (std::is_floating_point<T>()) {
 			doubleValue = valueA;
 			type = SQLVALUE_TYPE_REAL;
@@ -72,9 +80,36 @@ public:
 		columnNameValue = new std::string(columnName);
 	}
 
+	template<class T>
+	SQLDelayedValue(char* columnName, T valueA, int flagsA):SQLDelayedValue(columnName,valueA){
+		flags = flagsA;
+	}
 
 	inline int bind(sqlite3_stmt* statement) {
 		int index = sqlite3_bind_parameter_index(statement, columnNameValue->c_str());
+		if (index == 0) {
+			return 0; // Sometimes we have same set of binds for multiple statements but with different values being used or not being used. So if index not found, just discard. It doesn't seem like sqlite throws an error even if we use 0 as an index but whatever, safe is safe.
+		}
+		switch (type) {
+		case SQLVALUE_TYPE_NULL:
+			return SQLBIND_INDEX_NULL(statement, index);
+			break;
+		case SQLVALUE_TYPE_INTEGER:
+			return SQLBIND_INDEX(statement, int64, index, intValue);
+			break;
+		case SQLVALUE_TYPE_REAL:
+			return SQLBIND_INDEX(statement, double, index, doubleValue);
+			break;
+		case SQLVALUE_TYPE_TEXT:
+			return SQLBIND_INDEX_TEXT(statement, index, stringValue ? stringValue->c_str() : NULL);
+			break;
+		default:
+			throw std::invalid_argument("tried to bind SQLDelayedValue with invalid type");
+			break;
+		}
+	}
+	inline int bindOverrideName(sqlite3_stmt* statement, const char* overrideFieldname) {
+		int index = sqlite3_bind_parameter_index(statement, overrideFieldname);
 		if (index == 0) {
 			return 0; // Sometimes we have same set of binds for multiple statements but with different values being used or not being used. So if index not found, just discard. It doesn't seem like sqlite throws an error even if we use 0 as an index but whatever, safe is safe.
 		}
@@ -127,6 +162,10 @@ public:
 		values.push_back(new SQLDelayedValue(name,value));
 	}
 	template<class T>
+	void inline add(char* name, T value, int flags) {
+		values.push_back(new SQLDelayedValue(name,value,flags));
+	}
+	template<class T>
 	void inline replace(char* name, T value) {
 		remove(name);
 		values.push_back(new SQLDelayedValue(name,value));
@@ -136,6 +175,15 @@ public:
 		for (int i = 0; i < count; i++) {
 			values[i]->bind(statement);
 		}
+	}
+	inline SQLDelayedValue* getValueByFlag(int flag) {
+		int count = values.size();
+		for (int i = 0; i < count; i++) {
+			if (values[i]->getFlags() & flag) {
+				return values[i];
+			}
+		}
+		return NULL;
 	}
 	~SQLDelayedQuery() {
 		int count = values.size();
