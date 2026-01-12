@@ -874,6 +874,9 @@ void CModel::CMod_LoadEntityString( lump_t *l, const char *name ) {
 
 	COM_StripExtension(name, entName, sizeof(entName));
 	COM_DefaultExtension(entName, sizeof(entName), ".ent");
+	if (!FS_FileExists(entName)) {
+		return;
+	}
 	entLen = FS_FOpenFileRead(entName, &entHandle, qfalse, qfalse);
 
 	if (entHandle) {
@@ -1649,7 +1652,7 @@ void CModel::CM_LoadMap_Actual( const char *name, qboolean clientload, int *chec
 		Com_Error( ERR_DROP, "CM_LoadMap: NULL name" );
 	}
 
-	Com_DPrintf( "CM_LoadMap( %s, %i )\n", name, clientload );
+	//Com_DPrintf( "CM_LoadMap( %s, %i )\n", name, clientload );
 
 	if ( !strcmp( cm.name, name ) && clientload ) {
 		*checksum = last_checksum;
@@ -4017,7 +4020,7 @@ void CModel::CM_AddFacetBevels( facet_t *facet ) {
 					} //end if
 					ChopWindingInPlace( &w2, newplane, newplane[3], 0.1f );
 					if (!w2) {
-						Com_DPrintf("WARNING: CM_AddFacetBevels... invalid bevel\n");
+						//Com_DPrintf("WARNING: CM_AddFacetBevels... invalid bevel\n");
 						continue;
 					}
 					else {

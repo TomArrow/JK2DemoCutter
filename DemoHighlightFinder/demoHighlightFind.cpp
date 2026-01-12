@@ -3118,7 +3118,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 		SQLBIND_DELAYED_NULL(query, "@style");
 	}
 	std::string playernameStripped = Q_StripColorAll(meta->playerName);
-	SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME1);
+	SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 	SQLBIND_DELAYED(query, int, "@isTop10", runInfo->isLogged);
 	SQLBIND_DELAYED(query, int, "@isNumber1", runInfo->isNumber1);
 	SQLBIND_DELAYED(query, int, "@isPersonalBest", runInfo->isPersonalBest);
@@ -3860,7 +3860,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		preparedStatementText = "INSERT INTO defragRuns"
 			"(readableTime,totalMilliseconds,style,playerId,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
 			"VALUES "
-			"(@readableTime,@totalMilliseconds,@style,@playerId,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoTime, @lastGamestateDemoTime,@serverTime,@demoDateTime,@entryMeta);";
+			"(@readableTime,@totalMilliseconds,@style,@playerId,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoTime, @lastGamestateDemoTime,@serverTime,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDefragRunStatement, NULL);
 
