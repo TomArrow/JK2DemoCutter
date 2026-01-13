@@ -8346,7 +8346,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 											modInfo << saberMoveNames_general[psGeneralSaberMove];
 											if (!modInfo.str().size()) {
-												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
+												//modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberDrawAnimLevel];
+												modInfo << saberStyleNames[demo.cut.Cl.snap.ps.fd.saberAnimLevel]; // animlevel is more correct. reflects the actual saber stance rather than the displayed one (which may not be locked in yet)
 											}
 											else {
 												// It's a special attack.
