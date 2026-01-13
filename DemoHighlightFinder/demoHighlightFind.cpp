@@ -28,6 +28,8 @@
 #include "tsl/htrie_map.h"
 #include "../shared/libgmavi/libgmavi.h"
 
+#include "include/rapidjson/document.h"
+
 #define DEBUGSTATSDB
 
 #define BUFFERBAT
@@ -854,6 +856,7 @@ std::string lastPlayerModel[MAX_CLIENTS_MAX];
 int lastKnownRedFlagCarrier = -1;
 int lastKnownBlueFlagCarrier = -1;
 strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
+int saberComboCounter[MAX_CLIENTS_MAX];
 
 #define GROUND_CROUCH_SNEAK_THRESHOLD 2000 // If you are crouching and walking on ground for this long, we're gonna assume you're SNEAKING
 int groundCrouchDurations[MAX_CLIENTS_MAX];
@@ -1483,6 +1486,7 @@ struct frameInfo_t {
 	int torsoAnimGeneral[MAX_CLIENTS_MAX];
 	int groundEntityNum[MAX_CLIENTS_MAX];
 	int psStats12[MAX_CLIENTS_MAX];
+	int saberMoveGeneral[MAX_CLIENTS_MAX];
 }; 
 
 frameInfo_t lastFrameInfo;
@@ -1754,9 +1758,14 @@ std::set<std::string>	recorderPlayerNames;
 #define DERR_ERRORCNFSTRMOD		(1<<12)
 #define DERR_WEIRDMSGSIZE		(1<<13)
 #define DERR_MSGSIZEENDBUTLEFT	(1<<14)
+#define DERR_BADJSONMETA		(1<<15)
 //#define DERR_THRGHWALLBOXSOLID	(1<<15) // kill-based
 int	demoErrorFlags = 0;
 std::stringstream	demoErrors;
+
+#define DERIV_FAKEDEMO		(1<<0) // dentified by fake demo server name. could be reframe merge etc
+#define DERIV_SNAPSMANIP	(1<<1) // snaps manipulation by demo optimizer
+int	demoDerivativeFlags = 0;
 
 // This also updates the playerNamesToClientNums trie
 template<unsigned int max_clients>
@@ -2284,6 +2293,12 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 	if (stricmp(theNewMapname,currentMapName.c_str())) {
 		// map changed. null the base flag positions.
 		Com_Memset(&baseFlagPositions, 0, sizeof(baseFlagPositions));
+		currentMapName = theNewMapname;
+	}
+
+	const char* hostname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_hostname");
+	if (!stricmp(hostname, "^1^7^1FAKE ^4^7^4DEMO")) {
+		demoDerivativeFlags |= DERIV_FAKEDEMO;
 	}
 
 	activeKillDatabase = 0;
@@ -2952,6 +2967,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@duration", spreeInfo->totalTime);
 		SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 		SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
+		SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 
 		if (activeKillDatabase != -1) {
 			queryWrapper->databaseIndex = activeKillDatabase;
@@ -3158,6 +3174,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", meta->lastGameStateChangeInDemoTime); // determine outside (because delayed PB/WR info)
 	SQLBIND_DELAYED(query, int, "@serverTime", meta->serverTime);  // determine outside (because delayed PB/WR info)
 	SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+	SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 	SQLBIND_DELAYED(query, int, "@wasVisible", meta->wasVisible); // determine outside (because delayed PB/WR info)
 	SQLBIND_DELAYED(query, int, "@wasFollowed", meta->wasFollowed); // determine outside (because delayed PB/WR info)
 	SQLBIND_DELAYED(query, int, "@wasFollowedOrVisible", meta->wasVisibleOrFollowed); // determine outside (because delayed PB/WR info)
@@ -3247,6 +3264,7 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 			SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 			SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 			SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
+			SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 			SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum);
 
 			if (activeKillDatabase != -1) {
@@ -3361,6 +3379,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 	SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 	SQLBIND_DELAYED(query, int, "@demoDateTime", oldDemoDateModified);
+	SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 	SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", demo.cut.Clc.clientNum); 
 
 	if (activeKillDatabase != -1) {
@@ -3508,6 +3527,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #endif
 			"throughWallNormal	REAL,"
 			"throughWallOcclusion	INTEGER,"
+			"saberComboCount	INTEGER,"
 
 			"lastSneak	INTEGER,"
 			"lastSneakDuration	INTEGER,"
@@ -3808,6 +3828,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoRecorderNamesStripped	TEXT NOT NULL,"
 			"demoErrorFlags INTEGER NOT NULL,"
 			"demoErrors	TEXT,"
+			"demoDerivativeFlags INTEGER NOT NULL,"
 			"PRIMARY KEY(demoPath)"
 			"); ",
 			NULL, NULL, NULL);
@@ -3819,8 +3840,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoName TEXT NOT NULL,"
 			"demoPath TEXT NOT NULL,"
 			"demoDateTime TIMESTAMP NOT NULL,"
+			"demoDerivativeFlags INTEGER NOT NULL," // mark reframes/optiized demos
 			"count INTEGER NOT NULL,"
-			"UNIQUE(map,serverName,serverNameStripped,demoName,demoPath,demoDateTime)"
+			"UNIQUE(map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags)"
 			"); ",
 			NULL, NULL, NULL);
 
@@ -3855,13 +3877,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #if TRACK_GROUNDFRAME
 ",groundFrameQuality,groundFrameAngleChange"
 #endif
-			",throughWallNormal,throughWallOcclusion,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
+			",throughWallNormal,throughWallOcclusion,saberComboCount,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
 			"VALUES "
 			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
 ",@groundFrameQuality,@groundFrameAngleChange"
 #endif	
-",@throughWallNormal,@throughWallOcclusion,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
+",@throughWallNormal,@throughWallOcclusion,@saberComboCount,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
@@ -3895,7 +3917,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 //#define ENTRYMETA_PRESTATEMENT "INSERT INTO entryMeta (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime) VALUES (@map,@serverName,@serverNameStripped,@demoName,@demoPath,@demoDateTime) ON CONFLICT (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime) DO NOTHING; " // RETURNING id; the returning doesnt do anything rn but oh well
 //#define ENTRYMETA_IDSELECTOR "(SELECT id FROM entryMeta WHERE map=@map AND serverName=@serverName AND serverNameStripped=@serverNameStripped AND demoName=@demoName AND demoPath=@demoPath AND demoDateTime=@demoDateTime )"
-		preparedStatementText = "INSERT INTO entryMeta (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,count) VALUES (@map,@serverName,@serverNameStripped,@demoName,@demoPath,@demoDateTime,1) ON CONFLICT (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime) DO UPDATE SET count=count+1 RETURNING id;";
+		preparedStatementText = "INSERT INTO entryMeta (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags,count) VALUES (@map,@serverName,@serverNameStripped,@demoName,@demoPath,@demoDateTime,@demoDerivativeFlags,1) ON CONFLICT (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags) DO UPDATE SET count=count+1 RETURNING id;";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertEntryMetaStatement, NULL);
 
@@ -3925,9 +3947,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoDatabaseProperty, NULL);
 
 		preparedStatementText = "INSERT INTO demoMeta "
-			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors )"
+			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors,demoDerivativeFlags  )"
 			" VALUES "
-			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors)";
+			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors,@demoDerivativeFlags)";
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoMeta, NULL);
 
 		preparedStatementText = "SELECT last_insert_rowid();";
@@ -3937,7 +3959,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_exec(io.killDb[i].killDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillAngles','1');", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillSpree','1');", NULL, NULL, NULL);
-		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('entryMetaTable','1');", NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('entryMetaTable','2');", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('playerNamesTable','1');", NULL, NULL, NULL);
 
 
@@ -4756,6 +4778,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@demoErrorFlags", demoErrorFlags);
 		std::string demoErrorsString = demoErrors.str();
 		SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoErrors", demoErrorsString.c_str());
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@demoDerivativeFlags", demoDerivativeFlags);
 
 		std::stringstream recorderNames;
 		std::stringstream recorderNamesStripped;
@@ -5584,6 +5607,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 	
 
+	Com_Memset(saberComboCounter,0,sizeof(saberComboCounter));
 	Com_Memset(playerSpiralLocations,0,sizeof(playerSpiralLocations));
 	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
 	Com_Memset(playerVisibleFrames,0,sizeof(playerVisibleFrames));
@@ -5847,11 +5871,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			if (oldMsg.cursize == -1) {
 				if (oldSize > 0
 #ifdef DEBUG
-	|| true
+	|| true // wait. why?
 #endif
 					) {
-					demoErrorFlags |= DERR_MSGSIZEENDBUTLEFT;
-					demoErrors << "Message size changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
+					if (oldSize > 0) {
+						demoErrorFlags |= DERR_MSGSIZEENDBUTLEFT;
+						demoErrors << "Message size changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
+					}
 					std::cout << "Message size changed to -1. Probably end of demo after message " << oldSequenceNum << " at demotime " << demoCurrentTime << " with " << oldSize << " bytes left." << "\n";
 				}
 			}
@@ -5917,6 +5943,30 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
 				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,SEHExceptionCaught);
+
+				const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
+				if (maybeMeta) {
+
+					rapidjson::Document* jsonPreviousMetaDocument = new rapidjson::Document();
+					if (jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !jsonPreviousMetaDocument->IsObject()) {
+						// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
+						// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
+						// will quit the process. Because the user can after all just adjust and fix the commandline.
+						demoErrorFlags |= DERR_BADJSONMETA;
+						demoErrors << "Demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+						std::cout << "Demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+						break;
+					}
+
+					const char* snapsmanipKey = jsonGetRealMetadataKeyName(jsonPreviousMetaDocument,"opt_snapsmanip");
+					if (snapsmanipKey) {
+						int opt_snapsmanip = (*jsonPreviousMetaDocument)[snapsmanipKey].GetInt();
+						if (opt_snapsmanip) {
+							demoDerivativeFlags |= DERIV_SNAPSMANIP;
+						}
+					}
+
+				}
 				break;
 			}
 			// skip all the gamestates until we reach needed
@@ -6620,6 +6670,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
+							thisFrameInfo.saberMoveGeneral[thisEs->number] = thisEsGeneralSaberMove;
 							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveGeneral != thisEsGeneralSaberMove) {
 								if (thisEsGeneralSaberMove >= LS_PARRY_UP_GENERAL && thisEsGeneralSaberMove <= LS_PARRY_LL_GENERAL) {
 									hitDetectionData[thisEs->number].newParryDetected = qtrue;
@@ -6936,6 +6987,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #endif
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
+						thisFrameInfo.saberMoveGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralSaberMove;
 						if (playerLastSaberMove[demo.cut.Cl.snap.ps.clientNum].lastSaberMove[0].saberMoveGeneral != psGeneralSaberMove) {
 							if (psGeneralSaberMove >= LS_PARRY_UP_GENERAL && psGeneralSaberMove <= LS_PARRY_LL_GENERAL) {
 								hitDetectionData[demo.cut.Cl.snap.ps.clientNum].newParryDetected = qtrue;
@@ -7381,9 +7433,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 						}
 
-						// groundframe tracking
-#if TRACK_GROUNDFRAME
 						if (lastFrameInfo.entityExists[i]) {
+
+							// saber combo tracking
+							if (lastFrameInfo.saberMoveGeneral[i] != thisFrameInfo.saberMoveGeneral[i]) {
+								//saberMoveType_t oldType = classifySaberMove(lastFrameInfo.saberMoveGeneral[i]);
+								saberMoveType_t newType = classifySaberMove((saberMoveName_t)thisFrameInfo.saberMoveGeneral[i]);
+								if (newType == LST_ATTACK) {
+									saberComboCounter[i]++;
+								}
+								else if (newType == LST_IDLE) {
+									saberComboCounter[i] = 0;
+								} // else: some kind of transition. dont care, doesnt affect us.
+							}
+
+#if TRACK_GROUNDFRAME
+							// groundframe tracking
 							if (lastFrameInfo.groundEntityNum[i] == ENTITYNUM_NONE && thisFrameInfo.groundEntityNum[i] != ENTITYNUM_NONE) {
 								lastPreGroundFrameAir[i] = lastFrameInfo.commandTime[i] == -1 ? lastFrameInfo.serverTime : lastFrameInfo.commandTime[i];//lastFrameInfo.demoTime;
 								VectorCopy(lastFrameInfo.playerVelocities[i], lastPreGroundFrameVelocity[i]);
@@ -7462,8 +7527,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 								}
 							}
-						}
 #endif
+						}
 
 						if (opts.playerCSVDump) {
 							playerDumpCSVPoint_t newPoint;
@@ -7525,6 +7590,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					}
 					else {
+						saberComboCounter[i] = 0; // can't rly see whats happening
 						playerVisibleFrames[i] = 0;
 						playerVisibleClientFrames[i] = 0;
 						lastGroundHeight[i] = 99999999; // What's the point of remembering the ground height if the player may suddenly appear already in air and we have an old value and wrongly detect Air 2 Air kills?
@@ -9157,6 +9223,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 #endif
 
+							if (isSaberKill && !isWorldKill && attackerIsVisibleOrFollowed) {
+								SQLBIND_DELAYED(angleQuery, int, "@saberComboCount", saberComboCounter[attacker]);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(angleQuery, "@saberComboCount");
+							}
+
 							if (throughWall) {
 								SQLBIND_DELAYED(angleQuery, double, "@throughWallNormal", throughWallNormal);
 								SQLBIND_DELAYED(angleQuery, int, "@throughWallOcclusion", throughWallOcclusion);
@@ -9239,6 +9312,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 							SQLBIND_DELAYED(angleQuery, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+							SQLBIND_DELAYED(angleQuery, int, "@demoDerivativeFlags", demoDerivativeFlags);
 							SQLBIND_DELAYED(angleQuery, int, "@errorFlags", errorFlags);
 
 							if (activeKillDatabase != -1) {
@@ -9883,6 +9957,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
+							SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 
 							if (nearbyInfo) {
 								delete nearbyInfo;
@@ -10352,6 +10427,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@demoTime", demoCurrentTime);
 							SQLBIND_DELAYED(query, int, "@lastGamestateDemoTime", lastGameStateChangeInDemoTime);
 							SQLBIND_DELAYED(query, int, "@serverTime", demo.cut.Cl.snap.serverTime);
+							SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 							std::string pastLocationsString = getPlayerSpiralLocationsString(playerNum,demoCurrentTime-flagHoldTime,15);
 							SQLBIND_DELAYED_TEXT(query, "@pastLocations", pastLocationsString.c_str());

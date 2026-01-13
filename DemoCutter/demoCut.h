@@ -4177,6 +4177,23 @@ extern saberMoveData_t	saberMoveData_general[LS_MOVE_MAX_GENERAL];
 extern saberMoveData_jk2_t	saberMoveData_jk2[LS_MOVE_MAX_JK2];
 
 
+typedef enum saberMoveType_t { // roughly the 3 classes of saber moves for purposes of combo detection. note we dont exclude yellow dfa from being counted as part of a combo. same about any that jka would potentially exclude in bg_saber
+	LST_IDLE,
+	LST_ATTACK,
+	LST_TRANS
+};
+
+inline saberMoveType_t classifySaberMove(saberMoveName_t saberMove) {
+	if (saberMove <= LS_PUTAWAY_GENERAL) {
+		return LST_IDLE;
+	}
+	else if (saberMove <= LS_HILT_BASH_GENERAL) {
+		return LST_ATTACK;
+	}
+	else {
+		return LST_TRANS;
+	}
+}
 
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime = qtrue, qboolean clientSideStyleEventConversion=qfalse);
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues=qtrue, playerState_t* baseState=NULL, qboolean enhanceOnly=qfalse);
