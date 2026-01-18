@@ -855,8 +855,7 @@ int lastEventTime[MAX_GENTITIES];
 float lastGroundHeight[MAX_CLIENTS_MAX]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
 //std::map<int,std::string> lastPlayerModel;
 std::string lastPlayerModel[MAX_CLIENTS_MAX];
-int lastKnownRedFlagCarrier = -1;
-int lastKnownBlueFlagCarrier = -1;
+int lastKnownFlagCarrier[TEAM_NUM_TEAMS] = {-1,-1,-1,-1};
 strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
 int saberComboCounter[MAX_CLIENTS_MAX];
 
@@ -929,11 +928,19 @@ void resetLaughs() {
 }
 
 
-struct cgs{
-	int redflag, blueflag, yellowflag;
-	int redFlagLastChange, blueFlagLastChange, yellowflagLastChange;
-	int redFlagLastPickupOrigin, blueFlagLastPickupOrigin, yellowflagLastPickupOrigin;
-	int redFlagLastChangeToTaken, blueFlagLastChangeToTaken, yellowflagLastChangeToTaken;
+//struct cgs{// 0 is at base, 1 is taken, 2 is dropped
+//	int redflag, blueflag, yellowflag;
+//	int redFlagLastChange, blueFlagLastChange, yellowflagLastChange;
+//	int redFlagLastPickupOrigin, blueFlagLastPickupOrigin, yellowflagLastPickupOrigin;
+//	int redFlagLastChangeToTaken, blueFlagLastChangeToTaken, yellowflagLastChangeToTaken;
+//} cgs;
+
+struct cgs{// 0 is at base, 1 is taken, 2 is dropped
+	int flag[TEAM_NUM_TEAMS];
+	int64_t flagLastChange[TEAM_NUM_TEAMS];
+	int flagLastPickupOrigin[TEAM_NUM_TEAMS];
+	int64_t flagLastChangeToTaken[TEAM_NUM_TEAMS];
+	int64_t flagLastFlagHoldTimeOver0[TEAM_NUM_TEAMS];
 } cgs;
 
 
@@ -1761,6 +1768,7 @@ std::set<std::string>	recorderPlayerNames;
 #define DERR_WEIRDMSGSIZE		(1<<13)
 #define DERR_MSGSIZEENDBUTLEFT	(1<<14)
 #define DERR_BADJSONMETA		(1<<15)
+#define DERR_GAMELOGICFLAW		(1<<16)
 //#define DERR_THRGHWALLBOXSOLID	(1<<15) // kill-based
 int	demoErrorFlags = 0;
 std::stringstream	demoErrors;
@@ -5667,7 +5675,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&lastSneakDuration, 0, sizeof(lastSneakDuration));
 	resetCurrentPacketPeriodStats();
 
-	lastKnownRedFlagCarrier = lastKnownBlueFlagCarrier = -1;
+	lastKnownFlagCarrier[TEAM_RED] = lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_FREE] = -1;
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < max_clients; i++) {
@@ -5692,6 +5700,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	//	walkDetectedTime[i] = -1;
 	//}
 	Com_Memset(&cgs,0,sizeof(cgs));
+	for (int t = 0; t < TEAM_NUM_TEAMS; t++) {
+		cgs.flag[t] = -1;
+		cgs.flagLastChange[t] = -1;
+		cgs.flagLastPickupOrigin[t] = -1;
+		cgs.flagLastChangeToTaken[t] = -1;
+	}
+
 	resetLaughs();
 
 	
@@ -6044,7 +6059,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								if (index == CS_FLAGSTATUS) {
 									char* str = Cmd_Argv(2);
 
-									int redflagTmp, blueflagTmp, yellowflagTmp;
+									int flagTmp[TEAM_NUM_TEAMS];
+									//int redflagTmp, blueflagTmp, yellowflagTmp;
 									// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
 									if (strlen(str) >= 2) {
 										if (str[0] != '1') {
@@ -6053,46 +6069,67 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 										if (str[1] != '1') {
 											blueFlagStatusResetByConfigstring++;
 										}
-										redflagTmp = str[0] - '0';
-										blueflagTmp = str[1] - '0';
+										flagTmp[TEAM_RED] = str[0] - '0';
+										flagTmp[TEAM_BLUE] = str[1] - '0';
 									}
 									else { // This is some weird bug/imperfection in the code. Sometimes it just sends cs 23 0 for whatever reason. Seems to happen at end of games.
 										redFlagStatusResetByConfigstring++;
 										blueFlagStatusResetByConfigstring++;
-										redflagTmp = 0;
-										blueflagTmp = 0;
+										flagTmp[TEAM_RED] = 0;
+										flagTmp[TEAM_BLUE] = 0;
 									}
 									if (strlen(str) >= 3) { // Too lazy to do other way lol.
-										yellowflagTmp = str[2] - '0';
+										flagTmp[TEAM_FREE] = str[2] - '0';
 									}
 									else {
-										yellowflagTmp = 0;
+										flagTmp[TEAM_FREE] = 0;
 									}
 
-									// We already set cgs.redFlagLastChangeToTaken up here because farther down (after capture/kill event evaluation) it is used to update flag hold times.
+									// We already set cgs.flagLastChangeToTaken[TEAM_RED] up here because farther down (after capture/kill event evaluation) it is used to update flag hold times.
 									// Without this, the flag hold time will be wrong on the first and following frame, potentially leading to wrong flag hold times for captures that happened in 1 frame or 2 frames.
 									// But we don't yet update other flag related status stuff, we do that at the bottom. (idk it's messy maybe it doesnt even make sense. TODO)
-									if (cgs.redflag != redflagTmp) {
-										//cgs.redFlagLastChange = demoCurrentTime;
+									for (int t = TEAM_FREE; t < TEAM_SPECTATOR; t++) {
+										if (cgs.flag[t] != flagTmp[t]) {
+											//cgs.flagLastChange[TEAM_RED] = demoCurrentTime;
+											if (flagTmp[t] == 1) {
+												cgs.flagLastChangeToTaken[t] = demoCurrentTime;
+												//cgs.flagLastPickupOrigin[TEAM_RED] = cgs.flag[TEAM_RED];
+											}
+											else if (cgs.flag[t] == 1 && cgs.flagLastChangeToTaken[t] != demoCurrentTime) {
+												cgs.flagLastFlagHoldTimeOver0[t] = demoCurrentTime - cgs.flagLastChangeToTaken[t]; // to track caps where capper was unknown up to and including the cap. we will not have accurate flaghold times otherwise
+											}
+										}
+									}
+									/*if (cgs.flag[TEAM_RED] != flagTmp[TEAM_RED]) {
+										//cgs.flagLastChange[TEAM_RED] = demoCurrentTime;
 										if (redflagTmp == 1) {
-											cgs.redFlagLastChangeToTaken = demoCurrentTime;
-											//cgs.redFlagLastPickupOrigin = cgs.redflag;
+											cgs.flagLastChangeToTaken[TEAM_RED] = demoCurrentTime;
+											//cgs.flagLastPickupOrigin[TEAM_RED] = cgs.flag[TEAM_RED];
+										}
+										else if (cgs.flag[TEAM_RED] == 1 && cgs.flagLastChangeToTaken[TEAM_RED] != demoCurrentTime) {
+											cgs.flagLastFlagHoldTimeOver0[TEAM_RED] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED]; // to track caps where capper was unknown up to and including the cap. we will not have accurate flaghold times otherwise
 										}
 									}
-									if (cgs.blueflag != blueflagTmp) {
-										//cgs.blueFlagLastChange = demoCurrentTime;
+									if (cgs.flag[TEAM_BLUE] != blueflagTmp) {
+										//cgs.flagLastChange[TEAM_BLUE] = demoCurrentTime;
 										if (blueflagTmp == 1) {
-											cgs.blueFlagLastChangeToTaken = demoCurrentTime;
-											//cgs.blueFlagLastPickupOrigin = cgs.blueflag;
+											if (cgs.flagLastChangeToTaken[TEAM_BLUE] != demoCurrentTime) {
+												cgs.flagLastFlagHoldTimeOver0[TEAM_BLUE] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE]; // to track caps where capper was unknown up to and including the cap. we will not have accurate flaghold times otherwise
+											}
+											cgs.flagLastChangeToTaken[TEAM_BLUE] = demoCurrentTime;
+											//cgs.flagLastPickupOrigin[TEAM_BLUE] = cgs.flag[TEAM_BLUE];
 										}
 									}
-									if (cgs.yellowflag != yellowflagTmp) {
-										//cgs.yellowflagLastChange = demoCurrentTime;
+									if (cgs.flag[TEAM_FREE] != yellowflagTmp) {
+										//cgs.flagLastChange[TEAM_FREE] = demoCurrentTime;
 										if (yellowflagTmp == 1) {
-											cgs.yellowflagLastChangeToTaken = demoCurrentTime;
-											//cgs.yellowflagLastPickupOrigin = cgs.yellowflag; // Not sure if this is correct?
+											if (cgs.flagLastChangeToTaken[TEAM_FREE] != demoCurrentTime) {
+												cgs.flagLastFlagHoldTimeOver0[TEAM_FREE] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_FREE]; // to track caps where capper was unknown up to and including the cap. we will not have accurate flaghold times otherwise
+											}
+											cgs.flagLastChangeToTaken[TEAM_FREE] = demoCurrentTime;
+											//cgs.flagLastPickupOrigin[TEAM_FREE] = cgs.flag[TEAM_FREE]; // Not sure if this is correct?
 										}
-									}
+									}*/
 
 								}
 							}
@@ -6186,7 +6223,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				firstSnapAfterGamestate = true;
 
-				lastKnownRedFlagCarrier = lastKnownBlueFlagCarrier = -1; // New gamestate. Fair to assume that nobody has the flag now.
+				lastKnownFlagCarrier[TEAM_RED] = lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_FREE] = -1; // New gamestate. Fair to assume that nobody has the flag now. or its a demo starting in the middle of a game, but then we wouldn't know anyway.
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
@@ -7767,13 +7804,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							if (attackerEntity) {
 								attackerIsVisible = true;
 							}
-							victimIsFlagCarrier = target == lastKnownBlueFlagCarrier || target == lastKnownRedFlagCarrier;
-							attackerIsFlagCarrier = attacker == lastKnownBlueFlagCarrier || attacker == lastKnownRedFlagCarrier;
+							victimIsFlagCarrier = target == lastKnownFlagCarrier[TEAM_BLUE] || target == lastKnownFlagCarrier[TEAM_RED];
+							attackerIsFlagCarrier = attacker == lastKnownFlagCarrier[TEAM_BLUE] || attacker == lastKnownFlagCarrier[TEAM_RED];
 
-							int victimFlagTeam = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? TEAM_BLUE : TEAM_RED) : -1;
-							int attackerFlagTeam = attackerIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? TEAM_BLUE : TEAM_RED) : -1;
+							int victimFlagTeam = victimIsFlagCarrier ? (target == lastKnownFlagCarrier[TEAM_BLUE] ? TEAM_BLUE : TEAM_RED) : -1;
+							int attackerFlagTeam = attackerIsFlagCarrier ? (attacker == lastKnownFlagCarrier[TEAM_BLUE] ? TEAM_BLUE : TEAM_RED) : -1;
 
-							int victimCarrierLastPickupOrigin = victimIsFlagCarrier ? (target == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+							int victimCarrierLastPickupOrigin = victimIsFlagCarrier ? (target == lastKnownFlagCarrier[TEAM_BLUE] ? cgs.flagLastPickupOrigin[TEAM_BLUE] : cgs.flagLastPickupOrigin[TEAM_RED]) : -1;
 
 							if (!victimIsFlagCarrier) {
 								// Victim acquired the flag on this frame/snap
@@ -7867,7 +7904,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								victimFlagCarrierKillCount = recentKillsDuringFlagHold[target].kills;
 								victimFlagCarrierRetCount = recentKillsDuringFlagHold[target].rets;
 							}
-							// TODO What if lastKnownBlueFlagCarrier or lastKnownRedFlagCarrier is remembered and another kill is counted wrongly as ret even though he is no longer holding a flag?
+							// TODO What if lastKnownFlagCarrier[TEAM_BLUE] or lastKnownFlagCarrier[TEAM_RED] is remembered and another kill is counted wrongly as ret even though he is no longer holding a flag?
 
 
 							// If victim was capper, see if his entire run from start to unfortunate end was captured.
@@ -9121,7 +9158,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@redScore", teamInfo[TEAM_RED].score);
 							SQLBIND_DELAYED(query, int, "@blueScore", teamInfo[TEAM_BLUE].score);
 							if (victimIsFlagCarrier) {
-								SQLBIND_DELAYED(query, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.blueflag: cgs.redflag);
+								SQLBIND_DELAYED(query, int, "@otherFlagStatus",playerTeams[target] == TEAM_BLUE ? cgs.flag[TEAM_BLUE]: cgs.flag[TEAM_RED]);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(query, "@otherFlagStatus");
@@ -9470,15 +9507,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// but let's call it a day for now since this is mainly about the flag grab.
 							switch (flagTeam) {
 							case TEAM_FREE: // Is this correct?
-								//victimCarrierLastPickupOrigin = cgs.yellowflagLastPickupOrigin;
+								//victimCarrierLastPickupOrigin = cgs.flagLastPickupOrigin[TEAM_FREE];
 								break;
 							case TEAM_RED:
-								//victimCarrierLastPickupOrigin = cgs.redFlagLastPickupOrigin;
-								playerNum = lastKnownBlueFlagCarrier; // if we picked red flag, we wanna know who (if anyone) carries blue flag
+								//victimCarrierLastPickupOrigin = cgs.flagLastPickupOrigin[TEAM_RED];
+								playerNum = lastKnownFlagCarrier[TEAM_BLUE]; // if we picked red flag, we wanna know who (if anyone) carries blue flag
 								break;
 							case TEAM_BLUE:
-								//victimCarrierLastPickupOrigin = cgs.blueFlagLastPickupOrigin;
-								playerNum = lastKnownRedFlagCarrier; // if we picked blue flag, we wanna know who (if anyone) carries red flag
+								//victimCarrierLastPickupOrigin = cgs.flagLastPickupOrigin[TEAM_BLUE];
+								playerNum = lastKnownFlagCarrier[TEAM_RED]; // if we picked blue flag, we wanna know who (if anyone) carries red flag
 								break;
 							}
 
@@ -9586,16 +9623,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 							// Pickup origin
-							int pickupOrigin = -1;// victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+							int pickupOrigin = -1;// victimIsFlagCarrier ? (attacker == lastKnownFlagCarrier[TEAM_BLUE] ? cgs.flagLastPickupOrigin[TEAM_BLUE] : cgs.flagLastPickupOrigin[TEAM_RED]) : -1;
 							switch (flagTeam) {
 							case TEAM_FREE: // Is this correct?
-								pickupOrigin = cgs.yellowflagLastPickupOrigin;
+								pickupOrigin = cgs.flagLastPickupOrigin[TEAM_FREE];
 								break;
 							case TEAM_RED:
-								pickupOrigin = cgs.redFlagLastPickupOrigin;
+								pickupOrigin = cgs.flagLastPickupOrigin[TEAM_RED];
 								break;
 							case TEAM_BLUE:
-								pickupOrigin = cgs.blueFlagLastPickupOrigin;
+								pickupOrigin = cgs.flagLastPickupOrigin[TEAM_BLUE];
 								break;
 							}
 
@@ -10079,10 +10116,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// Let me rethink this some day TODO
 							if (flagTeam == TEAM_RED) {
 								redFlagNewCarrierByEvent = playerNum;
-								//lastKnownRedFlagCarrier = playerNum; // Don't set it here so it doesn't interfere with potential kill events timing-wise, in case the flag return and pickup of new flag happens on same frame (unlikely but possible, especially with snaps?)
+								//lastKnownFlagCarrier[TEAM_RED] = playerNum; // Don't set it here so it doesn't interfere with potential kill events timing-wise, in case the flag return and pickup of new flag happens on same frame (unlikely but possible, especially with snaps?)
 							}else if (flagTeam == TEAM_BLUE) {
 								blueFlagNewCarrierByEvent = playerNum;
-								//lastKnownBlueFlagCarrier = playerNum;
+								//lastKnownFlagCarrier[TEAM_BLUE] = playerNum;
 							}*/
 						}
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_FRAGGED_FLAG_CARRIER) {
@@ -10147,6 +10184,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							bool playerIsVisibleOrFollowed = playerIsFollowed || playerIsVisible;
 
 							int flagHoldTime = recentFlagHoldTimes[playerNum];
+
+							if (lastKnownFlagCarrier[flagTeam] == -1) { 
+								// we didn't actually know who this player was, so use the generic team-based last flag hold over 0.
+								// TODO maybe we should have a per-frame based one instead so we can apply it to 
+								// flag grabs as well even tho its not that important there
+								flagHoldTime = cgs.flagLastFlagHoldTimeOver0[flagTeam];
+							}
+							else if (lastKnownFlagCarrier[flagTeam] != playerNum) {
+								demoErrorFlags |= DERR_GAMELOGICFLAW;
+								demoErrors << "DEMO LOGIC FLAW: Capture: Last known flag carrier is known but NOT the person who got the cap?!?\n";
+								std::cerr << "Capture: Last known flag carrier is known but NOT the person who got the cap?!?" << "(" << DPrintFLocation << ")\n";
+								// i'm not sure what to do here because it makes no sense.
+							}
 
 							if (redFlagNewCarrierByEventBitMask & (1L << playerNum)) {
 								// Player got the flag on this exact frame. Flag hold time is going to be wrong. Set to 0 manually.
@@ -10352,17 +10402,21 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 							// Pickup origin
-							int victimCarrierLastPickupOrigin = -1;// victimIsFlagCarrier ? (attacker == lastKnownBlueFlagCarrier ? cgs.blueFlagLastPickupOrigin : cgs.redFlagLastPickupOrigin) : -1;
+							int capperLastPickupOrigin = -1;// victimIsFlagCarrier ? (attacker == lastKnownFlagCarrier[TEAM_BLUE] ? cgs.flagLastPickupOrigin[TEAM_BLUE] : cgs.flagLastPickupOrigin[TEAM_RED]) : -1;
 							switch (flagTeam) {
 								case TEAM_FREE: // Is this correct?
-									victimCarrierLastPickupOrigin = cgs.yellowflagLastPickupOrigin;
+									capperLastPickupOrigin = cgs.flagLastPickupOrigin[TEAM_FREE];
 									break;
 								case TEAM_RED:
-									victimCarrierLastPickupOrigin = cgs.redFlagLastPickupOrigin;
+									capperLastPickupOrigin = cgs.flagLastPickupOrigin[TEAM_RED];
 									break;
 								case TEAM_BLUE:
-									victimCarrierLastPickupOrigin = cgs.blueFlagLastPickupOrigin;
+									capperLastPickupOrigin = cgs.flagLastPickupOrigin[TEAM_BLUE];
 									break;
+							}
+
+							if (sameFrameCap) {
+								capperLastPickupOrigin = 2; // pretty much guaranteed and I think it's gonna be very hard to tell it apart from a hypothetical where someone picks it up from its base and captures it on the same frame :/
 							}
 
 							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
@@ -10380,7 +10434,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 							SQLBIND_DELAYED(query, int, "@flagHoldTime", flagHoldTime);
 							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
-							SQLBIND_DELAYED(query, int, "@flagPickupSource", victimCarrierLastPickupOrigin);
+							SQLBIND_DELAYED(query, int, "@flagPickupSource", capperLastPickupOrigin);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperName", playername.c_str(), QF_PLAYERNAME0);
 							std::string playernameStripped = Q_StripColorAll(playername);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
@@ -10515,7 +10569,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::stringstream ss2;
 							std::string boostString = boostCountCapper > 0 ? va("_BST%d", boostCountCapper) : "";
 							ss << mapname << std::setfill('0') << "___CAPTURE"<<(flagCarrierKillCount>0 ? va("%dK", flagCarrierKillCount):"")<<(flagCarrierRetCount>0 ? va("%dR", flagCarrierRetCount):"") << boostString;
-							ss2 << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< victimCarrierLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<(int)averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+							ss2 << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << "___" << playername << "___P"<< capperLastPickupOrigin <<"T"<<flagTeam<< "___"<< (int)moreThanOneVeryCloseEnemyTimePercent<<"DANGER"<<(int)(averageVeryCloseEnemyCount*100)<<"___"<<(int) maxSpeedCapper<<"_"<<(int)averageSpeedCapper<<"ups" << (wasFollowed ? "" : (wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
 							std::string targetFilename2 = ss2.str();
@@ -10719,18 +10773,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				// Find out which players are visible / followed
 				// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
-				//lastKnownBlueFlagCarrier = lastKnownRedFlagCarrier = -1;
+				//lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_RED] = -1;
 				if (redFlagStatusResetByConfigstring) { // First reset flag carrier if the flag status has been reset via configstring.
-					lastKnownRedFlagCarrier = -1;
+					lastKnownFlagCarrier[TEAM_RED] = -1;
 				}
 				if (blueFlagStatusResetByConfigstring) {
-					lastKnownBlueFlagCarrier = -1;
+					lastKnownFlagCarrier[TEAM_BLUE] = -1;
 				}
-				if (lastKnownRedFlagCarrier != -1) {
-					recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken; 
+				if (lastKnownFlagCarrier[TEAM_RED] != -1) {
+					recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED]; 
 				}
-				if (lastKnownBlueFlagCarrier != -1) {
-					recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
+				if (lastKnownFlagCarrier[TEAM_BLUE] != -1) {
+					recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE];
 				}
 				if (redFlagNewCarrierByEventBitMask) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
 					int64_t possiblePlayers = redFlagNewCarrierByEventBitMask; // These are all players who picked up a red flag this frame (silly I know!)
@@ -10740,11 +10794,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					// Check if possiblePlayers is a power of 2
 					if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
 						// It's one possible player.
-						lastKnownRedFlagCarrier = (int)(log2(possiblePlayers)+0.5); // + 0.5 to avoid double to int conversion issues issues.
+						lastKnownFlagCarrier[TEAM_RED] = (int)(log2(possiblePlayers)+0.5); // + 0.5 to avoid double to int conversion issues issues.
 					}
 					else {
 						// Either no player left or multiple ones. In short, we don't know.
-						lastKnownRedFlagCarrier = -1;
+						lastKnownFlagCarrier[TEAM_RED] = -1;
 					}
 				}
 				if (blueFlagNewCarrierByEventBitMask) {
@@ -10754,14 +10808,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					possiblePlayers &= ~blueFlagCapturedPlayerBitMask; 
 
 					if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
-						lastKnownBlueFlagCarrier = (int)(log2(possiblePlayers) + 0.5);
+						lastKnownFlagCarrier[TEAM_BLUE] = (int)(log2(possiblePlayers) + 0.5);
 					}
 					else {
-						lastKnownBlueFlagCarrier = -1;
+						lastKnownFlagCarrier[TEAM_BLUE] = -1;
 					}
 				}
-				vec3_t lastKnownBlueFlagCarrierPosition, lastKnownRedFlagCarrierPosition;
-				vec3_t lastKnownBlueFlagCarrierVelocity, lastKnownRedFlagCarrierVelocity;
+				vec3_t lastKnownFlagCarrierPosition[TEAM_NUM_TEAMS];
+				vec3_t lastKnownFlagCarrierVelocity[TEAM_NUM_TEAMS];
 				for (int p = 0; p < max_clients; p++) {
 					// Go through parseenttities of last snap to see if client is in it
 					bool clientIsInSnapshot = false;
@@ -10774,28 +10828,29 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							// TODO check playerteam bc ghost powerups? - I think that's not needed as we are checking entities and not scoreboard data.
 							if (thisEntity->powerups & (1 << PW_REDFLAG)) {
-								lastKnownRedFlagCarrier = thisEntity->number;
-								VectorCopy(thisEntity->pos.trBase,lastKnownRedFlagCarrierPosition);
-								VectorCopy(thisEntity->pos.trDelta,lastKnownRedFlagCarrierVelocity);
-								recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken; // Hmm but this creates a wrong value on the first frame of holding the flag. If it's a one-frame capture we will end up with a wrong time duration held ...
+								lastKnownFlagCarrier[TEAM_RED] = thisEntity->number;
+								VectorCopy(thisEntity->pos.trBase,lastKnownFlagCarrierPosition[TEAM_RED]);
+								VectorCopy(thisEntity->pos.trDelta,lastKnownFlagCarrierVelocity[TEAM_RED]);
+								recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED]; // Hmm but this creates a wrong value on the first frame of holding the flag. If it's a one-frame capture we will end up with a wrong time duration held ...
 							}
 							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
-								lastKnownBlueFlagCarrier = thisEntity->number;
-								VectorCopy(thisEntity->pos.trBase, lastKnownBlueFlagCarrierPosition);
-								VectorCopy(thisEntity->pos.trDelta, lastKnownBlueFlagCarrierVelocity);
-								recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
+								lastKnownFlagCarrier[TEAM_BLUE] = thisEntity->number;
+								VectorCopy(thisEntity->pos.trBase, lastKnownFlagCarrierPosition[TEAM_BLUE]);
+								VectorCopy(thisEntity->pos.trDelta, lastKnownFlagCarrierVelocity[TEAM_BLUE]);
+								recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE];
 							}
 							else { 
-								
+								// TODO also reset recent flag hold time here?
+
 								// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 								// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
-								if (lastKnownRedFlagCarrier == p) {
-									std::cerr << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
-									lastKnownRedFlagCarrier = -1;
+								if (lastKnownFlagCarrier[TEAM_RED] == p) {
+									std::cerr << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+									lastKnownFlagCarrier[TEAM_RED] = -1;
 								}
-								if (lastKnownBlueFlagCarrier == p) {
-									std::cerr << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
-									lastKnownBlueFlagCarrier = -1;
+								if (lastKnownFlagCarrier[TEAM_BLUE] == p) {
+									std::cerr << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+									lastKnownFlagCarrier[TEAM_BLUE] = -1;
 								}
 
 								// Reset the required meta event age for capture cuts if the player is seen without a flag.
@@ -10815,27 +10870,27 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 					if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG]) {
 
-						lastKnownRedFlagCarrier = demo.cut.Cl.snap.ps.clientNum;
-						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownRedFlagCarrierPosition);
-						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownRedFlagCarrierVelocity);
-						recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime - cgs.redFlagLastChangeToTaken;
+						lastKnownFlagCarrier[TEAM_RED] = demo.cut.Cl.snap.ps.clientNum;
+						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownFlagCarrierPosition[TEAM_RED]);
+						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownFlagCarrierVelocity[TEAM_RED]);
+						recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED];
 					}else if (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG]) {
 
-						lastKnownBlueFlagCarrier = demo.cut.Cl.snap.ps.clientNum;
-						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownBlueFlagCarrierPosition);
-						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownBlueFlagCarrierVelocity);
-						recentFlagHoldTimes[lastKnownBlueFlagCarrier] = demoCurrentTime - cgs.blueFlagLastChangeToTaken;
+						lastKnownFlagCarrier[TEAM_BLUE] = demo.cut.Cl.snap.ps.clientNum;
+						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownFlagCarrierPosition[TEAM_BLUE]);
+						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownFlagCarrierVelocity[TEAM_BLUE]);
+						recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE];
 					}
 					else {
 						// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 						// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
-						if (lastKnownRedFlagCarrier == demo.cut.Cl.snap.ps.clientNum) {
-							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <=0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownRedFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
-							lastKnownRedFlagCarrier = -1;
+						if (lastKnownFlagCarrier[TEAM_RED] == demo.cut.Cl.snap.ps.clientNum) {
+							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <=0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+							lastKnownFlagCarrier[TEAM_RED] = -1;
 						}
-						if (lastKnownBlueFlagCarrier == demo.cut.Cl.snap.ps.clientNum) {
-							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownBlueFlagCarrier WTF, resetting" << "(" << DPrintFLocation << ")\n";
-							lastKnownBlueFlagCarrier = -1;
+						if (lastKnownFlagCarrier[TEAM_BLUE] == demo.cut.Cl.snap.ps.clientNum) {
+							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+							lastKnownFlagCarrier[TEAM_BLUE] = -1;
 						}
 
 						// Same logic as with entities above, see comment above. But ofc playerstate is always visible but view angle can change
@@ -10881,36 +10936,36 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 
 				// save maxspeed of flag hold
-				if (lastKnownRedFlagCarrier != -1) {
-					if (recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownRedFlagCarrier]) {
+				if (lastKnownFlagCarrier[TEAM_RED] != -1) {
+					if (recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]]) {
 						// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
-						Com_Memset(&recentFlagHoldVariousInfo[lastKnownRedFlagCarrier], 0, sizeof(VariousCappingInfo));
+						Com_Memset(&recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]], 0, sizeof(VariousCappingInfo));
 					}
-					float speedHere = VectorLength(lastKnownRedFlagCarrierVelocity);
-					if (recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].maxSpeedThisRun < speedHere) {
-						recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].maxSpeedThisRun = speedHere;
+					float speedHere = VectorLength(lastKnownFlagCarrierVelocity[TEAM_RED]);
+					if (recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]].maxSpeedThisRun < speedHere) {
+						recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]].maxSpeedThisRun = speedHere;
 					}
-					recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].sumSpeeds += speedHere* deltaTimeFromLastSnapshot;
-					recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].divisorSpeeds += deltaTimeFromLastSnapshot;
-					recentFlagHoldVariousInfo[lastKnownRedFlagCarrier].lastUpdateTime = demoCurrentTime;
+					recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]].sumSpeeds += speedHere* deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]].divisorSpeeds += deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_RED]].lastUpdateTime = demoCurrentTime;
 				}
-				if (lastKnownBlueFlagCarrier != -1) {
-					if (recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownBlueFlagCarrier]) {
+				if (lastKnownFlagCarrier[TEAM_BLUE] != -1) {
+					if (recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]]) {
 						// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
-						Com_Memset(&recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier], 0, sizeof(VariousCappingInfo));
+						Com_Memset(&recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]], 0, sizeof(VariousCappingInfo));
 					}
-					float speedHere = VectorLength(lastKnownBlueFlagCarrierVelocity);
-					if (recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].maxSpeedThisRun < speedHere) {
-						recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].maxSpeedThisRun = speedHere;
+					float speedHere = VectorLength(lastKnownFlagCarrierVelocity[TEAM_BLUE]);
+					if (recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]].maxSpeedThisRun < speedHere) {
+						recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]].maxSpeedThisRun = speedHere;
 					}
-					recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].sumSpeeds += speedHere * deltaTimeFromLastSnapshot;
-					recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].divisorSpeeds += deltaTimeFromLastSnapshot;
-					recentFlagHoldVariousInfo[lastKnownBlueFlagCarrier].lastUpdateTime = demoCurrentTime;
+					recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]].sumSpeeds += speedHere * deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]].divisorSpeeds += deltaTimeFromLastSnapshot;
+					recentFlagHoldVariousInfo[lastKnownFlagCarrier[TEAM_BLUE]].lastUpdateTime = demoCurrentTime;
 				}
 
 
 				// Check amount of enemies nearby cappers and log it in case we need it later.
-				if (lastKnownBlueFlagCarrier!=-1 || lastKnownRedFlagCarrier!=-1) { // Don't bother if no flag carrier is visible at all
+				if (lastKnownFlagCarrier[TEAM_BLUE]!=-1 || lastKnownFlagCarrier[TEAM_RED]!=-1) { // Don't bother if no flag carrier is visible at all
 					int enemiesNearRedCarrier =0, enemiesNearBlueCarrier = 0;
 					int enemiesVeryCloseRedCarrier =0, enemiesVeryCloseBlueCarrier = 0;
 
@@ -10918,8 +10973,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					for (int pe = demo.cut.Cl.snap.parseEntitiesNum; pe < demo.cut.Cl.snap.parseEntitiesNum + demo.cut.Cl.snap.numEntities; pe++) {
 						entityState_t* thisEntity = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 						if (thisEntity->number < 0 || thisEntity->number >= max_clients || playerTeams[thisEntity->number]==TEAM_SPECTATOR) continue;
-						if (lastKnownBlueFlagCarrier != -1 && playerTeams[thisEntity->number] == TEAM_BLUE) {
-							float distance = VectorDistance(lastKnownBlueFlagCarrierPosition,thisEntity->pos.trBase);
+						if (lastKnownFlagCarrier[TEAM_BLUE] != -1 && playerTeams[thisEntity->number] == TEAM_BLUE) {
+							float distance = VectorDistance(lastKnownFlagCarrierPosition[TEAM_BLUE],thisEntity->pos.trBase);
 							if (distance <= NEARBY_PLAYER_MAX_DISTANCE) {
 								enemiesNearBlueCarrier++;
 							}
@@ -10927,8 +10982,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								enemiesVeryCloseBlueCarrier++;
 							}
 						}
-						if (lastKnownRedFlagCarrier != -1 && playerTeams[thisEntity->number] == TEAM_RED){
-							float distance = VectorDistance(lastKnownRedFlagCarrierPosition, thisEntity->pos.trBase);
+						if (lastKnownFlagCarrier[TEAM_RED] != -1 && playerTeams[thisEntity->number] == TEAM_RED){
+							float distance = VectorDistance(lastKnownFlagCarrierPosition[TEAM_RED], thisEntity->pos.trBase);
 							if (distance <= NEARBY_PLAYER_MAX_DISTANCE) {
 								enemiesNearRedCarrier++;
 							}
@@ -10939,23 +10994,23 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 
 					// Resets if necessary.
-					if (lastKnownBlueFlagCarrier != -1) {
-						if (recentFlagHoldEnemyNearbyTimes[lastKnownBlueFlagCarrier].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownBlueFlagCarrier]) {
+					if (lastKnownFlagCarrier[TEAM_BLUE] != -1) {
+						if (recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_BLUE]].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]]) {
 							// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
-							Com_Memset(&recentFlagHoldEnemyNearbyTimes[lastKnownBlueFlagCarrier], 0, sizeof(EnemyNearbyInfo));
+							Com_Memset(&recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_BLUE]], 0, sizeof(EnemyNearbyInfo));
 						}
-						recentFlagHoldEnemyNearbyTimes[lastKnownBlueFlagCarrier].enemyNearbyTimes[enemiesNearBlueCarrier] += deltaTimeFromLastSnapshot;
-						recentFlagHoldEnemyNearbyTimes[lastKnownBlueFlagCarrier].enemyVeryCloseTimes[enemiesVeryCloseBlueCarrier] += deltaTimeFromLastSnapshot;
-						recentFlagHoldEnemyNearbyTimes[lastKnownBlueFlagCarrier].lastUpdateTime = demoCurrentTime;
+						recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_BLUE]].enemyNearbyTimes[enemiesNearBlueCarrier] += deltaTimeFromLastSnapshot;
+						recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_BLUE]].enemyVeryCloseTimes[enemiesVeryCloseBlueCarrier] += deltaTimeFromLastSnapshot;
+						recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_BLUE]].lastUpdateTime = demoCurrentTime;
 					}
-					if (lastKnownRedFlagCarrier != -1) {
-						if (recentFlagHoldEnemyNearbyTimes[lastKnownRedFlagCarrier].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownRedFlagCarrier]) {
+					if (lastKnownFlagCarrier[TEAM_RED] != -1) {
+						if (recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_RED]].lastUpdateTime < demoCurrentTime - recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]]) {
 							// If the last nearby enemy info of this capper was before he even got the flag, reset before adding to the count
-							Com_Memset(&recentFlagHoldEnemyNearbyTimes[lastKnownRedFlagCarrier], 0, sizeof(EnemyNearbyInfo));
+							Com_Memset(&recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_RED]], 0, sizeof(EnemyNearbyInfo));
 						}
-						recentFlagHoldEnemyNearbyTimes[lastKnownRedFlagCarrier].enemyNearbyTimes[enemiesNearRedCarrier] += deltaTimeFromLastSnapshot;
-						recentFlagHoldEnemyNearbyTimes[lastKnownRedFlagCarrier].enemyVeryCloseTimes[enemiesVeryCloseRedCarrier] += deltaTimeFromLastSnapshot;
-						recentFlagHoldEnemyNearbyTimes[lastKnownRedFlagCarrier].lastUpdateTime = demoCurrentTime;
+						recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_RED]].enemyNearbyTimes[enemiesNearRedCarrier] += deltaTimeFromLastSnapshot;
+						recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_RED]].enemyVeryCloseTimes[enemiesVeryCloseRedCarrier] += deltaTimeFromLastSnapshot;
+						recentFlagHoldEnemyNearbyTimes[lastKnownFlagCarrier[TEAM_RED]].lastUpdateTime = demoCurrentTime;
 					}
 
 				}
@@ -11218,44 +11273,44 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						yellowflagTmp = 0;
 					}
 
-					if (cgs.redflag != redflagTmp) {
-						/* // Actually, we can't do this here bc lastknownredflagcarrier might not be actually known.
+					if (cgs.flag[TEAM_RED] != redflagTmp) {
+						/* // Actually, we can't do this here bc lastKnownFlagCarrier[TEAM_RED] might not be actually known.
 						if (redflagTmp == 1) { // Was just picked up. Set flag hold time to 0.
-							recentFlagHoldTimes[lastKnownRedFlagCarrier] = 0;
+							recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = 0;
 						}
-						if (cgs.redflag == 1) { // Was taken before. So just count the flag hold time.
-							recentFlagHoldTimes[lastKnownRedFlagCarrier] = demoCurrentTime-cgs.redFlagLastChange;
+						if (cgs.flag[TEAM_RED] == 1) { // Was taken before. So just count the flag hold time.
+							recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime-cgs.flagLastChange[TEAM_RED];
 						}*/
-						cgs.redFlagLastChange = demoCurrentTime;
+						cgs.flagLastChange[TEAM_RED] = demoCurrentTime;
 						if (redflagTmp == 1) {
-							cgs.redFlagLastChangeToTaken = demoCurrentTime;
-							//teamInfo[TEAM_RED].flagHoldOrigin = cgs.redflag;
-							cgs.redFlagLastPickupOrigin = cgs.redflag;
+							cgs.flagLastChangeToTaken[TEAM_RED] = demoCurrentTime;
+							//teamInfo[TEAM_RED].flagHoldOrigin = cgs.flag[TEAM_RED];
+							cgs.flagLastPickupOrigin[TEAM_RED] = cgs.flag[TEAM_RED];
 						}
 					}
-					if (cgs.blueflag != blueflagTmp) {
-						cgs.blueFlagLastChange = demoCurrentTime;
+					if (cgs.flag[TEAM_BLUE] != blueflagTmp) {
+						cgs.flagLastChange[TEAM_BLUE] = demoCurrentTime;
 						if (blueflagTmp == 1) {
-							cgs.blueFlagLastChangeToTaken = demoCurrentTime;
-							//teamInfo[TEAM_BLUE].flagHoldOrigin = cgs.blueflag;
-							cgs.blueFlagLastPickupOrigin = cgs.blueflag;
+							cgs.flagLastChangeToTaken[TEAM_BLUE] = demoCurrentTime;
+							//teamInfo[TEAM_BLUE].flagHoldOrigin = cgs.flag[TEAM_BLUE];
+							cgs.flagLastPickupOrigin[TEAM_BLUE] = cgs.flag[TEAM_BLUE];
 						}
 					}
-					if (cgs.yellowflag != yellowflagTmp) {
-						cgs.yellowflagLastChange = demoCurrentTime;
+					if (cgs.flag[TEAM_FREE] != yellowflagTmp) {
+						cgs.flagLastChange[TEAM_FREE] = demoCurrentTime;
 						if (yellowflagTmp == 1) {
-							cgs.yellowflagLastChangeToTaken = demoCurrentTime;
-							//teamInfo[TEAM_FREE].flagHoldOrigin = cgs.yellowflag; // Not sure if this is correct?
-							cgs.yellowflagLastPickupOrigin = cgs.yellowflag; // Not sure if this is correct?
+							cgs.flagLastChangeToTaken[TEAM_FREE] = demoCurrentTime;
+							//teamInfo[TEAM_FREE].flagHoldOrigin = cgs.flag[TEAM_FREE]; // Not sure if this is correct?
+							cgs.flagLastPickupOrigin[TEAM_FREE] = cgs.flag[TEAM_FREE]; // Not sure if this is correct?
 						}
 					}
-					cgs.redflag = redflagTmp;
-					cgs.blueflag = blueflagTmp;
-					cgs.yellowflag = yellowflagTmp;
+					cgs.flag[TEAM_RED] = redflagTmp;
+					cgs.flag[TEAM_BLUE] = blueflagTmp;
+					cgs.flag[TEAM_FREE] = yellowflagTmp;
 					/*if (cgs.isCTFMod && cgs.CTF3ModeActive)
-						demo.cgs.yellowflag = str[2] - '0';
+						demo.cgs.flag[TEAM_FREE] = str[2] - '0';
 					else
-						demo.cgs.yellowflag = 0;*/
+						demo.cgs.flag[TEAM_FREE] = 0;*/
 				}
 
 				hadConfigStringCommands = true;
