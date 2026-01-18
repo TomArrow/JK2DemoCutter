@@ -24,6 +24,7 @@
     <ClCompile Include="..\DemoCutter\huffman.cpp" />
     <ClCompile Include="..\DemoCutter\msg.cpp" />
     <ClCompile Include="..\shared\animMappingTable.cpp" />
+    <ClCompile Include="..\shared\base58\base58.cpp" />
     <ClCompile Include="..\shared\CModel.cpp" />
     <ClCompile Include="..\shared\libgmavi\libgmavi.c" />
     <ClCompile Include="..\shared\lzmaSDK\7zAlloc.c" />

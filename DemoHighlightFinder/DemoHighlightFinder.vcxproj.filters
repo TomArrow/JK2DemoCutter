@@ -221,6 +221,9 @@
     <ClCompile Include="..\shared\sabers\sabersFiles.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\base58\base58.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">

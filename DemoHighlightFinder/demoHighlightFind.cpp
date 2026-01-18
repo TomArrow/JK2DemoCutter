@@ -30,6 +30,8 @@
 
 #include "include/rapidjson/document.h"
 
+#include "../shared/base58/base58.h"
+
 #define DEBUGSTATSDB
 
 #define BUFFERBAT
@@ -2809,6 +2811,21 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 
 }
 
+#define HASH_BITS 224
+inline std::string makeStringHash(std::string input) {
+	constexpr int bytes = picosha3::bits_to_bytes(HASH_BITS);
+	auto sha3_512 = picosha3::get_sha3_generator<HASH_BITS>();
+	//return sha3_512.get_hex_string(input);
+	std::array<uint8_t, bytes> hash{};
+	sha3_512.process(input.cbegin(),input.cend());
+	sha3_512.finish();
+	sha3_512.get_hash_bytes(hash.begin(), hash.end());
+	std::string output;
+	ankerl::base58::encode(hash.data(),bytes, output);
+	return output.substr(std::min((size_t)22,output.size())); // 22 bytes of base58 should be around 128 bits?
+}
+
+
 template<unsigned int max_clients>
 void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker, std::vector<Kill>* killsOfThisSpree,std::vector<int>* victims,std::vector<std::string>* killHashes,std::string allKillsHashString, int64_t demoCurrentTime, const ioHandles_t& io, int bufferTime,int64_t lastGameStateChangeInDemoTime, const char* sourceDemoFile,std::string oldBasename,std::string oldPath,time_t oldDemoDateModified, demoType_t demoType, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,bool& wasDoingSQLiteExecution) {
 	
@@ -2915,9 +2932,12 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		std::string killHashesString = killHashesSS.str();
 
 		//hashss << playername << "_" << victimname << "_" << attacker << "_" << target << "_" << isDoomKill << "_" << isSuicide << "_" << mod << "_" << mapname << "_" << thisEs->pos.trBase[0] << "_" << thisEs->pos.trBase[1] << "_" << thisEs->pos.trBase[2];
-		auto sha3_512 = picosha3::get_sha3_generator<224>();
-		std::string hash_hex_string = sha3_512.get_hex_string(allKillsHashString);
-		std::string shorthash = hash_hex_string.substr(0, 3);
+		//auto sha3_512 = picosha3::get_sha3_generator<224>();
+		//sha3_512.get_hash_bytes()
+		//std::array<uint8_t, picosha3::bits_to_bytes(256)> hash{};
+		//std::string hash_hex_string = sha3_512.get_hex_string(allKillsHashString);
+		std::string hash_hex_string = makeStringHash(allKillsHashString);
+		std::string shorthash = hash_hex_string.substr(0, std::min((size_t)3,hash_hex_string.size()));
 
 
 		int maxSpeedAttacker = getMaxSpeedForClientinTimeFrame(clientNumAttacker, spreeInfo->lastKillTime - spreeInfo->totalTime - 1000, spreeInfo->lastKillTime);
@@ -3961,6 +3981,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('serverNameInKillSpree','1');", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('entryMetaTable','2');", NULL, NULL, NULL);
 		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('playerNamesTable','1');", NULL, NULL, NULL);
+		sqlite3_exec(io.killDb[i].killDb, "INSERT OR IGNORE INTO demoDatabaseProperties (`propertyName`,`value`) VALUES ('hashType','base58');", NULL, NULL, NULL);
 
 
 	}
@@ -8875,7 +8896,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							// Create hash.
 							std::stringstream hashss;
-							hashss << playername << "_" << victimname << "_" << attacker << "_" << target << "_" << isDoomKill << "_" << isSuicide << "_" << mod << "_" << mapname << "_" << thisEs->pos.trBase[0] << "_" << thisEs->pos.trBase[1] << "_" << thisEs->pos.trBase[2];
+							hashss << playername << "_" << victimname << "_" << serverName << "_" << attacker << "_" << target << "_" << isDoomKill << "_" << isSuicide << "_" << mod << "_" << mapname << "_" << thisEs->pos.trBase[0] << "_" << thisEs->pos.trBase[1] << "_" << thisEs->pos.trBase[2];
 							if (isMOHAADemo) { 
 								// Using serverTime is very bad because different angles will have different serverTimes due to snaps etc.
 								// But sadly this is the best we can do in MOHAA, as we don't get a real EV_OBITUARY
@@ -8885,9 +8906,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									hashss << thisEs->weapon;
 								}
 							}
-							auto sha3_512 = picosha3::get_sha3_generator<224>();
-							std::string hash_hex_string = sha3_512.get_hex_string(hashss.str());
-							std::string shorthash = hash_hex_string.substr(0,3);
+							//auto sha3_512 = picosha3::get_sha3_generator<224>();
+							//std::string hash_hex_string = sha3_512.get_hex_string(hashss.str());
+							std::string hash_hex_string = makeStringHash(hashss.str());
+							std::string shorthash = hash_hex_string.substr(0, std::min((size_t)3, hash_hex_string.size()));
 
 							// Ok now with knowing the hash stuff, save into kills list
 							thisKill.hashSourceString = hashss.str();
