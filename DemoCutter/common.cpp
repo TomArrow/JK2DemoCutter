@@ -151,7 +151,7 @@ constexpr byte ctz64table[64] = {
 // for the smart idea to have a de bruijin sequence with a 0 at lowest bit and using !input addition
 // see: https://gist.github.com/resilar/e722d4600dbec9752771ab4c9d47044f
 int __builtin_ctzll(unsigned long long input) {
-	return !input + ctz64table[((input & -input) * 0x7ef3ae369951612ULL) >> 58];
+	return !input + ctz64table[((input & (uint64_t)-(int64_t)input) * 0x7ef3ae369951612ULL) >> 58];
 }
 
 #else
