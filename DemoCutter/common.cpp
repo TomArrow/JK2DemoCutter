@@ -138,8 +138,16 @@ void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross) {
 	cross[2] = v1[0] * v2[1] - v1[1] * v2[0];
 }
 
-
-
+#ifdef _MSC_VER 
+int __builtin_ctzll(unsigned long long input) {
+	if (input == 0) {
+		return 63; // bleh? idk what the right return value is, shit isnt documented anywhere
+	}
+	unsigned long result =0;
+	_BitScanReverse64(&result,input);
+	return result;
+}
+#endif
 
 
 

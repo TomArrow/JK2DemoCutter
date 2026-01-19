@@ -615,6 +615,10 @@ vec_t Distance(const vec3_t p1, const vec3_t p2);
 vec_t DistanceSquared(const vec3_t p1, const vec3_t p2);
 void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross);
 
+#ifdef _MSC_VER 
+int __builtin_ctzll(unsigned long long input);
+#endif
+
 
 // past location encoding to get a ROUGH idea of the path a capper took.
 #define LOCATIONSPIRAL_GRIDSIZE 500 // distance between points on the grid. we encode the closest point to ourselves

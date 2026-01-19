@@ -2505,6 +2505,7 @@ psEventData_t demoCutGetEvent(playerState_t* ps, playerState_t* ops, int demoCur
 
 // readOnly parameter: Do not write anythng or change any state. We are pre-parsing events.
 int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType,qboolean readOnly) {
+	int lastEventNum;
 	//if (lastEvent.find(es->number) == lastEvent.end()) {
 	//	lastEvent[es->number] = 0;
 	//} // Not really necessary is it? That's what it will be by default?
@@ -2535,8 +2536,16 @@ int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType,q
 	}*/
 
 	// if ( cent->snapShotTime < cg.time - EVENT_VALID_MSEC ) {
-	if (lastEventTime[es->number] < demoCurrentTime - EVENT_VALID_MSEC && !readOnly) {
-		lastEvent[es->number] = 0;
+	if (lastEventTime[es->number] < demoCurrentTime - EVENT_VALID_MSEC) {
+		if (!readOnly) {
+			lastEventNum = lastEvent[es->number] = 0;
+		}
+		else {
+			lastEventNum = 0;
+		}
+	}
+	else {
+		lastEventNum = lastEvent[es->number];
 	}
 
 	int eventNumberRaw = es->eType > getET_EVENTS(demoType) ? es->eType - getET_EVENTS(demoType) : es->event;
@@ -2545,7 +2554,7 @@ int demoCutGetEvent(entityState_t* es,int demoCurrentTime, demoType_t demoType,q
 	if (!readOnly) {
 		lastEventTime[es->number] = demoCurrentTime;
 	}
-	if (eventNumberRaw == lastEvent[es->number]) {
+	if (eventNumberRaw == lastEventNum) {
 		return 0;
 	}
 
@@ -5845,13 +5854,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		qboolean strafeApplicablePlayerStateThisFrame = qfalse;
 		float playerStateStrafeDeviationThisFrame = 0;
 
-		int redFlagStatusResetByConfigstring = 0;
-		int blueFlagStatusResetByConfigstring = 0;
-		int64_t	redFlagNewCarrierByEventBitMask = 0;
-		int64_t	blueFlagNewCarrierByEventBitMask = 0;
-		int64_t	redFlagCapturedPlayerBitMask = 0;
-		int64_t	blueFlagCapturedPlayerBitMask = 0;
-		int64_t	playersKilledThisFrameBitMask = 0;
+		int	flagStatusResetByConfigstring[TEAM_NUM_TEAMS] = { 0,0,0,0 };
+		uint64_t	flagNewCarrierByEventBitMask[TEAM_NUM_TEAMS] = {0,0,0,0};
+		uint64_t	flagCapturedPlayerBitMask[TEAM_NUM_TEAMS] = {0,0,0,0};
+		uint64_t	playersKilledThisFrameBitMask = 0;
 
 	cutcontinue:
 
@@ -6067,17 +6073,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
 									if (strlen(str) >= 2) {
 										if (str[0] != '1') {
-											redFlagStatusResetByConfigstring++;
+											flagStatusResetByConfigstring[TEAM_RED]++;
 										}
 										if (str[1] != '1') {
-											blueFlagStatusResetByConfigstring++;
+											flagStatusResetByConfigstring[TEAM_BLUE]++;
 										}
 										flagTmp[TEAM_RED] = str[0] - '0';
 										flagTmp[TEAM_BLUE] = str[1] - '0';
 									}
 									else { // This is some weird bug/imperfection in the code. Sometimes it just sends cs 23 0 for whatever reason. Seems to happen at end of games.
-										redFlagStatusResetByConfigstring++;
-										blueFlagStatusResetByConfigstring++;
+										flagStatusResetByConfigstring[TEAM_RED]++;
+										flagStatusResetByConfigstring[TEAM_BLUE]++;
 										flagTmp[TEAM_RED] = 0;
 										flagTmp[TEAM_BLUE] = 0;
 									}
@@ -7724,12 +7730,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// we track all the players that got the flag on this frame.
 							// And if they are killed, we clear this flag again. (Or not?)
 							// This will be checked against in the EV_OBITUARY handling to detect returns that might otherwise have been lost.
-							if (flagTeam == TEAM_RED) {
-								redFlagNewCarrierByEventBitMask |= (1L << playerNum);
-							}
-							else if (flagTeam == TEAM_BLUE) {
-								blueFlagNewCarrierByEventBitMask |= (1L << playerNum);
-							}
+							flagNewCarrierByEventBitMask[flagTeam] |= (1L << playerNum);
 						}
 						else if (eventNumber == EV_CTFMESSAGE_GENERAL && thisEs->eventParm == CTFMESSAGE_PLAYER_CAPTURED_FLAG) {
 							int playerNum = thisEs->trickedentindex;
@@ -7739,12 +7740,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// Because let's say we remember the flag carrier from last frame and he actually successfully captured,
 							// but he died on the same frame after capturing, we don't wanna count that as a return.
 							// So this will be checked against in the EV_OBITUARY handling.
-							if (flagTeam == TEAM_RED) {
-								redFlagCapturedPlayerBitMask |= (1L << playerNum);
-							}
-							else if (flagTeam == TEAM_BLUE) {
-								blueFlagCapturedPlayerBitMask |= (1L << playerNum);
-							}
+							flagCapturedPlayerBitMask[flagTeam] |= (1L << playerNum);
 						}
 					}
 				}
@@ -7837,13 +7833,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// But logically it should be the former. How would you die and get the flag after you died?
 
 								// TODO what about victimCarrierLastPickupOrigin?
-								if (redFlagNewCarrierByEventBitMask & (1L << target)) {
+								if (flagNewCarrierByEventBitMask[TEAM_RED] & (1L << target)) {
 									victimIsFlagCarrier = true;
 									victimFlagTeam = TEAM_BLUE;
 									victimCarrierLastPickupOrigin = -1;
 									sameFrameRet = qtrue;
 								}
-								else if (blueFlagNewCarrierByEventBitMask & (1L << target)) {
+								else if (flagNewCarrierByEventBitMask[TEAM_BLUE] & (1L << target)) {
 									victimIsFlagCarrier = true;
 									victimFlagTeam = TEAM_RED;
 									victimCarrierLastPickupOrigin = -1;
@@ -7855,11 +7851,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// Same as above for victim
 
 								// TODO what about victimCarrierLastPickupOrigin?
-								if (redFlagNewCarrierByEventBitMask & (1L << attacker)) {
+								if (flagNewCarrierByEventBitMask[TEAM_RED] & (1L << attacker)) {
 									attackerIsFlagCarrier = true;
 									attackerFlagTeam = TEAM_BLUE;
 								}
-								else if (blueFlagNewCarrierByEventBitMask & (1L << attacker)) {
+								else if (flagNewCarrierByEventBitMask[TEAM_BLUE] & (1L << attacker)) {
 									attackerIsFlagCarrier = true;
 									attackerFlagTeam = TEAM_RED;
 								}
@@ -7871,12 +7867,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// We can't know the order for sure but logically it makes sense that someone captured the flag and died on the next frame
 								// versus someone dying and THEN capturing the flag. lol.
 								// TLDR: We assume that if that player captured a flag on this frame, this isn't a return.
-								if (redFlagCapturedPlayerBitMask & (1L << target)) {
+								if (flagCapturedPlayerBitMask[TEAM_RED] & (1L << target)) {
 									victimIsFlagCarrier = false;
 									victimFlagTeam = -1;
 									victimCarrierLastPickupOrigin = -1;
 								}
-								else if (blueFlagCapturedPlayerBitMask & (1L << target)) {
+								else if (flagCapturedPlayerBitMask[TEAM_BLUE] & (1L << target)) {
 									victimIsFlagCarrier = false;
 									victimFlagTeam = -1;
 									victimCarrierLastPickupOrigin = -1;
@@ -7888,11 +7884,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// he killed the other person first. It's the same frame, either is possible.
 							// Let's give benefit of doubt and assume he did the kill with the flag on his back.
 							/*if (attackerIsFlagCarrier) {
-								if (redFlagCapturedPlayerBitMask & (1L << attacker)) {
+								if (flagCapturedPlayerBitMask[TEAM_RED] & (1L << attacker)) {
 									attackerIsFlagCarrier = false;
 									attackerFlagTeam = -1;
 								}
-								else if (blueFlagCapturedPlayerBitMask & (1L << attacker)) {
+								else if (flagCapturedPlayerBitMask[TEAM_BLUE] & (1L << attacker)) {
 									attackerIsFlagCarrier = false;
 									attackerFlagTeam = -1;
 								}
@@ -9582,12 +9578,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							int flagHoldTime = playerNum != -1 ? recentFlagHoldTimes[playerNum] : 0;
 
 							if (playerNum != -1) {
-								if (redFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+								if (flagNewCarrierByEventBitMask[TEAM_RED] & (1L << playerNum)) {
 									// Player got the flag on this exact frame. Flag hold time is going to be wrong. Set to 0 manually.
 									flagHoldTime = 0;
 									//sameFrameCap = true;
 								}
-								else if (blueFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+								else if (flagNewCarrierByEventBitMask[TEAM_BLUE] & (1L << playerNum)) {
 									flagHoldTime = 0;
 									//sameFrameCap = true;
 								}
@@ -10211,18 +10207,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								flagHoldTime = cgs.flagLastFlagHoldTimeOver0[flagTeam];
 							}
 							else if (lastKnownFlagCarrier[flagTeam] != playerNum) {
+								// ive seen this happen when the capper is about to score, but dies, and on the same frame he dies, his teammate gets the flag and scores it.
+								// its ok then because sameframecap will zero flagholdtime anyway but meh.
+								// maybe we should mark that as some special kind of sameframecap
+								// and it still kinda feels dirty to get the wrong value here.
 								demoErrorFlags |= DERR_GAMELOGICFLAW;
 								demoErrors << "DEMO LOGIC FLAW: Capture: Last known flag carrier is known but NOT the person who got the cap?!?\n";
 								std::cerr << "Capture: Last known flag carrier is known but NOT the person who got the cap?!?" << "(" << DPrintFLocation << ")\n";
 								// i'm not sure what to do here because it makes no sense.
 							}
 
-							if (redFlagNewCarrierByEventBitMask & (1L << playerNum)) {
+							if (flagNewCarrierByEventBitMask[TEAM_RED] & (1L << playerNum) || flagNewCarrierByEventBitMask[TEAM_BLUE] & (1L << playerNum)) {
 								// Player got the flag on this exact frame. Flag hold time is going to be wrong. Set to 0 manually.
-								flagHoldTime = 0;
-								sameFrameCap = true;
-							}
-							else if (blueFlagNewCarrierByEventBitMask & (1L << playerNum)) {
 								flagHoldTime = 0;
 								sameFrameCap = true;
 							}
@@ -10793,10 +10789,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// Find out which players are visible / followed
 				// Also find out if any visible player is carrying the flag. (we do this after events so we always have the value from the last snap up there, bc dead entities no longer hold the flag)
 				//lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_RED] = -1;
-				if (redFlagStatusResetByConfigstring) { // First reset flag carrier if the flag status has been reset via configstring.
+				/*if (flagStatusResetByConfigstring[TEAM_RED]) { // First reset flag carrier if the flag status has been reset via configstring.
 					lastKnownFlagCarrier[TEAM_RED] = -1;
 				}
-				if (blueFlagStatusResetByConfigstring) {
+				if (flagStatusResetByConfigstring[TEAM_BLUE]) {
 					lastKnownFlagCarrier[TEAM_BLUE] = -1;
 				}
 				if (lastKnownFlagCarrier[TEAM_RED] != -1) {
@@ -10804,11 +10800,35 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 				if (lastKnownFlagCarrier[TEAM_BLUE] != -1) {
 					recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE];
+				}*/
+				for (int t = 0; t < TEAM_SPECTATOR; t++) {
+					if (flagStatusResetByConfigstring[t]) { // First reset flag carrier if the flag status has been reset via configstring.
+						lastKnownFlagCarrier[t] = -1;
+					}
+					if (lastKnownFlagCarrier[t] != -1) {
+						recentFlagHoldTimes[lastKnownFlagCarrier[t]] = demoCurrentTime - cgs.flagLastChangeToTaken[t];
+					}
+					if (flagNewCarrierByEventBitMask[t]) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
+						uint64_t possiblePlayers = flagNewCarrierByEventBitMask[t]; // These are all players who picked up a red flag this frame (silly I know!)
+						possiblePlayers &= ~playersKilledThisFrameBitMask; // These are players who were killed this frame, so they can no longer have the flag.
+						possiblePlayers &= ~flagCapturedPlayerBitMask[t]; // These are players who captured the flag this frame, so they too can no longer have it.
+
+						// Check if possiblePlayers is a power of 2
+						if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
+							// It's one possible player.
+							//lastKnownFlagCarrier[t] = (int)(log2(possiblePlayers) + 0.5); // + 0.5 to avoid double to int conversion issues issues.
+							lastKnownFlagCarrier[t] = __builtin_ctzll(possiblePlayers); // i think this is nicer :)
+						}
+						else {
+							// Either no player left or multiple ones. In short, we don't know.
+							lastKnownFlagCarrier[t] = -1;
+						}
+					}
 				}
-				if (redFlagNewCarrierByEventBitMask) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
-					int64_t possiblePlayers = redFlagNewCarrierByEventBitMask; // These are all players who picked up a red flag this frame (silly I know!)
+				/*if (flagNewCarrierByEventBitMask[TEAM_RED]) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
+					int64_t possiblePlayers = flagNewCarrierByEventBitMask[TEAM_RED]; // These are all players who picked up a red flag this frame (silly I know!)
 					possiblePlayers &= ~playersKilledThisFrameBitMask; // These are players who were killed this frame, so they can no longer have the flag.
-					possiblePlayers &= ~redFlagCapturedPlayerBitMask; // These are players who captured the flag this frame, so they too can no longer have it.
+					possiblePlayers &= ~flagCapturedPlayerBitMask[TEAM_RED]; // These are players who captured the flag this frame, so they too can no longer have it.
 					
 					// Check if possiblePlayers is a power of 2
 					if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
@@ -10820,11 +10840,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						lastKnownFlagCarrier[TEAM_RED] = -1;
 					}
 				}
-				if (blueFlagNewCarrierByEventBitMask) {
+				if (flagNewCarrierByEventBitMask[TEAM_BLUE]) {
 					// Same logic as with red flag above.
-					int64_t possiblePlayers = blueFlagNewCarrierByEventBitMask; 
+					int64_t possiblePlayers = flagNewCarrierByEventBitMask[TEAM_BLUE]; 
 					possiblePlayers &= ~playersKilledThisFrameBitMask; 
-					possiblePlayers &= ~blueFlagCapturedPlayerBitMask; 
+					possiblePlayers &= ~flagCapturedPlayerBitMask[TEAM_BLUE]; 
 
 					if (possiblePlayers && !(possiblePlayers & (possiblePlayers - 1))) {
 						lastKnownFlagCarrier[TEAM_BLUE] = (int)(log2(possiblePlayers) + 0.5);
@@ -10832,7 +10852,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					else {
 						lastKnownFlagCarrier[TEAM_BLUE] = -1;
 					}
-				}
+				}*/
 				vec3_t lastKnownFlagCarrierPosition[TEAM_NUM_TEAMS];
 				vec3_t lastKnownFlagCarrierVelocity[TEAM_NUM_TEAMS];
 				for (int p = 0; p < max_clients; p++) {
