@@ -1113,6 +1113,16 @@ static const int q3EntityTypeToGeneral [] {
 							// this avoids having to set eFlags and eventNum
 };
 
+static const int q3pmTypeToGeneral[]{
+	PM_NORMAL_GENERAL,		// can accelerate and turn
+	PM_NOCLIP_GENERAL,		// noclip movement
+	PM_SPECTATOR_GENERAL,	// still run into walls
+	PM_DEAD_GENERAL,		// no acceleration or turning, but free falling
+	PM_FREEZE_GENERAL,		// stuck in place with no control
+	PM_INTERMISSION_GENERAL,	// no movement or status bar
+	PM_SPINTERMISSION_GENERAL	// no movement or status bar
+};
+
 static const int q3GameTypeToGeneral [] {
 	GT_FFA_GENERAL,				// free for all
 	GT_TOURNAMENT_GENERAL,		// one on one tournament

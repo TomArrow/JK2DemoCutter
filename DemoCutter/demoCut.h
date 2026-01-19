@@ -2252,6 +2252,31 @@ typedef struct enumName_s {
 
 #define ENUMENTRY(a) { a , #a }
 
+typedef enum {
+	PM_NORMAL_GENERAL,		// can accelerate and turn
+	PM_CLIMBWALL_GENERAL,   // MOHAA
+	PM_JETPACK_GENERAL,		// special jetpack movement (JKA)
+	PM_FLOAT_GENERAL,		// float with no gravity in general direction of velocity (intended for gripping) (JK2/JKA)
+	PM_NOCLIP_GENERAL,		// noclip movement
+	PM_SPECTATOR_GENERAL,	// still run into walls
+	PM_DEAD_GENERAL,		// no acceleration or turning, but free falling
+	PM_FREEZE_GENERAL,		// stuck in place with no control
+	PM_INTERMISSION_GENERAL,	// no movement or status bar
+	PM_SPINTERMISSION_GENERAL,	// no movement or status bar
+	PM_TYPES_COUNT
+} pmtypeGeneral_t;
+
+static const int jk2pmTypeToGeneral[]{
+	PM_NORMAL_GENERAL,		// can accelerate and turn
+	PM_FLOAT_GENERAL,		// float with no gravity in general direction of velocity (intended for gripping)
+	PM_NOCLIP_GENERAL,		// noclip movement
+	PM_SPECTATOR_GENERAL,	// still run into walls
+	PM_DEAD_GENERAL,		// no acceleration or turning, but free falling
+	PM_FREEZE_GENERAL,		// stuck in place with no control
+	PM_INTERMISSION_GENERAL,	// no movement or status bar
+	PM_SPINTERMISSION_GENERAL	// no movement or status bar
+};
+
 //
 // entityState_t->eType
 //
@@ -5346,6 +5371,7 @@ enum gameMappingType_t { // When changing this, also update gameMappingTypeGener
 	GMAP_ANIMATIONS,
 	GMAP_ENTITYTYPE,
 	GMAP_GAMETYPE,
+	GMAP_PLAYERMOVETYPE,
 	GAMEMAPPINGTYPES_COUNT
 };
 
@@ -5358,6 +5384,7 @@ static const int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
 	MAX_ANIMATIONS_GENERAL+1,
 	ET_EVENTS_GENERAL+1,
 	GT_MAX_GAME_TYPE_GENERAL+1,
+	PM_TYPES_COUNT+1,
 }; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
 
 static const int gameMappingTypeGeneralValueOffset[GAMEMAPPINGTYPES_COUNT] {
@@ -5365,6 +5392,11 @@ static const int gameMappingTypeGeneralValueOffset[GAMEMAPPINGTYPES_COUNT] {
 	NULL,//GMAP_WEAPONS,
 	NULL, //GMAP_MEANSOFDEATH,
 	1, //GMAP_LIGHTSABERMOVE // Offset 1 because the real smallest value is -1 in this enum. We can't index an array with -1!
+	0, // GMAAP_ITEMLIST
+	0, // GMAP_ANIMATIONS
+	0, // GMAP_ENTITYTYPE
+	0, // GMAP_GAMETYPE
+	0, // GMAP_PLAYERMOVETYPE
 }; // + 1 because we wanna map the _MAX values too. Let's not cause writing to random memory locations and crash :)
 
 //struct gameMappings_t {

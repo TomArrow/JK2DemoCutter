@@ -1501,6 +1501,13 @@ static int mohaaModToGeneralMap[]{ // based on wolfcamql
 	MOD_MAX_GENERAL,//MOD_TOTAL_NUMBER_GENERAL,
 };
 
+static const int mohaapmTypeToGeneral[]{
+	PM_NORMAL_GENERAL,    // can accelerate and turn
+	PM_CLIMBWALL_GENERAL, // su44: I think it's used for ladders
+	PM_NOCLIP_GENERAL,    // noclip movement
+	PM_DEAD_GENERAL,      // no acceleration or turning, but free falling
+};
+
 static const int mohaaGametypeToGeneral[]{ // based on openmohaa
 	GT_SINGLE_PLAYER_GENERAL, // single player
 	GT_FFA_GENERAL,           // free for all

@@ -254,6 +254,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	int				mapRestartCounter = 0;
 	bool			SEHExceptionCaught = false;
+	int				psGeneralPMType = 0;
 	//mvprotocol_t	protocol;
 
 	qboolean demoCutStartsAtZero = (qboolean)(startTime.type == DEMOTIME && startTime.time == 0 && startTime.skips == 0);
@@ -530,7 +531,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				break;
 			case svc_gamestate_general:
 				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
-				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange, mapRestartCounter, NULL)) {
+				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(psGeneralPMType == PM_SPINTERMISSION_GENERAL), demoCurrentTime - demo.lastPMTChange, mapRestartCounter, NULL)) {
 					//Com_DPrintf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					//goto cutcomplete;// Actually, who cares. Let's keep the map changes in the cut demo too. Shrug.
 					newGameStateAfterDemoCutBegun = qtrue;
@@ -573,6 +574,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught, malformedMessageCaught)) {
 					goto cuterror;
 				}
+				psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,demoType);
 				if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
 					demoStartTime = demo.cut.Cl.snap.serverTime;
@@ -659,7 +661,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		int64_t cutStartOffset = 0;
 
 		//if (demoCurrentTime > endTime) {
-		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
+		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(psGeneralPMType == PM_SPINTERMISSION_GENERAL), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
 			goto cutcomplete;
 		}
 		else if (framesSaved > 0) {
@@ -674,7 +676,7 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		}
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (demoCurrentTime >= startTime) {
-		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(demo.cut.Cl.snap.ps.pm_type == PM_SPINTERMISSION), demoCurrentTime - demo.lastPMTChange,mapRestartCounter,&cutStartOffset)) {
+		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(psGeneralPMType == PM_SPINTERMISSION_GENERAL), demoCurrentTime - demo.lastPMTChange,mapRestartCounter,&cutStartOffset)) {
 			if (!jsonMetaDocument && !noForcedMeta) {
 				jsonMetaDocument = new rapidjson::Document();
 				jsonMetaDocument->SetObject();

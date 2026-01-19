@@ -1463,7 +1463,7 @@ struct samplePoint_t {
 	double time;
 };
 
-
+#define FIF_SCRIPTCHECK (1<<0) // set if no more than 10ms commandtime passed since last frame and mvement dir changed to backwards (4) but wasnt before.
 struct frameInfo_t {
 	int64_t demoTime;
 	int serverTime;
@@ -1496,6 +1496,8 @@ struct frameInfo_t {
 	int groundEntityNum[MAX_CLIENTS_MAX];
 	int psStats12[MAX_CLIENTS_MAX];
 	int saberMoveGeneral[MAX_CLIENTS_MAX];
+	int movementDir[MAX_CLIENTS_MAX];
+	int frameInfoFlags[MAX_CLIENTS_MAX];
 }; 
 
 frameInfo_t lastFrameInfo;
@@ -5630,6 +5632,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	int				lastKnownInOrderTime = 0;
 	qboolean		isCompressedFile = qfalse;
 	int				psGeneralSaberMove = 0;
+	int				psGeneralPMType = 0;
 	int				psGeneralTorsoAnim = 0;
 	int				psGeneralLegsAnim = 0;
 	const int		speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // The different max delays between kills for killstreaks are in an array. Normally we skip the last one (veeery long 18 seconds), but some ppl might wanna activate those too.
@@ -6306,6 +6309,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					requiredMetaEventAges[METRACKER_KILLS][cl] = demoCurrentTime - bufferTime; // Kills are a point in time. Whenever a kill happens, we need to have the past [bufferTime] milliseconds available. So just always require the last [bufferTime] milliseconds minimum for kills.
 				}
 
+				psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,demoType);
 				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(demo.cut.Cl.snap.ps.saberMove,demoType);
 				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.legsAnim,demoType);
 				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
@@ -6727,6 +6731,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								walkDetectedTimes[thisEs->number].push_back(demoCurrentTime);
 							}
 
+							thisFrameInfo.movementDir[thisEs->number] = thisEs->angles2[YAW];
+
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 							thisFrameInfo.saberMoveGeneral[thisEs->number] = thisEsGeneralSaberMove;
 							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveGeneral != thisEsGeneralSaberMove) {
@@ -6964,7 +6970,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					thisFrameInfo.entityExists[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 					thisFrameInfo.canBlockSimplified[demo.cut.Cl.snap.ps.clientNum] = WP_SaberCanBlock_Simple(&demo.cut.Cl.snap.ps, demoType);
 
-					if (demo.cut.Cl.snap.ps.pm_type != PM_DEAD && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
+					if (psGeneralPMType != PM_DEAD_GENERAL && demo.cut.Cl.snap.ps.stats[STAT_HEALTH] > 0) {
 						thisFrameInfo.isAlive[demo.cut.Cl.snap.ps.clientNum] = qtrue;
 						//speeds[demo.cut.Cl.snap.ps.clientNum][demoCurrentTime] = VectorLength(demo.cut.Cl.snap.ps.velocity);
 						
@@ -7043,6 +7049,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						thisFrameInfo.otherKillerTime[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKillerTime;
 						thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
 #endif
+						thisFrameInfo.movementDir[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.movementDir;
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 						thisFrameInfo.saberMoveGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralSaberMove;
@@ -7493,8 +7500,20 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						if (lastFrameInfo.entityExists[i]) {
 
-							// saber combo tracking
+							// script check part #2
+							if ((lastFrameInfo.frameInfoFlags[i] & FIF_SCRIPTCHECK) && thisFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 10) {
+								logSpecialThing("SCRIPTDETECT","OneFrameBackKeyBSTrigger","3 consecutive client frames no more than 10ms apart; middle frame has dbs/bs/blubs trigger and only frame with back key.",getPlayerName(i,CS_PLAYERS_here,isMOHAADemo),i,-1,demoCurrentTime,0,bufferTime,lastGameStateChangeInDemoTime,io,&sharedVars.oldBasename,&sharedVars.oldPath,sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+							}
+
 							if (lastFrameInfo.saberMoveGeneral[i] != thisFrameInfo.saberMoveGeneral[i]) {
+
+								// script check part #1
+								if (thisFrameInfo.movementDir[i] == 4 && lastFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 10 && (thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_CR_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACKSTAB_GENERAL)) {
+									thisFrameInfo.frameInfoFlags[i] |= FIF_SCRIPTCHECK;
+								}
+
+
+								// saber combo tracking
 								//saberMoveType_t oldType = classifySaberMove(lastFrameInfo.saberMoveGeneral[i]);
 								saberMoveType_t newType = classifySaberMove((saberMoveName_t)thisFrameInfo.saberMoveGeneral[i]);
 								if (newType == LST_ATTACK) {
@@ -10845,10 +10864,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 								// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
 								if (lastKnownFlagCarrier[TEAM_RED] == p) {
+									demoErrorFlags |= DERR_GAMELOGICFLAW;
+									demoErrors << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting\n";
 									std::cerr << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
 									lastKnownFlagCarrier[TEAM_RED] = -1;
 								}
 								if (lastKnownFlagCarrier[TEAM_BLUE] == p) {
+									demoErrorFlags |= DERR_GAMELOGICFLAW;
+									demoErrors << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting\n";
 									std::cerr << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
 									lastKnownFlagCarrier[TEAM_BLUE] = -1;
 								}
@@ -10868,13 +10891,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 						}
 					}
-					if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG]) {
+					if (demo.cut.Cl.snap.ps.powerups[PW_REDFLAG] && demo.cut.Cl.snap.ps.persistant[PERS_TEAM] < TEAM_SPECTATOR && playerTeams[demo.cut.Cl.snap.ps.clientNum] < TEAM_SPECTATOR) {
 
 						lastKnownFlagCarrier[TEAM_RED] = demo.cut.Cl.snap.ps.clientNum;
 						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownFlagCarrierPosition[TEAM_RED]);
 						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownFlagCarrierVelocity[TEAM_RED]);
 						recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED];
-					}else if (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG]) {
+					}else if (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG] && demo.cut.Cl.snap.ps.persistant[PERS_TEAM] < TEAM_SPECTATOR && playerTeams[demo.cut.Cl.snap.ps.clientNum] < TEAM_SPECTATOR) {
 
 						lastKnownFlagCarrier[TEAM_BLUE] = demo.cut.Cl.snap.ps.clientNum;
 						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownFlagCarrierPosition[TEAM_BLUE]);
@@ -10885,11 +10908,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 						// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
 						if (lastKnownFlagCarrier[TEAM_RED] == demo.cut.Cl.snap.ps.clientNum) {
-							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <=0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+							if (psGeneralPMType != PM_INTERMISSION_GENERAL) {
+								demoErrorFlags |= DERR_GAMELOGICFLAW;
+								std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting\n";
+								demoErrors << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+							}
 							lastKnownFlagCarrier[TEAM_RED] = -1;
 						}
 						if (lastKnownFlagCarrier[TEAM_BLUE] == demo.cut.Cl.snap.ps.clientNum) {
-							std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+							if (psGeneralPMType != PM_INTERMISSION_GENERAL) {
+								demoErrorFlags |= DERR_GAMELOGICFLAW;
+								demoErrors << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting\n";
+								std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+							}
 							lastKnownFlagCarrier[TEAM_BLUE] = -1;
 						}
 

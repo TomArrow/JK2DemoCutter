@@ -2066,8 +2066,9 @@ void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean s
 	int		i;
 
 	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+	int pmTypeGeneral = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(ps->pm_type,demoType);
 
-	if (ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR) {
+	if (pmTypeGeneral == PM_INTERMISSION_GENERAL || pmTypeGeneral == PM_SPECTATOR_GENERAL) {
 		s->eType = specializeGameValue<GMAP_ENTITYTYPE,UNSAFE>(ET_INVISIBLE_GENERAL,demoType);
 	}
 	else if (ps->stats[STAT_HEALTH] <= GIB_HEALTH) { // Hmm should I be really doing this?
@@ -2401,13 +2402,13 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		if (s->eFlags & EF_DEAD)
 		{
 			ps->stats[STAT_HEALTH] = 0;
-			ps->pm_type = PM_DEAD;
+			ps->pm_type = specializeGameValue<GMAP_PLAYERMOVETYPE,SAFE>(PM_DEAD_GENERAL,demoType);
 		}
 		else
 		{
 			ps->stats[STAT_HEALTH] = 100;
-			if (ps->pm_type == PM_DEAD) { // Correct this if needed.
-				ps->pm_type = PM_NORMAL;
+			if (generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(ps->pm_type, demoType) == PM_DEAD_GENERAL) { // Correct this if needed.
+				ps->pm_type = 0;// specializeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(PM_NORMAL_GENERAL, demoType); //(PM_NORMAL is always 0)
 			}
 		}
 	}
@@ -8332,6 +8333,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{mohaaEntityTypeToGeneral,sizeof(mohaaEntityTypeToGeneral) / sizeof(mohaaEntityTypeToGeneral[0])}},
 			{{},{mohaaGametypeToGeneral,sizeof(mohaaGametypeToGeneral) / sizeof(mohaaGametypeToGeneral[0])}},
+			{{},{mohaapmTypeToGeneral,sizeof(mohaapmTypeToGeneral) / sizeof(mohaapmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsMOHAA_ver_6,sizeof(entityStateFieldsMOHAA_ver_6) / sizeof(entityStateFieldsMOHAA_ver_6[0]),},
@@ -8376,6 +8378,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{mohaaEntityTypeToGeneral,sizeof(mohaaEntityTypeToGeneral) / sizeof(mohaaEntityTypeToGeneral[0])}},
 			{{},{mohaaGametypeToGeneral,sizeof(mohaaGametypeToGeneral) / sizeof(mohaaGametypeToGeneral[0])}},
+			{{},{mohaapmTypeToGeneral,sizeof(mohaapmTypeToGeneral) / sizeof(mohaapmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsMOHAA_ver_15,sizeof(entityStateFieldsMOHAA_ver_15) / sizeof(entityStateFieldsMOHAA_ver_15[0]),},
@@ -8417,6 +8420,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jk2spEntityTypeToGeneral,sizeof(jk2spEntityTypeToGeneral) / sizeof(jk2spEntityTypeToGeneral[0])}},
 			{{},{jk2spGametypeToGeneral,sizeof(jk2spGametypeToGeneral) / sizeof(jk2spGametypeToGeneral[0])}},
+			{{},{jk2sppmTypeToGeneral,sizeof(jk2sppmTypeToGeneral) / sizeof(jk2sppmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields_jk2sp,sizeof(entityStateFields_jk2sp) / sizeof(entityStateFields_jk2sp[0]),},
@@ -8452,6 +8456,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jk2EntityTypeToGeneral,sizeof(jk2EntityTypeToGeneral) / sizeof(jk2EntityTypeToGeneral[0])}},
 			{{},{jk2GametypeToGeneral,sizeof(jk2GametypeToGeneral) / sizeof(jk2GametypeToGeneral[0])}},
+			{{},{jk2pmTypeToGeneral,sizeof(jk2pmTypeToGeneral) / sizeof(jk2pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields15,sizeof(entityStateFields15) / sizeof(entityStateFields15[0]),},
@@ -8483,6 +8488,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jk2EntityTypeToGeneral,sizeof(jk2EntityTypeToGeneral) / sizeof(jk2EntityTypeToGeneral[0])}},
 			{{},{jk2GametypeToGeneral,sizeof(jk2GametypeToGeneral) / sizeof(jk2GametypeToGeneral[0])}},
+			{{},{jk2pmTypeToGeneral,sizeof(jk2pmTypeToGeneral) / sizeof(jk2pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields,	sizeof(entityStateFields) / sizeof(entityStateFields[0]),},
@@ -8514,6 +8520,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jk2EntityTypeToGeneral,sizeof(jk2EntityTypeToGeneral) / sizeof(jk2EntityTypeToGeneral[0])}},
 			{{},{jk2GametypeToGeneral,sizeof(jk2GametypeToGeneral) / sizeof(jk2GametypeToGeneral[0])}},
+			{{},{jk2pmTypeToGeneral,sizeof(jk2pmTypeToGeneral) / sizeof(jk2pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFields,	sizeof(entityStateFields) / sizeof(entityStateFields[0]),},
@@ -8555,6 +8562,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jkaEntityTypeToGeneral,sizeof(jkaEntityTypeToGeneral) / sizeof(jkaEntityTypeToGeneral[0])}},
 			{{},{jkaGametypeToGeneral,sizeof(jkaGametypeToGeneral) / sizeof(jkaGametypeToGeneral[0])}},
+			{{},{jkapmTypeToGeneral,sizeof(jkapmTypeToGeneral) / sizeof(jkapmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsJKA,sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),},
@@ -8599,6 +8607,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jkaEntityTypeToGeneral,sizeof(jkaEntityTypeToGeneral) / sizeof(jkaEntityTypeToGeneral[0])}},
 			{{},{jkaGametypeToGeneral,sizeof(jkaGametypeToGeneral) / sizeof(jkaGametypeToGeneral[0])}},
+			{{},{jkapmTypeToGeneral,sizeof(jkapmTypeToGeneral) / sizeof(jkapmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsJKA,sizeof(entityStateFieldsJKA) / sizeof(entityStateFieldsJKA[0]),},
@@ -8646,6 +8655,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{jkaEntityTypeToGeneral,sizeof(jkaEntityTypeToGeneral) / sizeof(jkaEntityTypeToGeneral[0])}},
 			{{},{jkaGametypeToGeneral,sizeof(jkaGametypeToGeneral) / sizeof(jkaGametypeToGeneral[0])}},
+			{{},{jkapmTypeToGeneral,sizeof(jkapmTypeToGeneral) / sizeof(jkapmTypeToGeneral[0])}},
 		},
 		{},
 		MAX_CONFIGSTRINGS_JKA
@@ -8681,6 +8691,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{q3EntityTypeToGeneral,sizeof(q3EntityTypeToGeneral) / sizeof(q3EntityTypeToGeneral[0])}},
 			{{},{q3GameTypeToGeneral,sizeof(q3GameTypeToGeneral) / sizeof(q3GameTypeToGeneral[0])}},
+			{{},{q3pmTypeToGeneral,sizeof(q3pmTypeToGeneral) / sizeof(q3pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -8721,6 +8732,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{q3EntityTypeToGeneral,sizeof(q3EntityTypeToGeneral) / sizeof(q3EntityTypeToGeneral[0])}},
 			{{},{q3GameTypeToGeneral,sizeof(q3GameTypeToGeneral) / sizeof(q3GameTypeToGeneral[0])}},
+			{{},{q3pmTypeToGeneral,sizeof(q3pmTypeToGeneral) / sizeof(q3pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -8761,6 +8773,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{q3EntityTypeToGeneral,sizeof(q3EntityTypeToGeneral) / sizeof(q3EntityTypeToGeneral[0])}},
 			{{},{q3GameTypeToGeneral,sizeof(q3GameTypeToGeneral) / sizeof(q3GameTypeToGeneral[0])}},
+			{{},{q3pmTypeToGeneral,sizeof(q3pmTypeToGeneral) / sizeof(q3pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQ3DM68,sizeof(entityStateFieldsQ3DM68) / sizeof(entityStateFieldsQ3DM68[0]),},
@@ -8805,6 +8818,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
 			{{},{qlGametypeToGeneral,sizeof(qlGametypeToGeneral) / sizeof(qlGametypeToGeneral[0])}},
+			{{},{q3pmTypeToGeneral,sizeof(q3pmTypeToGeneral) / sizeof(q3pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQL73,sizeof(entityStateFieldsQL73) / sizeof(entityStateFieldsQL73[0]),},
@@ -8849,6 +8863,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
 			{{},{qlGametypeToGeneral,sizeof(qlGametypeToGeneral) / sizeof(qlGametypeToGeneral[0])}},
+			{{},{q3pmTypeToGeneral,sizeof(q3pmTypeToGeneral) / sizeof(q3pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQLDM90,sizeof(entityStateFieldsQLDM90) / sizeof(entityStateFieldsQLDM90[0]),},
@@ -8893,6 +8908,7 @@ static gameInfo_t gameInfos[] = {
 			},
 			{{},{qlEntityTypeToGeneral,sizeof(qlEntityTypeToGeneral) / sizeof(qlEntityTypeToGeneral[0])}},
 			{{},{qlGametypeToGeneral,sizeof(qlGametypeToGeneral) / sizeof(qlGametypeToGeneral[0])}},
+			{{},{q3pmTypeToGeneral,sizeof(q3pmTypeToGeneral) / sizeof(q3pmTypeToGeneral[0])}},
 		},
 		{
 			{entityStateFieldsQLDM91,sizeof(entityStateFieldsQLDM91) / sizeof(entityStateFieldsQLDM91[0]),},
