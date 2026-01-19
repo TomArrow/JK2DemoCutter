@@ -157,7 +157,7 @@ int __builtin_ctzll(unsigned long long input) {
 #else
 int __builtin_ctzll(unsigned long long input) {
 	if (input == 0) {
-		return 63; // bleh? idk what the right return value is, shit isnt documented anywhere
+		return 64; // bleh? idk what the right return value is, shit isnt documented anywhere
 	}
 	unsigned long result =0;
 	_BitScanReverse64(&result,input);

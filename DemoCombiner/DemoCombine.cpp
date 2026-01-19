@@ -469,14 +469,14 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 							tmpConfigString = demoReaders[i]->reader.GetPlayerConfigString(clientNumHere, &tmpConfigStringMaxLength);
 
 							if (sourceDemoType == DM_14) {
-								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength,sizeof(copy)),tmpConfigString);
+								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength, (unsigned long long)sizeof(copy)),tmpConfigString);
 								tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay - pingCompensationHere, NULL,NULL, qfalse, NULL);
 								// DM_14 (jk2sp) stores saber color differently
 								Info_SetValueForKey(copy, sizeof(copy), "c1", va("%d", tmpPS.saberColor), demoReaders[i]->reader.isThisMOHAADemo());
 								tmpConfigString = copy;
 							}
 							else if (pi.modelNeededTeamAdjustment) {
-								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength, sizeof(copy)), tmpConfigString);
+								strcpy_s(copy, std::min((unsigned long long)tmpConfigStringMaxLength, (unsigned long long)sizeof(copy)), tmpConfigString);
 								tmpPS = demoReaders[i]->reader.GetInterpolatedPlayer(clientNumHere, sourceTime - demoReaders[i]->sourceInfo->delay - pingCompensationHere, NULL, NULL, qfalse, NULL);
 								// DM_14 (jk2sp) stores saber color differently
 								Info_SetValueForKey(copy, sizeof(copy), "model", va("%s/%s", pi.model.c_str(), pi.skin.c_str()), demoReaders[i]->reader.isThisMOHAADemo());
