@@ -856,8 +856,16 @@ float lastGroundHeight[MAX_CLIENTS_MAX]; // Last Z coordinate (height in Q3 syst
 //std::map<int,std::string> lastPlayerModel;
 std::string lastPlayerModel[MAX_CLIENTS_MAX];
 int lastKnownFlagCarrier[TEAM_NUM_TEAMS] = {-1,-1,-1,-1};
+#if _DEBUG
+int64_t lastKnownFlagCarrierSetTime[TEAM_NUM_TEAMS] = {-1,-1,-1,-1};
+#endif
 strafeDeviationInfo_t strafeDeviationsDefrag[MAX_CLIENTS_MAX];
 int saberComboCounter[MAX_CLIENTS_MAX];
+
+struct {
+	int clientNum;
+	int spawnCount;
+} oldPsInfo;
 
 #define GROUND_CROUCH_SNEAK_THRESHOLD 2000 // If you are crouching and walking on ground for this long, we're gonna assume you're SNEAKING
 int groundCrouchDurations[MAX_CLIENTS_MAX];
@@ -5648,6 +5656,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 	
 
+	Com_Memset(&oldPsInfo,0,sizeof(oldPsInfo));
 	Com_Memset(saberComboCounter,0,sizeof(saberComboCounter));
 	Com_Memset(playerSpiralLocations,0,sizeof(playerSpiralLocations));
 	Com_Memset(playerDemoStatsPointers,0,sizeof(playerDemoStatsPointers));
@@ -5687,7 +5696,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&lastSneakDuration, 0, sizeof(lastSneakDuration));
 	resetCurrentPacketPeriodStats();
 
-	lastKnownFlagCarrier[TEAM_RED] = lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_FREE] = -1;
+	lastKnownFlagCarrier[TEAM_RED] = lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_FREE] = -1; 
+#if _DEBUG
+	lastKnownFlagCarrierSetTime[TEAM_RED] = lastKnownFlagCarrierSetTime[TEAM_BLUE] = lastKnownFlagCarrierSetTime[TEAM_FREE] = -1;
+#endif
 
 	//Com_Memset(lastBackflip, 0, sizeof(lastBackflip));
 	for (int i = 0; i < max_clients; i++) {
@@ -5975,11 +5987,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		byte previousOcmd = 255;
 		while (1) {
 			bool malformedMessageCaught = false;
+			bool snapIsLikelyFirstRealSnapAfterGamestate = false;
 			int oldMsgOffset = oldMsg.readcount;
 
 			byte cmd, ocmd;
 			if (oldMsg.readcount > oldMsg.cursize) {
 				demoErrorFlags |= DERR_READPASTEND;
+				// TODO what if we got parse error in parsesnapshot but wanna keep going?
 				Com_DPrintf("Demo cutter, read past end of server message.\n");
 				demoErrors << "Read past end of server message\n";
 				goto cuterror;
@@ -6167,11 +6181,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				//	Com_Printf("Warning: unexpected new gamestate, finishing cutting.\n");
 				//	goto cutcomplete;
 				//}
+				Com_Memset(&oldPsInfo, 0, sizeof(oldPsInfo));
 				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0),SEHExceptionCaught)) { // Pass demoType by reference in case we need 1.03 detection
 					demoErrorFlags |= DERR_FAILPARSEGAMESTATE;
 					demoErrors << "Failed to parse gamestate\n";
 					goto cuterror;
 				}
+
 				if (opts.makeVideo || opts.throughWallChecks) {
 
 					char mapname[MAX_STRING_CHARS_MAX];
@@ -6271,6 +6287,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				currentPacketPeriodStats.nonDeltaSnapshotCount += (int)(demo.cut.Cl.snap.deltaNum == -1); // I'm 14 and this is optimized.
 				currentPacketPeriodStats.entitiesReceivedTotal += demo.cut.Cl.snap.numEntities;
 				currentPacketPeriodStats.totalSnapshotSize += oldMsg.readcount - oldMsgOffset;
+
+				snapIsLikelyFirstRealSnapAfterGamestate = oldPsInfo.clientNum == demo.cut.Cl.snap.ps.clientNum && oldPsInfo.spawnCount > demo.cut.Cl.snap.ps.persistant[PERS_SPAWN_COUNT]; // DONT RELY ON THIS FOR ANYTHING IMPORTANT. I JUST USE IT TO ADD TO SOME WARNING MESSAGES
+				oldPsInfo.spawnCount = demo.cut.Cl.snap.ps.persistant[PERS_SPAWN_COUNT];
+				oldPsInfo.clientNum = demo.cut.Cl.snap.ps.clientNum;
 
 				// Time related stuff
 				if (messageOffset++ == 0) {
@@ -10200,6 +10220,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							int flagHoldTime = recentFlagHoldTimes[playerNum];
 
+							if (flagNewCarrierByEventBitMask[TEAM_RED] & (1L << playerNum) || flagNewCarrierByEventBitMask[TEAM_BLUE] & (1L << playerNum)) {
+								// Player got the flag on this exact frame. 
+								sameFrameCap = true;
+							}
+
 							if (lastKnownFlagCarrier[flagTeam] == -1) { 
 								// we didn't actually know who this player was, so use the generic team-based last flag hold over 0.
 								// TODO maybe we should have a per-frame based one instead so we can apply it to 
@@ -10212,15 +10237,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// maybe we should mark that as some special kind of sameframecap
 								// and it still kinda feels dirty to get the wrong value here.
 								demoErrorFlags |= DERR_GAMELOGICFLAW;
-								demoErrors << "DEMO LOGIC FLAW: Capture: Last known flag carrier is known but NOT the person who got the cap?!?\n";
-								std::cerr << "Capture: Last known flag carrier is known but NOT the person who got the cap?!?" << "(" << DPrintFLocation << ")\n";
+								demoErrors << "DEMO LOGIC FLAW: Capture: Last known flag carrier is known but NOT the person who got the cap?!? (Same Frame Cap: "<< sameFrameCap <<")\n";
+								std::cerr << "Capture: Last known flag carrier is known but NOT the person who got the cap?!? (Same Frame Cap: " << sameFrameCap << ")" << "(" << DPrintFLocation << ")\n";
 								// i'm not sure what to do here because it makes no sense.
 							}
 
-							if (flagNewCarrierByEventBitMask[TEAM_RED] & (1L << playerNum) || flagNewCarrierByEventBitMask[TEAM_BLUE] & (1L << playerNum)) {
+							if (sameFrameCap) {
 								// Player got the flag on this exact frame. Flag hold time is going to be wrong. Set to 0 manually.
 								flagHoldTime = 0;
-								sameFrameCap = true;
 							}
 
 							bool wasFollowed = false;
@@ -10804,6 +10828,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				for (int t = 0; t < TEAM_SPECTATOR; t++) {
 					if (flagStatusResetByConfigstring[t]) { // First reset flag carrier if the flag status has been reset via configstring.
 						lastKnownFlagCarrier[t] = -1;
+#if _DEBUG
+						lastKnownFlagCarrierSetTime[t] = demoCurrentTime;
+#endif
 					}
 					if (lastKnownFlagCarrier[t] != -1) {
 						recentFlagHoldTimes[lastKnownFlagCarrier[t]] = demoCurrentTime - cgs.flagLastChangeToTaken[t];
@@ -10823,6 +10850,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// Either no player left or multiple ones. In short, we don't know.
 							lastKnownFlagCarrier[t] = -1;
 						}
+#if _DEBUG
+						lastKnownFlagCarrierSetTime[t] = demoCurrentTime;
+#endif
 					}
 				}
 				/*if (flagNewCarrierByEventBitMask[TEAM_RED]) { // Now set the flag carrier if we got any flag pickup events. And afterwards we check for entities with the flag additionally.
@@ -10871,12 +10901,18 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								VectorCopy(thisEntity->pos.trBase,lastKnownFlagCarrierPosition[TEAM_RED]);
 								VectorCopy(thisEntity->pos.trDelta,lastKnownFlagCarrierVelocity[TEAM_RED]);
 								recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED]; // Hmm but this creates a wrong value on the first frame of holding the flag. If it's a one-frame capture we will end up with a wrong time duration held ...
+#if _DEBUG
+								lastKnownFlagCarrierSetTime[TEAM_RED] = demoCurrentTime;
+#endif
 							}
 							else if (thisEntity->powerups & (1 << PW_BLUEFLAG)) {
 								lastKnownFlagCarrier[TEAM_BLUE] = thisEntity->number;
 								VectorCopy(thisEntity->pos.trBase, lastKnownFlagCarrierPosition[TEAM_BLUE]);
 								VectorCopy(thisEntity->pos.trDelta, lastKnownFlagCarrierVelocity[TEAM_BLUE]);
 								recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE];
+#if _DEBUG
+								lastKnownFlagCarrierSetTime[TEAM_BLUE] = demoCurrentTime;
+#endif
 							}
 							else { 
 								// TODO also reset recent flag hold time here?
@@ -10884,16 +10920,28 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 								// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
 								if (lastKnownFlagCarrier[TEAM_RED] == p) {
+									// this likely happens on older demos with a flag eating bug
+									// player takes flag, and then rejoins his team
+									// flag status remains as taken, but he doesn't have it anymore
 									demoErrorFlags |= DERR_GAMELOGICFLAW;
-									demoErrors << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting\n";
-									std::cerr << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+									demoErrors << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)",demoCurrentTime-lastGameStateChangeInDemoTime) : "") << "\n";
+									std::cerr << "Player entity ("<< p << (thisEntity->eFlags & EF_DEAD ? ", dead": "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "" << "(" << DPrintFLocation << ")\n";
 									lastKnownFlagCarrier[TEAM_RED] = -1;
+#if _DEBUG
+									lastKnownFlagCarrierSetTime[TEAM_RED] = demoCurrentTime;
+#endif
 								}
 								if (lastKnownFlagCarrier[TEAM_BLUE] == p) {
+									// this likely happens on older demos with a flag eating bug
+									// player takes flag, and then rejoins his team
+									// flag status remains as taken, but he doesn't have it anymore
 									demoErrorFlags |= DERR_GAMELOGICFLAW;
-									demoErrors << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting\n";
-									std::cerr << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+									demoErrors << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "\n";
+									std::cerr << "Player entity (" << p << (thisEntity->eFlags & EF_DEAD ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "" << "(" << DPrintFLocation << ")\n";
 									lastKnownFlagCarrier[TEAM_BLUE] = -1;
+#if _DEBUG
+									lastKnownFlagCarrierSetTime[TEAM_BLUE] = demoCurrentTime;
+#endif
 								}
 
 								// Reset the required meta event age for capture cuts if the player is seen without a flag.
@@ -10917,31 +10965,46 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownFlagCarrierPosition[TEAM_RED]);
 						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownFlagCarrierVelocity[TEAM_RED]);
 						recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_RED]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_RED];
+#if _DEBUG
+						lastKnownFlagCarrierSetTime[TEAM_RED] = demoCurrentTime;
+#endif
 					}else if (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG] && demo.cut.Cl.snap.ps.persistant[PERS_TEAM] < TEAM_SPECTATOR && playerTeams[demo.cut.Cl.snap.ps.clientNum] < TEAM_SPECTATOR) {
 
 						lastKnownFlagCarrier[TEAM_BLUE] = demo.cut.Cl.snap.ps.clientNum;
 						VectorCopy(demo.cut.Cl.snap.ps.origin, lastKnownFlagCarrierPosition[TEAM_BLUE]);
 						VectorCopy(demo.cut.Cl.snap.ps.velocity, lastKnownFlagCarrierVelocity[TEAM_BLUE]);
 						recentFlagHoldTimes[lastKnownFlagCarrier[TEAM_BLUE]] = demoCurrentTime - cgs.flagLastChangeToTaken[TEAM_BLUE];
+#if _DEBUG
+						lastKnownFlagCarrierSetTime[TEAM_BLUE] = demoCurrentTime;
+#endif
 					}
 					else {
 						// A little safety backup. If we see this player without a flag and he is remembered as the last flag carrier, reset it.
 						// We'll just keep this for a while maybe, worst case just as debug. If it turns out that it's not needed we can remove it.
+						// NOTE: This seems to happen sometimes after a fresh gamestate. 
+						// The PS isnt updated by the game module until the next usercmd is processed perhaps. (in one example commandTime was 3 seconds behind serverTime)
+						// and thus he still has the flag from previous game in the playerstate. It gets almost immediately cleared after, but we can see this happening as a result.
 						if (lastKnownFlagCarrier[TEAM_RED] == demo.cut.Cl.snap.ps.clientNum) {
 							if (psGeneralPMType != PM_INTERMISSION_GENERAL) {
 								demoErrorFlags |= DERR_GAMELOGICFLAW;
-								std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting\n";
-								demoErrors << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+								demoErrors << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "\n";
+								std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying red flag, but remembered as lastKnownFlagCarrier[TEAM_RED] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "" << "(" << DPrintFLocation << ")\n";
 							}
 							lastKnownFlagCarrier[TEAM_RED] = -1;
+#if _DEBUG
+							lastKnownFlagCarrierSetTime[TEAM_RED] = demoCurrentTime;
+#endif
 						}
 						if (lastKnownFlagCarrier[TEAM_BLUE] == demo.cut.Cl.snap.ps.clientNum) {
 							if (psGeneralPMType != PM_INTERMISSION_GENERAL) {
 								demoErrorFlags |= DERR_GAMELOGICFLAW;
-								demoErrors << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting\n";
-								std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << "(" << DPrintFLocation << ")\n";
+								demoErrors << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "\n";
+								std::cerr << "Playerstate (" << demo.cut.Cl.snap.ps.clientNum << (demo.cut.Cl.snap.ps.stats[STAT_HEALTH] <= 0 ? ", dead" : "") << ") is not carrying blue flag, but remembered as lastKnownFlagCarrier[TEAM_BLUE] WTF, resetting" << (snapIsLikelyFirstRealSnapAfterGamestate ? va("(likely due to recycled server snaps after gamestate, %lld since last gamestate)", demoCurrentTime - lastGameStateChangeInDemoTime) : "") << "" << "(" << DPrintFLocation << ")\n";
 							}
 							lastKnownFlagCarrier[TEAM_BLUE] = -1;
+#if _DEBUG
+							lastKnownFlagCarrierSetTime[TEAM_BLUE] = demoCurrentTime;
+#endif
 						}
 
 						// Same logic as with entities above, see comment above. But ofc playerstate is always visible but view angle can change

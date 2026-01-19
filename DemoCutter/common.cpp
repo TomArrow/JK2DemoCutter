@@ -139,6 +139,22 @@ void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross) {
 }
 
 #ifdef _MSC_VER 
+#ifndef _WIN64
+constexpr byte ctz64table[64] = {
+63,0,55,1,56,48,27,2,60,57,41,49,37,28,16,3,61,
+46,58,35,44,42,50,21,52,38,32,29,23,17,11,4,62,
+54,47,26,59,40,36,15,45,34,43,20,51,31,22,10,53,
+25,39,14,33,19,30,9,24,13,18,8,12,7,6,5
+};
+
+// thanks to resilar's "de Bruijn CTZ with proper handling of 0"
+// for the smart idea to have a de bruijin sequence with a 0 at lowest bit and using !input addition
+// see: https://gist.github.com/resilar/e722d4600dbec9752771ab4c9d47044f
+int __builtin_ctzll(unsigned long long input) {
+	return !input + ctz64table[((input & -input) * 0x7ef3ae369951612ULL) >> 58];
+}
+
+#else
 int __builtin_ctzll(unsigned long long input) {
 	if (input == 0) {
 		return 63; // bleh? idk what the right return value is, shit isnt documented anywhere
@@ -147,6 +163,7 @@ int __builtin_ctzll(unsigned long long input) {
 	_BitScanReverse64(&result,input);
 	return result;
 }
+#endif
 #endif
 
 
