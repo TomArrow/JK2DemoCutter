@@ -5174,7 +5174,7 @@ typedef ankerl::unordered_dense::segmented_set<std::string, ankerl::unordered_de
 extern InternedStringTable internedStrings;
 
 
-
+/*
 template<int bits>
 class EzBitmask {
 	byte data[(bits / 8) + 1] = { 0 };
@@ -5187,6 +5187,77 @@ public:
 	}
 	inline void clearbit(size_t bit) {
 		data[(bit >> 3)] &= ~(1 << (bit & 7));
+	}
+};*/
+
+enum class EzBitmaskMemoryType {
+	Stack,
+	Heap,
+};
+
+#define EZBM_DATASIZE ((bits + 7) / 8)
+template<size_t bits, EzBitmaskMemoryType memtype>
+class EzBitmask {
+	byte _dataHeap[memtype == EzBitmaskMemoryType::Stack ? EZBM_DATASIZE : 1] = { 0 }; // meeh it has to be size 1 at least xd
+	byte* _data = _dataHeap;
+public:
+	EzBitmask() {
+		if constexpr (memtype == EzBitmaskMemoryType::Heap) {
+			_data = new byte[EZBM_DATASIZE]{ 0 };
+		}
+	}
+	~EzBitmask() {
+		if constexpr (memtype == EzBitmaskMemoryType::Heap) {
+			if (_data) {
+				delete[] _data;
+				_data = NULL;
+			}
+		}
+	}
+	const bool operator [](size_t bit) {
+		return (_data[(bit >> 3)] & (1 << (bit & 7)));
+	}
+	void setbit(size_t bit) {
+		_data[(bit >> 3)] |= (1 << (bit & 7));
+	}
+	void clearbit(size_t bit) {
+		_data[(bit >> 3)] &= ~(1 << (bit & 7));
+	}
+	const byte* data() {
+		return _data;
+	}
+	const byte* release() {
+		if constexpr (memtype == EzBitmaskMemoryType::Heap) {
+			byte* retVal = _data;
+			_data = NULL;
+			return retVal;
+		}
+		else {
+			return _data;
+		}
+	}
+	const size_t getDataSize() {
+		return EZBM_DATASIZE;
+	}
+	void clear(size_t count = 0) {
+		if constexpr (memtype == EzBitmaskMemoryType::Heap) {
+			if (_data) {
+				memset(_data, 0, count ? std::min(EZBM_DATASIZE, count) : EZBM_DATASIZE);
+			}
+		}
+		else {
+			memset(_data, 0, count ? std::min(EZBM_DATASIZE, count) : EZBM_DATASIZE);
+		}
+	}
+	void fill(size_t count = 0) {
+		if constexpr (memtype == EzBitmaskMemoryType::Heap) {
+			if (_data) {
+				memset(_data, 255, count ? std::min(EZBM_DATASIZE, count) : EZBM_DATASIZE);
+			}
+		}
+		else {
+			memset(_data, 255, count ? std::min(EZBM_DATASIZE, count) : EZBM_DATASIZE);
+		}
 	}
 };
 

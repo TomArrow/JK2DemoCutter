@@ -537,6 +537,27 @@ void saveVideo(const ExtraSearchOptions& opts) {
 	gmav_finish(gmav);
 }
 
+
+
+
+// this identifies 
+class UniqueGame_t {
+	int levelStartTime;
+	int serverId;
+	std::string serverName;
+	std::string gameName;
+	std::string gameEndingCSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach intermission.
+	std::string version;
+
+
+	int databaseId;
+	int databaseIdFinished;
+};
+
+uint64_t uniqueGameIndex = 0;
+std::vector<UniqueGame_t> uniqueGames;
+
+
 typedef struct strafeCSVPoint_t {
 	int64_t timeOffset;
 	float distanceTraveledFromLast;
@@ -1056,7 +1077,7 @@ struct SpreeInfo {
 std::vector<Kill> kills[MAX_CLIENTS_MAX + 1]; // +1 is for world
 #define KILLERARRAYINDEX(k) (((k) < 0 || (k)>=max_clients) ? max_clients : (k)) 
 #define KILLERARRAYINDEX_REVERSE(k) (((k) < 0 || (k)>=max_clients) ? ENTITYNUM_WORLD : (k)) 
-EzBitmask<MAX_GENTITIES> clientHasKills;
+EzBitmask<MAX_GENTITIES, EzBitmaskMemoryType::Stack> clientHasKills;
 #else
 ankerl::unordered_dense::map<uint16_t, std::vector<Kill>, ankerl::unordered_dense::hash<uint16_t>> kills; // unordered_map should be faster. i could do array but then ... we might have to iterate over many emptyt ones. meh.
 #define KILLERARRAYINDEX(k) (k)
