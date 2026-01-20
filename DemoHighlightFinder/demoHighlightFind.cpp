@@ -32,6 +32,8 @@
 
 #include "../shared/base58/base58.h"
 
+#include "../shared/AngleCoder.h"
+
 #define DEBUGSTATSDB
 
 #define BUFFERBAT
@@ -322,8 +324,10 @@ std::queue<entityState_t*> parsedEventEntities;
 // flags for sql fields so we dont need to do dumb string comparisons
 #define QF_PLAYERNAME0				(1<<0)
 #define QF_PLAYERNAME0STRIPPED		(1<<1)
-#define QF_PLAYERNAME1				(1<<2)
-#define QF_PLAYERNAME1STRIPPED		(1<<3)
+#define QF_BOTSTATUS0				(1<<2)
+#define QF_PLAYERNAME1				(1<<3)
+#define QF_PLAYERNAME1STRIPPED		(1<<4)
+#define QF_BOTSTATUS1				(1<<5)
 
 
 typedef class SQLDelayedQueryWrapper_t {
@@ -852,6 +856,14 @@ int playerTeams[MAX_CLIENTS_MAX];
 TeamInfo teamInfo[MAX_TEAMS];
 int lastEvent[MAX_GENTITIES];
 int lastEventTime[MAX_GENTITIES];
+#define BOTSTATUS_CONFIRMED 1
+#define BOTSTATUS_SABERMODLIKELY 2
+#define BOTSTATUS_FIGHTBOTANGLEDETECT 4
+#define BOTSTATUS_NORMALBOT (BOTSTATUS_CONFIRMED|BOTSTATUS_SABERMODLIKELY)
+#define BOTSTATUS(clientNum) ( (clientNum >= 0 && clientNum < max_clients) ? (playerBotStatus[clientNum]) : 0 )
+int playerBotStatus[MAX_CLIENTS_MAX]; // bitmask. 1 = confirmed bot. 2 = likely bot (sabermod). 3 = fightbot
+AngleDecoder playerAngleDecoders[MAX_CLIENTS_MAX] {};
+
 float lastGroundHeight[MAX_CLIENTS_MAX]; // Last Z coordinate (height in Q3 system) when groundEntityNum was ENTITYNUM_WORLD
 //std::map<int,std::string> lastPlayerModel;
 std::string lastPlayerModel[MAX_CLIENTS_MAX];
@@ -2749,16 +2761,73 @@ template <unsigned int max_clients>
 void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 	int stringOffset;
 	memset(teamInfo,0,sizeof(teamInfo));
+
+
+	stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
+	const char* serverInfo = clCut->gameState.stringData + stringOffset;
+	const char* gameName = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
+	bool saberModStyleSkill = !_strnicmp(gameName,"SaberMod",8);
+
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 	for (int i = 0; i < max_clients; i++) {
 
 		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = clCut->gameState.stringData + stringOffset;
-		const char* playerTeam = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "t");
-		if (strlen(playerTeam)) {
-			int team = atoi(playerTeam);
-			playerTeams[i] = team;
-			teamInfo[team].playerCount++;
+		if (!*playerInfo) {
+			playerBotStatus[i] = 0;
+		}
+		else {
+			playerBotStatus[i] &= ~BOTSTATUS_NORMALBOT;
+
+			const char* playerTeam = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "t");
+			if (strlen(playerTeam)) {
+				int team = atoi(playerTeam);
+				playerTeams[i] = team;
+				teamInfo[team].playerCount++;
+			}
+			qboolean skillExists = qfalse;
+			const char* skillValue = Info_ValueForKey_Exists(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "skill",&skillExists);
+			if (!skillExists || !*skillValue) {
+				saberModStyleSkill = false;
+			}
+			else {
+#define SIMPLIFIEDSKILLEVAL 1
+#if !SIMPLIFIEDSKILLEVAL
+				float skillNum = atof(skillValue);
+#endif
+				if (saberModStyleSkill) {
+					// ok so, not every sabermod version actually uses this new way of communicating "skill".
+					// old versions use the normal way (bot gets skill value, player doesnt)
+					// we can luckily distinguish them. the old style uses the traditional %5.2f formatting, where
+					// the new version uses %i. So if we detect leading zeros or empty spaces, or post-comma stuff,
+					// we know it's the old version
+					// note: i think %5.2f might lead with zeros depending on compiler? not sure. qvm has spaces. might be confusing sth tho.
+#if SIMPLIFIEDSKILLEVAL
+					float skillNum = atof(skillValue);
+#endif
+					int skilllen = strlen(skillValue);
+					if (!skilllen || skilllen > 2 && skillValue[skilllen - 3] == '.' || *skillValue == ' ' || _strnicmp(skillValue, "00",2)) {
+						saberModStyleSkill = false;
+					}
+					if (saberModStyleSkill && skillNum > 0.1f) {
+						playerBotStatus[i] |= BOTSTATUS_SABERMODLIKELY;
+					}
+#if !SIMPLIFIEDSKILLEVAL
+					else if (!saberModStyleSkill && skillNum > -0.5f) {
+						playerBotStatus[i] |= BOTSTATUS_CONFIRMED;
+					}
+#endif
+				}
+#if !SIMPLIFIEDSKILLEVAL
+				else if (skillNum > -0.5f) { // TODO wait is this correct? code comment says skill could be 0 for real players? ehh
+					playerBotStatus[i] |= BOTSTATUS_CONFIRMED;
+				}
+#else
+				else {
+					playerBotStatus[i] |= BOTSTATUS_CONFIRMED;
+				}
+#endif
+			}
 		}
 	}
 	stringOffset = clCut->gameState.stringOffsets[CS_SCORES1];
@@ -2985,6 +3054,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerName", playername.c_str(), QF_PLAYERNAME0);
 		std::string playernameStripped = Q_StripColorAll(playername);
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
+		SQLBIND_DELAYED_FLAGS(query, int, "@killerBotStatus",BOTSTATUS(clientNumAttacker), QF_BOTSTATUS0);
 		SQLBIND_DELAYED_TEXT(query, "@victimNames", victimsString.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@victimNamesStripped", victimsStringStripped.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@killTypes", killTypesString.c_str());
@@ -3236,6 +3306,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 
 	SQLBIND_DELAYED(query, int, "@demoRecorderClientnum", meta->demoRecorderClientNum);
 	SQLBIND_DELAYED(query, int, "@runnerClientNum", meta->playerNum);
+	SQLBIND_DELAYED_FLAGS(query, int, "@runnerBotStatus", BOTSTATUS(meta->playerNum),QF_BOTSTATUS0);
 
 	io.defragQueries->push_back(queryWrapper);
 
@@ -3357,6 +3428,7 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 }
 
 // TODO Optimize this a bit more with the random usage of std::string/const char etc?
+template<unsigned int max_clients>
 void logSpecialThing(const char* specialType, const std::string details, const std::string comment, const std::string playerNameIfExists, const int reframeClientNum, const int altClientNum, const int64_t demoCurrentTime, const int duration, const int bufferTime, const int64_t lastGameStateChangeInDemoTime, const ioHandles_t& io, std::string* oldBasename, std::string* oldPath, const int oldDemoDateModified, const char* sourceDemoFile, const qboolean force,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts, const highlightSearchMode_t searchMode,const demoType_t demoType) {
 	
 	SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
@@ -3380,6 +3452,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	else {
 		SQLBIND_DELAYED_NULL(query, "@clientNum");
 	}
+	SQLBIND_DELAYED_FLAGS(query, int, "@botStatus", BOTSTATUS(reframeClientNum), QF_BOTSTATUS0);
 	if (altClientNum != -1 && altClientNum != reframeClientNum) {
 		SQLBIND_DELAYED_TEXT(query, "@clientNumAlt", altClientNum);
 		const char* playerNameAlt = getPlayerName(altClientNum,getCS_PLAYERS(demoType),demoTypeIsMOHAA(demoType));
@@ -3392,6 +3465,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 		SQLBIND_DELAYED_NULL_FLAGS(query, "@playerNameAlt",QF_PLAYERNAME1);
 		SQLBIND_DELAYED_NULL_FLAGS(query, "@playerNameAltStripped", QF_PLAYERNAME1STRIPPED);
 	}
+	SQLBIND_DELAYED_FLAGS(query, int, "@botStatusAlt", BOTSTATUS(altClientNum), QF_BOTSTATUS1);
 	if (playerNameIfExists.size()) {
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerName", playerNameIfExists.c_str(),QF_PLAYERNAME0);
 		std::string playerNameIfExistsStripped = Q_StripColorAll(playerNameIfExists);
@@ -3898,8 +3972,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"id	INTEGER PRIMARY KEY,"
 			"playerName	TEXT NOT NULL,"
 			"playerNameStripped	TEXT NOT NULL,"
+			"botStatus INTEGER NOT NULL,"
 			"count INTEGER NOT NULL,"
-			"UNIQUE(playerName,playerNameStripped)"
+			"UNIQUE(playerName,playerNameStripped,botStatus)"
 			"); ",
 			NULL, NULL, NULL);
 
@@ -3968,7 +4043,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertEntryMetaStatement, NULL);
 
-		preparedStatementText = "INSERT INTO playerNames (playerName,playerNameStripped,count) VALUES (@playerName,@playerNameStripped,1) ON CONFLICT (playerName,playerNameStripped) DO UPDATE SET count=count+1 RETURNING id;";
+		preparedStatementText = "INSERT INTO playerNames (playerName,playerNameStripped,botStatus,count) VALUES (@playerName,@playerNameStripped,@botStatus,1) ON CONFLICT (playerName,playerNameStripped,botStatus) DO UPDATE SET count=count+1 RETURNING id;";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertPlayerNameStatement, NULL);
 
@@ -4275,19 +4350,28 @@ void handleKillDbPreQueries(SQLDelayedQuery* mainQuery, ioHandlesKillDb_t* killD
 	}
 	sqlite3_reset(killDbHandle->insertEntryMetaStatement);
 }
-void handleKillDbPlayerPreQuery(const char* nameField,int fieldFlag, int fieldFlagStripped,SQLDelayedQuery* mainQuery, ioHandlesKillDb_t* killDbHandle, sqlite3_stmt* mainStatement) {
+void handleKillDbPlayerPreQuery(const char* nameField,int fieldFlag, int fieldFlagStripped, int fieldFlagBotStatus,SQLDelayedQuery* mainQuery, ioHandlesKillDb_t* killDbHandle, sqlite3_stmt* mainStatement) {
 
 	SQLDelayedValue* valRaw = mainQuery->getValueByFlag(fieldFlag);
 	SQLDelayedValue* valStrip = mainQuery->getValueByFlag(fieldFlagStripped);
+	SQLDelayedValue* valBot = mainQuery->getValueByFlag(fieldFlagBotStatus);
 
-	if (valRaw->getType() == SQLVALUE_TYPE_NULL || valStrip->getType() == SQLVALUE_TYPE_NULL) {
+	if (!valRaw || !valStrip || !valBot) {
+		throw std::exception("handleKillDbPlayerPreQuery: name, stripped name or bot value not found.");
+	}
+
+	if (valRaw->getType() == SQLVALUE_TYPE_NULL) {
 
 		SQLDelayedValue val(nameField, SQLDelayedValue_NULL);
 		val.bind(mainStatement);
 	}
 	else {
+		if (valBot->getType() == SQLVALUE_TYPE_NULL || valStrip->getType() == SQLVALUE_TYPE_NULL) {
+			throw std::exception("handleKillDbPlayerPreQuery: name field is given, but stripped name and/or bot value are NULL.");
+		}
 		valRaw->bindOverrideName(killDbHandle->insertPlayerNameStatement, "@playerName");
 		valStrip->bindOverrideName(killDbHandle->insertPlayerNameStatement, "@playerNameStripped");
+		valBot->bindOverrideName(killDbHandle->insertPlayerNameStatement, "@botStatus");
 
 		int queryResult = sqlite3_step(killDbHandle->insertPlayerNameStatement);
 		if (queryResult != SQLITE_ROW) {
@@ -4370,8 +4454,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Kills
 	for (auto it = io.killQueries->begin(); it != io.killQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertStatement);
-		handleKillDbPlayerPreQuery("@killerId",QF_PLAYERNAME0,QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertStatement);
-		handleKillDbPlayerPreQuery("@victimId",QF_PLAYERNAME1,QF_PLAYERNAME1STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertStatement);
+		handleKillDbPlayerPreQuery("@killerId",QF_PLAYERNAME0,QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertStatement);
+		handleKillDbPlayerPreQuery("@victimId",QF_PLAYERNAME1,QF_PLAYERNAME1STRIPPED, QF_BOTSTATUS1, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertStatement);
 		if (queryResult != SQLITE_DONE) {
@@ -4402,7 +4486,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.spreeQueries->begin(); it != io.spreeQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
-		handleKillDbPlayerPreQuery("@killerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
+		handleKillDbPlayerPreQuery("@killerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
@@ -4418,7 +4502,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.captureQueries->begin(); it != io.captureQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
-		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
+		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		uint64_t insertedId = -1;
@@ -4446,8 +4530,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.flagGrabQueries->begin(); it != io.flagGrabQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
-		handleKillDbPlayerPreQuery("@grabberId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
-		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		handleKillDbPlayerPreQuery("@grabberId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, QF_BOTSTATUS1, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		uint64_t insertedId = -1;
@@ -4475,7 +4559,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.defragQueries->begin(); it != io.defragQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
-		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
+		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		if (queryResult != SQLITE_DONE) {
@@ -4519,8 +4603,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		// TODO put in database
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
-		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
-		handleKillDbPlayerPreQuery("@playerIdAlt", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
+		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
+		handleKillDbPlayerPreQuery("@playerIdAlt", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, QF_BOTSTATUS1, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertSpecialStatement);
@@ -5681,6 +5765,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(recentFlagHoldEnemyNearbyTimes,0,sizeof(recentFlagHoldEnemyNearbyTimes));
 	Com_Memset(recentFlagHoldVariousInfo,0,sizeof(recentFlagHoldVariousInfo));
 	Com_Memset(playerTeams,0,sizeof(playerTeams));
+	Com_Memset(playerBotStatus,0,sizeof(playerBotStatus));
 	Com_Memset(teamInfo,0,sizeof(teamInfo));
 	Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 	Com_Memset(&lastFrameInfo, 0, sizeof(lastFrameInfo));
@@ -6759,6 +6844,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							thisFrameInfo.movementDir[thisEs->number] = thisEs->angles2[YAW];
 
+							{
+								std::vector<unsigned char> resultMaybe = playerAngleDecoders[thisEs->number].GiveAngleMaybeReturnResult(thisEs->apos.trBase[PITCH], thisEs->apos.trBase[YAW]);
+								if (resultMaybe.size() > 0) {
+									std::string sentData(resultMaybe.begin(),resultMaybe.end());
+									if (sentData == "HEHEFIGHTBOTXD" && thisEs->number >= 0 && thisEs->number < max_clients) {
+										if (!(playerBotStatus[thisEs->number] & BOTSTATUS_FIGHTBOTANGLEDETECT)) {
+											std::cout << "Player entity detected as fightbot: (" << thisEs->number << "): " << sentData << "\n";
+											playerBotStatus[thisEs->number] |= BOTSTATUS_FIGHTBOTANGLEDETECT;
+										}
+									}
+									else {
+										std::cout << "Entity angle Decoder data ("<<thisEs->number<<"): " << sentData << "\n";
+									}
+								}
+							}
+
 							// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 							thisFrameInfo.saberMoveGeneral[thisEs->number] = thisEsGeneralSaberMove;
 							if (playerLastSaberMove[thisEs->number].lastSaberMove[0].saberMoveGeneral != thisEsGeneralSaberMove) {
@@ -6970,7 +7071,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + demo.cut.Cl.snap.ps.clientNum];
 						const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
 						const char* playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
-						logSpecialThing("JUMPBUGSEARCH", "", "", playerName, demo.cut.Cl.snap.ps.clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+						logSpecialThing<max_clients>("JUMPBUGSEARCH", "", "", playerName, demo.cut.Cl.snap.ps.clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}
 
 					// Backflip detection
@@ -7076,6 +7177,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						thisFrameInfo.otherKillerValue[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.otherKiller;
 #endif
 						thisFrameInfo.movementDir[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.movementDir;
+
+						{
+							std::vector<unsigned char> resultMaybe = playerAngleDecoders[demo.cut.Cl.snap.ps.clientNum].GiveAngleMaybeReturnResult(demo.cut.Cl.snap.ps.viewangles[PITCH], demo.cut.Cl.snap.ps.viewangles[YAW]);
+							if (resultMaybe.size() > 0) {
+								std::string sentData(resultMaybe.begin(), resultMaybe.end()); 
+								if (sentData == "HEHEFIGHTBOTXD") {
+									if (!(playerBotStatus[demo.cut.Cl.snap.ps.clientNum] & BOTSTATUS_FIGHTBOTANGLEDETECT)) {
+										std::cout << "Player PS detected as fightbot: (" << demo.cut.Cl.snap.ps.clientNum << "): " << sentData << "\n";
+										playerBotStatus[demo.cut.Cl.snap.ps.clientNum] |= BOTSTATUS_FIGHTBOTANGLEDETECT;
+									}
+								}
+								else {
+									std::cout << "Entity angle Decoder data (" << demo.cut.Cl.snap.ps.clientNum << "): " << sentData << "\n";
+								}
+							}
+						}
 
 						// Remember at which time and speed the last sabermove change occurred. So we can see movement speed at which dbs and such was executed.
 						thisFrameInfo.saberMoveGeneral[demo.cut.Cl.snap.ps.clientNum] = psGeneralSaberMove;
@@ -7527,14 +7644,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						if (lastFrameInfo.entityExists[i]) {
 
 							// script check part #2
-							if ((lastFrameInfo.frameInfoFlags[i] & FIF_SCRIPTCHECK) && thisFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 10) {
-								logSpecialThing("SCRIPTDETECT","OneFrameBackKeyBSTrigger","3 consecutive client frames no more than 10ms apart; middle frame has dbs/bs/blubs trigger and only frame with back key.",getPlayerName(i,CS_PLAYERS_here,isMOHAADemo),i,-1,demoCurrentTime,0,bufferTime,lastGameStateChangeInDemoTime,io,&sharedVars.oldBasename,&sharedVars.oldPath,sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+							if ((lastFrameInfo.frameInfoFlags[i] & FIF_SCRIPTCHECK) && thisFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 20) {
+								logSpecialThing<max_clients>("SCRIPTDETECT","OneFrameBackKeyBSTrigger","3 consecutive client frames no more than 10ms apart; middle frame has dbs/bs/blubs trigger and only frame with back key.",getPlayerName(i,CS_PLAYERS_here,isMOHAADemo),i,-1,demoCurrentTime,0,bufferTime,lastGameStateChangeInDemoTime,io,&sharedVars.oldBasename,&sharedVars.oldPath,sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 							}
 
 							if (lastFrameInfo.saberMoveGeneral[i] != thisFrameInfo.saberMoveGeneral[i]) {
 
 								// script check part #1
-								if (thisFrameInfo.movementDir[i] == 4 && lastFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 10 && (thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_CR_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACKSTAB_GENERAL)) {
+								if (thisFrameInfo.movementDir[i] == 4 && lastFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 20 && (thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_CR_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACKSTAB_GENERAL)) {
 									thisFrameInfo.frameInfoFlags[i] |= FIF_SCRIPTCHECK;
 								}
 
@@ -9180,9 +9297,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerName", playername.c_str(), QF_PLAYERNAME0);
 							std::string playernameStripped = Q_StripColorAll(playername);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
+							SQLBIND_DELAYED_FLAGS(query, int, "@attackerBotStatus", BOTSTATUS(attacker), QF_BOTSTATUS0);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@victimName", victimname.c_str(), QF_PLAYERNAME1);
 							std::string victimnameStripped = Q_StripColorAll(victimname);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@victimNameStripped", victimnameStripped.c_str(), QF_PLAYERNAME1STRIPPED);
+							SQLBIND_DELAYED_FLAGS(query, int, "@victimBotStatus", BOTSTATUS(target), QF_BOTSTATUS1);
 							if (isWorldKill) {
 								SQLBIND_DELAYED_NULL(query, "@killerTeam");
 							}
@@ -9889,7 +10008,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@grabberName", grabberplayername.c_str(), QF_PLAYERNAME0);
 							std::string grabbernameStripped = Q_StripColorAll(grabberplayername);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@grabberNameStripped", grabbernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
-							SQLBIND_DELAYED(query, int, "@grabberClientNum", grabberPlayerNum);
+							SQLBIND_DELAYED(query, int, "@grabberClientNum", grabberPlayerNum); 
+							SQLBIND_DELAYED_FLAGS(query, int, "@grabberBotStatus",  BOTSTATUS(grabberPlayerNum), QF_BOTSTATUS0);
 							if (playerNum != -1) {
 								SQLBIND_DELAYED(query, int, "@enemyFlagHoldTime", flagHoldTime);
 								SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
@@ -9903,6 +10023,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL_FLAGS(query, "@capperName",QF_PLAYERNAME1);
 								SQLBIND_DELAYED_NULL_FLAGS(query, "@capperNameStripped", QF_PLAYERNAME1STRIPPED);
 							}
+							SQLBIND_DELAYED_FLAGS(query, int, "@capperBotStatus",  BOTSTATUS(playerNum), QF_BOTSTATUS1);
 							SQLBIND_DELAYED(query, int, "@grabberIsVisible", grabberPlayerIsVisible);
 							SQLBIND_DELAYED(query, int, "@grabberIsFollowed", grabberPlayerIsFollowed);
 							SQLBIND_DELAYED(query, int, "@grabberIsFollowedOrVisible", grabberPlayerIsVisibleOrFollowed);
@@ -10475,6 +10596,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
 							SQLBIND_DELAYED(query, int, "@flagPickupSource", capperLastPickupOrigin);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperName", playername.c_str(), QF_PLAYERNAME0);
+							SQLBIND_DELAYED_FLAGS(query, int, "@capperBotStatus",  BOTSTATUS(playerNum), QF_BOTSTATUS0);
 							std::string playernameStripped = Q_StripColorAll(playername);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 							SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
@@ -11224,7 +11346,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
 						msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
 					}
-					logSpecialThing("STRINGSEARCH", msgInfo.isValid? msgInfo.message : opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+					logSpecialThing<max_clients>("STRINGSEARCH", msgInfo.isValid? msgInfo.message : opts.stringSearch, rawcommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 				}
 			}
 
@@ -11298,7 +11420,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 							if (isMark) {
-								logSpecialThing("MARK", msgInfo.message, rawChatCommand, playerName, reframeClientNum, msgInfo.playerNum, demoCurrentTime, duration, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+								logSpecialThing<max_clients>("MARK", msgInfo.message, rawChatCommand, playerName, reframeClientNum, msgInfo.playerNum, demoCurrentTime, duration, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 							}
 
 						}
@@ -11311,7 +11433,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doChatSearch) {
 					if (strstr(rawChatCommand.c_str(),opts.chatSearch.c_str()) || strstr(chatCommand.c_str(), opts.chatSearch.c_str())) {
 						parsedChatMessage_t msgInfo = ParseChatMessage<max_clients>(&demo.cut.Cl, demoType, Cmd_Argv(1), Cmd_Argc() >= 3 ? Cmd_Argv(2) : NULL);
-						logSpecialThing("CHATSEARCH", msgInfo.isValid ? msgInfo.message : opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+						logSpecialThing<max_clients>("CHATSEARCH", msgInfo.isValid ? msgInfo.message : opts.chatSearch, rawChatCommand, msgInfo.isValid ? msgInfo.playerName : "", msgInfo.isValid ? msgInfo.playerNum : -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}
 				}
 				if (opts.writeChatsUnique) {
@@ -11367,7 +11489,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 
 				int index = atoi(Cmd_Argv(1));
-				if (index == CS_FLAGSTATUS) {
+				if (index >= CS_PLAYERS_here && index < CS_PLAYERS_here+max_clients) {
+					char* str = Cmd_Argv(2);
+					while (*str == ' ') {
+						str++;
+					}
+					if (!*str) {
+						playerBotStatus[index - CS_PLAYERS_here] = 0;
+					}
+				}
+				else if (index == CS_FLAGSTATUS) {
 					char* str = Cmd_Argv(2);
 
 					int redflagTmp, blueflagTmp, yellowflagTmp;
@@ -11464,7 +11595,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (opts.doPrintSearch) {
 					std::string strippedPrint = Q_StripColorAll(printText);
 					if (strstr(printText.c_str(), opts.printSearch.c_str()) || strstr(strippedPrint.c_str(), opts.printSearch.c_str())) {
-						logSpecialThing("PRINTSEARCH", opts.printSearch, printText,"", -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+						logSpecialThing<max_clients>("PRINTSEARCH", opts.printSearch, printText,"", -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}
 				}
 

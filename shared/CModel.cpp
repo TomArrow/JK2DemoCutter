@@ -3809,7 +3809,7 @@ void CModel::CM_SetBorderInward( facet_t *facet, cGrid_t *grid, int gridPlanes[M
 			facet->borderPlanes[k] = -1;
 		} else {
 			// bisecting side border
-			Com_DPrintf( "WARNING: CM_SetBorderInward: mixed plane sides\n" );
+			//Com_DPrintf( "WARNING: CM_SetBorderInward: mixed plane sides\n" );
 			facet->borderInward[k] = qfalse;
 			if ( !debugBlock ) {
 				debugBlock = qtrue;

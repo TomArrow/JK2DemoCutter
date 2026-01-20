@@ -321,6 +321,9 @@
     <ClInclude Include="..\shared\sabers\sabers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\shared\AngleCoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

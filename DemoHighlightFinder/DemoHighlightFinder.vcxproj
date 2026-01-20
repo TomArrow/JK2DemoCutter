@@ -97,6 +97,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h" />
+    <ClInclude Include="..\shared\AngleCoder.h" />
     <ClInclude Include="..\shared\boostTupleHash.hpp" />
     <ClInclude Include="..\shared\include\named_mutex.hpp" />
     <ClInclude Include="..\shared\include\picosha3.h" />

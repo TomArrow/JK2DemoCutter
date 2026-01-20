@@ -2189,6 +2189,8 @@ enum svc_ops_e_general {
 };
 
 char* Info_ValueForKey(const char* s,int maxLength, const char* key);
+qboolean Info_HasKey(const char* s, int maxLength, const char* key);
+char* Info_ValueForKey_Exists(const char* s, int maxLength, const char* key, qboolean* exists);
 void Info_RemoveKey(char* s, const char* key, bool isMOHAADemo);
 void Info_RemoveKey_Big(char* s, const char* key);
 qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value, bool isMOHAADemo);
