@@ -558,6 +558,11 @@ uint64_t uniqueGameIndex = 0;
 std::vector<UniqueGame_t> uniqueGames;
 
 
+
+
+EzBitmask<MAX_CONFIGSTRINGS_MAX, EzBitmaskMemoryType::Stack> configStringChanged;
+
+
 typedef struct strafeCSVPoint_t {
 	int64_t timeOffset;
 	float distanceTraveledFromLast;
@@ -2321,160 +2326,166 @@ int g_gametype_general = 0;
 int activeKillDatabase = 0; // right now we dont have kill-specific filters, only global ones based on gametype or mapname and such. so we can optimize this and save it globally. 
 std::string currentMapName = "";
 void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts) { // TODO: make this adapt to JKA
-	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
-	const char* serverInfo = clCut->gameState.stringData + stringOffset;
 
-	int g_weaponDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
-	g_gametype = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_gametype"));
-	g_gametype_general = generalizeGameValue<GMAP_GAMETYPE,SAFE>(g_gametype,demoType);
-	gameIsQ3Defrag = false;
-	if (demoType == DM_68) {
-		const char* gamename = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
-		if (!_stricmp(gamename, "defrag")) {
-			gameIsQ3Defrag = true;
-			q3DefragInfo.cheats = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_cheats"));
-			q3DefragInfo.promode = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "df_promode"));
-			q3DefragInfo.version = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_vers"));
-			q3DefragInfo.SetMapName(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname"));
-			q3DefragInfo.gameType = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_gametype"));
-			q3DefragInfo.online = q3DefragInfo.gameType > 4;
+	if (configStringChanged[CS_SERVERINFO]) {
 
+		int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
+		const char* serverInfo = clCut->gameState.stringData + stringOffset;
+
+		int g_weaponDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
+		g_gametype = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_gametype"));
+		g_gametype_general = generalizeGameValue<GMAP_GAMETYPE,SAFE>(g_gametype,demoType);
+		gameIsQ3Defrag = false;
+		if (demoType == DM_68) {
+			const char* gamename = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
+			if (!_stricmp(gamename, "defrag")) {
+				gameIsQ3Defrag = true;
+				q3DefragInfo.cheats = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_cheats"));
+				q3DefragInfo.promode = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "df_promode"));
+				q3DefragInfo.version = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_vers"));
+				q3DefragInfo.SetMapName(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname"));
+				q3DefragInfo.gameType = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_gametype"));
+				q3DefragInfo.online = q3DefragInfo.gameType > 4;
+
+			}
 		}
-	}
 
-	const char* theNewMapname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname");
-	if (stricmp(theNewMapname,currentMapName.c_str())) {
-		// map changed. null the base flag positions.
-		Com_Memset(&baseFlagPositions, 0, sizeof(baseFlagPositions));
-		currentMapName = theNewMapname;
-	}
+		const char* theNewMapname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname");
+		if (stricmp(theNewMapname,currentMapName.c_str())) {
+			// map changed. null the base flag positions.
+			Com_Memset(&baseFlagPositions, 0, sizeof(baseFlagPositions));
+			currentMapName = theNewMapname;
+		}
 
-	const char* hostname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_hostname");
-	if (!stricmp(hostname, "^1^7^1FAKE ^4^7^4DEMO")) {
-		demoDerivativeFlags |= DERIV_FAKEDEMO;
-	}
+		const char* hostname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_hostname");
+		if (!stricmp(hostname, "^1^7^1FAKE ^4^7^4DEMO")) {
+			demoDerivativeFlags |= DERIV_FAKEDEMO;
+		}
 
-	activeKillDatabase = 0;
-	if (opts.filters.size()) {
-		activeKillDatabase = -1; // kinda ugly since i have to check it but meh
-		const char* curMapname = Info_ValueForKey(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
-		bool foundMatch = false;
-		for (int i = 0; i < opts.filters.size(); i++) {
-			const ResultFilter* fitler = &opts.filters[i];
-			switch (fitler->type) {
-				case ResultFilter::Type::FILTER_ALLGOES:
-					foundMatch = true;
-					break;
-				case ResultFilter::Type::FILTER_GAMETYPE:
-					if (fitler->matchValue & (1 << g_gametype_general)) {
+		activeKillDatabase = 0;
+		if (opts.filters.size()) {
+			activeKillDatabase = -1; // kinda ugly since i have to check it but meh
+			const char* curMapname = Info_ValueForKey(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+			bool foundMatch = false;
+			for (int i = 0; i < opts.filters.size(); i++) {
+				const ResultFilter* fitler = &opts.filters[i];
+				switch (fitler->type) {
+					case ResultFilter::Type::FILTER_ALLGOES:
 						foundMatch = true;
-					}
-					break;
-				case ResultFilter::Type::FILTER_MAP:
-					{
-						const char* search = fitler->matchString.c_str();
-						const int maplen = strlen(curMapname);
-						const int searchlen = strlen(search);
-						if (fitler->matchStart && fitler->matchEnd) {
-							foundMatch = !_stricmp(curMapname, search);
+						break;
+					case ResultFilter::Type::FILTER_GAMETYPE:
+						if (fitler->matchValue & (1 << g_gametype_general)) {
+							foundMatch = true;
 						}
-						else if (fitler->matchStart) {
-							foundMatch = !_strnicmp(curMapname, search, searchlen);
-						}
-						else if (fitler->matchEnd) {
-							if (maplen >= searchlen) {
-								const char* maptest = curMapname + (maplen- searchlen);
-								foundMatch = !_stricmp(maptest, search);
+						break;
+					case ResultFilter::Type::FILTER_MAP:
+						{
+							const char* search = fitler->matchString.c_str();
+							const int maplen = strlen(curMapname);
+							const int searchlen = strlen(search);
+							if (fitler->matchStart && fitler->matchEnd) {
+								foundMatch = !_stricmp(curMapname, search);
+							}
+							else if (fitler->matchStart) {
+								foundMatch = !_strnicmp(curMapname, search, searchlen);
+							}
+							else if (fitler->matchEnd) {
+								if (maplen >= searchlen) {
+									const char* maptest = curMapname + (maplen- searchlen);
+									foundMatch = !_stricmp(maptest, search);
+								}
+							}
+							else {
+								const char* maptest = curMapname;
+								while (*maptest && !foundMatch) {
+									foundMatch = !_strnicmp(maptest, search, searchlen);
+									maptest++;
+								}
 							}
 						}
-						else {
-							const char* maptest = curMapname;
-							while (*maptest && !foundMatch) {
-								foundMatch = !_strnicmp(maptest, search, searchlen);
-								maptest++;
-							}
-						}
-					}
+						break;
+				}
+				if (foundMatch) {
+					activeKillDatabase = i;
 					break;
-			}
-			if (foundMatch) {
-				activeKillDatabase = i;
-				break;
-			}
-		}
-	}
-
-	// JKA:
-	// Online forum says 65523 is saber only
-	// CTF Haven uses 57339
-	// I think difference is: The former allows saber and disallows tripmines, while the latter has those flipped. 
-	// And you actually get a saber even if saber is disabled, not sure why.
-	// But, neither of these two disallow WP_BRYAR_OLD or WP_EMPLACED_GUN (16 and 17). Not sure why.
-	// Logically speaking maybe those should be disabled too, but my task is to analyze demos, not to complain
-	// to server owners since they can't retroactively change it either, so the demos are what they are.
-	// 
-	// Helpful btw: http://www.bradgoodman.com/bittool/
-	// Some other mentions: 524279 (all but saber is blocked), 65531 (all but saber and above 15 blocked)
-
-	int i = 0;
-	int numWeapons = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NUM_WEAPONS_GENERAL,demoType);
-	int allowedSaberIshWeapons[] = { 
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NONE_GENERAL, demoType),
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_SABER_GENERAL,demoType),
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_MELEE_GENERAL,demoType),
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_THERMAL_GENERAL,demoType),
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TRIP_MINE_GENERAL,demoType),
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_DET_PACK_GENERAL,demoType),
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_BRYAR_OLD_GENERAL,demoType), // Not sure about this one but it also often ends up enabled even though it's saber-only
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_EMPLACED_GUN_GENERAL,demoType), // I think this is just a mounted gun and is typically not disallowed in the weapondisable
-		specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TURRET_GENERAL,demoType)
-	};
-	int allowedSaberIshWeaponsCount = sizeof(allowedSaberIshWeapons) / sizeof(allowedSaberIshWeapons[0]);
-	gameIsSaberOnlyIsh = true;
-	while (i < numWeapons)
-	{
-		if (!(g_weaponDisable & (1 << i))) // Is this particular weapon allowed?
-		{
-			// Check if it is one of the allowed weapons
-			bool thisWeaponIsOk = false;
-			for (int b = 0; b < allowedSaberIshWeaponsCount; b++) {
-				if (i == allowedSaberIshWeapons[b]) {
-					thisWeaponIsOk = true;
 				}
 			}
-			if (!thisWeaponIsOk) {
-				gameIsSaberOnlyIsh = false;
-				break;
-			}
 		}
 
-		i++;
+		// JKA:
+		// Online forum says 65523 is saber only
+		// CTF Haven uses 57339
+		// I think difference is: The former allows saber and disallows tripmines, while the latter has those flipped. 
+		// And you actually get a saber even if saber is disabled, not sure why.
+		// But, neither of these two disallow WP_BRYAR_OLD or WP_EMPLACED_GUN (16 and 17). Not sure why.
+		// Logically speaking maybe those should be disabled too, but my task is to analyze demos, not to complain
+		// to server owners since they can't retroactively change it either, so the demos are what they are.
+		// 
+		// Helpful btw: http://www.bradgoodman.com/bittool/
+		// Some other mentions: 524279 (all but saber is blocked), 65531 (all but saber and above 15 blocked)
+
+		int i = 0;
+		int numWeapons = specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NUM_WEAPONS_GENERAL,demoType);
+		int allowedSaberIshWeapons[] = { 
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_NONE_GENERAL, demoType),
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_SABER_GENERAL,demoType),
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_MELEE_GENERAL,demoType),
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_THERMAL_GENERAL,demoType),
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TRIP_MINE_GENERAL,demoType),
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_DET_PACK_GENERAL,demoType),
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_BRYAR_OLD_GENERAL,demoType), // Not sure about this one but it also often ends up enabled even though it's saber-only
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_EMPLACED_GUN_GENERAL,demoType), // I think this is just a mounted gun and is typically not disallowed in the weapondisable
+			specializeGameValue<GMAP_WEAPONS, UNSAFE>(WP_TURRET_GENERAL,demoType)
+		};
+		int allowedSaberIshWeaponsCount = sizeof(allowedSaberIshWeapons) / sizeof(allowedSaberIshWeapons[0]);
+		gameIsSaberOnlyIsh = true;
+		while (i < numWeapons)
+		{
+			if (!(g_weaponDisable & (1 << i))) // Is this particular weapon allowed?
+			{
+				// Check if it is one of the allowed weapons
+				bool thisWeaponIsOk = false;
+				for (int b = 0; b < allowedSaberIshWeaponsCount; b++) {
+					if (i == allowedSaberIshWeapons[b]) {
+						thisWeaponIsOk = true;
+					}
+				}
+				if (!thisWeaponIsOk) {
+					gameIsSaberOnlyIsh = false;
+					break;
+				}
+			}
+
+			i++;
+		}
+
+
+		// Check if any "moving" force powers (that could result in a doom/suic) are present
+		// IF they are, we must use some guesses to see if a doom/suic kill is actually a saber kill, because it might 
+		// just be someone force pulling someone or such
+		// Force powers luckily are same for JK2 and JKA so no specialization needed atm (but might change if we ever support some mods?)
+
+		int g_forcePowerDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
+
+		gameAllowsDoomingForcePowers = false;
+		// These are the powers that I think POTENTIALLY can result in dooms?
+		if (
+			!(g_forcePowerDisable & (1 << FP_PUSH)) ||
+			!(g_forcePowerDisable & (1 << FP_PULL)) ||
+			!(g_forcePowerDisable & (1 << FP_GRIP)) ||
+			!(g_forcePowerDisable & (1 << FP_LIGHTNING)) || // I'm not sure about this one. Edit: Yeah we checked. It can doom u.
+			(!(g_forcePowerDisable & (1 << FP_DRAIN)) && demoType >= DM_25 && demoType <= DM_26_XBOX)|| // In JKA drain can eat at health too i think? But not in jk2, drain cant doom u in jk2 thats for sure.
+			!(g_forcePowerDisable & (1 << FP_SABERTHROW))
+			) {
+			gameAllowsDoomingForcePowers = true;
+		}
+
 	}
+	
 
 	if (sentryModelIndex == -1) {
 		sentryModelIndex = G_ModelIndex_NoAdd("models/items/psgun.glm", clCut, NULL, demoType);
 		if (!sentryModelIndex) sentryModelIndex = -1;
-	}
-
-
-	// Check if any "moving" force powers (that could result in a doom/suic) are present
-	// IF they are, we must use some guesses to see if a doom/suic kill is actually a saber kill, because it might 
-	// just be someone force pulling someone or such
-	// Force powers luckily are same for JK2 and JKA so no specialization needed atm (but might change if we ever support some mods?)
-
-	int g_forcePowerDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
-
-	gameAllowsDoomingForcePowers = false;
-	// These are the powers that I think POTENTIALLY can result in dooms?
-	if (
-		!(g_forcePowerDisable & (1 << FP_PUSH)) ||
-		!(g_forcePowerDisable & (1 << FP_PULL)) ||
-		!(g_forcePowerDisable & (1 << FP_GRIP)) ||
-		!(g_forcePowerDisable & (1 << FP_LIGHTNING)) || // I'm not sure about this one. Edit: Yeah we checked. It can doom u.
-		(!(g_forcePowerDisable & (1 << FP_DRAIN)) && demoType >= DM_25 && demoType <= DM_26_XBOX)|| // In JKA drain can eat at health too i think? But not in jk2, drain cant doom u in jk2 thats for sure.
-		!(g_forcePowerDisable & (1 << FP_SABERTHROW))
-		) {
-		gameAllowsDoomingForcePowers = true;
 	}
 
 
@@ -6294,6 +6305,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cuterror;
 				}
 
+				configStringChanged.fill();
+
 				if (opts.makeVideo || opts.throughWallChecks) {
 
 					char mapname[MAX_STRING_CHARS_MAX];
@@ -6367,6 +6380,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cutcomplete;
 				}
 				updatePlayerDemoStatsArrayPointers<max_clients>(demoType, opts);
+				configStringChanged.clear();
 				//Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
 				//newHandle = FS_FOpenFileWrite(newName);
 				//if (!newHandle) {
@@ -11510,6 +11524,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 
 				int index = atoi(Cmd_Argv(1));
+				configStringChanged.setbit(index);
 				if (index >= CS_PLAYERS_here && index < CS_PLAYERS_here+max_clients) {
 					char* str = Cmd_Argv(2);
 					while (*str == ' ') {
@@ -11692,6 +11707,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				goto cutcomplete;
 			}
 			updatePlayerDemoStatsArrayPointers<max_clients>(demoType, opts);
+			configStringChanged.clear();
 		}
 
 
