@@ -5769,6 +5769,40 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	}
 }
 
+char* demoCutHandleBigConfigString(const char* cmd, int index) { // index: in case we are parsing commands in multiple places (cringe yea)
+
+	char* s;
+	static char bigConfigString[2][BIG_INFO_STRING];
+
+	if (!strcmp(cmd, "bcs0")) {
+		Com_sprintf(bigConfigString[index], BIG_INFO_STRING, "cs %s \"%s", Cmd_Argv(1), Cmd_Argv(2));
+		return NULL;
+	}
+
+	if (!strcmp(cmd, "bcs1")) {
+		s = Cmd_Argv(2);
+		if (strlen(bigConfigString[index]) + strlen(s) >= BIG_INFO_STRING) {
+			Com_Error(ERR_DROP, "bcs exceeded BIG_INFO_STRING");
+			return NULL;
+		}
+		strcat(bigConfigString[index], s);
+		return NULL;
+	}
+
+	if (!strcmp(cmd, "bcs2")) {
+		s = Cmd_Argv(2);
+		if (strlen(bigConfigString[index]) + strlen(s) + 1 >= BIG_INFO_STRING) {
+			Com_Error(ERR_DROP, "bcs exceeded BIG_INFO_STRING");
+			return NULL;
+		}
+		strcat(bigConfigString[index], s);
+		strcat(bigConfigString[index], "\"");
+		s = bigConfigString[index];
+		return s;
+	}
+}
+
+
 static inline qboolean demoCutParseCommandStringReal(msg_t* msg, clientConnection_t* clcCut, demoType_t demoType) {
 	int index;
 #if 0//def MSG_READBITS_TRANSCODE

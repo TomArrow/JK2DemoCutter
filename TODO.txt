@@ -43,6 +43,7 @@ find: dooms on heads of other ppl or other objects?
 - not sure if done yet? find amount of SD in a cap run
 
 IMPORTANT: handle bcs... (bcs0 bcs1 bcs3)
+ALSO for writing gamestates.
 
 
 q3 defrag: 

@@ -2636,6 +2636,17 @@ readNext:
 		readCommand.serverTime = thisDemo.cut.Cl.snap.serverTime;
 		readCommands.push_back(readCommand);
 
+		if (!strcmp(cmd, "bcs0") || !strcmp(cmd, "bcs1") || !strcmp(cmd, "bcs2")) {
+			char* test = demoCutHandleBigConfigString(cmd, 0);
+			if (test) {
+				//demoErrorFlags |= DERR_ATYPICALBUTLEGAL; // already doing this further down...
+				//demoErrors << "Not an error: Demo uses bcs0/bcs1/bcs2\n";
+				//std::cerr << "Not an error: Demo uses bcs0/bcs1/bcs2 (" << DPrintFLocation << ")\n";
+				command = test;
+				Cmd_TokenizeString(command);
+			}
+		}
+
 		if (!strcmp(cmd, "cs")) {
 			if (!demoCutConfigstringModified(&thisDemo.cut.Cl,demoType)) {
 				Com_DPrintf("[NOTE] Demo cutter, configstring parsing failed.\n");

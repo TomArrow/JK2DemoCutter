@@ -1881,6 +1881,7 @@ std::set<std::string>	recorderPlayerNames;
 #define DERR_MSGSIZEENDBUTLEFT	(1<<14)
 #define DERR_BADJSONMETA		(1<<15)
 #define DERR_GAMELOGICFLAW		(1<<16)
+#define DERR_ATYPICALBUTLEGAL	(1<<17) // for stuff thats just unusual. to keep track of. e.g. bcs0 bcs1 etc
 //#define DERR_THRGHWALLBOXSOLID	(1<<15) // kill-based
 int	demoErrorFlags = 0;
 std::stringstream	demoErrors;
@@ -6273,6 +6274,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						Cmd_TokenizeString(command);
 
 						char* cmd = Cmd_Argv(0);
+
+						if (!strcmp(cmd, "bcs0") || !strcmp(cmd, "bcs1") || !strcmp(cmd, "bcs2")) {
+							char* test = demoCutHandleBigConfigString(cmd, 0);
+							if (test) {
+								//demoErrorFlags |= DERR_ATYPICALBUTLEGAL; // already doing this further down...
+								//demoErrors << "Not an error: Demo uses bcs0/bcs1/bcs2\n";
+								//std::cerr << "Not an error: Demo uses bcs0/bcs1/bcs2 (" << DPrintFLocation << ")\n";
+								command = test; 
+								Cmd_TokenizeString(command);
+							}
+						}
 
 						//if (isMOHAADemo) {
 
@@ -11462,7 +11474,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			//if (cmd[0] && !firstServerCommand) {
 			//	firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 			//}
-
+			if (!strcmp(cmd, "bcs0") || !strcmp(cmd, "bcs1") || !strcmp(cmd, "bcs2")) {
+				char* test = demoCutHandleBigConfigString(cmd, 1);
+				if (test) {
+					demoErrorFlags |= DERR_ATYPICALBUTLEGAL;
+					demoErrors << "Not an error: Demo uses bcs0/bcs1/bcs2\n";
+					std::cerr << "Not an error: Demo uses bcs0/bcs1/bcs2 (" << DPrintFLocation << ")\n";
+					command = test;
+					Cmd_TokenizeString(command);
+				}
+			}
 
 			if (opts.doStringSearch) {
 				std::string rawcommand = command;

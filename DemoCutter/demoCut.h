@@ -5317,7 +5317,7 @@ public:
 
 
 
-
+char* demoCutHandleBigConfigString(const char* cmd, int index);
 //qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader, bool& SEHExceptionCaught);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
