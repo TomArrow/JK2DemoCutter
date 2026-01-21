@@ -2188,6 +2188,19 @@ enum svc_ops_e_general {
 	svc_ops_general_count
 };
 
+typedef ankerl::unordered_dense::map<std::string, std::string, ankerl::unordered_dense::hash<std::string>> csMap_t;
+
+// CAREFUL. Only use lowercase here. since its technically case sensitive. should also be faster in the end tho
+// ALSO CAREFUL. Don't use a c_str() return to then do stuff in the next line. the underlying std::string is dead at that point.
+inline std::string Info_ValueForKey(csMap_t in,const char* search) {
+	auto item = in.find(search);
+	if (item != in.end()) {
+		return item->second;
+	}
+	return "";
+}
+
+csMap_t Info_MakeMap(const char* s, int maxLength);
 char* Info_ValueForKey(const char* s,int maxLength, const char* key);
 qboolean Info_HasKey(const char* s, int maxLength, const char* key);
 char* Info_ValueForKey_Exists(const char* s, int maxLength, const char* key, qboolean* exists);

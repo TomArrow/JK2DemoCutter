@@ -538,29 +538,93 @@ void saveVideo(const ExtraSearchOptions& opts) {
 }
 
 
+// CAREFUL. Always use lower case keys. technically not case insensitive
+csMap_t serverInfoMap;
+csMap_t systemInfoMap;
+
+
+EzBitmask<MAX_CONFIGSTRINGS_MAX, EzBitmaskMemoryType::Stack> configStringChanged;
 
 
 // this identifies 
 class UniqueGame_t {
-	int levelStartTime;
-	int serverId;
-	std::string serverName;
-	std::string gameName;
-	std::string gameEndingCSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach intermission.
-	std::string version;
+public:
+
+	int serverId = 0; // CS_SYSTEMINFO
+	std::string sv_referencedPaks; // CS_SYSTEMINFO
+
+	std::string gameEndingCSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach the end of a game or intermission.
+
+	int levelStartTime = 0; // CS_SERVERINFO
+	std::string serverName; // CS_SERVERINFO
+	std::string mapName; // CS_SERVERINFO
+	std::string gameName; // CS_SERVERINFO
+	std::string version; // CS_SERVERINFO
+	// latch cvars
+	int g_truejedi = 0; // CS_SERVERINFO
+	int g_gametype = 0; // CS_SERVERINFO
+	int sv_maxclients = 0; // CS_SERVERINFO
+	int g_forcepowerdisable = 0; // CS_SERVERINFO
+	int g_weapondisable = 0; // CS_SERVERINFO
+	int g_duelweapondisable = 0; // CS_SERVERINFO
+	int g_maxforcerank = 0; // CS_SERVERINFO
+
+	UniqueGame_t() {
+
+	}
+
+	UniqueGame_t(clientActive_t* clCut, demoType_t demoType) {
+		
+		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_weapondisable").c_str());
+		g_truejedi = atoi(Info_ValueForKey(serverInfoMap,"g_jedivmerc").c_str());
+		sv_maxclients = atoi(Info_ValueForKey(serverInfoMap,"sv_maxclients").c_str());
+		g_forcepowerdisable = atoi(Info_ValueForKey(serverInfoMap,"g_forcepowerdisable").c_str());
+		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_weapondisable").c_str());
+		g_duelweapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_duelweapondisable").c_str());
+		g_maxforcerank = atoi(Info_ValueForKey(serverInfoMap,"g_maxforcerank").c_str());
+
+		serverName = Info_ValueForKey(serverInfoMap,"sv_hostname");
+		mapName = Info_ValueForKey(serverInfoMap,"mapname");
+		gameName = Info_ValueForKey(serverInfoMap,"gamename");
+		version = Info_ValueForKey(serverInfoMap,"version");
+
+		sv_referencedPaks = Info_ValueForKey(systemInfoMap,"sv_referencedpaks");
+		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
+
+		int stringOffset = clCut->gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)];
+		levelStartTime = atoi(clCut->gameState.stringData + stringOffset);
+	}
 
 
-	int databaseId;
-	int databaseIdFinished;
+	bool SameGame(UniqueGame_t* otherGame) { // this only serves to reliably compare games within a demo.
+		return levelStartTime == otherGame->levelStartTime &&
+			serverId == otherGame->serverId &&
+			serverName == otherGame->serverName &&
+			mapName == otherGame->mapName &&
+			gameName == otherGame->gameName &&
+			version == otherGame->version &&
+			sv_referencedPaks == otherGame->sv_referencedPaks &&
+			//gameEndingCSHash == otherGame->gameEndingCSHash &&
+			g_truejedi == otherGame->g_truejedi &&
+			g_gametype == otherGame->g_gametype &&
+			sv_maxclients == otherGame->sv_maxclients &&
+			g_forcepowerdisable == otherGame->g_forcepowerdisable &&
+			g_weapondisable == otherGame->g_weapondisable &&
+			g_duelweapondisable == otherGame->g_duelweapondisable &&
+			g_maxforcerank == otherGame->g_maxforcerank &&
+			levelStartTime == otherGame->levelStartTime;
+	}
+
+
+	int databaseId = -1;
+	int databaseIdFinished = -1;
 };
 
-uint64_t uniqueGameIndex = 0;
+uint64_t uniqueGameIndex = -1;
 std::vector<UniqueGame_t> uniqueGames;
+UniqueGame_t uniqueGameCurrent;
 
 
-
-
-EzBitmask<MAX_CONFIGSTRINGS_MAX, EzBitmaskMemoryType::Stack> configStringChanged;
 
 
 typedef struct strafeCSVPoint_t {
@@ -1836,12 +1900,14 @@ void updatePlayerDemoStatsArrayPointers(demoType_t demoType, const ExtraSearchOp
 		Com_Memset(clientNameIsDuplicate, 0, sizeof(clientNameIsDuplicate));
 	}
 
-	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
-	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+	std::string mapname = uniqueGameCurrent.mapName;
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 	for (int i = 0; i < max_clients; i++) {
-		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
+		if (!configStringChanged[CS_PLAYERS_here + i] && !configStringChanged[CS_SERVERINFO] && !isMOHAADemo) {
+			continue;
+		}
+
+		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string playerName = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
 
@@ -2289,11 +2355,9 @@ qboolean findDARKDefragRun(std::string printText) {
 
 
 void updateForcePowersInfo(clientActive_t* clCut) { // TODO: make this adapt to JKA
-	int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
-	const char* playerInfo = clCut->gameState.stringData + stringOffset;
 
-	int g_forcePowerDisable = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
-	int g_maxForceRank = atoi(Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_maxForceRank"));
+	int g_forcePowerDisable = uniqueGameCurrent.g_forcepowerdisable;
+	int g_maxForceRank = uniqueGameCurrent.g_maxforcerank;
 
 	if (g_forcePowerDisable & (1 << FP_LEVITATION))
 	{
@@ -2327,45 +2391,59 @@ int activeKillDatabase = 0; // right now we dont have kill-specific filters, onl
 std::string currentMapName = "";
 void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts) { // TODO: make this adapt to JKA
 
+	if (configStringChanged[CS_SERVERINFO] || configStringChanged[CS_SYSTEMINFO] || configStringChanged[getCS_LEVEL_START_TIME(demoType)]) {
+
+		UniqueGame_t newGame(clCut, demoType);
+		if (uniqueGameIndex == -1 || !uniqueGameCurrent.SameGame(&newGame)) {
+			uniqueGameIndex++;
+			if (uniqueGameIndex > 0) {
+				uniqueGames.push_back(std::move(uniqueGameCurrent));
+			}
+			uniqueGameCurrent = std::move(newGame);
+		}
+	}
+
 	if (configStringChanged[CS_SERVERINFO]) {
 
-		int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
-		const char* serverInfo = clCut->gameState.stringData + stringOffset;
+		updateForcePowersInfo(clCut);
 
-		int g_weaponDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_weaponDisable"));
-		g_gametype = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_gametype"));
+		//int stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
+		//const char* serverInfo = clCut->gameState.stringData + stringOffset;
+
+		int g_weaponDisable = uniqueGameCurrent.g_weapondisable;
+		g_gametype = uniqueGameCurrent.g_gametype;
 		g_gametype_general = generalizeGameValue<GMAP_GAMETYPE,SAFE>(g_gametype,demoType);
 		gameIsQ3Defrag = false;
 		if (demoType == DM_68) {
-			const char* gamename = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
-			if (!_stricmp(gamename, "defrag")) {
+			if (!_stricmp(uniqueGameCurrent.gameName.c_str(), "defrag")) {
 				gameIsQ3Defrag = true;
-				q3DefragInfo.cheats = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_cheats"));
-				q3DefragInfo.promode = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "df_promode"));
-				q3DefragInfo.version = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_vers"));
-				q3DefragInfo.SetMapName(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname"));
-				q3DefragInfo.gameType = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "defrag_gametype"));
+				q3DefragInfo.cheats = atoi(Info_ValueForKey(serverInfoMap, "sv_cheats").c_str());
+				q3DefragInfo.promode = atoi(Info_ValueForKey(serverInfoMap, "df_promode").c_str());
+				q3DefragInfo.version = atoi(Info_ValueForKey(serverInfoMap, "defrag_vers").c_str());
+				q3DefragInfo.SetMapName(Info_ValueForKey(serverInfoMap, "mapname").c_str());
+				q3DefragInfo.gameType = atoi(Info_ValueForKey(serverInfoMap, "defrag_gametype").c_str());
 				q3DefragInfo.online = q3DefragInfo.gameType > 4;
 
 			}
 		}
 
-		const char* theNewMapname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "mapname");
-		if (stricmp(theNewMapname,currentMapName.c_str())) {
+		std::string theNewMapname = uniqueGameCurrent.mapName;
+		if (stricmp(theNewMapname.c_str(),currentMapName.c_str())) {
 			// map changed. null the base flag positions.
 			Com_Memset(&baseFlagPositions, 0, sizeof(baseFlagPositions));
 			currentMapName = theNewMapname;
 		}
 
-		const char* hostname = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "sv_hostname");
-		if (!stricmp(hostname, "^1^7^1FAKE ^4^7^4DEMO")) {
+		std::string hostname = uniqueGameCurrent.serverName;
+		if (!stricmp(hostname.c_str(), "^1^7^1FAKE ^4^7^4DEMO")) {
 			demoDerivativeFlags |= DERIV_FAKEDEMO;
 		}
 
 		activeKillDatabase = 0;
 		if (opts.filters.size()) {
 			activeKillDatabase = -1; // kinda ugly since i have to check it but meh
-			const char* curMapname = Info_ValueForKey(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
+			std::string curMapnameStr = uniqueGameCurrent.mapName;
+			const char* curMapname = curMapnameStr.c_str();
 			bool foundMatch = false;
 			for (int i = 0; i < opts.filters.size(); i++) {
 				const ResultFilter* fitler = &opts.filters[i];
@@ -2465,7 +2543,7 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 		// just be someone force pulling someone or such
 		// Force powers luckily are same for JK2 and JKA so no specialization needed atm (but might change if we ever support some mods?)
 
-		int g_forcePowerDisable = atoi(Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_forcePowerDisable"));
+		int g_forcePowerDisable = uniqueGameCurrent.g_forcepowerdisable;
 
 		gameAllowsDoomingForcePowers = false;
 		// These are the powers that I think POTENTIALLY can result in dooms?
@@ -2795,13 +2873,18 @@ void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 	memset(teamInfo,0,sizeof(teamInfo));
 
 
-	stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
-	const char* serverInfo = clCut->gameState.stringData + stringOffset;
-	const char* gameName = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
+	//stringOffset = clCut->gameState.stringOffsets[CS_SERVERINFO];
+	//const char* serverInfo = clCut->gameState.stringData + stringOffset;
+	//const char* gameName = Info_ValueForKey(serverInfo, sizeof(clCut->gameState.stringData) - stringOffset, "gamename");
+	const char* gameName = uniqueGameCurrent.gameName.c_str();
 	bool saberModStyleSkill = !_strnicmp(gameName,"SaberMod",8);
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 	for (int i = 0; i < max_clients; i++) {
+
+		if (!configStringChanged[CS_PLAYERS_here + i]) {
+			continue;
+		}
 
 		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* playerInfo = clCut->gameState.stringData + stringOffset;
@@ -2862,27 +2945,27 @@ void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 			}
 		}
 	}
-	stringOffset = clCut->gameState.stringOffsets[CS_SCORES1];
-	teamInfo[TEAM_RED].score = atoi(clCut->gameState.stringData + stringOffset);
-	stringOffset = clCut->gameState.stringOffsets[CS_SCORES2];
-	teamInfo[TEAM_BLUE].score = atoi(clCut->gameState.stringData + stringOffset);
+	if (configStringChanged[CS_SCORES1] || configStringChanged[CS_SCORES2]) {
+		stringOffset = clCut->gameState.stringOffsets[CS_SCORES1];
+		teamInfo[TEAM_RED].score = atoi(clCut->gameState.stringData + stringOffset);
+		stringOffset = clCut->gameState.stringOffsets[CS_SCORES2];
+		teamInfo[TEAM_BLUE].score = atoi(clCut->gameState.stringData + stringOffset);
+	}
 }
 
 template<unsigned int max_clients>
 void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t demoType,bool& wasDoingSQLiteExecution, const ExtraSearchOptions& opts) {
-
-
-	int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
-	const char* info = demo.cut.Cl.gameState.stringData + stringOffset;
-	std::string mapname = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "mapname");
 
 	static std::vector<std::string> modelsToAdd;
 	modelsToAdd.clear();
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 	for (int i = 0; i < max_clients; i++) {
+		if (!configStringChanged[CS_PLAYERS_here + i]) {
+			continue;
+		}
 
-		stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
+		int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + i];
 		const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 		std::string modelName = Info_ValueForKey(victimInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "model");
 		if (modelName != lastPlayerModel[i]) {
@@ -2919,7 +3002,7 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 		SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 		SQLDelayedQuery* query = &queryWrapper->query;
 
-		SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
+		SQLBIND_DELAYED_TEXT(query, "@map", uniqueGameCurrent.mapName.c_str());
 		//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@map", mapname.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@baseModel", baseModel.c_str());
 		//SQLBIND_DELAYED_TEXT(io.updatePlayerModelCountStatement, "@baseModel", baseModel.c_str());
@@ -6306,6 +6389,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 
 				configStringChanged.fill();
+				{
+					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+					const char* serverInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+					serverInfoMap = Info_MakeMap(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+					stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
+					const char* systemInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+				}
+
 
 				if (opts.makeVideo || opts.throughWallChecks) {
 
@@ -6371,10 +6463,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
-				CheckForNameChanges<max_clients>(&demo.cut.Cl,io,demoType,wasDoingSQLiteExecution,opts);
-				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
-				updateForcePowersInfo(&demo.cut.Cl);
 				updateGameInfo(&demo.cut.Cl, demoType,opts);
+				CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
+				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
 					std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
 					goto cutcomplete;
@@ -11525,7 +11616,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				int index = atoi(Cmd_Argv(1));
 				configStringChanged.setbit(index);
-				if (index >= CS_PLAYERS_here && index < CS_PLAYERS_here+max_clients) {
+				if (index == CS_SERVERINFO) {
+
+					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
+					const char* serverInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+					serverInfoMap = Info_MakeMap(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+				}
+				else if (index == CS_SYSTEMINFO) {
+
+					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
+					const char* systemInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+				}
+				else if (index >= CS_PLAYERS_here && index < CS_PLAYERS_here+max_clients) {
 					char* str = Cmd_Argv(2);
 					while (*str == ' ') {
 						str++;
@@ -11698,10 +11801,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 
 		if (hadConfigStringCommands) {
-			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution,opts);
-			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
-			updateForcePowersInfo(&demo.cut.Cl);
 			updateGameInfo(&demo.cut.Cl,demoType,opts);
+			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
+			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
 				std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
 				goto cutcomplete;

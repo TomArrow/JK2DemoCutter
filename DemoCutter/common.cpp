@@ -963,6 +963,59 @@ char* Info_ValueForKey(const char* s,int maxLength, const char* key) {
 
 /*
 ===============
+Info_MakeMap
+
+Returns a map that lets us quickly look up values.
+FIXME: overflow check?
+===============
+*/
+csMap_t Info_MakeMap(const char* s,int maxLength) {
+	csMap_t retVal;
+	char	pkey[BIG_INFO_KEY];
+	static	char value[BIG_INFO_VALUE];	// use two buffers so compares
+											// work without stomping on each other
+	char* o;
+
+	if (!s) {
+		return retVal;
+	}
+
+	//if (strlen(s) >= BIG_INFO_STRING) {
+	if (strnlen_s(s,maxLength) >= BIG_INFO_STRING) {
+		Com_Error(ERR_DROP, "Info_ValueForKey: oversize infostring");
+	}
+
+	if (*s == '\\')
+		s++;
+	while (1) {
+		o = pkey;
+		while (*s != '\\') {
+			if (!*s)
+				return retVal;
+			*o++ = tolowerSignSafe(*s++);
+		}
+		*o = 0;
+		s++;
+
+		o = value;
+
+		while (*s != '\\' && *s) {
+			*o++ = *s++;
+		}
+		*o = 0;
+
+		retVal[pkey] = value;
+
+		if (!*s)
+			break;
+		s++;
+	}
+
+	return retVal;
+}
+
+/*
+===============
 Info_ValueForKey_Exists
 
 Searches the string for the given
