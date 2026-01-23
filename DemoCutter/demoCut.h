@@ -5716,6 +5716,11 @@ inline bool demoTypeIsMOHAA(demoType_t demoType) {
 	return demoType == DM3_MOHAA_PROT_15 || demoType == DM3_MOHAA_PROT_6;
 }
 
+constexpr inline int PMF_INTERMISSION_MOHAA = (1 << 6);
+inline bool getPSIntermissionStatus(bool isMOHAADemo, int pmTypeGeneral, int pmFlags) {
+	return isMOHAADemo ? (pmFlags & PMF_INTERMISSION_MOHAA) : (pmTypeGeneral == PM_INTERMISSION_GENERAL);
+}
+
 
 int getMOHTeam(entityState_t* s);
 

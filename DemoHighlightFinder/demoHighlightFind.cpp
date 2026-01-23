@@ -538,6 +538,60 @@ void saveVideo(const ExtraSearchOptions& opts) {
 }
 
 
+
+#define HASH_BITS 224
+inline std::string makeStringHash(std::string input) {
+	constexpr int bytes = picosha3::bits_to_bytes(HASH_BITS);
+	auto sha3_512 = picosha3::get_sha3_generator<HASH_BITS>();
+	//return sha3_512.get_hex_string(input);
+	std::array<uint8_t, bytes> hash{};
+	sha3_512.process(input.cbegin(), input.cend());
+	sha3_512.finish();
+	sha3_512.get_hash_bytes(hash.begin(), hash.end());
+	std::string output;
+	ankerl::base58::encode(hash.data(), bytes, output);
+	return output.substr(std::min((size_t)22, output.size())); // 22 bytes of base58 should be around 128 bits?
+}
+
+
+
+
+
+#define DERR_SEH				(1<<0)
+#define DERR_OPENFAIL			(1<<1)
+#define DERR_FAILREADSEQNUM		(1<<2)
+#define DERR_DUPEMSGNUM			(1<<3)
+#define DERR_MSGSIZEOVERMAX		(1<<4)
+#define DERR_FAILREADMSG		(1<<5)
+#define DERR_READPASTEND		(1<<6)
+#define DERR_ILLEGIBLESRVMSG	(1<<7)
+#define DERR_FAILPARSECMDSTR	(1<<8)
+#define DERR_FAILPARSEGAMESTATE	(1<<9)
+#define DERR_FAILPARSESNAP		(1<<10)
+#define DERR_SNAPMALFORMED		(1<<11)
+#define DERR_ERRORCNFSTRMOD		(1<<12)
+#define DERR_WEIRDMSGSIZE		(1<<13)
+#define DERR_MSGSIZEENDBUTLEFT	(1<<14)
+#define DERR_BADJSONMETA		(1<<15)
+#define DERR_GAMELOGICFLAW		(1<<16)
+#define DERR_ATYPICALBUTLEGAL	(1<<17) // for stuff thats just unusual. to keep track of. e.g. bcs0 bcs1 etc
+//#define DERR_THRGHWALLBOXSOLID	(1<<15) // kill-based
+int	demoErrorFlags = 0;
+std::stringstream	demoErrors;
+
+
+// notable: 
+// - 1.1 introduces hexcolors (tho thats technically a clientside thing)
+// - 1.2.2 introduces match statistics
+struct  {
+	bool nwh;
+	int version[3];
+} NWHVersion;
+
+bool nwhMatchStatisticsGathering = false;
+std::stringstream nwhMatchStatistics;
+
+
 // CAREFUL. Always use lower case keys. technically not case insensitive
 csMap_t serverInfoMap;
 csMap_t systemInfoMap;
@@ -549,11 +603,101 @@ EzBitmask<MAX_CONFIGSTRINGS_MAX, EzBitmaskMemoryType::Stack> configStringChanged
 // this identifies 
 class UniqueGame_t {
 public:
+	enum class IntermissionStatus {
+		Unknown, // these must be followed in order, otherwise invalid
+		MaybeCarryOver,
+		NoIntermission,
+		IntermissionAnnounced,
+		IntermissionPSConfirmed, // this is the holy grail. we save end stats if either this or NoIntermission is true.
+		Invalid,
+		IntermissionStatusTypeCount
+	};
+	static inline const char* intermissionTypes[(size_t)IntermissionStatus::IntermissionStatusTypeCount] = {
+		"Unknown", // these must be followed in order, otherwise invalid
+		"MaybeCarryOver",
+		"NoIntermission",
+		"IntermissionAnnounced",
+		"IntermissionPSConfirmed",
+		"Invalid",
+	};
+
+private:
+	demoType_t _demoType = DM_15;
+	bool _isMOHAADemo = false;
+	IntermissionStatus _intermissionStatus = IntermissionStatus::Unknown;
+	std::string _lastScores = ""; // hopefully the intermission scores
+	std::string _lastMatchStatistics = "";
+	int _oldIntermission = -1;
+public:
+	IntermissionStatus getIntermissionStatus() {
+		return _intermissionStatus;
+	}
+	void csIntermissionReceived() {
+		if (_intermissionStatus == IntermissionStatus::NoIntermission) {
+			_intermissionStatus = IntermissionStatus::IntermissionAnnounced;
+		}
+		else {
+			demoErrorFlags |= DERR_GAMELOGICFLAW;
+			demoErrors << "Intermission cs received but previous status was " << intermissionTypes[(size_t)_intermissionStatus] << "\n";
+			_intermissionStatus = IntermissionStatus::Invalid; // idk what would lead us here
+		}
+	}
+
+	void setLastScores(std::string scores) {
+		if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced) {
+			_lastScores = scores;
+		}
+	}
+	void setMatchStatistics(std::string matchStatistics) {
+		if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced) {
+			_lastMatchStatistics = matchStatistics;
+		}
+	}
+
+	void psIntermissionStatus(bool isOn = false) {
+		if (_oldIntermission == 0 && !isOn || isOn && _oldIntermission == 1) {
+			return; // no change
+		}
+		_oldIntermission = isOn ? 1 : 0;
+		if (!isOn) {
+			if (_intermissionStatus == IntermissionStatus::Unknown || _intermissionStatus == IntermissionStatus::MaybeCarryOver) {
+				_intermissionStatus = IntermissionStatus::NoIntermission;
+			}
+			else {
+				demoErrorFlags |= DERR_GAMELOGICFLAW;
+				demoErrors << "Intermission ps flag changed to false with previous intermission status "<< intermissionTypes[(size_t)_intermissionStatus]<< "\n";
+				std::cerr << "Intermission ps flag changed to false with previous intermission status "<< intermissionTypes[(size_t)_intermissionStatus]<< "(" << DPrintFLocation << ")\n";
+				//if (_intermissionStatus != IntermissionStatus::IntermissionPSConfirmed) {
+					// if its already gone thru the full cycle and confirmed, we should be good in principle right? idk...
+					_intermissionStatus = IntermissionStatus::Invalid; // idk what would lead us here
+				//}
+			}
+		}
+		else {
+			if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced || _isMOHAADemo && _intermissionStatus == IntermissionStatus::NoIntermission) {
+				// mohaa has no cs_intermission
+				_intermissionStatus = IntermissionStatus::IntermissionPSConfirmed;
+			}
+			else if (_intermissionStatus == IntermissionStatus::Unknown) {
+				_intermissionStatus = IntermissionStatus::MaybeCarryOver; // need to double check tho!
+			}
+			else {
+				demoErrorFlags |= DERR_GAMELOGICFLAW;
+				demoErrors << "Intermission ps flag changed to true with previous intermission status " << intermissionTypes[(size_t)_intermissionStatus] << "\n";
+				std::cerr << "Intermission ps flag changed to true with previous intermission status " << intermissionTypes[(size_t)_intermissionStatus] << "(" << DPrintFLocation << ")\n";
+				_intermissionStatus = IntermissionStatus::Invalid; // idk what would lead us here
+			}
+		}
+	}
+
+
 
 	int serverId = 0; // CS_SYSTEMINFO
 	std::string sv_referencedPaks; // CS_SYSTEMINFO
 
-	std::string gameEndingCSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach the end of a game or intermission.
+	std::string CSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach the end of a game or intermission.
+	int CSHashUniquesCount = 0;
+	bool CSHashConfirmed = false; // we set this to true if either a new game starts without intermission or we see the transition between non-intermission and intermission
 
 	int levelStartTime = 0; // CS_SERVERINFO
 	std::string serverName; // CS_SERVERINFO
@@ -569,12 +713,48 @@ public:
 	int g_duelweapondisable = 0; // CS_SERVERINFO
 	int g_maxforcerank = 0; // CS_SERVERINFO
 
+
+	// random stuff to track:
+	int gameDuration = 0;
+
+	void buildCSHash(clientActive_t* clCut, demoType_t demoType) {
+#define CSHASHTYPES_COUNT 3
+		int csHashIndexes[CSHASHTYPES_COUNT][2] = {
+			{getCS_SOUNDS(demoType),getCS_SOUNDS(demoType) + 256},
+			{getCS_MODELS(demoType),getCS_MODELS(demoType) + 256},
+			{getCS_EFFECTS(demoType),getCS_EFFECTS(demoType) + 64}
+		};
+		std::stringstream hashData;
+		int stringOffset;
+		const char* thestring;
+		int (*indexes)[2] = csHashIndexes;
+		for (int j = 0; j < CSHASHTYPES_COUNT; j++, indexes++) {
+			for (int i = (*indexes)[0]; i < (*indexes)[1]; i++) {
+				stringOffset = clCut->gameState.stringOffsets[i];
+				thestring = clCut->gameState.stringData + stringOffset;
+				if (!thestring) {
+					hashData << "_";
+					continue;
+				}
+				int safeStringLength = strnlen_s(thestring, sizeof(clCut->gameState.stringData) - stringOffset);
+				hashData << "_" << std::string_view(thestring, safeStringLength);
+			}
+		}
+
+		std::string newCSHash = makeStringHash(hashData.str());
+		if (!CSHashUniquesCount || newCSHash != CSHash) {
+			CSHashUniquesCount++;
+			CSHash = newCSHash;
+		}
+	}
+
 	UniqueGame_t() {
 
 	}
 
 	UniqueGame_t(clientActive_t* clCut, demoType_t demoType) {
-		
+		_demoType = demoType;
+		_isMOHAADemo = demoTypeIsMOHAA(demoType);
 		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_weapondisable").c_str());
 		g_truejedi = atoi(Info_ValueForKey(serverInfoMap,"g_jedivmerc").c_str());
 		sv_maxclients = atoi(Info_ValueForKey(serverInfoMap,"sv_maxclients").c_str());
@@ -592,14 +772,18 @@ public:
 		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
 
 		int stringOffset = clCut->gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)];
-		levelStartTime = atoi(clCut->gameState.stringData + stringOffset);
+		levelStartTime = atoi(clCut->gameState.stringData + stringOffset); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+
+		int currentGameTime = clCut->snap.serverTime - CS_LEVEL_START_TIME;
+		if (currentGameTime > gameDuration) {
+			gameDuration = currentGameTime;
+		}
 	}
 
 
 	bool SameGame(UniqueGame_t* otherGame) { // this only serves to reliably compare games within a demo.
-		return levelStartTime == otherGame->levelStartTime &&
-			serverId == otherGame->serverId &&
-			serverName == otherGame->serverName &&
+		return serverId == otherGame->serverId &&
+			serverName == otherGame->serverName && // this is risky. sv_hostname can change during a game...
 			mapName == otherGame->mapName &&
 			gameName == otherGame->gameName &&
 			version == otherGame->version &&
@@ -611,8 +795,8 @@ public:
 			g_forcepowerdisable == otherGame->g_forcepowerdisable &&
 			g_weapondisable == otherGame->g_weapondisable &&
 			g_duelweapondisable == otherGame->g_duelweapondisable &&
-			g_maxforcerank == otherGame->g_maxforcerank &&
-			levelStartTime == otherGame->levelStartTime;
+			//levelStartTime == otherGame->levelStartTime && // actually not valid cuz pauses
+			g_maxforcerank == otherGame->g_maxforcerank;
 	}
 
 
@@ -1864,27 +2048,6 @@ tsl::htrie_map<char, int> playerNamesToClientNums;
 qboolean clientNameIsDuplicate[MAX_CLIENTS_MAX];
 std::set<std::string>	recorderPlayerNames;
 
-#define DERR_SEH				(1<<0)
-#define DERR_OPENFAIL			(1<<1)
-#define DERR_FAILREADSEQNUM		(1<<2)
-#define DERR_DUPEMSGNUM			(1<<3)
-#define DERR_MSGSIZEOVERMAX		(1<<4)
-#define DERR_FAILREADMSG		(1<<5)
-#define DERR_READPASTEND		(1<<6)
-#define DERR_ILLEGIBLESRVMSG	(1<<7)
-#define DERR_FAILPARSECMDSTR	(1<<8)
-#define DERR_FAILPARSEGAMESTATE	(1<<9)
-#define DERR_FAILPARSESNAP		(1<<10)
-#define DERR_SNAPMALFORMED		(1<<11)
-#define DERR_ERRORCNFSTRMOD		(1<<12)
-#define DERR_WEIRDMSGSIZE		(1<<13)
-#define DERR_MSGSIZEENDBUTLEFT	(1<<14)
-#define DERR_BADJSONMETA		(1<<15)
-#define DERR_GAMELOGICFLAW		(1<<16)
-#define DERR_ATYPICALBUTLEGAL	(1<<17) // for stuff thats just unusual. to keep track of. e.g. bcs0 bcs1 etc
-//#define DERR_THRGHWALLBOXSOLID	(1<<15) // kill-based
-int	demoErrorFlags = 0;
-std::stringstream	demoErrors;
 
 #define DERIV_FAKEDEMO		(1<<0) // dentified by fake demo server name. could be reframe merge etc
 #define DERIV_SNAPSMANIP	(1<<1) // snaps manipulation by demo optimizer
@@ -2390,18 +2553,26 @@ int g_gametype = 0;
 int g_gametype_general = 0;
 int activeKillDatabase = 0; // right now we dont have kill-specific filters, only global ones based on gametype or mapname and such. so we can optimize this and save it globally. 
 std::string currentMapName = "";
-void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts) { // TODO: make this adapt to JKA
+void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts, bool rebuildCSHash) { // TODO: make this adapt to JKA
 
 	if (configStringChanged[CS_SERVERINFO] || configStringChanged[CS_SYSTEMINFO] || configStringChanged[getCS_LEVEL_START_TIME(demoType)]) {
 
 		UniqueGame_t newGame(clCut, demoType);
 		if (uniqueGameIndex == -1 || !uniqueGameCurrent.SameGame(&newGame)) {
 			uniqueGameIndex++;
+			if (!rebuildCSHash) {
+				newGame.CSHash = uniqueGameCurrent.CSHash; // we are not rebuilding on this frame anyway, so copy it over.
+				newGame.CSHashUniquesCount = 1;
+			}
 			if (uniqueGameIndex > 0) {
 				uniqueGames.push_back(std::move(uniqueGameCurrent));
 			}
 			uniqueGameCurrent = std::move(newGame);
 		}
+	}
+
+	if (rebuildCSHash) {
+		uniqueGameCurrent.buildCSHash(&demo.cut.Cl,demoType);
 	}
 
 	if (configStringChanged[CS_SERVERINFO]) {
@@ -2426,6 +2597,18 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 				q3DefragInfo.online = q3DefragInfo.gameType > 4;
 
 			}
+		}
+
+		const char* nwhString = strstr(uniqueGameCurrent.gameName.c_str(), "NWH");
+		if (nwhString) {
+			NWHVersion.nwh = true;
+			int countmatch = sscanf(nwhString,"NWH v%d.%d.%d", &NWHVersion.version[0], &NWHVersion.version[1], &NWHVersion.version[2]);
+			for (int i = 2; i >= countmatch; i--) {
+				NWHVersion.version[i] = 0;
+			}
+		}
+		else {
+			NWHVersion.nwh = false;
 		}
 
 		std::string theNewMapname = uniqueGameCurrent.mapName;
@@ -3023,19 +3206,7 @@ void CheckForNameChanges(clientActive_t* clCut,const ioHandles_t &io, demoType_t
 
 }
 
-#define HASH_BITS 224
-inline std::string makeStringHash(std::string input) {
-	constexpr int bytes = picosha3::bits_to_bytes(HASH_BITS);
-	auto sha3_512 = picosha3::get_sha3_generator<HASH_BITS>();
-	//return sha3_512.get_hex_string(input);
-	std::array<uint8_t, bytes> hash{};
-	sha3_512.process(input.cbegin(),input.cend());
-	sha3_512.finish();
-	sha3_512.get_hash_bytes(hash.begin(), hash.end());
-	std::string output;
-	ankerl::base58::encode(hash.data(),bytes, output);
-	return output.substr(std::min((size_t)22,output.size())); // 22 bytes of base58 should be around 128 bits?
-}
+
 
 
 template<unsigned int max_clients>
@@ -5895,6 +6066,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&groundCrouchDurations, 0, sizeof(groundCrouchDurations));
 	Com_Memset(&lastSneak, 0, sizeof(lastSneak));
 	Com_Memset(&lastSneakDuration, 0, sizeof(lastSneakDuration));
+	Com_Memset(&NWHVersion, 0, sizeof(NWHVersion));
 	resetCurrentPacketPeriodStats();
 
 	lastKnownFlagCarrier[TEAM_RED] = lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_FREE] = -1; 
@@ -5971,6 +6143,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	demoCutGetDemoType(sourceDemoFile,ext, oldName,&demoType,&isCompressedFile,&demo.cut.Clc);
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+	int CS_MODELS_here = getCS_MODELS(demoType);
+	int CS_EFFECTS_here = getCS_EFFECTS(demoType);
+	int CS_SOUNDS_here = getCS_SOUNDS(demoType);
 
 	//createCompressedOutput = (qboolean)!isCompressedFile;
 
@@ -6288,10 +6463,20 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						//if (isMOHAADemo) {
 
-							if (!strcmp(cmd, "cs")) {
+							if (!strcmp(cmd, "map_restart")) {
+
+								std::cout << "map_restart\n";
+							}
+							else if (!strcmp(cmd, "cs")) {
 
 								int index = atoi(Cmd_Argv(1));
-								if (index == CS_FLAGSTATUS) {
+								if (!isMOHAADemo && index == CS_INTERMISSION) {
+									int isIntermission = atoi(Cmd_Argv(2));
+									if (isIntermission) {
+										uniqueGameCurrent.csIntermissionReceived();
+									}
+								}
+								else if (index == CS_FLAGSTATUS) {
 									char* str = Cmd_Argv(2);
 
 									int flagTmp[TEAM_NUM_TEAMS];
@@ -6400,6 +6585,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cuterror;
 				}
 
+				std::cout << "gamestate\n";
+
 				configStringChanged.fill();
 				{
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
@@ -6475,7 +6662,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
-				updateGameInfo(&demo.cut.Cl, demoType,opts);
+				updateGameInfo(&demo.cut.Cl, demoType,opts,true);
 				CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
@@ -6558,10 +6745,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					requiredMetaEventAges[METRACKER_KILLS][cl] = demoCurrentTime - bufferTime; // Kills are a point in time. Whenever a kill happens, we need to have the past [bufferTime] milliseconds available. So just always require the last [bufferTime] milliseconds minimum for kills.
 				}
 
-				psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,demoType);
 				psGeneralSaberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE, UNSAFE>(demo.cut.Cl.snap.ps.saberMove,demoType);
 				psGeneralLegsAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.legsAnim,demoType);
 				psGeneralTorsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(demo.cut.Cl.snap.ps.torsoAnim,demoType);
+				psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type, demoType);
 
 				Com_Memset(droppedFlagEntities, 0, sizeof(droppedFlagEntities));
 				Com_Memset(baseFlagEntities, 0, sizeof(baseFlagEntities));
@@ -11466,6 +11653,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 
 		bool hadConfigStringCommands = false;
+		bool rebuildUniqueGameCSHash = false;
 		// process any new server commands
 		for (; demo.cut.Clc.lastExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
 			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
@@ -11497,7 +11685,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 			}
 
-			if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
+			if (!isMOHAADemo && uniqueGameCurrent.getIntermissionStatus() == UniqueGame_t::IntermissionStatus::IntermissionAnnounced && !strcmp(cmd, "scores")) {
+				uniqueGameCurrent.setLastScores(command);
+			}
+			else if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
 				std::string rawChatCommand = command;
 				std::string chatCommand = Q_StripColorAll(rawChatCommand);
 
@@ -11648,6 +11839,19 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
 					const char* systemInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+				}
+				else if (NWHVersion.nwh && nwhMatchStatisticsGathering && !isMOHAADemo && index == CS_INTERMISSION && !*Cmd_Argv(2)) {
+					nwhMatchStatisticsGathering = false;
+					uniqueGameCurrent.setMatchStatistics(nwhMatchStatistics.str());
+					nwhMatchStatistics.str(std::string()); // clear it
+				}
+				else if (index >= CS_MODELS_here && index < CS_MODELS_here +256
+					|| index >= CS_SOUNDS_here && index < CS_SOUNDS_here + 256
+					|| index >= CS_EFFECTS_here && index < CS_EFFECTS_here + 64
+					) {
+					// we use this to, at the end of a game, have a unique hash of the order of 
+					// entries in CS_SOUNDS and/or CS_EFFECTS
+					rebuildUniqueGameCSHash = true;
 				}
 				else if (index >= CS_PLAYERS_here && index < CS_PLAYERS_here+max_clients) {
 					char* str = Cmd_Argv(2);
@@ -11804,6 +12008,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (!result) continue;
 				}
 
+				// TODO maybe check for v1.2.2, that's when it was introduced, but I guess who cares
+				if (NWHVersion.nwh && printText == "^2/ ^7Additional Match Statistics ^2/^7\n") {
+					nwhMatchStatisticsGathering = true;
+					nwhMatchStatistics.str(std::string());
+					nwhMatchStatistics << printText;
+				}
+				else if (nwhMatchStatisticsGathering) {
+					nwhMatchStatistics << printText;
+				}
 				
 				
 			}
@@ -11822,7 +12035,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 
 		if (hadConfigStringCommands) {
-			updateGameInfo(&demo.cut.Cl,demoType,opts);
+			updateGameInfo(&demo.cut.Cl,demoType,opts, rebuildUniqueGameCSHash);
 			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
@@ -11833,6 +12046,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			configStringChanged.clear();
 		}
 
+		uniqueGameCurrent.psIntermissionStatus(getPSIntermissionStatus(isMOHAADemo, psGeneralPMType, demo.cut.Cl.snap.ps.pm_flags));
 
 
 		if ( opts.writeDemoPacketStats && (oldSize == 0 || (currentPacketPeriodStats.periodTotalTime > 0 && (opts.writeDemoPacketStats < 0 || (demoCurrentTime - lastPacketStatsWritten) >= opts.writeDemoPacketStats)))) {
