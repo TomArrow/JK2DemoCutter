@@ -5367,7 +5367,7 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 void demoCutWriteEmptyMessageMetadataPart(msg_t* msg, demoType_t demoType, const char* metaData);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool& SEHExceptionCaught);
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmd_t>* cmdsSave, bool& SEHExceptionCaught);
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);

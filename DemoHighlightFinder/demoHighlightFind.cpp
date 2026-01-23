@@ -503,6 +503,7 @@ public:
 	bool playerCSVDump = false;
 	bool playerCSVDumpCommandTimeDupeSkip = false;
 	int	entityCSVDump = 0; // -1 = all ents; 0 = none; > 0 specific ent
+	int	userCMDCSVDump = 0; // -1 = all ents; 0 = none; > 0 specific ent
 	bool doChatSearch = false;
 	bool doPrintSearch = false;
 	bool doStringSearch = false;
@@ -750,34 +751,39 @@ public:
 
 	}
 
-	UniqueGame_t(clientActive_t* clCut, demoType_t demoType) {
-		_demoType = demoType;
-		_isMOHAADemo = demoTypeIsMOHAA(demoType);
-		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_weapondisable").c_str());
-		g_truejedi = atoi(Info_ValueForKey(serverInfoMap,"g_jedivmerc").c_str());
-		sv_maxclients = atoi(Info_ValueForKey(serverInfoMap,"sv_maxclients").c_str());
-		g_forcepowerdisable = atoi(Info_ValueForKey(serverInfoMap,"g_forcepowerdisable").c_str());
-		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_weapondisable").c_str());
-		g_duelweapondisable = atoi(Info_ValueForKey(serverInfoMap,"g_duelweapondisable").c_str());
-		g_maxforcerank = atoi(Info_ValueForKey(serverInfoMap,"g_maxforcerank").c_str());
+	void updateValues(clientActive_t* clCut) {
 
-		serverName = Info_ValueForKey(serverInfoMap,"sv_hostname");
-		mapName = Info_ValueForKey(serverInfoMap,"mapname");
-		gameName = Info_ValueForKey(serverInfoMap,"gamename");
-		version = Info_ValueForKey(serverInfoMap,"version");
-
-		sv_referencedPaks = Info_ValueForKey(systemInfoMap,"sv_referencedpaks");
-		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
-		sv_cheats = atoi(Info_ValueForKey(systemInfoMap, "sv_cheats").c_str());
-		sv_gameStartUnixTime = std::strtoll(Info_ValueForKey(systemInfoMap, "sv_gameStartUnixTime").c_str(),nullptr,10);
-
-		int stringOffset = clCut->gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)];
+		serverName = Info_ValueForKey(serverInfoMap, "sv_hostname");
+		int stringOffset = clCut->gameState.stringOffsets[getCS_LEVEL_START_TIME(_demoType)];
 		levelStartTime = atoi(clCut->gameState.stringData + stringOffset); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
 
 		int currentGameTime = clCut->snap.serverTime - CS_LEVEL_START_TIME;
 		if (currentGameTime > gameDuration) {
 			gameDuration = currentGameTime;
 		}
+	}
+
+	UniqueGame_t(clientActive_t* clCut, demoType_t demoType) {
+		_demoType = demoType;
+		_isMOHAADemo = demoTypeIsMOHAA(demoType);
+
+		// constructor only handles stuff that cannot change during a game (at least on an average server, cuz latched or cvar_rom)
+		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap, "g_weapondisable").c_str());
+		g_truejedi = atoi(Info_ValueForKey(serverInfoMap, "g_jedivmerc").c_str());
+		sv_maxclients = atoi(Info_ValueForKey(serverInfoMap, "sv_maxclients").c_str());
+		g_forcepowerdisable = atoi(Info_ValueForKey(serverInfoMap, "g_forcepowerdisable").c_str());
+		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap, "g_weapondisable").c_str());
+		g_duelweapondisable = atoi(Info_ValueForKey(serverInfoMap, "g_duelweapondisable").c_str());
+		g_maxforcerank = atoi(Info_ValueForKey(serverInfoMap, "g_maxforcerank").c_str());
+		mapName = Info_ValueForKey(serverInfoMap, "mapname");
+		gameName = Info_ValueForKey(serverInfoMap, "gamename");
+		version = Info_ValueForKey(serverInfoMap, "version");
+		sv_referencedPaks = Info_ValueForKey(systemInfoMap, "sv_referencedpaks");
+		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
+		sv_cheats = atoi(Info_ValueForKey(systemInfoMap, "sv_cheats").c_str());
+		sv_gameStartUnixTime = std::strtoll(Info_ValueForKey(systemInfoMap, "sv_gameStartUnixTime").c_str(), nullptr, 10);
+
+		updateValues(clCut); // this handles stuff that is moore dynamic.
 	}
 
 
@@ -881,6 +887,7 @@ typedef struct entityDumpCSVPoint_t {
 	trajectory_t apos;
 };
 std::vector<entityDumpCSVPoint_t> entityDumpCSVDataPoints[MAX_GENTITIES];
+std::vector<usercmd_t> playerUserCmds[MAX_CLIENTS_MAX];
 
 
 #define PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -2602,6 +2609,9 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 				uniqueGames.push_back(std::move(uniqueGameCurrent));
 			}
 			uniqueGameCurrent = std::move(newGame);
+		}
+		else {
+			uniqueGameCurrent.updateValues(clCut);
 		}
 	}
 
@@ -5435,6 +5445,11 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			writePlayerDumpCSV(i, opts);
 		}
 	}
+	if (opts.userCMDCSVDump) {
+		for (int i = 0; i < max_clients; i++) {
+			writeUserCMDDumpCSV(i, opts);
+		}
+	}
 	if (opts.entityCSVDump) {
 		for (int i = max_clients; i < MAX_GENTITIES; i++) {
 			writeEntityDumpCSV(i, opts);
@@ -5525,6 +5540,32 @@ static void inline writePlayerDumpCSV(int clientNum, const ExtraSearchOptions& o
 		}
 		if (countSkipped) {
 			std::cout << "writePlayerDumpCSV: Skipped " << countSkipped << " frames with duplicate commandTime for player " << clientNum << ".\n";
+		}
+
+		strafeCSVPlayerOutputHandle.close();
+	}
+}
+
+static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& opts) {
+	if (playerUserCmds[clientNum].size() > 0) {
+
+		std::ofstream strafeCSVPlayerOutputHandle;
+		strafeCSVPlayerOutputHandle.open(va("playerUserCMDDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
+
+		strafeCSVPlayerOutputHandle << "commandTime,upmove,forwardmove,rightmove,angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
+
+		int lastCommandTime = -9999999;
+		int64_t countSkipped = 0;
+		for (auto it = playerUserCmds[clientNum].begin(); it != playerUserCmds[clientNum].end(); it++) {
+			if (false && lastCommandTime == it->serverTime) {
+				countSkipped++;
+				continue;
+			}
+			strafeCSVPlayerOutputHandle << it->serverTime << "," << (int)it->upmove << "," << (int)it->forwardmove << "," << (int)it->rightmove << "," << it->angles[0] << "," << it->angles[1] << "," << it->angles[2] << "," << (int)it->buttons << "," << (int)it->weapon << "," << (int)it->forcesel << "," << (int)it->invensel << "," << (int)it->generic_cmd << "\n";
+			lastCommandTime = it->serverTime;
+		}
+		if (countSkipped) {
+			std::cout << "writeUserCMDDumpCSV: Skipped " << countSkipped << " frames with duplicate commandTime for player " << clientNum << ".\n";
 		}
 
 		strafeCSVPlayerOutputHandle.close();
@@ -6507,7 +6548,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			ocmd = MSG_ReadByte(&oldMsg);
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
-				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,SEHExceptionCaught);
+				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL,SEHExceptionCaught);
 
 				const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
 				if (maybeMeta) {
@@ -12381,6 +12422,7 @@ int main(int argcO, char** argvO) {
 	auto a = op.add<popl::Implicit<int>>("a", "net-analysis", "Debugs some net stuff to understand how mods work. A bit like shownet but without showing all the normal stuff like angles/origin etc, and with support for pers/stats/ammo etc. Pass number for more (atm only mode 1)",1);
 	auto y = op.add<popl::Implicit<int>>("y", "player-frames-csv", "Writes CSV files containing position, velocity and viewangle of players. Pass 1 as a value to skip duplicate commandTime values",0);
 	auto E = op.add<popl::Implicit<int>>("E", "entity-frames-csv", "Writes CSV files containing trajectory of non-player entities. Pass a number to only do a specific entity number.",-1);
+	auto F = op.add<popl::Implicit<int>>("F", "usercmds-csv", "Writes CSV files containing user commands. Currently only does playerstate ones as recorded by TommyTernal defrag.",-1);
 	auto z = op.add<popl::Value<std::string>>("z", "strafe-csv", "Writes CSV files containing different strafes. Pass 2 numbers separated by comma. Sync point (ups speed) and reset point ups (speed). Optionally, a third number for a minimum run length in milliseconds.");
 	auto Z = op.add<popl::Switch>("Z", "strafe-csv-interpolate", "Does the strafe CSV with interpolated values instead of leaving them empty when not available at a certain time interval.");
 	auto C = op.add<popl::Value<std::string>>("C", "chat-search", "Searches for a string in chats.");
@@ -12444,6 +12486,7 @@ int main(int argcO, char** argvO) {
 	opts.playerCSVDump = y->is_set();
 	opts.findjumpbugs = j->is_set();
 	opts.entityCSVDump = !E->is_set() ? 0 : E->value();
+	opts.userCMDCSVDump = !F->is_set() ? 0 : F->value();
 	opts.skipKills = K->is_set();
 	opts.teleportAnalysis = A->is_set() ? A->value() : 0;
 	opts.writeChatsUnique = L->is_set() ? (L->value() & 1) : false;

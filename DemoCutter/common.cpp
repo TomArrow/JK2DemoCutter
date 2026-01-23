@@ -6322,7 +6322,7 @@ const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 	return MSG_ReadBigString(msg, demoType);
 }
 
-static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType) {
+static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmd_t>* cmdsSave) {
 
 	usercmd_t	nullcmd;
 
@@ -6386,6 +6386,9 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 		while (MSG_ReadBits(msg, 1)) {
 			MSG_ReadDeltaUsercmdKey(msg, 0, &oldcmd, &cmd);
 			oldcmd = cmd;
+			if (cmdsSave) {
+				cmdsSave->push_back(cmd);
+			}
 			if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
 				std::cerr << "New usercmd; readcount " << msg->readcount << "; serverTime  " << cmd.serverTime << ", angles[0] " << (int)cmd.angles[0]
 					<< ", angles[1] " << (int)cmd.angles[1]
@@ -6410,9 +6413,9 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 	return qtrue;
 }
 
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, bool& SEHExceptionCaught) {
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmd_t>* cmdsSave, bool& SEHExceptionCaught) {
 	__TRY{
-		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType);
+		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType,cmdsSave);
 	}
 	__EXCEPT{
 		SEHExceptionCaught = true;
