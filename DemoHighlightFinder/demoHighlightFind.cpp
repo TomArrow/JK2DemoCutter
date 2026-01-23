@@ -41,6 +41,24 @@
 #define KILLVECARRAY 1
 
 
+
+
+// notable: 
+// - 1.1 introduces hexcolors (tho thats technically a clientside thing)
+// - 1.2.2 introduces match statistics
+struct {
+	bool nwh;
+	uint16_t version[3];
+} NWHVersion;
+#define NWHVERSION(a,b,c) ( NWHVersion.version[0] > a || (NWHVersion.version[0] == a && (NWHVersion.version[1] > b || NWHVersion.version[1] == b && (NWHVersion.version[2] >= c))) )
+
+bool nwhHexColors = false;
+bool nwhMatchStatisticsGathering = false;
+std::stringstream nwhMatchStatistics;
+
+
+
+
 #define VIDEOWIDTH 400
 #define VIDEOHEIGHT 300
 #define S3L_POSMULT 8
@@ -281,7 +299,7 @@ void videoDrawText(int64_t demoCurrentTime) {
 	for (auto it = screenCenterText.begin(); it != screenCenterText.end(); it++) {
 		char* cleanStr = new char[std::get<1>(*it).size() + 1];
 		Q_strncpyz(cleanStr, std::get<1>(*it).size() + 1, std::get<1>(*it).c_str(), std::get<1>(*it).size()+1);
-		Q_StripColorAll(cleanStr);
+		Q_StripColorAll(cleanStr,nwhHexColors);
 		int x = VIDEOWIDTH / 2 - strlen(cleanStr)*blit32_ADVANCE/2;
 		delete[] cleanStr;
 		y += blit32_ROW_ADVANCE*blit32_TextExplicit((color3ub_t*)drawBuffer, whitefont, 1, VIDEOWIDTH, VIDEOHEIGHT, 1, x, y, std::get<1>(*it).c_str());
@@ -290,10 +308,10 @@ void videoDrawText(int64_t demoCurrentTime) {
 
 bool videoAdjustTextColor(color3ub_t* Value, int* i, const char* txt, int strLen) {
 	if (*i+1 < strLen) {
-		if (Q_IsColorStringHex(txt+1)) {
+		if (Q_IsColorStringHex(txt,nwhHexColors)) {
 			vec4_t color;
 			int skipCount;
-			if (Q_parseColorHex(txt+1, color, &skipCount)) {
+			if (Q_parseColorHex(txt+1, color, &skipCount, nwhHexColors)) {
 				*i += skipCount;
 				Value->r = (byte)std::min(color[0] * 255.0f, 255.0f);
 				Value->g = (byte)std::min(color[1] * 255.0f, 255.0f);
@@ -580,16 +598,6 @@ int	demoErrorFlags = 0;
 std::stringstream	demoErrors;
 
 
-// notable: 
-// - 1.1 introduces hexcolors (tho thats technically a clientside thing)
-// - 1.2.2 introduces match statistics
-struct  {
-	bool nwh;
-	int version[3];
-} NWHVersion;
-
-bool nwhMatchStatisticsGathering = false;
-std::stringstream nwhMatchStatistics;
 
 
 // CAREFUL. Always use lower case keys. technically not case insensitive
@@ -2372,7 +2380,7 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 			possibleClientNums.push_back(clientNum);
 			if (isPossiblyRealName) {
 				std::string playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
-				std::string playerNameCompareStripped = Q_StripColorAll(playerNameCompare);
+				std::string playerNameCompareStripped = Q_StripColorAll(playerNameCompare, nwhHexColors);
 				if (playerNameCompare == info->playerName) {
 					playerNumber = clientNum;
 				}
@@ -2602,10 +2610,11 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 		const char* nwhString = strstr(uniqueGameCurrent.gameName.c_str(), "NWH");
 		if (nwhString) {
 			NWHVersion.nwh = true;
-			int countmatch = sscanf(nwhString,"NWH v%d.%d.%d", &NWHVersion.version[0], &NWHVersion.version[1], &NWHVersion.version[2]);
+			int countmatch = sscanf(nwhString,"NWH v%hu.%hu.%hu", &NWHVersion.version[0], &NWHVersion.version[1], &NWHVersion.version[2]);
 			for (int i = 2; i >= countmatch; i--) {
 				NWHVersion.version[i] = 0;
 			}
+			nwhHexColors = NWHVERSION(1,1,0);
 		}
 		else {
 			NWHVersion.nwh = false;
@@ -2891,6 +2900,7 @@ entityState_t* findEntity(int number) {
 
 class NearbyPlayerInfo {
 public:
+	bool analysisDone = false;
 	std::string nearbyPlayersString;
 	std::string nearbyEnemiesString;
 	int nearbyPlayersCount = 0;
@@ -2900,8 +2910,7 @@ public:
 };
 
 template <unsigned int max_clients>
-inline NearbyPlayerInfo* getNearbyPlayersInfo(vec3_t position, int excludeNum) {
-	NearbyPlayerInfo* retVal = new NearbyPlayerInfo();
+inline void getNearbyPlayersInfo(vec3_t position, int excludeNum, NearbyPlayerInfo& retVal) {
 
 	// Find nearby players.
 	std::stringstream nearbyPlayersSS;
@@ -2912,7 +2921,7 @@ inline NearbyPlayerInfo* getNearbyPlayersInfo(vec3_t position, int excludeNum) {
 		if (thisEntitySub->number >= 0 && thisEntitySub->number < max_clients && thisEntitySub->number != excludeNum) {
 			float nearbyPlayerDistance = VectorDistance(thisEntitySub->pos.trBase, position);
 			if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
-				nearbyPlayersSS << (retVal->nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " (" << (int)nearbyPlayerDistance << ")";
+				nearbyPlayersSS << (retVal.nearbyPlayersCount++ == 0 ? "" : ",") << thisEntitySub->number << " (" << (int)nearbyPlayerDistance << ")";
 				nearbyPlayers.push_back(thisEntitySub->number);
 				nearbyPlayersDistances.push_back(nearbyPlayerDistance);
 			}
@@ -2921,13 +2930,13 @@ inline NearbyPlayerInfo* getNearbyPlayersInfo(vec3_t position, int excludeNum) {
 	if (demo.cut.Cl.snap.ps.clientNum != excludeNum) {
 		float nearbyPlayerDistance = VectorDistance(demo.cut.Cl.snap.ps.origin, position);
 		if (nearbyPlayerDistance <= NEARBY_PLAYER_MAX_DISTANCE) {
-			nearbyPlayersSS << (retVal->nearbyPlayersCount++ == 0 ? "" : ",") << demo.cut.Cl.snap.ps.clientNum << " (" << (int)nearbyPlayerDistance << ")";
+			nearbyPlayersSS << (retVal.nearbyPlayersCount++ == 0 ? "" : ",") << demo.cut.Cl.snap.ps.clientNum << " (" << (int)nearbyPlayerDistance << ")";
 			nearbyPlayers.push_back(demo.cut.Cl.snap.ps.clientNum);
 			nearbyPlayersDistances.push_back(nearbyPlayerDistance);
 		}
 	}
 
-	retVal->nearbyPlayersString = nearbyPlayersSS.str();
+	retVal.nearbyPlayersString = nearbyPlayersSS.str();
 
 	// Find nearby enemies
 	std::stringstream nearbyEnemiesSS;
@@ -2937,18 +2946,19 @@ inline NearbyPlayerInfo* getNearbyPlayersInfo(vec3_t position, int excludeNum) {
 	for (int nearV = 0; nearV < nearbyPlayers.size(); nearV++) {
 		int nearbyPlayerHere = nearbyPlayers[nearV];
 		if (playerTeams[nearbyPlayerHere] != playerTeams[excludeNum]) {
-			nearbyEnemiesSS << (retVal->nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[nearV] << ")";
+			nearbyEnemiesSS << (retVal.nearbyEnemiescount++ == 0 ? "" : ",") << nearbyPlayerHere << " (" << (int)nearbyPlayersDistances[nearV] << ")";
 			if (nearbyPlayersDistances[nearV] <= VERYCLOSE_PLAYER_MAX_DISTANCE) {
-				retVal->verycloseEnemiescount++;
+				retVal.verycloseEnemiescount++;
 			}
 		}
 		if (nearbyPlayersDistances[nearV] <= VERYCLOSE_PLAYER_MAX_DISTANCE) {
-			retVal->veryClosePlayersCount++;
+			retVal.veryClosePlayersCount++;
 		}
 	}
-	retVal->nearbyEnemiesString = nearbyEnemiesSS.str();
+	retVal.nearbyEnemiesString = nearbyEnemiesSS.str();
 
-	return retVal;
+	retVal.analysisDone = true;
+
 }
 
 
@@ -3259,7 +3269,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 			//const char* victimInfo = demo.cut.Cl.gameState.stringData + stringOffset;
 			int timeSinceLastKill = (*killsOfThisSpree)[i].time - lastKillTime;
 			victimsSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << (*killsOfThisSpree)[i].victimName << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
-			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
+			victimsStrippedSS << (*killsOfThisSpree)[i].targetClientNum/*<< (*victims)[i]*/ << ": " << Q_StripColorAll((*killsOfThisSpree)[i].victimName, nwhHexColors) << " ("<< (*killsOfThisSpree)[i].modInfoString<<", +"<< (i>0? timeSinceLastKill :0)<<")" << "\n";
 
 			uniqueTargets.insert((*killsOfThisSpree)[i].targetClientNum);
 
@@ -3336,10 +3346,10 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@maxDelayActual", maxDelayActual);
 		SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 		SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-		std::string serverNameStripped = Q_StripColorAll(serverName);
+		std::string serverNameStripped = Q_StripColorAll(serverName, nwhHexColors);
 		SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerName", playername.c_str(), QF_PLAYERNAME0);
-		std::string playernameStripped = Q_StripColorAll(playername);
+		std::string playernameStripped = Q_StripColorAll(playername, nwhHexColors);
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 		SQLBIND_DELAYED_FLAGS(query, int, "@killerBotStatus",BOTSTATUS(clientNumAttacker), QF_BOTSTATUS0);
 		SQLBIND_DELAYED_TEXT(query, "@victimNames", victimsString.c_str());
@@ -3545,7 +3555,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 
 	SQLBIND_DELAYED_TEXT(query, "@map", meta->mapName.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@serverName", meta->serverName.c_str());
-	std::string serverNameStripped = Q_StripColorAll(meta->serverName);
+	std::string serverNameStripped = Q_StripColorAll(meta->serverName, nwhHexColors);
 	SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@readableTime", formattedTimeString.c_str());
 	SQLBIND_DELAYED(query, int, "@totalMilliseconds", runInfo->milliseconds);
@@ -3556,7 +3566,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 	else {
 		SQLBIND_DELAYED_NULL(query, "@style");
 	}
-	std::string playernameStripped = Q_StripColorAll(meta->playerName);
+	std::string playernameStripped = Q_StripColorAll(meta->playerName, nwhHexColors);
 	SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 	SQLBIND_DELAYED(query, int, "@isTop10", runInfo->isLogged);
 	SQLBIND_DELAYED(query, int, "@isNumber1", runInfo->isNumber1);
@@ -3653,13 +3663,13 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 			std::string serverName = Info_ValueForKey(info, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, "sv_hostname");
 			SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 			SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-			std::string serverNameStripped = Q_StripColorAll(serverName);
+			std::string serverNameStripped = Q_StripColorAll(serverName, nwhHexColors);
 			SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 			std::string laughsString = laughs.str();
 			std::string laughsChatlogString = laughsChatlog.str();
 			SQLBIND_DELAYED_TEXT(query, "@laughs", laughsString.c_str());
 			SQLBIND_DELAYED_TEXT(query, "@chatlog", laughsChatlogString.c_str());
-			std::string laughsChatlogStringStripped = Q_StripColorAll(laughsChatlogString);
+			std::string laughsChatlogStringStripped = Q_StripColorAll(laughsChatlogString, nwhHexColors);
 			SQLBIND_DELAYED_TEXT(query, "@chatlogStripped", laughsChatlogStringStripped.c_str());
 			SQLBIND_DELAYED(query, int, "@laughCount", laughCount);
 			SQLBIND_DELAYED_TEXT(query, "@demoName", (*oldBasename).c_str());
@@ -3730,7 +3740,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	// Aye, let's log it.
 	SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-	std::string serverNameStripped = Q_StripColorAll(serverName);
+	std::string serverNameStripped = Q_StripColorAll(serverName, nwhHexColors);
 	SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@type", specialType);
 	if (reframeClientNum != -1) {
@@ -3744,7 +3754,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 		SQLBIND_DELAYED_TEXT(query, "@clientNumAlt", altClientNum);
 		const char* playerNameAlt = getPlayerName(altClientNum,getCS_PLAYERS(demoType),demoTypeIsMOHAA(demoType));
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameAlt", playerNameAlt, QF_PLAYERNAME1);
-		std::string playerNameAltStripped = Q_StripColorAll(playerNameAlt);
+		std::string playerNameAltStripped = Q_StripColorAll(playerNameAlt, nwhHexColors);
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameAltStripped", playerNameAltStripped.c_str(), QF_PLAYERNAME1STRIPPED);
 	}
 	else {
@@ -3755,7 +3765,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	SQLBIND_DELAYED_FLAGS(query, int, "@botStatusAlt", BOTSTATUS(altClientNum), QF_BOTSTATUS1);
 	if (playerNameIfExists.size()) {
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerName", playerNameIfExists.c_str(),QF_PLAYERNAME0);
-		std::string playerNameIfExistsStripped = Q_StripColorAll(playerNameIfExists);
+		std::string playerNameIfExistsStripped = Q_StripColorAll(playerNameIfExists, nwhHexColors);
 		SQLBIND_DELAYED_TEXT_FLAGS(query, "@playerNameStripped", playerNameIfExistsStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 	}
 	else {
@@ -3764,7 +3774,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	}
 	if (details.size()) {
 		SQLBIND_DELAYED_TEXT(query, "@details", details.c_str());
-		std::string detailsStripped = Q_StripColorAll(details);
+		std::string detailsStripped = Q_StripColorAll(details, nwhHexColors);
 		SQLBIND_DELAYED_TEXT(query, "@detailsStripped", detailsStripped.c_str());
 	}
 	else {
@@ -3773,7 +3783,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 	}
 	if (comment.size()) {
 		SQLBIND_DELAYED_TEXT(query, "@comment", comment.c_str());
-		std::string commentStripped = Q_StripColorAll(comment);
+		std::string commentStripped = Q_StripColorAll(comment, nwhHexColors);
 		SQLBIND_DELAYED_TEXT(query, "@commentStripped", commentStripped.c_str());
 	}
 	else {
@@ -5208,7 +5218,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 				recorderNamesStripped << ", ";
 			}
 			recorderNames << *it;
-			recorderNamesStripped << Q_StripColorAll(*it);
+			recorderNamesStripped << Q_StripColorAll(*it, nwhHexColors);
 		}
 		std::string recorderNamesString = recorderNames.str();
 		std::string recorderNamesStrippedString = recorderNamesStripped.str();
@@ -5810,7 +5820,7 @@ static void inline saveStatisticsToDbReal(const ioHandles_t& io,bool& wasDoingSQ
 			int64_t groundFrameSampleCount = it->second.groundFrameQuality.divisor + 0.5;
 			SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 			SQLBIND_DELAYED_TEXT(query, "@playerName", playerName.c_str());
-			std::string playernameStripped = Q_StripColorAll(playerName);
+			std::string playernameStripped = Q_StripColorAll(playerName, nwhHexColors);
 			SQLBIND_DELAYED_TEXT(query, "@playerNameStripped", playernameStripped.c_str());
 			SQLBIND_DELAYED(query, int, "@clientNum", clientNum);
 			SQLBIND_DELAYED(query, double, "@averageStrafeDeviation", strafeDeviation);
@@ -9620,11 +9630,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT(query, "@shorthash", shorthash.c_str());
 							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerName", playername.c_str(), QF_PLAYERNAME0);
-							std::string playernameStripped = Q_StripColorAll(playername);
+							std::string playernameStripped = Q_StripColorAll(playername, nwhHexColors);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@killerNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 							SQLBIND_DELAYED_FLAGS(query, int, "@attackerBotStatus", BOTSTATUS(attacker), QF_BOTSTATUS0);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@victimName", victimname.c_str(), QF_PLAYERNAME1);
-							std::string victimnameStripped = Q_StripColorAll(victimname);
+							std::string victimnameStripped = Q_StripColorAll(victimname, nwhHexColors);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@victimNameStripped", victimnameStripped.c_str(), QF_PLAYERNAME1STRIPPED);
 							SQLBIND_DELAYED_FLAGS(query, int, "@victimBotStatus", BOTSTATUS(target), QF_BOTSTATUS1);
 							if (isWorldKill) {
@@ -9672,7 +9682,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED_TEXT(angleQuery, "@shorthash", shorthash.c_str());
 							SQLBIND_DELAYED_TEXT(angleQuery, "@map", mapname.c_str());
 							SQLBIND_DELAYED_TEXT(angleQuery, "@serverName", serverName.c_str());
-							std::string serverNameStripped = Q_StripColorAll(serverName);
+							std::string serverNameStripped = Q_StripColorAll(serverName, nwhHexColors);
 							SQLBIND_DELAYED_TEXT(angleQuery, "@serverNameStripped", serverNameStripped.c_str());
 							SQLBIND_DELAYED(angleQuery, int, "@isReturn", victimIsFlagCarrier);
 							SQLBIND_DELAYED(angleQuery, int, "@isTeamKill", isTeamKill);
@@ -10087,7 +10097,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							vec3_t currentPosCapper;
 							vec3_t currentDirCapper;
 
-							NearbyPlayerInfo* nearbyInfo = NULL;
+							NearbyPlayerInfo nearbyInfo;
 							if (grabberPlayerIsVisibleOrFollowed) {
 								if (grabberPlayerEntity) {
 									VectorCopy(grabberPlayerEntity->pos.trBase, currentPos); // This is also useful in general.
@@ -10097,7 +10107,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									VectorCopy(demo.cut.Cl.snap.ps.origin, currentPos);
 									VectorCopy(demo.cut.Cl.snap.ps.velocity, currentDir);
 								}
-								nearbyInfo = getNearbyPlayersInfo<max_clients>(currentPos, grabberPlayerNum);
+								getNearbyPlayersInfo<max_clients>(currentPos, grabberPlayerNum, nearbyInfo);
 							}
 
 
@@ -10115,9 +10125,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								break;
 							}
 
-							NearbyPlayerInfo* nearbyInfoPad = NULL;
+							NearbyPlayerInfo nearbyInfoPad;
 							if (pickupOrigin == 2 && baseFlagPositions[flagTeam].known) {
-								nearbyInfoPad = getNearbyPlayersInfo<max_clients>(baseFlagPositions[flagTeam].pos, grabberPlayerNum);
+								getNearbyPlayersInfo<max_clients>(baseFlagPositions[flagTeam].pos, grabberPlayerNum, nearbyInfoPad);
 							}
 
 							// Boosts that led to this cap
@@ -10326,12 +10336,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 							SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-							std::string serverNameStripped = Q_StripColorAll(serverName);
+							std::string serverNameStripped = Q_StripColorAll(serverName, nwhHexColors);
 							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
 							SQLBIND_DELAYED(query, int, "@flagPickupSource", pickupOrigin);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@grabberName", grabberplayername.c_str(), QF_PLAYERNAME0);
-							std::string grabbernameStripped = Q_StripColorAll(grabberplayername);
+							std::string grabbernameStripped = Q_StripColorAll(grabberplayername, nwhHexColors);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@grabberNameStripped", grabbernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 							SQLBIND_DELAYED(query, int, "@grabberClientNum", grabberPlayerNum); 
 							SQLBIND_DELAYED_FLAGS(query, int, "@grabberBotStatus",  BOTSTATUS(grabberPlayerNum), QF_BOTSTATUS0);
@@ -10339,7 +10349,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED(query, int, "@enemyFlagHoldTime", flagHoldTime);
 								SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
 								SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperName", playername.c_str(), QF_PLAYERNAME1);
-								std::string playernameStripped = Q_StripColorAll(playername);
+								std::string playernameStripped = Q_StripColorAll(playername, nwhHexColors);
 								SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperNameStripped", playernameStripped.c_str(), QF_PLAYERNAME1STRIPPED);
 							}
 							else {
@@ -10399,13 +10409,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL(query, "@maxSpeedCapperLastSecond");
 							}
 
-							if (nearbyInfo) {
-								SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyInfo->nearbyPlayersString.c_str());
-								SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyInfo->nearbyPlayersCount);
-								SQLBIND_DELAYED_TEXT(query, "@nearbyEnemies", nearbyInfo->nearbyEnemiesString.c_str());
-								SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", nearbyInfo->nearbyEnemiescount);
-								SQLBIND_DELAYED(query, int, "@veryCloseEnemyCount", nearbyInfo->verycloseEnemiescount);
-								SQLBIND_DELAYED(query, int, "@veryClosePlayersCount", nearbyInfo->veryClosePlayersCount);
+							if (nearbyInfo.analysisDone) {
+								SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyInfo.nearbyPlayersString.c_str());
+								SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyInfo.nearbyPlayersCount);
+								SQLBIND_DELAYED_TEXT(query, "@nearbyEnemies", nearbyInfo.nearbyEnemiesString.c_str());
+								SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", nearbyInfo.nearbyEnemiescount);
+								SQLBIND_DELAYED(query, int, "@veryCloseEnemyCount", nearbyInfo.verycloseEnemiescount);
+								SQLBIND_DELAYED(query, int, "@veryClosePlayersCount", nearbyInfo.veryClosePlayersCount);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(query, "@nearbyPlayers");
@@ -10415,13 +10425,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED(query, int, "@veryCloseEnemyCount", 0);
 								SQLBIND_DELAYED(query, int, "@veryClosePlayersCount", 0);
 							}
-							if (nearbyInfoPad) {
-								SQLBIND_DELAYED_TEXT(query, "@padNearbyPlayers", nearbyInfoPad->nearbyPlayersString.c_str());
-								SQLBIND_DELAYED(query, int, "@padNearbyPlayerCount", nearbyInfoPad->nearbyPlayersCount);
-								SQLBIND_DELAYED_TEXT(query, "@padNearbyEnemies", nearbyInfoPad->nearbyEnemiesString.c_str());
-								SQLBIND_DELAYED(query, int, "@padNearbyEnemyCount", nearbyInfoPad->nearbyEnemiescount);
-								SQLBIND_DELAYED(query, int, "@padVeryCloseEnemyCount", nearbyInfoPad->verycloseEnemiescount);
-								SQLBIND_DELAYED(query, int, "@padVeryClosePlayersCount", nearbyInfoPad->veryClosePlayersCount);
+							if (nearbyInfoPad.analysisDone) {
+								SQLBIND_DELAYED_TEXT(query, "@padNearbyPlayers", nearbyInfoPad.nearbyPlayersString.c_str());
+								SQLBIND_DELAYED(query, int, "@padNearbyPlayerCount", nearbyInfoPad.nearbyPlayersCount);
+								SQLBIND_DELAYED_TEXT(query, "@padNearbyEnemies", nearbyInfoPad.nearbyEnemiesString.c_str());
+								SQLBIND_DELAYED(query, int, "@padNearbyEnemyCount", nearbyInfoPad.nearbyEnemiescount);
+								SQLBIND_DELAYED(query, int, "@padVeryCloseEnemyCount", nearbyInfoPad.verycloseEnemiescount);
+								SQLBIND_DELAYED(query, int, "@padVeryClosePlayersCount", nearbyInfoPad.veryClosePlayersCount);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(query, "@padNearbyPlayers");
@@ -10500,12 +10510,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 							SQLBIND_DELAYED(query, int, "@demoDerivativeFlags", demoDerivativeFlags);
 
-							if (nearbyInfo) {
-								delete nearbyInfo;
-							}
-							if (nearbyInfoPad) {
-								delete nearbyInfoPad;
-							}
+
 
 							if (activeKillDatabase != -1) {
 								queryWrapper->databaseIndex = activeKillDatabase;
@@ -10569,7 +10574,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// << "_" << (int)maxSpeedCapperLastSecond
 							std::string boostString = boostCountGrabber > 0 ? va("_BST%d", boostCountGrabber) : "";
 							ss << mapname << std::setfill('0') << "___FLAGGRAB" << (flagCarrierKillCount > 0 ? va("%dK", flagCarrierKillCount) : "") << (flagCarrierRetCount > 0 ? va("%dR", flagCarrierRetCount) : "") << boostString;
-							ss2 << std::setfill('0') << "___" << /*"" << "___"<<*/  grabberplayername << "___P" << pickupOrigin << "T" << flagTeam << "___" << (nearbyInfo ? nearbyInfo->verycloseEnemiescount : 0)  << "DANGER" << (nearbyInfo ? nearbyInfo->nearbyEnemiescount : 0) << "___" << (int)maxSpeedGrabberLastSecond  << "ups" << (grabberPlayerIsFollowed ? "" : (grabberPlayerIsVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << grabberPlayerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+							ss2 << std::setfill('0') << "___" << /*"" << "___"<<*/  grabberplayername << "___P" << pickupOrigin << "T" << flagTeam << "___" << (nearbyInfo.verycloseEnemiescount)  << "DANGER" << (nearbyInfo.nearbyEnemiescount) << "___" << (int)maxSpeedGrabberLastSecond  << "ups" << (grabberPlayerIsFollowed ? "" : (grabberPlayerIsVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << grabberPlayerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 							std::string targetFilename = ss.str();
 							std::string targetFilename2 = ss2.str();
@@ -10724,7 +10729,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							vec3_t currentPos;
 							vec3_t currentDir;
 
-							NearbyPlayerInfo* nearbyInfo = NULL;
+							NearbyPlayerInfo nearbyInfo;
 							if (playerIsVisibleOrFollowed) {
 								if (playerEntity) {
 									VectorCopy(playerEntity->pos.trBase, currentPos); // This is also useful in general.
@@ -10734,7 +10739,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									VectorCopy(demo.cut.Cl.snap.ps.origin, currentPos);
 									VectorCopy(demo.cut.Cl.snap.ps.velocity, currentDir);
 								}
-								nearbyInfo = getNearbyPlayersInfo<max_clients>(currentPos, playerNum);
+								getNearbyPlayersInfo<max_clients>(currentPos, playerNum, nearbyInfo);
 							}
 
 
@@ -10915,14 +10920,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							SQLBIND_DELAYED_TEXT(query, "@map", mapname.c_str());
 							SQLBIND_DELAYED_TEXT(query, "@serverName", serverName.c_str());
-							std::string serverNameStripped = Q_StripColorAll(serverName);
+							std::string serverNameStripped = Q_StripColorAll(serverName, nwhHexColors);
 							SQLBIND_DELAYED_TEXT(query, "@serverNameStripped", serverNameStripped.c_str());
 							SQLBIND_DELAYED(query, int, "@flagHoldTime", flagHoldTime);
 							//SQLBIND(io.insertCaptureStatement, int, "@flagPickupSource", teamInfo[flagTeam].flagHoldOrigin);
 							SQLBIND_DELAYED(query, int, "@flagPickupSource", capperLastPickupOrigin);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperName", playername.c_str(), QF_PLAYERNAME0);
 							SQLBIND_DELAYED_FLAGS(query, int, "@capperBotStatus",  BOTSTATUS(playerNum), QF_BOTSTATUS0);
-							std::string playernameStripped = Q_StripColorAll(playername);
+							std::string playernameStripped = Q_StripColorAll(playername, nwhHexColors);
 							SQLBIND_DELAYED_TEXT_FLAGS(query, "@capperNameStripped", playernameStripped.c_str(), QF_PLAYERNAME0STRIPPED);
 							SQLBIND_DELAYED(query, int, "@capperClientNum", playerNum);
 							SQLBIND_DELAYED(query, int, "@capperIsVisible", playerIsVisible);
@@ -10948,11 +10953,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, double, "@maxSpeedCapperLastSecond", maxSpeedCapperLastSecond);
 							SQLBIND_DELAYED(query, double, "@maxSpeedCapper", maxSpeedCapper);
 							SQLBIND_DELAYED(query, double, "@averageSpeedCapper", averageSpeedCapper);
-							if (nearbyInfo) {
-								SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyInfo->nearbyPlayersString.c_str());
-								SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyInfo->nearbyPlayersCount);
-								SQLBIND_DELAYED_TEXT(query, "@nearbyEnemies", nearbyInfo->nearbyEnemiesString.c_str());
-								SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", nearbyInfo->nearbyEnemiescount);
+							if (nearbyInfo.analysisDone) {
+								SQLBIND_DELAYED_TEXT(query, "@nearbyPlayers", nearbyInfo.nearbyPlayersString.c_str());
+								SQLBIND_DELAYED(query, int, "@nearbyPlayerCount", nearbyInfo.nearbyPlayersCount);
+								SQLBIND_DELAYED_TEXT(query, "@nearbyEnemies", nearbyInfo.nearbyEnemiesString.c_str());
+								SQLBIND_DELAYED(query, int, "@nearbyEnemyCount", nearbyInfo.nearbyEnemiescount);
 							}
 							else {
 								SQLBIND_DELAYED_NULL(query, "@nearbyPlayers");
@@ -10994,10 +10999,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(query, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 							std::string pastLocationsString = getPlayerSpiralLocationsString(playerNum,demoCurrentTime-flagHoldTime,15);
 							SQLBIND_DELAYED_TEXT(query, "@pastLocations", pastLocationsString.c_str());
-
-							if (nearbyInfo) {
-								delete nearbyInfo;
-							}
 
 							if (activeKillDatabase != -1) {
 								queryWrapper->databaseIndex = activeKillDatabase;
@@ -11675,7 +11676,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 			if (opts.doStringSearch) {
 				std::string rawcommand = command;
-				std::string strippedCommand = Q_StripColorAll(rawcommand);
+				std::string strippedCommand = Q_StripColorAll(rawcommand, nwhHexColors);
 				if (strstr(rawcommand.c_str(), opts.stringSearch.c_str()) || strstr(strippedCommand.c_str(), opts.stringSearch.c_str())) {
 					parsedChatMessage_t msgInfo;
 					if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
@@ -11690,7 +11691,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			}
 			else if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
 				std::string rawChatCommand = command;
-				std::string chatCommand = Q_StripColorAll(rawChatCommand);
+				std::string chatCommand = Q_StripColorAll(rawChatCommand, nwhHexColors);
 
 				if (opts.makeVideo) {
 					videoConsole.push_back({ demoCurrentTime,Cmd_Argv(1)});
@@ -11701,7 +11702,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (msgInfo.isValid) {
 						std::vector<std::string> splitMsg = splitString(msgInfo.message, " ");
 						if (splitMsg.size()) {
-							std::string cleaned = Q_StripColorAll(splitMsg[0]);
+							std::string cleaned = Q_StripColorAll(splitMsg[0], nwhHexColors);
 							bool isMark = false;
 							int reframeClientNum = -1;
 							int duration = 60000;
@@ -11957,7 +11958,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 
 				if (opts.doPrintSearch) {
-					std::string strippedPrint = Q_StripColorAll(printText);
+					std::string strippedPrint = Q_StripColorAll(printText, nwhHexColors);
 					if (strstr(printText.c_str(), opts.printSearch.c_str()) || strstr(strippedPrint.c_str(), opts.printSearch.c_str())) {
 						logSpecialThing<max_clients>("PRINTSEARCH", opts.printSearch, printText,"", -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 					}

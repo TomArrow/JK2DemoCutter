@@ -104,7 +104,7 @@ int getClientNumForDemo(std::string* thisPlayer,DemoReader* reader,qboolean prin
 			int stringLen = strlen(sourceCStringName);
 			char* cStringName = new char[stringLen + 1];
 			strcpy_s(cStringName, stringLen + 1, sourceCStringName);
-			Q_StripColorAll(cStringName);
+			Q_StripColorAll(cStringName,false);
 			std::string nameHereLowerColorStripped = cStringName;
 
 			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {

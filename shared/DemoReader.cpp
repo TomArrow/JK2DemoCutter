@@ -71,7 +71,7 @@ int DemoReader::getClientNumForDemo(std::string* playerSearchString, qboolean pr
 			int stringLen = strlen(sourceCStringName);
 			char* cStringName = new char[stringLen + 1];
 			strcpy_s(cStringName, stringLen + 1, sourceCStringName);
-			Q_StripColorAll(cStringName);
+			Q_StripColorAll(cStringName,false); // todo do nwh detect with lenience here.
 			std::string nameHereLowerColorStripped = cStringName;
 
 			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {

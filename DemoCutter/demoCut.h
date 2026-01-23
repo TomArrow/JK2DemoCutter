@@ -2088,22 +2088,44 @@ char* Cmd_ArgsFrom(int arg);
 
 
 
+#define Q_COLOR_ESCAPE	'^'
+// you MUST have the last bit on here about colour strings being less than 7 or taiwanese strings register as colour!!!!
+//#define Q_IsColorString(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE && *((p)+1) <= '7' && *((p)+1) >= '0' )
+// Correct version of the above for Q_StripColor
+#define Q_IsColorStringExt(p)	((p) && *(p) == Q_COLOR_ESCAPE && *((p)+1) && isdigit(*((p)+1))) // ^[0-9]
 
+// from eternaljk2mv:
+#define Q_IsColorString(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) <= '7' && *((p)+1) >= '0' )
+#define Q_IsColorString_1_02(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE ) // 1.02 ColorStrings
+#define Q_IsColorString_Extended(p) Q_IsColorString_1_02(p)
+
+#define Q_IsColorStringNT(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE && *((p)+1) <= 0x7F && *((p)+1) >= 0x00 )
+#define ColorIndexNT(c)			( (c) & 127 )
 
 // VIDEO STUFF
 #define COLOR_EXT_AMOUNT 16 // can be safely raised only to 32
 #define ColorIndex(c)	( ( (c) - '0' ) & 7 )
 #define ColorIndex_Extended(c) ( ( (c) - '0' ) & (COLOR_EXT_AMOUNT - 1) ) // compatible with 1.02, 'a' & 15 = 1
 
-#define Q_IsColorStringHex(p) ((Q_IsColorStringHexY((p))) || (Q_IsColorStringHexy((p))) || (Q_IsColorStringHexX((p))) || (Q_IsColorStringHexx((p)) ))
-#define Q_IsColorStringHexY(p) (p) && *(p)=='Y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6)) && Q_IsHex((p+7)) && Q_IsHex((p+8))
-#define Q_IsColorStringHexy(p) (p) && *(p)=='y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4))
-#define Q_IsColorStringHexX(p) (p) && *(p)=='X' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6))
-#define Q_IsColorStringHexx(p) (p) && *(p)=='x' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3))
-
 #define Q_IsHex(p) ((p) && ((*(p) >= '0' && *(p) <= '9') || (*(p) >= 'a' && *(p) <= 'f') || (*(p) >= 'A' && *(p) <= 'F')))
+#define Q_IsColorStringHexY(p) ((p)+8) && (p) && *(p)=='Y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6)) && Q_IsHex((p+7)) && Q_IsHex((p+8))
+#define Q_IsColorStringHexy(p) ((p)+4) && (p) && *(p)=='y' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4))
+#define Q_IsColorStringHexX(p) ((p)+6) && (p) && *(p)=='X' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3)) && Q_IsHex((p+4)) && Q_IsHex((p+5)) && Q_IsHex((p+6))
+#define Q_IsColorStringHexx(p) ((p)+3) && (p) && *(p)=='x' && Q_IsHex((p+1)) && Q_IsHex((p+2)) && Q_IsHex((p+3))
+#define Q_IsColorStringHexRest(p) ( (Q_IsColorStringHexY((p))) || (Q_IsColorStringHexy((p))) || (Q_IsColorStringHexX((p))) || (Q_IsColorStringHexx((p)) ) )
+#define Q_IsColorStringHexStrict(p) ((p) && *(p) == Q_COLOR_ESCAPE && Q_IsColorStringHexRest((p)+1) )
 
-qboolean Q_parseColorHex(const char* p, float* color, int* skipCount);
+#define Q_IsHexLenient(p) ( (p) && *(p) )
+#define Q_IsColorStringHexYLenient(p) ((p)+8) && (p) && *(p)=='Y' && Q_IsHexLenient((p+1)) && Q_IsHexLenient((p+2)) && Q_IsHexLenient((p+3)) && Q_IsHexLenient((p+4)) && Q_IsHexLenient((p+5)) && Q_IsHexLenient((p+6)) && Q_IsHexLenient((p+7)) && Q_IsHexLenient((p+8))
+#define Q_IsColorStringHexyLenient(p) ((p)+4) && (p) && *(p)=='y' && Q_IsHexLenient((p+1)) && Q_IsHexLenient((p+2)) && Q_IsHexLenient((p+3)) && Q_IsHexLenient((p+4))
+#define Q_IsColorStringHexXLenient(p) ((p)+6) && (p) && *(p)=='X' && Q_IsHexLenient((p+1)) && Q_IsHexLenient((p+2)) && Q_IsHexLenient((p+3)) && Q_IsHexLenient((p+4)) && Q_IsHexLenient((p+5)) && Q_IsHexLenient((p+6))
+#define Q_IsColorStringHexxLenient(p) ((p)+3) && (p) && *(p)=='x' && Q_IsHexLenient((p+1)) && Q_IsHexLenient((p+2)) && Q_IsHexLenient((p+3))
+#define Q_IsColorStringHexRestLenient(p) ( (Q_IsColorStringHexYLenient((p))) || (Q_IsColorStringHexyLenient((p))) || (Q_IsColorStringHexXLenient((p))) || (Q_IsColorStringHexxLenient((p)) ) )
+#define Q_IsColorStringHexLenient(p) ((p) && *(p) == Q_COLOR_ESCAPE && Q_IsColorStringHexRestLenient((p)+1) )
+
+#define Q_IsColorStringHex(p,lenient) ( !(lenient) && Q_IsColorStringHexStrict((p)) || (lenient) && Q_IsColorStringHexLenient((p))   )
+
+qboolean Q_parseColorHex(const char* p, float* color, int* skipCount, bool lenient);
 extern const vec4_t	g_color_table[COLOR_EXT_AMOUNT];
 extern vec4_t	g_color_table_nt[128];
 
@@ -4615,8 +4637,13 @@ typedef enum {
 } ctfMsg_t;
 
 
-std::string Q_StripColorAll(std::string string);
-void Q_StripColorAll(char* text);
+typedef enum {
+	HEXCOLOR_SAFE,
+	HEXCOLOR_NWH // allows a bit more funky nwh hexcolors that dont double check for colors actually being hex
+} hexColorType_t;
+
+std::string Q_StripColorAll(std::string string, bool lenient);
+void Q_StripColorAll(char* text, bool lenient);
 
 
 typedef struct {
