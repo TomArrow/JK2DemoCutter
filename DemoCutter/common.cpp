@@ -7,6 +7,7 @@
 #include "jk2spStuff.h"
 #include <stateFields.h>
 #include <sstream>
+#include <ctime>
 #include "CModel.h"
 
 #include "include/rapidjson/document.h"
@@ -3096,14 +3097,82 @@ float Vector2DistanceSquared(vec2_t v1, vec2_t v2)
 
 
 
+constexpr int64_t yearSeconds = 60 * 60 * 24 * 365;
+constexpr int64_t unixTimeDemoTimeFeatureStart = 1680220800;
+const int64_t currentUnixTime = (int64_t)std::time(nullptr);
 
+qboolean parseDemoTimeNameColors(const char* s, int64_t* outValueMin, int64_t* outValueMax) {
+	char colorValuesMin[13] = { 0 };
+	char colorValuesMax[13] = { 0 };
+	int i = 0;
+	*outValueMin = INT64_MIN;
+	*outValueMax = INT64_MAX;
+	while (*s) {
+		while (*s == ' ') {
+			s++; // skip whitespace, we dont colorcode it.
+		}
+		if (!*s || !*(s+1)) {
+			break; // cut off but still usable
+		}
+		if (*s != '^' || *(s+1) < '0' || *(s + 1) > '7') {
+			return qfalse;
+		}
+		colorValuesMin[i] = *(s + 1);
+		colorValuesMax[i] = *(s + 1);
+		s += 2;
+		i++;
 
+		if (i == 12) break;
 
+		// 2 possibilities now. either jka style (single color) or jk2 style (2 colors in a row)
+		if (!*s || !*(s + 1)) {
+			break; // cut off but still usable
+		}
+		if (*s == '^' && *(s + 1) >= '0' && *(s + 1) <= '7') {
+			// we are following up with a second color.
+			colorValuesMin[i] = *(s + 1);
+			colorValuesMax[i] = *(s + 1);
+			s += 2;
+			i++;
+			if (i == 12) break;
+
+			if (!*s || !*(s + 1)) {
+				break; // cut off but still usable
+			}
+			// since jk2 front/shadow colors are triplets, skip one and confirm its identical to first
+			if (*s != '^' || *(s + 1) != colorValuesMin[i-2]) {
+				return qfalse;
+			}
+			else {
+				s += 2;
+			}
+		}
+		if (!*s) break;
+		// let's continue and see if we find more next round.
+		s++;
+	}
+	//if (i < 6) return qfalse; // too few colors to be sure.
+	while (i < 12) {
+		colorValuesMin[i] = '0';
+		colorValuesMax[i] = '7';
+		i++;
+	}
+	colorValuesMin[12] = 0;
+	colorValuesMax[12] = 0;
+	*outValueMin = std::stoll(colorValuesMin,nullptr,8);
+	*outValueMax = std::stoll(colorValuesMax,nullptr,8);
+
+	if (*outValueMax > currentUnixTime + yearSeconds || *outValueMin < unixTimeDemoTimeFeatureStart - yearSeconds) { // adding +-1 year as a buffer in case computers have weird dates set.
+		return qfalse;
+	}
+
+	return qtrue;
+}
 
 qboolean Q_parseColorHex(const char* p, float* color, int* skipCount, bool lenient) {
 	char c = *p++;
 	int i;
-	int val;
+	int val = 0;
 
 	qboolean doWrite = qtrue;
 	if (!color || !(color + 3)) {

@@ -1141,6 +1141,8 @@ int lastEventTime[MAX_GENTITIES];
 #define BOTSTATUS_CONFIRMED 1
 #define BOTSTATUS_SABERMODLIKELY 2
 #define BOTSTATUS_FIGHTBOTANGLEDETECT 4
+#define BOTSTATUS_LIKELYJKCLIENT 8
+#define BOTSTATUS_LIKELYDEMOBOT 16
 #define BOTSTATUS_NORMALBOT (BOTSTATUS_CONFIRMED|BOTSTATUS_SABERMODLIKELY)
 #define BOTSTATUS(clientNum) ( (clientNum >= 0 && clientNum < max_clients) ? (playerBotStatus[clientNum]) : 0 )
 int playerBotStatus[MAX_CLIENTS_MAX]; // bitmask. 1 = confirmed bot. 2 = likely bot (sabermod). 3 = fightbot
@@ -3137,6 +3139,34 @@ void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 				}
 #endif
 			}
+
+
+			// find demobot
+			do {
+				const char* maybeDemoBotProperty = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "c1");
+				if (atoi(maybeDemoBotProperty) != 4) break; // demobot has c1 4 
+				maybeDemoBotProperty = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "c2");
+				if (atoi(maybeDemoBotProperty) != 4) break; // demobot has c2 4
+				maybeDemoBotProperty = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "model");
+				if (*maybeDemoBotProperty && _stricmp(maybeDemoBotProperty,"kyle/default")) break; // demobot is model kyle/default, or "" on nwh
+				maybeDemoBotProperty = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_blueteam");
+				if (*maybeDemoBotProperty) break; // demobot is g_blueteam ""
+				maybeDemoBotProperty = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, "g_redteam");
+				if (*maybeDemoBotProperty && strnicmp(maybeDemoBotProperty,"dcut:",5)) break; // demobot is g_redteam "" or some string starting with "dcut:" (demobot connnect unixtime)
+				// ok now we have checked the basic things. this is now almost certainly a jkclient
+				// but is it a demobot?
+				playerBotStatus[i] |= BOTSTATUS_LIKELYJKCLIENT;
+				// let's check for demo time name colors
+				maybeDemoBotProperty = Info_ValueForKey(playerInfo, sizeof(clCut->gameState.stringData) - stringOffset, demoTypeIsMOHAA(demoType) ? "name" : "n");
+				int64_t namecoltimeMin;
+				int64_t namecoltimeMax;
+				if (!parseDemoTimeNameColors(maybeDemoBotProperty,&namecoltimeMin,&namecoltimeMax)) {
+					std::cout << "Client " << i << " identified as (probably) JKClient.\n";
+					break;
+				}
+				playerBotStatus[i] |= BOTSTATUS_LIKELYDEMOBOT;
+				std::cout<< "Client " << i << " identified as (probably) demobot.\n";
+			} while (0);
 		}
 	}
 	if (configStringChanged[CS_SCORES1] || configStringChanged[CS_SCORES2]) {
@@ -4525,15 +4555,16 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_exec(io.chatsUniqueDb, "CREATE TABLE chatsUnique ("
 			"chat TEXT NOT NULL COLLATE BINARY,"
 			"demoType INTEGER NOT NULL,"
+			"botStatus INTEGER NOT NULL,"
 			"countFound INTEGER NOT NULL,"
-			"PRIMARY KEY (demoType,chat COLLATE BINARY)"
+			"PRIMARY KEY (demoType,botStatus,chat COLLATE BINARY)"
 			"); ",
 			NULL, NULL, NULL);
 
-		preparedStatementText = "INSERT OR IGNORE INTO chatsUnique (chat, demoType, countFound) VALUES (@chat, @demoType,0);";
+		preparedStatementText = "INSERT OR IGNORE INTO chatsUnique (chat,botStatus, demoType, countFound) VALUES (@chat,@botStatus, @demoType,0);";
 		sqlite3_prepare_v2(io.chatsUniqueDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertChatUniqueStatement, NULL);
 
-		preparedStatementText = "UPDATE chatsUnique SET countFound = countFound + 1 WHERE chat=@chat AND demoType=@demoType;"; // TODO make this dynamic? not a million queries for dupes?
+		preparedStatementText = "UPDATE chatsUnique SET countFound = countFound + 1 WHERE chat=@chat AND demoType=@demoType AND botStatus=@botStatus;"; // TODO make this dynamic? not a million queries for dupes?
 		sqlite3_prepare_v2(io.chatsUniqueDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateChatUniqueCountStatement, NULL);
 
 		sqlite3_exec(io.chatsUniqueDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
@@ -11783,7 +11814,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
 						SQLDelayedQuery* query = &queryWrapper->query;
 
+						int botStatus = (msgInfo.playerNum >= 0 && msgInfo.playerNum < max_clients) ? playerBotStatus[msgInfo.playerNum] : -1;
+
 						SQLBIND_DELAYED_TEXT(query, "@chat", msgInfo.message.c_str());
+						SQLBIND_DELAYED(query, int, "@botStatus", botStatus);
 						SQLBIND_DELAYED(query, int, "@demoType", demoType);
 
 						io.chatsUniqueQueries->push_back(queryWrapper);

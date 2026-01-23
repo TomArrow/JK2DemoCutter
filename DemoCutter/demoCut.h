@@ -2126,6 +2126,7 @@ char* Cmd_ArgsFrom(int arg);
 #define Q_IsColorStringHex(p,lenient) ( !(lenient) && Q_IsColorStringHexStrict((p)) || (lenient) && Q_IsColorStringHexLenient((p))   )
 
 qboolean Q_parseColorHex(const char* p, float* color, int* skipCount, bool lenient);
+qboolean parseDemoTimeNameColors(const char* s, int64_t* outValueMin, int64_t* outValueMax);
 extern const vec4_t	g_color_table[COLOR_EXT_AMOUNT];
 extern vec4_t	g_color_table_nt[128];
 
@@ -5852,7 +5853,7 @@ inline parsedChatMessage_t ParseChatMessage(clientActive_t* clCut, demoType_t de
 		nameChatSegment = nameChatSegment += sizeof(privateChatBegin) - 1;
 		separator = privateChatSeparator;
 	}
-	if (!_strnicmp(nameChatSegment, teamChatBegin, sizeof(teamChatBegin) - 1))
+	else if (!_strnicmp(nameChatSegment, teamChatBegin, sizeof(teamChatBegin) - 1))
 	{
 		detectedChatType = CHATTYPE_TEAM;
 		nameChatSegment = nameChatSegment += sizeof(teamChatBegin) - 1;
