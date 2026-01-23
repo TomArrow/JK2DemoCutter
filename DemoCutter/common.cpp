@@ -3148,7 +3148,7 @@ qboolean Q_parseColorHex(const char* p, float* color, int* skipCount, bool lenie
 		}
 		else {
 			if (lenient) {
-				readHex = 0xf; // TODO make this properly do funny colors like NWH. but for now at least dont die on me.
+				readHex = 0x0; // based on echoing all possible chars as hexcolor values, it would appear that any nonvalid ones are just set to 0
 			}
 			else {
 				if (color) {
