@@ -386,6 +386,8 @@ struct ioHandles_t {
 
 	// statsDb
 	sqlite3* statsDb;
+	sqlite3_stmt* insertInfoStringComboStatement;
+	sqlite3_stmt* insertInfoStringKeyStatement;
 	sqlite3_stmt* insertPlayerModelStatement;
 	sqlite3_stmt* updatePlayerModelCountStatement;
 	sqlite3_stmt* selectStatsLastInsertRowIdStatement;
@@ -603,7 +605,16 @@ std::stringstream	demoErrors;
 // CAREFUL. Always use lower case keys. technically not case insensitive
 csMap_t serverInfoMap;
 csMap_t systemInfoMap;
+csMap_t playerInfoMap[MAX_CLIENTS_MAX]; // hmm for anything but "n" it might be faster too use valueforkey? cuz its right at the beginning? idk. could benchmark it but idk if worth.
 
+// these are for tracking various combinations of serverinfo, systeminfo and playarinfo keys and values
+csComboMap_t _serverInfoComboMap;
+csComboMap_t _systemInfoComboMap;
+csComboMap_t _playerInfoComboMap;
+
+csComboMap_t* serverInfoComboMap = NULL;
+csComboMap_t* systemInfoComboMap = NULL;
+csComboMap_t* playerInfoComboMap = NULL;
 
 EzBitmask<MAX_CONFIGSTRINGS_MAX, EzBitmaskMemoryType::Stack> configStringChanged;
 
@@ -702,13 +713,13 @@ public:
 
 	int serverId = 0; // CS_SYSTEMINFO
 	std::string sv_referencedPaks; // CS_SYSTEMINFO
+	int sv_cheats = 0; // CS_SYSTEMINFO
 
 	std::string CSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach the end of a game or intermission.
 	int CSHashUniquesCount = 0;
 	bool CSHashConfirmed = false; // we set this to true if either a new game starts without intermission or we see the transition between non-intermission and intermission
 
-	int levelStartTime = 0; // CS_SERVERINFO
-	std::string serverName; // CS_SERVERINFO
+	// should be reliable across a game:
 	std::string mapName; // CS_SERVERINFO
 	std::string gameName; // CS_SERVERINFO
 	std::string version; // CS_SERVERINFO
@@ -720,41 +731,20 @@ public:
 	int g_weapondisable = 0; // CS_SERVERINFO
 	int g_duelweapondisable = 0; // CS_SERVERINFO
 	int g_maxforcerank = 0; // CS_SERVERINFO
+	int64_t sv_gameStartUnixTime = 0; // CS_SERVERINFO
+
+	// can change during game, whether likely or not:
+	int levelStartTime = 0; // CS_SERVERINFO
+	std::string serverName; // CS_SERVERINFO
 
 
 	// random stuff to track:
 	int gameDuration = 0;
 
-	void buildCSHash(clientActive_t* clCut, demoType_t demoType) {
-#define CSHASHTYPES_COUNT 3
-		int csHashIndexes[CSHASHTYPES_COUNT][2] = {
-			{getCS_SOUNDS(demoType),getCS_SOUNDS(demoType) + 256},
-			{getCS_MODELS(demoType),getCS_MODELS(demoType) + 256},
-			{getCS_EFFECTS(demoType),getCS_EFFECTS(demoType) + 64}
-		};
-		std::stringstream hashData;
-		int stringOffset;
-		const char* thestring;
-		int (*indexes)[2] = csHashIndexes;
-		for (int j = 0; j < CSHASHTYPES_COUNT; j++, indexes++) {
-			for (int i = (*indexes)[0]; i < (*indexes)[1]; i++) {
-				stringOffset = clCut->gameState.stringOffsets[i];
-				thestring = clCut->gameState.stringData + stringOffset;
-				if (!thestring) {
-					hashData << "_";
-					continue;
-				}
-				int safeStringLength = strnlen_s(thestring, sizeof(clCut->gameState.stringData) - stringOffset);
-				hashData << "_" << std::string_view(thestring, safeStringLength);
-			}
-		}
 
-		std::string newCSHash = makeStringHash(hashData.str());
-		if (!CSHashUniquesCount || newCSHash != CSHash) {
-			CSHashUniquesCount++;
-			CSHash = newCSHash;
-		}
-	}
+	// to consider, stable: mv_httpdownloads
+	// to consider, volatile: g_needpass mv_cs_remaps
+
 
 	UniqueGame_t() {
 
@@ -778,6 +768,8 @@ public:
 
 		sv_referencedPaks = Info_ValueForKey(systemInfoMap,"sv_referencedpaks");
 		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
+		sv_cheats = atoi(Info_ValueForKey(systemInfoMap, "sv_cheats").c_str());
+		sv_gameStartUnixTime = std::strtoll(Info_ValueForKey(systemInfoMap, "sv_gameStartUnixTime").c_str(),nullptr,10);
 
 		int stringOffset = clCut->gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)];
 		levelStartTime = atoi(clCut->gameState.stringData + stringOffset); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
@@ -791,7 +783,7 @@ public:
 
 	bool SameGame(UniqueGame_t* otherGame) { // this only serves to reliably compare games within a demo.
 		return serverId == otherGame->serverId &&
-			serverName == otherGame->serverName && // this is risky. sv_hostname can change during a game...
+			//serverName == otherGame->serverName && // this is risky. sv_hostname can change during a game...
 			mapName == otherGame->mapName &&
 			gameName == otherGame->gameName &&
 			version == otherGame->version &&
@@ -810,6 +802,38 @@ public:
 
 	int databaseId = -1;
 	int databaseIdFinished = -1;
+
+
+	void buildCSHash(clientActive_t* clCut, demoType_t demoType) {
+#define CSHASHTYPES_COUNT 3
+		int csHashIndexes[CSHASHTYPES_COUNT][2] = {
+			{getCS_SOUNDS(demoType),getCS_SOUNDS(demoType) + 256},
+			{getCS_MODELS(demoType),getCS_MODELS(demoType) + 256},
+			{getCS_EFFECTS(demoType),getCS_EFFECTS(demoType) + 64}
+		};
+		std::stringstream hashData;
+		int stringOffset;
+		const char* thestring;
+		int(*indexes)[2] = csHashIndexes;
+		for (int j = 0; j < CSHASHTYPES_COUNT; j++, indexes++) {
+			for (int i = (*indexes)[0]; i < (*indexes)[1]; i++) {
+				stringOffset = clCut->gameState.stringOffsets[i];
+				thestring = clCut->gameState.stringData + stringOffset;
+				if (!thestring) {
+					hashData << "_";
+					continue;
+				}
+				int safeStringLength = strnlen_s(thestring, sizeof(clCut->gameState.stringData) - stringOffset);
+				hashData << "_" << std::string_view(thestring, safeStringLength);
+			}
+		}
+
+		std::string newCSHash = makeStringHash(hashData.str());
+		if (!CSHashUniquesCount || newCSHash != CSHash) {
+			CSHashUniquesCount++;
+			CSHash = newCSHash;
+		}
+	}
 };
 
 uint64_t uniqueGameIndex = -1;
@@ -4423,6 +4447,22 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 
+		sqlite3_exec(io.statsDb, "CREATE TABLE infoStringCombos ("
+			"infoStringType	TEXT NOT NULL,"
+			"infoStringKey	TEXT NOT NULL,"
+			"infoStringValue	TEXT NOT NULL,"
+			"countFound INTEGER NOT NULL,"
+			"PRIMARY KEY(infoStringType,infoStringKey,infoStringValue)"
+			"); ",
+			NULL, NULL, NULL);
+		sqlite3_exec(io.statsDb, "CREATE TABLE infoStringKeys ("
+			"infoStringType	TEXT NOT NULL,"
+			"infoStringKey	TEXT NOT NULL,"
+			"countFound INTEGER NOT NULL,"
+			"countValuesFound INTEGER NOT NULL,"
+			"PRIMARY KEY(infoStringType,infoStringKey)"
+			"); ",
+			NULL, NULL, NULL);
 		sqlite3_exec(io.statsDb, "CREATE TABLE playerModels ("
 			"map	TEXT NOT NULL,"
 			"baseModel	TEXT NOT NULL,"
@@ -4461,9 +4501,18 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.selectStatsLastInsertRowIdStatement, NULL);
 
+		preparedStatementText = "INSERT INTO infoStringKeys (infoStringType,infoStringKey,countFound,countValuesFound) VALUES (@infoStringType,@infoStringKey, 1, @countValuesFound) ON CONFLICT (infoStringType,infoStringKey) DO UPDATE SET countFound=countFound+1,countValuesFound=countValuesFound+@countValuesFound;"; // RETURNING ROWID
+
+		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertInfoStringKeyStatement, NULL);
+
+		preparedStatementText = "INSERT INTO infoStringCombos (infoStringType,infoStringKey,infoStringValue,countFound) VALUES (@infoStringType,@infoStringKey,@infoStringValue, 1) ON CONFLICT (infoStringType,infoStringKey,infoStringValue) DO UPDATE SET countFound=countFound+1;"; // RETURNING ROWID
+
+		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertInfoStringComboStatement, NULL);
+
 		preparedStatementText = "INSERT OR IGNORE INTO playerModels (map,baseModel,variant,countFound) VALUES (@map,@baseModel,@variant, 0);";
 
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertPlayerModelStatement, NULL);
+
 		preparedStatementText = "UPDATE playerModels SET countFound = countFound + 1 WHERE map=@map AND baseModel=@baseModel AND variant=@variant;";
 
 		sqlite3_prepare_v2(io.statsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updatePlayerModelCountStatement, NULL);
@@ -4489,6 +4538,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		io.statsDb = NULL;
 		io.selectStatsLastInsertRowIdStatement = NULL;
 		io.insertPlayerModelStatement = NULL;
+		io.insertInfoStringComboStatement = NULL;
+		io.insertInfoStringKeyStatement = NULL;
 		io.updatePlayerModelCountStatement = NULL;
 		io.insertPlayerDemoStatsStatement = NULL;
 	}
@@ -4717,6 +4768,41 @@ void handleKillDbPlayerPreQuery(const char* nameField,int fieldFlag, int fieldFl
 		sqlite3_reset(killDbHandle->insertPlayerNameStatement);
 	}
 	
+}
+
+void insertComboMap(const char* type, csComboMap_t* comboMap, ioHandles_t& io, const ExtraSearchOptions& opts) {
+	if (!opts.doStatsDb) return; // shouldnt happen
+	for (auto it = comboMap->begin(); it != comboMap->end(); it++) {
+
+		SQLBIND_NONDELAYED_TEXT(io.insertInfoStringKeyStatement, "@infoStringType", type);
+		SQLBIND_NONDELAYED_TEXT(io.insertInfoStringKeyStatement, "@infoStringKey", it->first.c_str());
+		SQLBIND_NONDELAYED(io.insertInfoStringKeyStatement,int64, "@countValuesFound", it->second.size());
+		int queryResult = sqlite3_step(io.insertInfoStringKeyStatement);
+		if (queryResult != SQLITE_DONE) {
+			std::cerr << "Error inserting infostring key into database: " << queryResult << ":" << sqlite3_errmsg(io.statsDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
+		sqlite3_reset(io.insertInfoStringKeyStatement);
+
+		for (auto it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+			SQLBIND_NONDELAYED_TEXT(io.insertInfoStringComboStatement, "@infoStringType", type);
+			SQLBIND_NONDELAYED_TEXT(io.insertInfoStringComboStatement, "@infoStringKey", it->first.c_str());
+			SQLBIND_NONDELAYED_TEXT(io.insertInfoStringComboStatement, "@infoStringValue", it2->c_str());
+			int queryResult = sqlite3_step(io.insertInfoStringComboStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cerr << "Error inserting combo map value into database: " << queryResult << ":" << sqlite3_errmsg(io.statsDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			sqlite3_reset(io.insertInfoStringComboStatement);
+		}
+	}
+}
+
+// anything we might need to reference in the later queries or just wanna do manually and not with buffered queries.
+void executeEarlyQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
+	if (opts.doStatsDb) {
+		insertComboMap("sei", &_serverInfoComboMap, io, opts);
+		insertComboMap("syi", &_systemInfoComboMap, io, opts);
+		insertComboMap("pi", &_playerInfoComboMap, io, opts);
+	}
 }
 
 void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
@@ -5265,6 +5351,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		sqlite3_reset(io.killDb[i].insertDemoMeta);
 	}
 
+	executeEarlyQueries(io, opts);
 	executeAllQueries(io, opts);
 
 	if (doFinalizeSQLite) {
@@ -5299,6 +5386,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		if (opts.doStatsDb) {
 			sqlite3_exec(io.statsDb, "COMMIT;", NULL, NULL, NULL);
 			sqlite3_finalize(io.insertPlayerModelStatement);
+			sqlite3_finalize(io.insertInfoStringComboStatement);
+			sqlite3_finalize(io.insertInfoStringKeyStatement);
 			sqlite3_finalize(io.updatePlayerModelCountStatement);
 			sqlite3_finalize(io.selectStatsLastInsertRowIdStatement);
 			sqlite3_finalize(io.insertPlayerDemoStatsStatement);
@@ -6632,10 +6721,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				{
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char* serverInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-					serverInfoMap = Info_MakeMap(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+					serverInfoMap = Info_MakeMap(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, serverInfoComboMap);
 					stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
 					const char* systemInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, systemInfoComboMap);
+					for (int i = 0; i < max_clients; i++) {
+						stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here+i];
+						const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+						playerInfoMap[i] = Info_MakeMap(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, playerInfoComboMap);
+					}
 				}
 
 
@@ -11867,13 +11961,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char* serverInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-					serverInfoMap = Info_MakeMap(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+					serverInfoMap = Info_MakeMap(serverInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, serverInfoComboMap);
 				}
 				else if (index == CS_SYSTEMINFO) {
 
 					int stringOffset = demo.cut.Cl.gameState.stringOffsets[CS_SYSTEMINFO];
 					const char* systemInfo = demo.cut.Cl.gameState.stringData + stringOffset;
-					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset);
+					systemInfoMap = Info_MakeMap(systemInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, systemInfoComboMap);
 				}
 				else if (NWHVersion.nwh && nwhMatchStatisticsGathering && !isMOHAADemo && index == CS_INTERMISSION && !*Cmd_Argv(2)) {
 					nwhMatchStatisticsGathering = false;
@@ -11896,6 +11990,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (!*str) {
 						playerBotStatus[index - CS_PLAYERS_here] = 0;
 					}
+
+					int stringOffset = demo.cut.Cl.gameState.stringOffsets[index];
+					const char* playerInfo = demo.cut.Cl.gameState.stringData + stringOffset;
+					playerInfoMap[index - CS_PLAYERS_here] = Info_MakeMap(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, playerInfoComboMap);
 				}
 				else if (index == CS_FLAGSTATUS) {
 					char* str = Cmd_Argv(2);
@@ -12351,6 +12449,13 @@ int main(int argcO, char** argvO) {
 	opts.writeChatsUnique = L->is_set() ? (L->value() & 1) : false;
 	opts.writeChatsCategorized = L->is_set() ? (L->value() & 2) : false;
 	opts.doStatsDb = Q->is_set() ? !(Q->value() & 1) : true;
+
+	if (opts.doStatsDb) {
+		serverInfoComboMap = &_serverInfoComboMap;
+		systemInfoComboMap = &_systemInfoComboMap;
+		playerInfoComboMap = &_playerInfoComboMap;
+	}
+
 	opts.doStrafeDeviation = Q->is_set() ? !(Q->value() & 2) : true;
 	if (x->is_set()) {
 		int v[6];

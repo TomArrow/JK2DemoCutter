@@ -970,7 +970,7 @@ Returns a map that lets us quickly look up values.
 FIXME: overflow check?
 ===============
 */
-csMap_t Info_MakeMap(const char* s,int maxLength) {
+csMap_t Info_MakeMap(const char* s,int maxLength, csComboMap_t* comboMap) {
 	csMap_t retVal;
 	char	pkey[BIG_INFO_KEY];
 	static	char value[BIG_INFO_VALUE];	// use two buffers so compares
@@ -1006,6 +1006,9 @@ csMap_t Info_MakeMap(const char* s,int maxLength) {
 		*o = 0;
 
 		retVal[pkey] = value;
+		if (comboMap) {
+			(*comboMap)[pkey].insert(value);
+		}
 
 		if (!*s)
 			break;

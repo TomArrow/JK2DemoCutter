@@ -2212,6 +2212,8 @@ enum svc_ops_e_general {
 };
 
 typedef ankerl::unordered_dense::map<std::string, std::string, ankerl::unordered_dense::hash<std::string>> csMap_t;
+typedef ankerl::unordered_dense::set<std::string, ankerl::unordered_dense::hash<std::string>> stringSet_t;
+typedef ankerl::unordered_dense::map<std::string, stringSet_t, ankerl::unordered_dense::hash<std::string>> csComboMap_t; // to track combination of key->values
 
 // CAREFUL. Only use lowercase here. since its technically case sensitive. should also be faster in the end tho
 // ALSO CAREFUL. Don't use a c_str() return to then do stuff in the next line. the underlying std::string is dead at that point.
@@ -2223,7 +2225,7 @@ inline std::string Info_ValueForKey(csMap_t in,const char* search) {
 	return "";
 }
 
-csMap_t Info_MakeMap(const char* s, int maxLength);
+csMap_t Info_MakeMap(const char* s, int maxLength, csComboMap_t* comboMap);
 char* Info_ValueForKey(const char* s,int maxLength, const char* key);
 qboolean Info_HasKey(const char* s, int maxLength, const char* key);
 char* Info_ValueForKey_Exists(const char* s, int maxLength, const char* key, qboolean* exists);
