@@ -183,6 +183,29 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 
 
 
+#define COMMA ,
+#define QUOT2(a) #a
+#define QUOTE(a) QUOT2(a)
+
+//#define SQLBIND_DELAYED(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
+//#define SQLBIND_DELAYED_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
+//#define SQLBIND_DELAYED_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
+// 
+#define SQLBIND_NONDELAYED(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
+#define SQLBIND_NONDELAYED_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
+#define SQLBIND_NONDELAYED_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
+
+#define SQLBIND_DELAYED(delayedQuery,type,name,value) delayedQuery->add(name,value)
+#define SQLBIND_DELAYED_FLAGS(delayedQuery,type,name,value,flags) delayedQuery->add(name,value,flags)
+#define SQLBIND_DELAYED_NULL(delayedQuery,name) delayedQuery->add(name,SQLDelayedValue_NULL)
+#define SQLBIND_DELAYED_NULL_FLAGS(delayedQuery,name,flags) delayedQuery->add(name,SQLDelayedValue_NULL,flags)
+#define SQLBIND_DELAYED_TEXT(delayedQuery,name,value) delayedQuery->add(name,value)
+#define SQLBIND_DELAYED_TEXT_FLAGS(delayedQuery,name,value,flags) delayedQuery->add(name,value,flags)
+
+
+
+
+
 typedef enum globalDebugOutputType_t {
 	DEBUG_CONFIGSTRING,
 	DEBUG_COMMANDS,
@@ -2088,6 +2111,65 @@ char* Cmd_ArgsFrom(int arg);
 
 
 
+
+constexpr inline size_t strlenConstExpr(const char* txt) {
+	size_t count = 0;
+	while (*txt != 0) {
+		count++;
+		txt++;
+	}
+	return count;
+}
+
+// string that can be a constexpr literal and already knows its size and can do epic fast unsafe comparisons with memcmp, 10-20x times faster than strcmp sometimes
+// TODO: when/if we switch to C++ 20, make len a template param.
+struct CoolString {
+	constexpr static size_t maxLen = 100;
+	char data[maxLen+1];
+	size_t len;
+	void printme() {
+		std::cout << data << len << "\n";
+	}
+	// make sure the string ur comparing against is stored in a buffer that is legal to read up to the len of this string+1
+	// careful: returns true if match.
+	bool us_match(const char* cmpstr, int cmpstrlen)const {
+		return  !memcmp(data,cmpstr,len+1);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
+	}
+	// checks if the CoolString is the ending of a string being compared against
+	// make sure the string ur comparing against is stored in a buffer that is legal to read up to the len of this string+1
+	// careful: returns true if match.
+	bool us_isending(const char* cmpstr, int cmpstrlen)const {
+		return  !memcmp(data, cmpstr + cmpstrlen - len, len + 1);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
+	}
+	// checks if the CoolString is the start of a string being compared against
+	// make sure the string ur comparing against is stored in a buffer that is legal to read up to the len of this string+1
+	// careful: returns true if match.
+	bool us_isstart(const char* cmpstr, int cmpstrlen)const {
+		return  !memcmp(data, cmpstr + cmpstrlen - len, len);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
+	}
+};
+
+
+constexpr CoolString operator ""_cs(const char* blah,size_t len) {
+	CoolString retVal{};
+	if (len > CoolString::maxLen) {
+		throw std::invalid_argument("_cs string literal cant be longer than 20 chars");
+	}
+	//constexpr len = strlenConstExpr(blah);
+	for (size_t i = 0; i < len; i++) {
+		retVal.data[i] = blah[i];
+	}
+	retVal.data[len] = 0;
+	retVal.len = len;
+	return retVal;
+}
+
+
+
+
+
+
+
 #define Q_COLOR_ESCAPE	'^'
 // you MUST have the last bit on here about colour strings being less than 7 or taiwanese strings register as colour!!!!
 //#define Q_IsColorString(p)	( p && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) != Q_COLOR_ESCAPE && *((p)+1) <= '7' && *((p)+1) >= '0' )
@@ -2211,14 +2293,34 @@ enum svc_ops_e_general {
 	svc_ops_general_count
 };
 
-typedef ankerl::unordered_dense::map<std::string, std::string, ankerl::unordered_dense::hash<std::string>> csMap_t;
-typedef ankerl::unordered_dense::set<std::string, ankerl::unordered_dense::hash<std::string>> stringSet_t;
-typedef ankerl::unordered_dense::map<std::string, stringSet_t, ankerl::unordered_dense::hash<std::string>> csComboMap_t; // to track combination of key->values
+
+struct identityHash {
+	auto operator()(uint64_t const& x) const noexcept -> uint64_t {
+		return x;
+	}
+};
+// TODO find a way to precompute hashes for lookup
+typedef ankerl::unordered_dense::hash<std::string> stringHash_t;
+typedef ankerl::unordered_dense::map<std::string, std::string, stringHash_t> csMap_t;
+typedef ankerl::unordered_dense::set<std::string, stringHash_t> stringSet_t;
+typedef ankerl::unordered_dense::map<std::string, stringSet_t, stringHash_t> csComboMap_t; // to track combination of key->values
 
 // CAREFUL. Only use lowercase here. since its technically case sensitive. should also be faster in the end tho
 // ALSO CAREFUL. Don't use a c_str() return to then do stuff in the next line. the underlying std::string is dead at that point.
 inline std::string Info_ValueForKey(csMap_t in,const char* search) {
 	auto item = in.find(search);
+	if (item != in.end()) {
+		return item->second;
+	}
+	return "";
+}
+
+inline std::string Info_ValueForKey(csMap_t in,const char* search,const char* searchAlt) {
+	auto item = in.find(search);
+	if (item != in.end()) {
+		return item->second;
+	}
+	item = in.find(searchAlt);
 	if (item != in.end()) {
 		return item->second;
 	}

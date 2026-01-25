@@ -34,6 +34,8 @@
 
 #include "../shared/AngleCoder.h"
 
+#include "../shared/sqlite_tabledefs.h"
+
 #define DEBUGSTATSDB
 
 #define BUFFERBAT
@@ -357,6 +359,7 @@ public:
 	std::string batchString2 = ""; // Main text to appear in batch (part2)
 	std::stringstream batchMiddlePart; // Something to insert into the middle of the target cut filename. Not the most intuitive variable name but that's what this comment is for
 	int	databaseIndex = 0; // so we can split finds based on maps or other things
+	int uniqueGameIndex = -2;
 };
 
 #define MAX_KILLDBS 32
@@ -364,6 +367,8 @@ public:
 struct ioHandlesKillDb_t {
 
 	sqlite3* killDb;
+	sqlite3_stmt* insertUniqueGameAbstractStatement;
+	sqlite3_stmt* insertUniqueGameStatement;
 	sqlite3_stmt* insertPlayerNameStatement;
 	sqlite3_stmt* insertEntryMetaStatement;
 	sqlite3_stmt* insertSpecialStatement;
@@ -627,6 +632,7 @@ public:
 		Unknown, // these must be followed in order, otherwise invalid
 		MaybeCarryOver,
 		NoIntermission,
+		GameEndStringFound,
 		IntermissionAnnounced,
 		IntermissionPSConfirmed, // this is the holy grail. we save end stats if either this or NoIntermission is true.
 		Invalid,
@@ -653,12 +659,22 @@ public:
 		return _intermissionStatus;
 	}
 	void csIntermissionReceived() {
-		if (_intermissionStatus == IntermissionStatus::NoIntermission) {
+		if (_intermissionStatus == IntermissionStatus::NoIntermission || _intermissionStatus == IntermissionStatus::GameEndStringFound) {
 			_intermissionStatus = IntermissionStatus::IntermissionAnnounced;
 		}
 		else {
 			demoErrorFlags |= DERR_GAMELOGICFLAW;
 			demoErrors << "Intermission cs received but previous status was " << intermissionTypes[(size_t)_intermissionStatus] << "\n";
+			_intermissionStatus = IntermissionStatus::Invalid; // idk what would lead us here
+		}
+	}
+	void gameEndMessageFound() {
+		if (_intermissionStatus == IntermissionStatus::NoIntermission || _intermissionStatus == IntermissionStatus::IntermissionAnnounced) {
+			_intermissionStatus = IntermissionStatus::GameEndStringFound;
+		}
+		else {
+			demoErrorFlags |= DERR_GAMELOGICFLAW;
+			demoErrors << "Game end messagge found but previous status was " << intermissionTypes[(size_t)_intermissionStatus] << "\n";
 			_intermissionStatus = IntermissionStatus::Invalid; // idk what would lead us here
 		}
 	}
@@ -694,7 +710,7 @@ public:
 			}
 		}
 		else {
-			if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced || _isMOHAADemo && _intermissionStatus == IntermissionStatus::NoIntermission) {
+			if (_intermissionStatus == IntermissionStatus::GameEndStringFound ||_intermissionStatus == IntermissionStatus::IntermissionAnnounced || _isMOHAADemo && _intermissionStatus == IntermissionStatus::NoIntermission) {
 				// mohaa has no cs_intermission
 				_intermissionStatus = IntermissionStatus::IntermissionPSConfirmed;
 			}
@@ -718,13 +734,17 @@ public:
 
 	std::string CSHash; // configstring hash of stuff like models, sounds etc. databaseIdFinished is only generated if we reach the end of a game or intermission.
 	int CSHashUniquesCount = 0;
-	bool CSHashConfirmed = false; // we set this to true if either a new game starts without intermission or we see the transition between non-intermission and intermission
+	//bool CSHashConfirmed = false; // we set this to true if either a new game starts without intermission or we see the transition between non-intermission and intermission
 
 	// should be reliable across a game:
+	// latch/rom/stable cvars
 	std::string mapName; // CS_SERVERINFO
 	std::string gameName; // CS_SERVERINFO
 	std::string version; // CS_SERVERINFO
-	// latch cvars
+	std::string gameDate; // CS_SERVERINFO
+	std::string Location; // CS_SERVERINFO
+	std::string cpuValue; // CS_SERVERINFO
+	int protocol = 0; // CS_SERVERINFO
 	int g_truejedi = 0; // CS_SERVERINFO
 	int g_gametype = 0; // CS_SERVERINFO
 	int sv_maxclients = 0; // CS_SERVERINFO
@@ -737,6 +757,24 @@ public:
 	// can change during game, whether likely or not:
 	int levelStartTime = 0; // CS_SERVERINFO
 	std::string serverName; // CS_SERVERINFO
+	std::string motd; // CS_MOTD
+	std::string message; // CS_MESSAGE
+	std::string fs_game; // CS_SYSTEMINFO
+	int sv_fps = 0; // CS_SERVERINFO
+	int g_needpass = 0; // CS_SERVERINFO
+	int g_forceregentime = 0; // CS_SERVERINFO
+
+	// nwh
+	int g_blockchance = 0; // CS_SERVERINFO
+	int g_blockchanceb = 0; // CS_SERVERINFO
+	int g_blockchancer = 0; // CS_SERVERINFO
+	int g_blockchancey = 0; // CS_SERVERINFO
+	int g_blockfactor = 0; // CS_SERVERINFO
+	int g_disablerandomparries = 0; // CS_SERVERINFO
+	int g_saberUpdateRate = 0; // CS_SERVERINFO
+
+	// TODO maybe: g_maxGameClients o3j_version  sv_pure
+	// TODO maybe: q3df: df_promode, defrag_vers, defrag_gametype defrag_bspcrc defrag_mode defrag_svfps defrag_clfps df_competition df_mp_InterferenceOff 
 
 
 	// random stuff to track:
@@ -752,12 +790,82 @@ public:
 	}
 
 	void updateValues(clientActive_t* clCut) {
+		
+		// don't update once ps intermission is confirmed
+		if (_intermissionStatus == IntermissionStatus::IntermissionPSConfirmed) {
+			return;
+		}
 
+		// TODO find a way to precompute the lookup hashes
+
+		// unique for finish game
+		sv_fps = atoi(Info_ValueForKey(serverInfoMap, "sv_fps").c_str());
+		protocol = atoi(Info_ValueForKey(serverInfoMap, "protocol").c_str());
+		g_needpass = atoi(Info_ValueForKey(serverInfoMap, "g_needpass").c_str());
 		serverName = Info_ValueForKey(serverInfoMap, "sv_hostname");
+		fs_game = Info_ValueForKey(systemInfoMap, "fs_game"); // can it actually be changed live?
+		g_forceregentime = atoi(Info_ValueForKey(serverInfoMap, "g_forceregentime").c_str());
 		int stringOffset = clCut->gameState.stringOffsets[getCS_LEVEL_START_TIME(_demoType)];
 		levelStartTime = atoi(clCut->gameState.stringData + stringOffset); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+		stringOffset = clCut->gameState.stringOffsets[CS_MOTD];
+		motd = clCut->gameState.stringData + stringOffset; // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+		
+		// nwh/other mods
+		g_blockchance = atoi(Info_ValueForKey(serverInfoMap, "g_blockchance").c_str());
+		g_blockchanceb = atoi(Info_ValueForKey(serverInfoMap, "g_blockchanceb").c_str());
+		g_blockchancer = atoi(Info_ValueForKey(serverInfoMap, "g_blockchancer").c_str());
+		g_blockchancey = atoi(Info_ValueForKey(serverInfoMap, "g_blockchancey").c_str());
+		g_blockfactor = atoi(Info_ValueForKey(serverInfoMap, "g_blockfactor").c_str());
+		g_disablerandomparries = atoi(Info_ValueForKey(serverInfoMap, "g_disablerandomparries").c_str());
+		g_saberUpdateRate = atoi(Info_ValueForKey(serverInfoMap, "g_saberUpdateRate").c_str());
 
-		int currentGameTime = clCut->snap.serverTime - CS_LEVEL_START_TIME;
+		if (!_isMOHAADemo) {
+			stringOffset = clCut->gameState.stringOffsets[CS_MESSAGE];
+			message = clCut->gameState.stringData + stringOffset; // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+		}
+
+
+
+		// informative, not part of key
+		int currentGameTime = clCut->snap.serverTime - levelStartTime;
+		if (currentGameTime > gameDuration) {
+			gameDuration = currentGameTime;
+		}
+	}
+	void updateValuesMove(UniqueGame_t* newGame, clientActive_t* clCut) {
+		
+		// don't update once ps intermission is confirmed
+		if (_intermissionStatus == IntermissionStatus::IntermissionPSConfirmed) {
+			return;
+		}
+
+		// TODO find a way to precompute the lookup hashes
+
+		// unique for finish game
+		sv_fps = newGame->sv_fps;
+		protocol = newGame->protocol;
+		g_needpass = newGame->g_needpass;
+		serverName = std::move(newGame->serverName);
+		fs_game = std::move(newGame->fs_game); // can it actually be changed live?
+		g_forceregentime = newGame->g_forceregentime;
+		levelStartTime = newGame->levelStartTime; // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+		motd = std::move(newGame->motd); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+		
+		// nwh/other mods
+		g_blockchance = newGame->g_blockchance;
+		g_blockchanceb = newGame->g_blockchanceb;
+		g_blockchancer = newGame->g_blockchancer;
+		g_blockchancey = newGame->g_blockchancey;
+		g_blockfactor = newGame->g_blockfactor;
+		g_disablerandomparries = newGame->g_disablerandomparries;
+		g_saberUpdateRate = newGame->g_saberUpdateRate;
+
+		if (!_isMOHAADemo) {
+			message = std::move(newGame->message); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+		}
+
+		// informative, not part of key
+		int currentGameTime = clCut->snap.serverTime - levelStartTime;
 		if (currentGameTime > gameDuration) {
 			gameDuration = currentGameTime;
 		}
@@ -777,11 +885,15 @@ public:
 		g_maxforcerank = atoi(Info_ValueForKey(serverInfoMap, "g_maxforcerank").c_str());
 		mapName = Info_ValueForKey(serverInfoMap, "mapname");
 		gameName = Info_ValueForKey(serverInfoMap, "gamename");
+		cpuValue = Info_ValueForKey(serverInfoMap, "cpu","^7cpu");
 		version = Info_ValueForKey(serverInfoMap, "version");
 		sv_referencedPaks = Info_ValueForKey(systemInfoMap, "sv_referencedpaks");
+		gameDate = Info_ValueForKey(systemInfoMap, "gamedate");
+		Location = Info_ValueForKey(systemInfoMap, "location");
+		cpuValue = Info_ValueForKey(systemInfoMap, "^7cpu");
 		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
 		sv_cheats = atoi(Info_ValueForKey(systemInfoMap, "sv_cheats").c_str());
-		sv_gameStartUnixTime = std::strtoll(Info_ValueForKey(systemInfoMap, "sv_gameStartUnixTime").c_str(), nullptr, 10);
+		sv_gameStartUnixTime = std::strtoll(Info_ValueForKey(systemInfoMap, "sv_gamestartunixtime").c_str(), nullptr, 10);
 
 		updateValues(clCut); // this handles stuff that is moore dynamic.
 	}
@@ -811,6 +923,11 @@ public:
 
 
 	void buildCSHash(clientActive_t* clCut, demoType_t demoType) {
+
+		if (_intermissionStatus == IntermissionStatus::IntermissionPSConfirmed) {
+			return;
+		}
+
 #define CSHASHTYPES_COUNT 3
 		int csHashIndexes[CSHASHTYPES_COUNT][2] = {
 			{getCS_SOUNDS(demoType),getCS_SOUNDS(demoType) + 256},
@@ -1302,20 +1419,6 @@ ankerl::unordered_dense::map< frameInfoViewModelAnimSimpleKey, int, ankerl::unor
 #endif
 
 
-//#define SQLBIND_DELAYED(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
-//#define SQLBIND_DELAYED_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
-//#define SQLBIND_DELAYED_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
-// 
-#define SQLBIND_NONDELAYED(statement,type,name,value) sqlite3_bind_##type##(statement,sqlite3_bind_parameter_index(statement,name),value)
-#define SQLBIND_NONDELAYED_NULL(statement,name) sqlite3_bind_null(statement,sqlite3_bind_parameter_index(statement,name))
-#define SQLBIND_NONDELAYED_TEXT(statement,name,value) sqlite3_bind_text(statement,sqlite3_bind_parameter_index(statement,name),value,-1,NULL)
-
-#define SQLBIND_DELAYED(delayedQuery,type,name,value) delayedQuery->add(name,value)
-#define SQLBIND_DELAYED_FLAGS(delayedQuery,type,name,value,flags) delayedQuery->add(name,value,flags)
-#define SQLBIND_DELAYED_NULL(delayedQuery,name) delayedQuery->add(name,SQLDelayedValue_NULL)
-#define SQLBIND_DELAYED_NULL_FLAGS(delayedQuery,name,flags) delayedQuery->add(name,SQLDelayedValue_NULL,flags)
-#define SQLBIND_DELAYED_TEXT(delayedQuery,name,value) delayedQuery->add(name,value)
-#define SQLBIND_DELAYED_TEXT_FLAGS(delayedQuery,name,value,flags) delayedQuery->add(name,value,flags)
 
 #define NEARBY_PLAYER_MAX_DISTANCE 1000.0f
 #define VERYCLOSE_PLAYER_MAX_DISTANCE 300.0f
@@ -2596,7 +2699,7 @@ int activeKillDatabase = 0; // right now we dont have kill-specific filters, onl
 std::string currentMapName = "";
 void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts, bool rebuildCSHash) { // TODO: make this adapt to JKA
 
-	if (configStringChanged[CS_SERVERINFO] || configStringChanged[CS_SYSTEMINFO] || configStringChanged[getCS_LEVEL_START_TIME(demoType)]) {
+	if (configStringChanged[CS_SERVERINFO] || configStringChanged[CS_SYSTEMINFO] || configStringChanged[getCS_LEVEL_START_TIME(demoType)] || configStringChanged[CS_MOTD] || configStringChanged[CS_MESSAGE]) {
 
 		UniqueGame_t newGame(clCut, demoType);
 		if (uniqueGameIndex == -1 || !uniqueGameCurrent.SameGame(&newGame)) {
@@ -2611,7 +2714,7 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 			uniqueGameCurrent = std::move(newGame);
 		}
 		else {
-			uniqueGameCurrent.updateValues(clCut);
+			uniqueGameCurrent.updateValuesMove(&newGame,clCut); // careful, invalidates newGame strings
 		}
 	}
 
@@ -3928,6 +4031,42 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 
+
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE uniqueGamesAbstract ("
+#define FIELDSFUNC(a,b,c)  QUOTE(a ) " " c QUOTE(COMMA)
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a ) " " c
+			"id INTEGER NOT NULL,"
+			UNIQUEGAME_ABSTRACT_TEXT()
+			UNIQUEGAME_ABSTRACT()
+			",countDemos INTEGER NOT NULL"
+			",PRIMARY KEY(id)"
+			",UNIQUE("
+#define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_ABSTRACT_TEXT()
+			UNIQUEGAME_ABSTRACT()
+			")"
+			"); ",
+			NULL, NULL, NULL);
+
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE uniqueGamesConcrete ("
+#define FIELDSFUNC(a,b,c)  QUOTE(a ) " " c QUOTE(COMMA)
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a ) " " c
+			"id INTEGER NOT NULL,"
+			"abstractId INTEGER NOT NULL,"
+			UNIQUEGAME_CONCRETE_TEXT()
+			UNIQUEGAME_CONCRETE()
+			",countDemos INTEGER NOT NULL"
+			",PRIMARY KEY(id)"
+			",UNIQUE(abstractId,"
+#define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_CONCRETE_TEXT()
+			UNIQUEGAME_CONCRETE()
+			")"
+			"); ",
+			NULL, NULL, NULL);
+
 		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE kills ("
 			"hash	TEXT,"
 			"shorthash	TEXT,"
@@ -4349,6 +4488,50 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"(@hash, @shorthash, @map, @killerName, @victimName, @killerClientNum, @victimClientNum, @isReturn, @isDoomKill, @isExplosion, @isSuicide, @targetIsVisible,@attackerIsVisible,"
 			"@isFollowed, @meansOfDeath, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTarget, @meansOfDeathString, @probableKillingWeapon, @positionX,"
 			"@positionY, @positionZ,@demoName,@demoTime, @serverTime, @demoDateTime);";*/
+		preparedStatementText = "INSERT INTO uniqueGamesAbstract"
+			"(countDemos,"
+#define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_ABSTRACT_TEXT()
+			UNIQUEGAME_ABSTRACT()
+			")"
+			" VALUES "
+			"(1,"
+#define FIELDSFUNC(a,b,c) QUOTE(@a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_ABSTRACT_TEXT()
+			UNIQUEGAME_ABSTRACT()
+			") ON CONFLICT ("
+#define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_ABSTRACT_TEXT()
+			UNIQUEGAME_ABSTRACT()
+			") DO UPDATE SET countDemos=countDemos+1 RETURNING id; ;";
+		;
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameAbstractStatement, NULL);
+		
+		preparedStatementText = "INSERT INTO uniqueGamesConcrete"
+			"(abstractId,countDemos,"
+#define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_CONCRETE_TEXT()
+			UNIQUEGAME_CONCRETE()
+			")"
+			" VALUES "
+			"(@abstractId,1,"
+#define FIELDSFUNC(a,b,c) QUOTE(@a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(@a )
+			UNIQUEGAME_CONCRETE_TEXT()
+			UNIQUEGAME_CONCRETE()
+			") ON CONFLICT (abstractId,"
+#define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+			UNIQUEGAME_CONCRETE_TEXT()
+			UNIQUEGAME_CONCRETE()
+			") DO UPDATE SET countDemos=countDemos+1 RETURNING id; ;";
+		;
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameStatement, NULL);
+
 		preparedStatementText = "INSERT INTO kills"
 			"(hash,shorthash,map,killerId,victimId,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
 			"VALUES "
@@ -5390,6 +5573,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			sqlite3_finalize(io.killDb[i].selectLastInsertRowIdStatement);
 			sqlite3_finalize(io.killDb[i].insertEntryMetaStatement);
 			sqlite3_finalize(io.killDb[i].insertPlayerNameStatement);
+			sqlite3_finalize(io.killDb[i].insertUniqueGameAbstractStatement);
+			sqlite3_finalize(io.killDb[i].insertUniqueGameStatement);
 			sqlite3_close(io.killDb[i].killDb);
 		}
 
@@ -6644,6 +6829,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								if (!isMOHAADemo && index == CS_INTERMISSION) {
 									int isIntermission = atoi(Cmd_Argv(2));
 									if (isIntermission) {
+										// actually we sadly can't rely on this because although the game module is supposed to set it to 1,
+										// no configstring update is sent if there is no change, and under normal circumstances,
+										// it just never gets reset back to 0
+										// alternatives:
+										// cs 6/7 (cs_scores ones) reaching capturelimit in serverinfo
 										uniqueGameCurrent.csIntermissionReceived();
 									}
 								}
@@ -12124,7 +12314,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				qboolean runFound = qfalse;
 				defragRunInfoFinal_t runInfo;
 
-				std::string printText = Cmd_Argv(1);
+				const char* printTextC = Cmd_Argv(1);
+				std::string printText = printTextC;
+				size_t printTextLen = printText.size();
 
 				if (opts.makeVideo) {
 					videoConsole.push_back({ demoCurrentTime,printText });
@@ -12191,7 +12383,22 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				else if (nwhMatchStatisticsGathering) {
 					nwhMatchStatistics << printText;
 				}
-				
+
+				static constexpr auto capturelimit1 = "hit the capturelimit.\n"_cs;
+				static constexpr auto capturelimit2 = "@@@HIT_CAPTURE_LIMIT"_cs;
+				static constexpr auto killlimit1 = "@@@HIT_THE_KILL_LIMIT.\n"_cs;
+				static constexpr auto killlimit2 = "@@@HIT_THE_KILL_LIMIT\n"_cs;
+				static constexpr auto winlimit = "hit the win limit.\n"_cs;
+				static constexpr auto timelimit = "@@@TIMELIMIT_HIT"_cs;
+				if (capturelimit1.us_isending(printTextC, printTextLen)
+					|| capturelimit2.us_isstart(printTextC, printTextLen)
+					|| killlimit1.us_isending(printTextC, printTextLen)
+					|| killlimit2.us_isending(printTextC, printTextLen)
+					|| winlimit.us_isending(printTextC, printTextLen)
+					|| timelimit.us_isstart(printTextC, printTextLen)
+					) {
+					uniqueGameCurrent.gameEndMessageFound();
+				}
 				
 			}
 		}
@@ -12399,7 +12606,6 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 
 int main(int argcO, char** argvO) {
-
 
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");

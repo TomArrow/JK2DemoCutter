@@ -108,6 +108,7 @@
     <ClInclude Include="..\shared\sabers\sabers.h" />
     <ClInclude Include="..\shared\SQLDelayer.h" />
     <ClInclude Include="..\shared\sqlite\sqlite3.h" />
+    <ClInclude Include="..\shared\sqlite_tabledefs.h" />
     <ClInclude Include="..\shared\zlib\crc32.h" />
     <ClInclude Include="..\shared\zlib\deflate.h" />
     <ClInclude Include="..\shared\zlib\gzguts.h" />

@@ -42,7 +42,7 @@ std::string errorInfo = "";
 
 static	int			cmd_argc;
 static	char* cmd_argv[MAX_STRING_TOKENS];		// points into cmd_tokenized
-static	char		cmd_tokenized[BIG_INFO_STRING + MAX_STRING_TOKENS];	// will have 0 bytes inserted
+static	char		cmd_tokenized[BIG_INFO_STRING + MAX_STRING_TOKENS + CoolString::maxLen+1];	// will have 0 bytes inserted. and +coolstring maxlen so we can do nice safe compares
 
 
 void VectorInverse(vec3_t v) {
@@ -6205,14 +6205,6 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 	}
 }
 
-constexpr int strlenConstExpr(const char* txt) {
-	int count = 0;
-	while (*txt != 0) {
-		count++;
-		txt++;
-	}
-	return count;
-}
 
 void demoCutWriteEmptyMessageMetadataPart(msg_t* msg,   demoType_t demoType, const char* metaData) {
 
