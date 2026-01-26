@@ -4477,6 +4477,7 @@ int getLikelyStanceFromTorsoAnim(int torsoAnim, demoType_t demoType, byte* proba
 
 
 float VectorDistance(vec3_t v1, vec3_t v2);
+float VectorDistanceSquared(vec3_t v1, vec3_t v2);
 float Vector2Distance(vec2_t v1, vec2_t v2);
 float Vector2DistanceSquared(vec2_t v1, vec2_t v2);
 

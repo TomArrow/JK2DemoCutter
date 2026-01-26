@@ -1399,6 +1399,14 @@ struct hitDetectionData_t {
 hitDetectionData_t hitDetectionData[MAX_CLIENTS_MAX];
 qboolean jumpDetected[MAX_CLIENTS_MAX];
 
+struct multiHitData_t {
+	int64_t lastHitTime;
+	int hitCount; // true multihits, no delay
+	int hitCountLenient; // hits withiin 1 second of each other
+};
+
+multiHitData_t playerMultiHit[MAX_CLIENTS_MAX];
+
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
 jp::Regex regexLaugh(R"raw(\x19:\s*(r+[oi]+[tf]+[kl]+|[op]+[mn]+[ghf]+|[lk]+[mn]+[fg]*a+[okli]+|a?ha[ha]{2,}|w+[rt]+[gf]+|(?-i)X+D+|L+O{1,100}L+(?i)))raw", "mSi");
 #define MAX_LAUGH_DELAY 7000 // From first laugh to last laugh, max delay.
@@ -4193,6 +4201,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"throughWallNormal	REAL,"
 			"throughWallOcclusion	INTEGER,"
 			"saberComboCount	INTEGER,"
+			"victimHitCount	INTEGER,"
+			"victimHitCountLenient	INTEGER,"
 
 			"lastSneak	INTEGER,"
 			"lastSneakDuration	INTEGER,"
@@ -4596,13 +4606,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #if TRACK_GROUNDFRAME
 ",groundFrameQuality,groundFrameAngleChange"
 #endif
-			",throughWallNormal,throughWallOcclusion,saberComboCount,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
+			",throughWallNormal,throughWallOcclusion,saberComboCount,victimHitCount,victimHitCountLenient,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
 			"VALUES "
 			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
 ",@groundFrameQuality,@groundFrameAngleChange"
 #endif	
-",@throughWallNormal,@throughWallOcclusion,@saberComboCount,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
+",@throughWallNormal,@throughWallOcclusion,@saberComboCount,@victimHitCount,@victimHitCountLenient,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
@@ -6545,6 +6555,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&forcePowersInfo, 0, sizeof(forcePowersInfo));
 	Com_Memset(&strafeDeviationsDefrag, 0, sizeof(strafeDeviationsDefrag));
 	Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
+	Com_Memset(&playerMultiHit, 0, sizeof(playerMultiHit));
 	Com_Memset(&jumpDetected, 0, sizeof(jumpDetected));
 	Com_Memset(&requiredMetaEventAges, 0, sizeof(requiredMetaEventAges));
 	Com_Memset(&metaEventTrackers, 0, sizeof(metaEventTrackers));
@@ -10265,6 +10276,23 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							else {
 								SQLBIND_DELAYED_NULL(angleQuery, "@saberComboCount");
 							}
+							if (targetIsVisible) {
+								int deltaSinceOldHit = lastFrameInfo.demoTime + 1 - playerMultiHit[target].lastHitTime;
+								int theHitCount = 1;
+								int theHitCountLenient = 1;
+								if (deltaSinceOldHit <= 100) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
+									theHitCount += playerMultiHit[target].hitCount;
+								}
+								if (deltaSinceOldHit <= 1000) { 
+									theHitCountLenient += playerMultiHit[target].hitCountLenient;
+								}
+								SQLBIND_DELAYED(angleQuery, int, "@victimHitCount", theHitCount);
+								SQLBIND_DELAYED(angleQuery, int, "@victimHitCountLenient", theHitCountLenient);
+							}
+							else {
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimHitCount");
+								SQLBIND_DELAYED_NULL(angleQuery, "@victimHitCountLenient");
+							}
 
 							if (throughWall) {
 								SQLBIND_DELAYED(angleQuery, double, "@throughWallNormal", throughWallNormal);
@@ -10436,10 +10464,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							
 							// Mark nearby players for potential saber hit detection
 							for (int playerNum = 0; playerNum < max_clients; playerNum++) {
-								constexpr float maxDistance = 100.0f + 2.0f * (float)SABER_LENGTH_MAX;
-								if (thisFrameInfo.entityExists[playerNum] && VectorDistance(thisFrameInfo.playerPositions[playerNum], thisEs->pos.trBase) <= maxDistance) {
-									hitDetectionData[playerNum].nearbySaberHitDetected = qtrue;
-									addMetaEvent(METAEVENT_SABERHIT, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
+								static constexpr float maxDistance = 100.0f + 2.0f * (float)SABER_LENGTH_MAX; // should add the velocity i guess? cuz of the saber forward pushing thing
+								if (thisFrameInfo.entityExists[playerNum]) {
+									// actually nevermind this: we are dealing with the player being hit, not with the one doing the hitting :/
+									//float maxDistanceHere = maxDistance + (std::abs(thisFrameInfo.playerVelocities[playerNum][0])+ std::abs(thisFrameInfo.playerVelocities[playerNum][1])+ std::abs(thisFrameInfo.playerVelocities[playerNum][2]))* 0.08f; // fVSpeed
+									if (VectorDistanceSquared(thisFrameInfo.playerPositions[playerNum], thisEs->pos.trBase) <= maxDistance * maxDistance) {
+										hitDetectionData[playerNum].nearbySaberHitDetected = qtrue;
+										addMetaEvent(METAEVENT_SABERHIT, demoCurrentTime, playerNum, bufferTime, opts, bufferTime);
+									}
 								}
 							}
 						}
@@ -12072,6 +12104,21 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// The saber hit detection isn't really all that reliable but it's good enough for a sort of global stats I guess
 				for (int playerNum = 0; playerNum < max_clients; playerNum++) {
 					if (hitDetectionData[playerNum].confirmedHit || hitDetectionData[playerNum].nearbySaberHitDetected && hitDetectionData[playerNum].painDetected) {
+						// he was hit somewhere between last frame and this one. let's assume last frame + 1 frame
+						// so we can calculate the time delta between the hits
+						int deltaSinceOldHit = lastFrameInfo.demoTime + 1 - playerMultiHit[playerNum].lastHitTime;
+						if (deltaSinceOldHit > 100) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
+							playerMultiHit[playerNum].hitCount = 1;
+						}
+						else {
+							playerMultiHit[playerNum].hitCount++;
+						}
+						if (deltaSinceOldHit > 1000) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
+							playerMultiHit[playerNum].hitCountLenient = 1;
+						}
+						else {
+							playerMultiHit[playerNum].hitCountLenient++;
+						}
 						if (playerDemoStatsPointers[playerNum]) {
 							playerDemoStatsPointers[playerNum]->everUsed = qtrue;
 							playerDemoStatsPointers[playerNum]->hitBySaberCount++;
@@ -12079,6 +12126,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								playerDemoStatsPointers[playerNum]->hitBySaberBlockableCount++;
 							}
 						}
+						playerMultiHit[playerNum].lastHitTime = demoCurrentTime;
 					}
 					if (hitDetectionData[playerNum].newParryDetected) {
 						if (playerDemoStatsPointers[playerNum]) {

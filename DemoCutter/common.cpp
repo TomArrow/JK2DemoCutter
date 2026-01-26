@@ -3080,6 +3080,13 @@ float VectorDistance(vec3_t v1, vec3_t v2)
 	VectorSubtract(v2, v1, dir);
 	return VectorLength(dir);
 } 
+float VectorDistanceSquared(vec3_t v1, vec3_t v2)
+{
+	vec3_t dir;
+
+	VectorSubtract(v2, v1, dir);
+	return Vector2LengthSquared(dir);
+} 
 
 float Vector2Distance(vec2_t v1, vec2_t v2)
 {
