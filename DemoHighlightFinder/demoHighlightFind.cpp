@@ -534,6 +534,7 @@ public:
 	bool makeVideo = false;
 	bool filterBotOnBotKills = false;
 	bool savePointCloud = false;
+	size_t pointCloudSizeLimit = 0;
 	//bool filterBotKills = false;
 	//bool filterBotRets = false;
 	//bool filterFightBotKills = false;
@@ -1041,17 +1042,19 @@ typedef struct playerDumpCSVPoint_t {
 };
 std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
 
-
-std::vector<pointCloudEntry_t> pointCloudEntries;
+ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntry_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMap;
+std::vector<pointCloudEntry_t>* pointCloudEntries = NULL;
 
 void addPointCloudEntry(vec3_t org, byte color[3]) {
-	pointCloudEntry_t newEntry;
-	newEntry.pos[0] = fp16_ieee_from_fp32_value(org[0]);
-	newEntry.pos[1] = fp16_ieee_from_fp32_value(org[1]);
-	newEntry.pos[2] = fp16_ieee_from_fp32_value(org[2]);
-	newEntry.color[0] = (color[0] & 240) | ((color[1] & 240) >> 4); // dumb but good enough for our very simple colors (full or half
-	newEntry.color[1] = (color[2] & 240); // dumb but good enough for our very simple colors (full or half
-	pointCloudEntries.push_back(newEntry);
+	if (pointCloudEntries) {
+		pointCloudEntry_t newEntry;
+		newEntry.pos[0] = fp16_ieee_from_fp32_value(org[0]);
+		newEntry.pos[1] = fp16_ieee_from_fp32_value(org[1]);
+		newEntry.pos[2] = fp16_ieee_from_fp32_value(org[2]);
+		newEntry.color[0] = (color[0] & 240) | ((color[1] & 240) >> 4); // dumb but good enough for our very simple colors (full or half
+		newEntry.color[1] = (color[2] & 240); // dumb but good enough for our very simple colors (full or half
+		pointCloudEntries->push_back(newEntry);
+	}
 }
 
 typedef struct entityDumpCSVPoint_t {
@@ -5850,11 +5853,31 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	}
 #ifdef BUFFERBAT
 
-	if (pointCloudEntries.size()) {
-		std::ofstream pointCloudFile;
-		pointCloudFile.open("pointCloud.bin", std::ios_base::app | std::ios_base::binary); // append instead of overwrite
-		pointCloudFile.write((const char*)pointCloudEntries.data(), pointCloudEntries.size() * sizeof(pointCloudEntry_t));
-		pointCloudFile.close();
+	if (pointCloudEntriesMap.size()) {
+		for (auto it = pointCloudEntriesMap.begin(); it != pointCloudEntriesMap.end(); it++) {
+			if (it->second.size()) {
+
+				std::filesystem::create_directory("pointClouds");
+				std::ofstream pointCloudFile;
+				pointCloudFile.open(va("pointClouds/pointCloud-%s.bin",it->first.c_str()), std::ios_base::app | std::ios_base::binary); // append instead of overwrite
+				size_t availableSpace = SIZE_MAX;
+				if (opts.pointCloudSizeLimit) {
+					size_t currentSize = pointCloudFile.tellp();
+					if (opts.pointCloudSizeLimit <= currentSize) {
+						availableSpace = 0;
+					}
+					else {
+						availableSpace = opts.pointCloudSizeLimit - currentSize;
+						availableSpace /= sizeof(pointCloudEntry_t);
+						availableSpace *= sizeof(pointCloudEntry_t); // make it align with the point cloud entry size
+					}
+				}
+				if (availableSpace) {
+					pointCloudFile.write((const char*)it->second.data(), std::min(it->second.size() * sizeof(pointCloudEntry_t), availableSpace));
+				}
+				pointCloudFile.close();
+			}
+		}
 	}
 	if (streamsize(io.outputBatHandle)) {
 		std::ofstream outputBatHandle;
@@ -7184,6 +7207,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 				}
 
+				if (opts.savePointCloud) {
+					pointCloudEntries = &pointCloudEntriesMap[serverInfoMap["mapname"]];
+				}
 
 				if (opts.makeVideo || opts.throughWallChecks) {
 
@@ -8568,7 +8594,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						if (lastFrameInfo.entityExists[i]) {
 							
-							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !VectorCompare(lastFrameInfo.playerPositions[i], thisFrameInfo.playerPositions[i])) {
+							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && !VectorCompare(lastFrameInfo.playerPositions[i], thisFrameInfo.playerPositions[i]) && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
 								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]]);
 							}
 
@@ -8679,7 +8705,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 #endif
 						}
 						else {
-							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR) {
+							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
 								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]]);
 							}
 						}
@@ -12972,6 +12998,7 @@ int main(int argcO, char** argvO) {
 	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
 	auto B = op.add<popl::Implicit<int>>("B", "bot-filter", "Filter out kills by bots and on bots. Bitmask. 1=filter out any bot-on-bot kills",1);
 	auto i = op.add<popl::Implicit<int>>("i", "save-point-cloud", "Save a point-cloud file of all unique player positions, fp16ieee[3] and color byte[2] (4 bits per color).",1);
+	auto I = op.add<popl::Implicit<size_t>>("I", "point-cloud-size-limit", "Limit a point cloud's file size. Optionally specify a number, default 2 GB. (unrestricted without -I optiion)",(size_t) 2147483648ULL);
 
 	
 	op.parse(argcO, argvO);
@@ -13029,6 +13056,7 @@ int main(int argcO, char** argvO) {
 	opts.doStatsDb = Q->is_set() ? !(Q->value() & 1) : true;
 	opts.filterBotOnBotKills = B->is_set() ? (B->value() & 1) : false;
 	opts.savePointCloud = i->is_set() ? (i->value() & 1) : false;
+	opts.pointCloudSizeLimit = I->is_set() ? I->value() : 0;
 	//opts.filterBotKills = B->is_set() ? (B->value() & 1) : false;
 	//opts.filterBotRets = B->is_set() ? (B->value() & 2) : false;
 	//opts.filterFightBotKills = B->is_set() ? (B->value() & 4) : false;
