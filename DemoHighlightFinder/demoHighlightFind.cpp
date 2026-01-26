@@ -366,6 +366,7 @@ public:
 
 struct ioHandlesKillDb_t {
 
+	int index;
 	sqlite3* killDb;
 	sqlite3_stmt* insertUniqueGameAbstractStatement;
 	sqlite3_stmt* insertUniqueGameStatement;
@@ -3577,6 +3578,7 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 		if (activeKillDatabase != -1) {
 			queryWrapper->databaseIndex = activeKillDatabase;
+			queryWrapper->uniqueGameIndex = uniqueGameIndex;
 			io.spreeQueries->push_back(queryWrapper);
 		}
 		else {
@@ -3876,6 +3878,7 @@ void checkSaveLaughs(int64_t demoCurrentTime, int bufferTime, int64_t lastGameSt
 
 			if (activeKillDatabase != -1) {
 				queryWrapper->databaseIndex = activeKillDatabase;
+				queryWrapper->uniqueGameIndex = uniqueGameIndex;
 				io.laughQueries->push_back(queryWrapper);
 			}
 			else {
@@ -3994,6 +3997,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 
 	if (activeKillDatabase != -1) {
 		queryWrapper->databaseIndex = activeKillDatabase;
+		queryWrapper->uniqueGameIndex = uniqueGameIndex;
 		io.specialQueries->push_back(queryWrapper);
 	}
 	else {
@@ -4048,6 +4052,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	int sqlResult = 0;
 	int readonlyResult = 0;
 	for (int i = 0; i < opts.killDbsCount; i++) {
+		io.killDb[i].index = i; // bleh
+
 		const char* killDbName = opts.filters.size() ? va("killDatabase%d.db",i) : "killDatabase.db"; // todo dont create databases we end up not needing
 		while ((sqlResult = sqlite3_open(killDbName, &io.killDb[i].killDb)) != SQLITE_OK || (readonlyResult = sqlite3_db_readonly(io.killDb[i].killDb, "main"))) {
 			std::cerr << DPrintFLocation << ":" << "error opening "<< killDbName << " for read/write (" << sqlResult << "," << readonlyResult << "): " << sqlite3_errmsg(io.killDb[i].killDb) << ". Trying again in 1000ms." << "\n";
@@ -4487,8 +4493,11 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoPath TEXT NOT NULL,"
 			"demoDateTime TIMESTAMP NOT NULL,"
 			"demoDerivativeFlags INTEGER NOT NULL," // mark reframes/optiized demos
+			"uniqueGameIdAbstract INTEGER NOT NULL,"
+			"uniqueGameIdConcrete INTEGER NOT NULL,"
+			"demoGameId INTEGER NOT NULL,"
 			"count INTEGER NOT NULL,"
-			"UNIQUE(map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags)"
+			"UNIQUE(map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags,uniqueGameIdAbstract,uniqueGameIdConcrete,demoGameId)"
 			"); ",
 			NULL, NULL, NULL);
 
@@ -4614,7 +4623,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
 //#define ENTRYMETA_PRESTATEMENT "INSERT INTO entryMeta (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime) VALUES (@map,@serverName,@serverNameStripped,@demoName,@demoPath,@demoDateTime) ON CONFLICT (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime) DO NOTHING; " // RETURNING id; the returning doesnt do anything rn but oh well
 //#define ENTRYMETA_IDSELECTOR "(SELECT id FROM entryMeta WHERE map=@map AND serverName=@serverName AND serverNameStripped=@serverNameStripped AND demoName=@demoName AND demoPath=@demoPath AND demoDateTime=@demoDateTime )"
-		preparedStatementText = "INSERT INTO entryMeta (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags,count) VALUES (@map,@serverName,@serverNameStripped,@demoName,@demoPath,@demoDateTime,@demoDerivativeFlags,1) ON CONFLICT (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags) DO UPDATE SET count=count+1 RETURNING id;";
+		preparedStatementText = "INSERT INTO entryMeta (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags,uniqueGameIdAbstract,uniqueGameIdConcrete,demoGameId,count) VALUES (@map,@serverName,@serverNameStripped,@demoName,@demoPath,@demoDateTime,@demoDerivativeFlags,@uniqueGameIdAbstract,@uniqueGameIdConcrete,@demoGameId,1) ON CONFLICT (map,serverName,serverNameStripped,demoName,demoPath,demoDateTime,demoDerivativeFlags,uniqueGameIdAbstract,uniqueGameIdConcrete,demoGameId) DO UPDATE SET count=count+1 RETURNING id;";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertEntryMetaStatement, NULL);
 
@@ -4935,9 +4944,34 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #endif
 }
 
-void handleKillDbPreQueries(SQLDelayedQuery* mainQuery, ioHandlesKillDb_t* killDbHandle, sqlite3_stmt* mainStatement) {
+UniqueGame_t* getUniqueGameByIndex(int index) {
+	if (index == uniqueGameIndex) {
+		return &uniqueGameCurrent;
+	}
+	else if(index >= 0) {
+		return &uniqueGames[index];
+	}
+	else {
+		return NULL;
+	}
+}
+
+void handleKillDbPreQueries(SQLDelayedQueryWrapper_t* mainQueryWrapper, ioHandlesKillDb_t* killDbHandle, sqlite3_stmt* mainStatement) {
+	UniqueGame_t* game = getUniqueGameByIndex(mainQueryWrapper->uniqueGameIndex);
+
 	// entrymeta
+	SQLDelayedQuery* mainQuery = &mainQueryWrapper->query;
 	mainQuery->bind(killDbHandle->insertEntryMetaStatement);
+	if (game) {
+		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdAbstract", game->databaseId[killDbHandle->index]);
+		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdConcrete", game->databaseIdFinished[killDbHandle->index]);
+		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@demoGameId", mainQueryWrapper->uniqueGameIndex);
+	}
+	else {
+		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdAbstract", -2);
+		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdConcrete", -2);
+		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@demoGameId", -2);
+	}
 	int queryResult = sqlite3_step(killDbHandle->insertEntryMetaStatement);
 	if (queryResult != SQLITE_ROW) {
 		std::cerr << "Error getting entry meta id from database: " << queryResult << ":" << sqlite3_errmsg(killDbHandle->killDb) << "(" << DPrintFLocation << ")" << "\n";
@@ -5162,7 +5196,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Kill angles
 	for (auto it = io.killAngleQueries->begin(); it != io.killAngleQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertAngleStatement);
-		handleKillDbPreQueries(&(*it)->query,&io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertAngleStatement);
+		handleKillDbPreQueries((*it),&io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertAngleStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertAngleStatement);
 		if (queryResult != SQLITE_DONE) {
@@ -5176,7 +5210,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Sprees
 	for (auto it = io.spreeQueries->begin(); it != io.spreeQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpreeStatement);
-		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
+		handleKillDbPreQueries((*it), &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 		handleKillDbPlayerPreQuery("@killerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpreeStatement);
 
 		//wasDoingSQLiteExecution = true;
@@ -5192,7 +5226,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Captures
 	for (auto it = io.captureQueries->begin(); it != io.captureQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
-		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
+		handleKillDbPreQueries((*it), &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertCaptureStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertCaptureStatement);
@@ -5220,7 +5254,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// FlagGrabs
 	for (auto it = io.flagGrabQueries->begin(); it != io.flagGrabQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
-		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
+		handleKillDbPreQueries((*it), &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		handleKillDbPlayerPreQuery("@grabberId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		handleKillDbPlayerPreQuery("@capperId", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, QF_BOTSTATUS1, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertFlagGrabStatement);
 		//wasDoingSQLiteExecution = true;
@@ -5249,7 +5283,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Defrag
 	for (auto it = io.defragQueries->begin(); it != io.defragQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
-		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
+		handleKillDbPreQueries((*it), &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertDefragRunStatement);
@@ -5264,7 +5298,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	// Laughs
 	for (auto it = io.laughQueries->begin(); it != io.laughQueries->end(); it++) {
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertLaughsStatement);
-		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertLaughsStatement);
+		handleKillDbPreQueries((*it), &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertLaughsStatement);
 
 		//wasDoingSQLiteExecution = true;
 		int queryResult = sqlite3_step(io.killDb[(*it)->databaseIndex].insertLaughsStatement);
@@ -5293,7 +5327,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	for (auto it = io.specialQueries->begin(); it != io.specialQueries->end(); it++) {
 		// TODO put in database
 		(*it)->query.bind(io.killDb[(*it)->databaseIndex].insertSpecialStatement);
-		handleKillDbPreQueries(&(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
+		handleKillDbPreQueries((*it), &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 		handleKillDbPlayerPreQuery("@playerId", QF_PLAYERNAME0, QF_PLAYERNAME0STRIPPED, QF_BOTSTATUS0, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 		handleKillDbPlayerPreQuery("@playerIdAlt", QF_PLAYERNAME1, QF_PLAYERNAME1STRIPPED, QF_BOTSTATUS1, &(*it)->query, &io.killDb[(*it)->databaseIndex], io.killDb[(*it)->databaseIndex].insertSpecialStatement);
 
@@ -10108,6 +10142,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (activeKillDatabase != -1) {
 								queryWrapper->databaseIndex = activeKillDatabase;
+								queryWrapper->uniqueGameIndex = uniqueGameIndex;
 								io.killQueries->push_back(queryWrapper);
 							}
 							else {
@@ -10306,6 +10341,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (activeKillDatabase != -1) {
 								angleQueryWrapper->databaseIndex = activeKillDatabase;
+								angleQueryWrapper->uniqueGameIndex = uniqueGameIndex;
 								io.killAngleQueries->push_back(angleQueryWrapper);
 							}
 							else {
@@ -10954,6 +10990,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (activeKillDatabase != -1) {
 								queryWrapper->databaseIndex = activeKillDatabase;
+								queryWrapper->uniqueGameIndex = uniqueGameIndex;
 								io.flagGrabQueries->push_back(queryWrapper);
 							}
 							else {
@@ -11442,6 +11479,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (activeKillDatabase != -1) {
 								queryWrapper->databaseIndex = activeKillDatabase;
+								queryWrapper->uniqueGameIndex = uniqueGameIndex;
 								io.captureQueries->push_back(queryWrapper);
 							}
 							else {

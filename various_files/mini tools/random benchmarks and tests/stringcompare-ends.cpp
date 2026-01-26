@@ -106,7 +106,7 @@ void compareStrcmp(){
     int matches = 0;
     for(int r=0;r<100000;r++){
         for(int i=0;i<stringcount;i++){
-            matches += !strcmp("hit the capturelimit.",strings[i]+stringLengths[i]-21);
+            matches += !strcmp("mit.",strings[i]+stringLengths[i]-4);
             //matches += !memcmp("Red hit the capturelimit.",strings[i],26);
         }
     }
@@ -116,7 +116,7 @@ void compareStrcasecmp(){
     int matches = 0;
     for(int r=0;r<100000;r++){
         for(int i=0;i<stringcount;i++){
-            matches += !strcasecmp("hit the capturelimit.",strings[i]+stringLengths[i]-21);
+            matches += !strcasecmp("mit.",strings[i]+stringLengths[i]-4);
             //matches += !memcmp("Red hit the capturelimit.",strings[i],26);
         }
     }
@@ -127,7 +127,7 @@ void compareMine(){
     for(int r=0;r<100000;r++){
         for(int i=0;i<stringcount;i++){
             
-			static constexpr auto theStrng = "hit the capturelimit."_cs;
+			static constexpr auto theStrng = "mit."_cs;
             matches += theStrng.isending(strings[i],stringLengths[i]);
         }
     }
