@@ -531,6 +531,11 @@ public:
 	bool doStrafeDeviation = false;
 	bool findjumpbugs = false;
 	bool makeVideo = false;
+	bool filterBotOnBotKills = false;
+	//bool filterBotKills = false;
+	//bool filterBotRets = false;
+	//bool filterFightBotKills = false;
+	//bool filterFightBotRets = false;
 	int videoMinMsec = 0;
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
@@ -1330,6 +1335,7 @@ int lastEventTime[MAX_GENTITIES];
 #define BOTSTATUS_LIKELYJKCLIENT 8
 #define BOTSTATUS_LIKELYDEMOBOT 16
 #define BOTSTATUS_NORMALBOT (BOTSTATUS_CONFIRMED|BOTSTATUS_SABERMODLIKELY)
+#define BOTSTATUS_FIGHTBOT (BOTSTATUS_FIGHTBOTANGLEDETECT|BOTSTATUS_LIKELYJKCLIENT|BOTSTATUS_LIKELYDEMOBOT)
 #define BOTSTATUS(clientNum) ( (clientNum >= 0 && clientNum < max_clients) ? (playerBotStatus[clientNum]) : 0 )
 int playerBotStatus[MAX_CLIENTS_MAX]; // bitmask. 1 = confirmed bot. 2 = likely bot (sabermod). 3 = fightbot
 AngleDecoder playerAngleDecoders[MAX_CLIENTS_MAX] {};
@@ -1481,6 +1487,9 @@ public:
 	bool isSuicide;
 	bool isRet;
 	bool isTeamKill;
+	bool isBotKill;
+	bool isFightBotKill;
+	bool isFiltered;
 	bool isDoom;
 	bool isExplosion;
 	bool isVisible;
@@ -1504,6 +1513,9 @@ struct SpreeInfo {
 	int countKills = 0;
 	int countRets = 0;
 	int countTeamKills = 0;
+	int countBotKills = 0;
+	int countFightBotKills = 0;
+	int countFiltered = 0; // how many we actually dont care about
 	int countDooms = 0;
 	int countExplosions = 0;
 	int countThirdPersons = 0; // Not followed ones.
@@ -3439,6 +3451,20 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 
 	if ((searchMode == SEARCH_MY_CTF_RETURNS || searchMode == SEARCH_ALL_MY_KILLS) && spreeInfo->countThirdPersons == spreeInfo->countKills) return;
 
+	if (spreeInfo->countFiltered == spreeInfo->countKills) {
+		return; 
+	} // not a single interesting kill in this, e.g. all bot kills
+	//if (clientNumAttacker >= 0 && clientNumAttacker < max_clients) {
+		// actually, who cares, killsprees BY bots are kinda interesting.
+		//bool playerIsBot = playerBotStatus[clientNumAttacker] & BOTSTATUS_NORMALBOT;
+		//if (opts.filterBotKills && playerIsBot && (spreeInfo->countRets == 0 || opts.filterFightBotRets)) {
+		//	return;
+		//}
+		//if (opts.filterBotRets && playerIsBot && (spreeInfo->countRets == spreeInfo->countKills || opts.filterBotKills)) {
+		//	return;
+		//}
+	//}
+
 	if (spreeInfo->countKills >= KILLSTREAK_MIN_KILLS || spreeInfo->countRets >= 2) { // gotta be at least 3 kills or 2 rets to count as killstreak
 
 		int uniqueTargetCount = 0;
@@ -3575,6 +3601,8 @@ void CheckSaveKillstreak(int maxDelay,SpreeInfo* spreeInfo,int clientNumAttacker
 		SQLBIND_DELAYED(query, int, "@countKills", spreeInfo->countKills);
 		SQLBIND_DELAYED(query, int, "@countRets", spreeInfo->countRets);
 		SQLBIND_DELAYED(query, int, "@countTeamKills", spreeInfo->countTeamKills);
+		SQLBIND_DELAYED(query, int, "@countBotKills", spreeInfo->countBotKills);
+		SQLBIND_DELAYED(query, int, "@countFightBotKills", spreeInfo->countFightBotKills);
 		SQLBIND_DELAYED(query, int, "@countUniqueTargets", uniqueTargetCount);
 		SQLBIND_DELAYED(query, int, "@countDooms", spreeInfo->countDooms);
 		SQLBIND_DELAYED(query, int, "@countExplosions", spreeInfo->countExplosions);
@@ -4459,6 +4487,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"countKills	INTEGER NOT NULL,"
 			"countRets	INTEGER NOT NULL,"
 			"countTeamKills	INTEGER NOT NULL,"
+			"countBotKills	INTEGER NOT NULL,"
+			"countFightBotKills	INTEGER NOT NULL,"
 			"countUniqueTargets	INTEGER NOT NULL,"
 			"countDooms	INTEGER NOT NULL,"
 			"countExplosions	INTEGER NOT NULL,"
@@ -4662,10 +4692,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertSpecialStatement, NULL);
 
 		preparedStatementText = "INSERT INTO killSprees "
-			"( hash, shorthash,maxDelay,maxDelayActual,killerId, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countUniqueTargets, countDooms, countExplosions,"
+			"( hash, shorthash,maxDelay,maxDelayActual,killerId, victimNames, victimNamesStripped ,killTypes, killTypesCount,killHashes, killerClientNum, victimClientNums, countKills, countRets, countTeamKills,countBotKills,countFightBotKills,countUniqueTargets, countDooms, countExplosions,"
 			" countThirdPersons, countInvisibles, demoRecorderClientnum, maxSpeedAttacker, maxSpeedTargets,resultingCaptures,resultingSelfCaptures,resultingCapturesAfter,resultingSelfCapturesAfter,resultingLaughs,resultingLaughsAfter,metaEvents,demoTime,lastGamestateDemoTime,duration,serverTime,nearbyPlayers,nearbyPlayerCount,entryMeta)"
 			" VALUES "
-			"( @hash, @shorthash, @maxDelay, @maxDelayActual, @killerId, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countUniqueTargets, @countDooms, @countExplosions,"
+			"( @hash, @shorthash, @maxDelay, @maxDelayActual, @killerId, @victimNames ,@victimNamesStripped, @killTypes,@killTypesCount ,@killHashes, @killerClientNum, @victimClientNums, @countKills, @countRets,@countTeamKills,@countBotKills,@countFightBotKills,@countUniqueTargets, @countDooms, @countExplosions,"
 			" @countThirdPersons, @countInvisibles, @demoRecorderClientnum, @maxSpeedAttacker, @maxSpeedTargets,@resultingCaptures,@resultingSelfCaptures,@resultingCapturesAfter,@resultingSelfCapturesAfter,@resultingLaughs,@resultingLaughsAfter,@metaEvents,@demoTime, @lastGamestateDemoTime,@duration,@serverTime,@nearbyPlayers,@nearbyPlayerCount,@entryMeta)";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertSpreeStatement, NULL);
@@ -8756,6 +8786,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							bool			isWorldKill = false;
 							bool			targetIsVisible = false;
 							bool			attackerIsVisibleOrFollowed = false;
+							bool			attackerIsNormalBot = false;
 							bool			targetIsVisibleOrFollowed = false;
 							bool			attackerIsVisible = false;
 							bool			isSaberKill = false; // In case we want to avoid non-saber kills to save space with huge demo collections
@@ -8771,6 +8802,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							if (attacker < 0 || attacker >= max_clients) {
 								attacker = ENTITYNUM_WORLD;
 								isWorldKill = true;
+							}
+							else {
+								attackerIsNormalBot = (playerBotStatus[attacker] & BOTSTATUS_NORMALBOT);
 							}
 							
 							mod = generalizeGameValue<GMAP_MEANSOFDEATH,SAFE>(mod,demoType);
@@ -8955,6 +8989,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							Kill thisKill;
 							thisKill.isRet = victimIsFlagCarrier;
 							thisKill.isTeamKill = isTeamKill;
+							thisKill.isBotKill = (playerBotStatus[target] & BOTSTATUS_NORMALBOT) ? true : false;
+							thisKill.isFightBotKill = (playerBotStatus[target] & BOTSTATUS_FIGHTBOT) ? true : false;
+							thisKill.isFiltered =!opts.filterBotOnBotKills ?  false : (thisKill.isBotKill && attackerIsNormalBot);
 							thisKill.isSuicide = isSuicide;
 							thisKill.isDoom = isDoomKill;
 							thisKill.isExplosion = (mod == MOD_FLECHETTE_GENERAL ||
@@ -9971,7 +10008,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 
 
-							if (opts.onlyLogSaberKills && !isSaberKill) {
+							if (opts.onlyLogSaberKills && !isSaberKill || thisKill.isFiltered) { // hmm so what if we have a killspree including this kill but this one's gone? oh well..
 								continue;
 							}
 
@@ -11706,6 +11743,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								if (thisKill->isDoom) spreeInfo.countDooms++;
 								if (thisKill->isRet) spreeInfo.countRets++;
 								if (thisKill->isTeamKill) spreeInfo.countTeamKills++;
+								if (thisKill->isBotKill) spreeInfo.countBotKills++;
+								if (thisKill->isFightBotKill) spreeInfo.countFightBotKills++;
+								if (thisKill->isFiltered) spreeInfo.countFiltered++;
 								if (thisKill->isExplosion) spreeInfo.countExplosions++;
 								if (!thisKill->isFollowed) spreeInfo.countThirdPersons++;
 								if (!thisKill->isVisible) spreeInfo.countInvisibles++;
@@ -12825,6 +12865,7 @@ int main(int argcO, char** argvO) {
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
 	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
 	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
+	auto B = op.add<popl::Implicit<int>>("B", "bot-filter", "Filter out kills by bots and on bots. Bitmask. 1=filter out any bot-on-bot kills",1);
 
 	
 	op.parse(argcO, argvO);
@@ -12880,6 +12921,11 @@ int main(int argcO, char** argvO) {
 	opts.writeChatsUnique = L->is_set() ? (L->value() & 1) : false;
 	opts.writeChatsCategorized = L->is_set() ? (L->value() & 2) : false;
 	opts.doStatsDb = Q->is_set() ? !(Q->value() & 1) : true;
+	opts.filterBotOnBotKills = B->is_set() ? (B->value() & 1) : false;
+	//opts.filterBotKills = B->is_set() ? (B->value() & 1) : false;
+	//opts.filterBotRets = B->is_set() ? (B->value() & 2) : false;
+	//opts.filterFightBotKills = B->is_set() ? (B->value() & 4) : false;
+	//opts.filterFightBotRets = B->is_set() ? (B->value() & 8) : false;
 
 	if (opts.doStatsDb) {
 		serverInfoComboMap = &_serverInfoComboMap;
