@@ -2033,6 +2033,14 @@ demoPeriodPacketStats_t currentPacketPeriodStats;
 int64_t lastPacketStatsWritten = 0;
 
 
+struct {
+	averageHelper_t	averageMsec;
+	int minMsec;
+	int droppedPackets;
+	bool canTrackMsec;
+} demoFpsMetaTracker;
+
+
 
 
 static inline void resetCurrentPacketPeriodStats() {
@@ -4538,6 +4546,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoErrorFlags INTEGER NOT NULL,"
 			"demoErrors	TEXT,"
 			"demoDerivativeFlags INTEGER NOT NULL,"
+			"droppedPackets INTEGER NOT NULL,"
+			"minMsec INTEGER NOT NULL,"
+			"averageFrameDuration REAL NOT NULL,"
 			"PRIMARY KEY(demoPath)"
 			"); ",
 			NULL, NULL, NULL);
@@ -4710,9 +4721,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoDatabaseProperty, NULL);
 
 		preparedStatementText = "INSERT INTO demoMeta "
-			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors,demoDerivativeFlags  )"
+			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors,demoDerivativeFlags,droppedPackets,minMsec,averageFrameDuration  )"
 			" VALUES "
-			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors,@demoDerivativeFlags)";
+			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors,@demoDerivativeFlags,@droppedPackets,@minMsec,@averageFrameDuration)";
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoMeta, NULL);
 
 		preparedStatementText = "SELECT last_insert_rowid();";
@@ -5693,6 +5704,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoErrors", demoErrorsString.c_str());
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@demoDerivativeFlags", demoDerivativeFlags);
 
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@minMsec", demoFpsMetaTracker.minMsec);
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@droppedPackets", demoFpsMetaTracker.droppedPackets);
+		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, double, "@averageFrameDuration", (demoFpsMetaTracker.averageMsec.sum / demoFpsMetaTracker.averageMsec.divisor));
+
 		std::stringstream recorderNames;
 		std::stringstream recorderNamesStripped;
 		int j = 0;
@@ -6599,6 +6614,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(&lastSneakDuration, 0, sizeof(lastSneakDuration));
 	Com_Memset(&NWHVersion, 0, sizeof(NWHVersion));
 	resetCurrentPacketPeriodStats();
+	Com_Memset(&demoFpsMetaTracker, 0, sizeof(demoFpsMetaTracker));
+	demoFpsMetaTracker.minMsec = INT_MAX;
+
 
 	lastKnownFlagCarrier[TEAM_RED] = lastKnownFlagCarrier[TEAM_BLUE] = lastKnownFlagCarrier[TEAM_FREE] = -1; 
 #if _DEBUG
@@ -6821,6 +6839,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 		else {
 			currentPacketPeriodStats.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
+			demoFpsMetaTracker.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
 		}
 
 		oldSize -= 4;
@@ -7121,6 +7140,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cuterror;
 				}
 
+				demoFpsMetaTracker.canTrackMsec = false;
+
 				std::cout << "gamestate\n";
 
 				configStringChanged.fill();
@@ -7276,11 +7297,24 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				if (demoCurrentTime < 0) {
 					std::cerr << "demoCurrentTime negative wtf?! demoOldTime "<< demoOldTime << ", demoCurrentTime " << demoCurrentTime  << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << DPrintFLocation << ")\n";
 				}
+
+				if (demoFpsMetaTracker.canTrackMsec && demo.cut.Cl.snap.serverTime > lastKnownTime && demo.cut.Cl.snap.serverTime-1001 < lastKnownTime) { // if delta is over 1000, its probably not fps, but a hitch
+					int delta = demo.cut.Cl.snap.serverTime - lastKnownTime;
+					if (demoFpsMetaTracker.minMsec > delta) {
+						demoFpsMetaTracker.minMsec = delta;
+					}
+					demoFpsMetaTracker.averageMsec.sum += delta;
+					demoFpsMetaTracker.averageMsec.divisor++;
+				}
+				demoFpsMetaTracker.canTrackMsec = true;
+
 				deltaTimeFromLastSnapshot = demoCurrentTime - demoOldTime;
 				lastKnownTime = demo.cut.Cl.snap.serverTime;
 				currentPacketPeriodStats.periodTotalTime += demoCurrentTime - demoOldTime;
 				demoOldTime = demoCurrentTime;
 				firstSnapAfterGamestate = false;
+
+
 
 				for (int cl = 0; cl < max_clients; cl++) {
 					requiredMetaEventAges[METRACKER_KILLS][cl] = demoCurrentTime - bufferTime; // Kills are a point in time. Whenever a kill happens, we need to have the past [bufferTime] milliseconds available. So just always require the last [bufferTime] milliseconds minimum for kills.
@@ -10419,6 +10453,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							SQLBIND_DELAYED(angleQuery, int, "@demoDateTime", sharedVars.oldDemoDateModified);
 							SQLBIND_DELAYED(angleQuery, int, "@demoDerivativeFlags", demoDerivativeFlags);
 							SQLBIND_DELAYED(angleQuery, int, "@errorFlags", errorFlags);
+
+
+
 
 							if (activeKillDatabase != -1) {
 								angleQueryWrapper->databaseIndex = activeKillDatabase;
