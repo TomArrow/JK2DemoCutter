@@ -748,7 +748,9 @@ public:
 		UNIQUEGAME_CONCRETE_TEXT()
 #define FIELDSFUNC(a,b,c) SQLBIND_NONDELAYED(statement,int64,QUOTE(@a),(int64_t)b);
 #define FIELDSFUNC_LAST(a,b,c) FIELDSFUNC(a,b,c)
-		UNIQUEGAME_CONCRETE()
+			UNIQUEGAME_CONCRETE()
+
+		SQLBIND_NONDELAYED(statement, int64, "@gameDuration", gameDuration);
 	}
 
 
@@ -788,6 +790,8 @@ public:
 	int sv_fps = 0; // CS_SERVERINFO
 	int g_needpass = 0; // CS_SERVERINFO
 	int g_forceregentime = 0; // CS_SERVERINFO
+	int scores1 = -1; // CS_SCORES1
+	int scores2 = -1; // CS_SCORES2
 
 	// nwh
 	int g_blockchance = 0; // CS_SERVERINFO
@@ -847,15 +851,21 @@ public:
 		if (!_isMOHAADemo) {
 			stringOffset = clCut->gameState.stringOffsets[CS_MESSAGE];
 			message = clCut->gameState.stringData + stringOffset; // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+			
+			stringOffset = clCut->gameState.stringOffsets[CS_SCORES1];
+			scores1 = atoi(clCut->gameState.stringData + stringOffset); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+			stringOffset = clCut->gameState.stringOffsets[CS_SCORES2];
+			scores2 = atoi(clCut->gameState.stringData + stringOffset); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+
 		}
 
 
 
 		// informative, not part of key
 		int currentGameTime = clCut->snap.serverTime - levelStartTime;
-		if (currentGameTime > gameDuration) {
+		//if (currentGameTime > gameDuration) {
 			gameDuration = currentGameTime;
-		}
+		//}
 	}
 	void updateValuesMove(UniqueGame_t* newGame, clientActive_t* clCut) {
 		
@@ -887,13 +897,15 @@ public:
 
 		if (!_isMOHAADemo) {
 			message = std::move(newGame->message); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
+			scores1 = scores1;
+			scores2 = scores2;
 		}
 
 		// informative, not part of key
 		int currentGameTime = clCut->snap.serverTime - levelStartTime;
-		if (currentGameTime > gameDuration) {
+		//if (currentGameTime > gameDuration) {
 			gameDuration = currentGameTime;
-		}
+		//}
 	}
 
 	UniqueGame_t(clientActive_t* clCut, demoType_t demoType) {
@@ -915,7 +927,7 @@ public:
 		version = Info_ValueForKey(serverInfoMap, "version");
 		sv_referencedPaks = Info_ValueForKey(systemInfoMap, "sv_referencedpaks");
 		gameDate = Info_ValueForKey(systemInfoMap, "gamedate");
-		Location = Info_ValueForKey(systemInfoMap, "location");
+		Location = Info_ValueForKey(systemInfoMap, "location","country");
 		cpuValue = Info_ValueForKey(systemInfoMap, "^7cpu");
 		serverId = atoi(Info_ValueForKey(systemInfoMap, "sv_serverid").c_str());
 		sv_cheats = atoi(Info_ValueForKey(systemInfoMap, "sv_cheats").c_str());
@@ -944,8 +956,8 @@ public:
 	}
 
 
-	int64_t databaseId[MAX_KILLDBS] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
-	int64_t databaseIdFinished[MAX_KILLDBS] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+	int64_t databaseId[MAX_KILLDBS] = { -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2 };
+	int64_t databaseIdFinished[MAX_KILLDBS] = { -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2 };
 
 
 	void buildCSHash(clientActive_t* clCut, demoType_t demoType) {
@@ -2723,9 +2735,9 @@ int g_gametype = 0;
 int g_gametype_general = 0;
 int activeKillDatabase = 0; // right now we dont have kill-specific filters, only global ones based on gametype or mapname and such. so we can optimize this and save it globally. 
 std::string currentMapName = "";
-void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts, bool rebuildCSHash) { // TODO: make this adapt to JKA
-
-	if (configStringChanged[CS_SERVERINFO] || configStringChanged[CS_SYSTEMINFO] || configStringChanged[getCS_LEVEL_START_TIME(demoType)] || configStringChanged[CS_MOTD] || configStringChanged[CS_MESSAGE]) {
+void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearchOptions& opts, bool rebuildCSHash, bool isMOHAADemo) { // TODO: make this adapt to JKA
+	
+	if (configStringChanged[CS_SERVERINFO] || configStringChanged[CS_SYSTEMINFO] || configStringChanged[getCS_LEVEL_START_TIME(demoType)] || configStringChanged[CS_MOTD] || !isMOHAADemo && configStringChanged[CS_MESSAGE]|| !isMOHAADemo && configStringChanged[CS_SCORES1]|| !isMOHAADemo && configStringChanged[CS_SCORES2]) {
 
 		UniqueGame_t newGame(clCut, demoType);
 		if (uniqueGameIndex == -1 || !uniqueGameCurrent.SameGame(&newGame)) {
@@ -4088,6 +4100,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			UNIQUEGAME_CONCRETE_TEXT()
 			UNIQUEGAME_CONCRETE()
 			",countDemos INTEGER NOT NULL"
+			",gameDuration INTEGER NOT NULL"
 			",PRIMARY KEY(id)"
 			",UNIQUE(abstractId,"
 #define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
@@ -4548,14 +4561,14 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		}
 		
 		preparedStatementText = "INSERT INTO uniqueGamesConcrete"
-			"(abstractId,countDemos,"
+			"(abstractId,countDemos, gameDuration,"
 #define FIELDSFUNC(a,b,c) QUOTE(a ) QUOTE(COMMA) 
 #define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
 			UNIQUEGAME_CONCRETE_TEXT()
 			UNIQUEGAME_CONCRETE()
 			")"
 			" VALUES "
-			"(@abstractId,1,"
+			"(@abstractId,1,@gameDuration,"
 #define FIELDSFUNC(a,b,c) QUOTE(@a ) QUOTE(COMMA) 
 #define FIELDSFUNC_LAST(a,b,c) QUOTE(@a )
 			UNIQUEGAME_CONCRETE_TEXT()
@@ -4565,7 +4578,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
 			UNIQUEGAME_CONCRETE_TEXT()
 			UNIQUEGAME_CONCRETE()
-			") DO UPDATE SET countDemos=countDemos+1 RETURNING id; ;";
+			") DO UPDATE SET countDemos=countDemos+1, gameDuration=MAX(gameDuration,@gameDuration) RETURNING id; ;";
 		;
 		sqlResult = sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameStatement, NULL);
 		if (sqlResult != SQLITE_OK) {
@@ -4962,15 +4975,14 @@ void handleKillDbPreQueries(SQLDelayedQueryWrapper_t* mainQueryWrapper, ioHandle
 	// entrymeta
 	SQLDelayedQuery* mainQuery = &mainQueryWrapper->query;
 	mainQuery->bind(killDbHandle->insertEntryMetaStatement);
+	SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@demoGameId", mainQueryWrapper->uniqueGameIndex);
 	if (game) {
 		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdAbstract", game->databaseId[killDbHandle->index]);
 		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdConcrete", game->databaseIdFinished[killDbHandle->index]);
-		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@demoGameId", mainQueryWrapper->uniqueGameIndex);
 	}
 	else {
 		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdAbstract", -2);
 		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@uniqueGameIdConcrete", -2);
-		SQLBIND_NONDELAYED(killDbHandle->insertEntryMetaStatement, int64, "@demoGameId", -2);
 	}
 	int queryResult = sqlite3_step(killDbHandle->insertEntryMetaStatement);
 	if (queryResult != SQLITE_ROW) {
@@ -7146,7 +7158,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				sentryModelIndex = -1; // Reset this here because a new gamestate could mean that modelIndizi changed
 
-				updateGameInfo(&demo.cut.Cl, demoType,opts,true);
+				updateGameInfo(&demo.cut.Cl, demoType,opts,true,isMOHAADemo);
 				CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
@@ -12538,7 +12550,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 
 		if (hadConfigStringCommands) {
-			updateGameInfo(&demo.cut.Cl,demoType,opts, rebuildUniqueGameCSHash);
+			updateGameInfo(&demo.cut.Cl,demoType,opts, rebuildUniqueGameCSHash, isMOHAADemo);
 			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
 			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {

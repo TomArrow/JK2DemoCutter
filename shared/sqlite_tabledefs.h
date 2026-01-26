@@ -39,6 +39,8 @@
 
 #define UNIQUEGAME_CONCRETE()\
 		FIELDSFUNC(intermissionStatus,_intermissionStatus,"INTEGER NOT NULL")\
+		FIELDSFUNC(scores1,scores1,"INTEGER NOT NULL")\
+		FIELDSFUNC(scores2,scores2,"INTEGER NOT NULL")\
 		FIELDSFUNC(levelStartTime,levelStartTime,"INTEGER NOT NULL")\
 		FIELDSFUNC(sv_fps,sv_fps,"INTEGER NOT NULL")\
 		FIELDSFUNC(g_needpass,g_needpass,"INTEGER NOT NULL")\
