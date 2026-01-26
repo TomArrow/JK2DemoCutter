@@ -2133,8 +2133,8 @@ struct CoolString {
 	}
 	// make sure the string ur comparing against is stored in a buffer that is legal to read up to the len of this string+1
 	// careful: returns true if match.
-	bool us_match(const char* cmpstr, int cmpstrlen)const {
-		return  !memcmp(data,cmpstr,len+1);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
+	bool us_match(const char* cmpstr)const {
+		return  !memcmp(data, cmpstr, len+1);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
 	}
 	// checks if the CoolString is the ending of a string being compared against
 	// make sure the string ur comparing against is stored in a buffer that is legal to read up to the len of this string+1
@@ -2145,8 +2145,8 @@ struct CoolString {
 	// checks if the CoolString is the start of a string being compared against
 	// make sure the string ur comparing against is stored in a buffer that is legal to read up to the len of this string+1
 	// careful: returns true if match.
-	bool us_isstart(const char* cmpstr, int cmpstrlen)const {
-		return  !memcmp(data, cmpstr + cmpstrlen - len, len);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
+	bool us_isstart(const char* cmpstr)const {
+		return  !memcmp(data, cmpstr, len);  // adding cmpstrlen == len &&  actually makes this 10 times slower!!
 	}
 };
 

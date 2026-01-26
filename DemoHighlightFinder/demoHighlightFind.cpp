@@ -2342,8 +2342,12 @@ qboolean findFreedomDefragRun(std::string printText, defragRunInfoFinal_t* info,
 		return qfalse;
 	}
 	extraArg = (const char*)Cmd_Argv(2);
-	bool isRanked = !_stricmp(extraArg, "dffinish_ranked");
-	if (!_stricmp(extraArg, "dffinish") || isRanked) {
+	static constexpr auto matchRanked = "dffinish_ranked"_cs;
+	static constexpr auto match = "dffinish"_cs;
+	//bool isRanked = !_stricmp(extraArg, "dffinish_ranked");
+	bool isRanked = matchRanked.us_match(extraArg);
+	//if (!_stricmp(extraArg, "dffinish") || isRanked) {
+	if (match.us_match(extraArg) || isRanked) {
 		finishedRunInfo_t runInfo;
 		runInfo.runId = atoi(Cmd_Argv(3));
 		runInfo.clientNum = atoi(Cmd_Argv(4));
@@ -12515,10 +12519,26 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				std::cerr << "STUFFTEXT DUMP: " << Cmd_Argv(1) << "\n";
 
 			}
-			else if (opts.makeVideo && !strcmp(cmd, "cp"))
+			else if (!strcmp(cmd, "cp"))
 			{
+				const char* cpTextC = Cmd_Argv(1);
+				size_t cpTextLen = strlen(cpTextC);
+
+				static constexpr auto timerStartedMatcherPlus2 = "Race timer started!"_cs;
+				
+				if (timerStartedMatcherPlus2.us_isstart(cpTextC+2)) {
+					strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].lastReset = demoCurrentTime;
+					if (strafeApplicablePlayerStateThisFrame) {
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 1;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = playerStateStrafeDeviationThisFrame;
+					}
+					else {
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 0;
+						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = 0;
+					}
+				}
 				if (opts.makeVideo) {
-					screenCenterText.push_back({ demoCurrentTime,Cmd_Argv(1) });
+					screenCenterText.push_back({ demoCurrentTime,cpTextC });
 				}
 			}
 			else if (!strcmp(cmd, "print")) {
@@ -12559,8 +12579,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					.setSubject(&printText)                         //set subject string
 					.setNumberedSubstringVector(&vec_num)         //pass pointer to VecNum vector
 					.match();*/
-				
-				if (printText.find("Timer started") != std::string::npos) {
+				static constexpr auto timerStartedMatcher = "^2[^7OC-System^2]: ^7Timer started\n"_cs;
+				//if (printText.find("Timer started") != std::string::npos) {
+				if (timerStartedMatcher.us_match(printTextC)) {
 					strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].lastReset = demoCurrentTime;
 					if (strafeApplicablePlayerStateThisFrame) {
 						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 1;
@@ -12572,13 +12593,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 				}
 
+				static constexpr auto ocStartPrefilter = "^2[^7OC-System^2]:"_cs;
+
 				if (findFreedomDefragRun<max_clients>(printText,&runInfo, qfalse, demoCurrentTime, lastGameStateChangeInDemoTime, demoType, CS_PLAYERS_here)) {
 					runFound = qtrue;
-				} else if (findOCDefragRun(printText, &runInfo.info)) {
+				} else if (ocStartPrefilter.us_isstart(printTextC) && findOCDefragRun(printText, &runInfo.info)) {
 					runFound = qtrue;
-				} else if (findRazorDefragRun(printText, &runInfo.info)) {
+				} else if (findRazorDefragRun(printText, &runInfo.info)) { // TODO prefilter somehow to avoid expensive regex?
 					runFound = qtrue;
-				} else if (findJAProDefragRun<max_clients>(printText, &runInfo.info, demoType)) {
+				} else if (findJAProDefragRun<max_clients>(printText, &runInfo.info, demoType)) { // TODO prefilter somehow to avoid expensive regex?
 					runFound = qtrue;
 				}
 				else {
@@ -12613,11 +12636,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				static constexpr auto winlimit = "hit the win limit.\n"_cs;
 				static constexpr auto timelimit = "@@@TIMELIMIT_HIT"_cs;
 				if (capturelimit1.us_isending(printTextC, printTextLen)
-					|| capturelimit2.us_isstart(printTextC, printTextLen)
+					|| capturelimit2.us_isstart(printTextC)
 					|| killlimit1.us_isending(printTextC, printTextLen)
 					|| killlimit2.us_isending(printTextC, printTextLen)
 					|| winlimit.us_isending(printTextC, printTextLen)
-					|| timelimit.us_isstart(printTextC, printTextLen)
+					|| timelimit.us_isstart(printTextC)
 					) {
 					uniqueGameCurrent.gameEndMessageFound();
 				}
