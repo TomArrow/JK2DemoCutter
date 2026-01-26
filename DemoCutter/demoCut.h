@@ -4778,6 +4778,35 @@ typedef struct {
 	byte		color[2];
 } pointCloudEntry_t;
 
+#pragma pack(push, 1)
+typedef struct pointCloudEntryFP32_s {
+	float		pos[3]; // float16
+	byte		color[2];
+} pointCloudEntryFP32_t;
+#pragma pack(pop)
+
+
+template <>
+struct ankerl::unordered_dense::hash<pointCloudEntryFP32_t> {
+	using is_avalanching = void;
+
+	[[nodiscard]] auto operator()(pointCloudEntryFP32_t const& x) const noexcept -> uint64_t {
+		return detail::wyhash::hash(&x,sizeof(pointCloudEntryFP32_t));
+	}
+};
+
+inline bool operator==(const pointCloudEntryFP32_t& me, const pointCloudEntryFP32_t& other)
+{
+	return !memcmp(&me,&other,sizeof(pointCloudEntryFP32_t));
+}
+
+#pragma pack(push, 1)
+typedef struct {
+	float			pos[3]; // float16
+	byte			color[2];
+	unsigned short	multiplier;
+} pointCloudEntryFP32Full_t;
+#pragma pack(pop)
 
 
 typedef enum {

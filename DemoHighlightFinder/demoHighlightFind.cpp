@@ -535,6 +535,7 @@ public:
 	bool filterBotOnBotKills = false;
 	bool savePointCloud = false;
 	bool savePointCloudS16 = true;
+	bool savePointCloudFP32 = false;
 	size_t pointCloudSizeLimit = 0;
 	//bool filterBotKills = false;
 	//bool filterBotRets = false;
@@ -1045,9 +1046,23 @@ std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
 
 ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntry_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMap;
 std::vector<pointCloudEntry_t>* pointCloudEntries = NULL;
+//ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntryFP32_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMapFP32;
+//std::vector<pointCloudEntryFP32_t>* pointCloudEntriesFP32 = NULL;
+ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::map<pointCloudEntryFP32_t, uint16_t, ankerl::unordered_dense::hash<pointCloudEntryFP32_t>>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMapFP32;
+ankerl::unordered_dense::map<pointCloudEntryFP32_t, uint16_t, ankerl::unordered_dense::hash<pointCloudEntryFP32_t>>* pointCloudEntriesFP32 = NULL;
 
-void addPointCloudEntry(vec3_t org, byte color[3], bool u16) {
-	if (pointCloudEntries) {
+void addPointCloudEntry(vec3_t org, byte color[3], bool u16, bool fp32) {
+	if (fp32 && pointCloudEntriesFP32) {
+		pointCloudEntryFP32_t newEntry;
+		VectorCopy(org,newEntry.pos);
+		//VectorCopy(color,newEntry.color);
+		//newEntry.color[3] = 0;
+		newEntry.color[0] = (color[0] & 240) | ((color[1] & 240) >> 4); // dumb but good enough for our very simple colors (full or half
+		newEntry.color[1] = (color[2] & 240); // dumb but good enough for our very simple colors (full or half
+		uint16_t* count = &(*pointCloudEntriesFP32)[newEntry];
+		*count = std::min((int)UINT16_MAX, (int)*count + 1);// we have one more of these. avoid dupes :)
+	}
+	else if (pointCloudEntries) {
 		pointCloudEntry_t newEntry;
 		if (u16) {
 			newEntry.poss16[0] = roundf(org[0]) + copysignf(0.5f, org[0]);
@@ -5867,7 +5882,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 				std::filesystem::create_directory("pointClouds");
 				std::fstream pointCloudFile;
-				pointCloudFile.open(va("pointClouds/pointCloud-%s-%s.bin",it->first.c_str(), opts.savePointCloudS16 ? "s16" : "fp16"), std::ios_base::ate | std::ios::in | std::ios::out | std::ios_base::binary); // append instead of overwrite
+				pointCloudFile.open(va("pointClouds/pointCloud-%s-%s.bin",it->first.c_str(), opts.savePointCloudS16 ? "s16" : "fp16"), std::ios_base::ate | std::ios::out | std::ios_base::binary); // append instead of overwrite
 				size_t availableSpace = SIZE_MAX;
 				size_t currentSize = pointCloudFile.tellp();
 				if (currentSize % sizeof(pointCloudEntry_t)) {
@@ -5891,6 +5906,52 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 				}
 				if (availableSpace) {
 					pointCloudFile.write((const char*)it->second.data(), std::min(it->second.size() * sizeof(pointCloudEntry_t), availableSpace));
+				}
+				pointCloudFile.close();
+			}
+		}
+	}
+	if (pointCloudEntriesMapFP32.size()) {
+		for (auto it = pointCloudEntriesMapFP32.begin(); it != pointCloudEntriesMapFP32.end(); it++) {
+			if (it->second.size()) {
+
+				std::filesystem::create_directory("pointClouds");
+				std::fstream pointCloudFile;
+				pointCloudFile.open(va("pointClouds/pointCloud-%s-fp32.bin",it->first.c_str()), std::ios_base::ate | std::ios::out | std::ios_base::binary); // append instead of overwrite
+				size_t availableSpace = SIZE_MAX;
+				//pointCloudFile.write(NULL, 0); // just to make tellp work?
+				size_t currentSize = pointCloudFile.tellp();
+				if (currentSize % sizeof(pointCloudEntryFP32Full_t)) {
+					std::cerr << "wtf, pointcloud file size is not multiple of point cloud entry. trying to fixx\n";
+					// try to fix?
+					size_t writeStart = currentSize/ sizeof(pointCloudEntryFP32Full_t);
+					writeStart *= sizeof(pointCloudEntryFP32Full_t);
+					pointCloudFile.seekp(writeStart,std::ios_base::beg);
+				}
+				if (opts.pointCloudSizeLimit) {
+					//pointCloudFile.write(NULL, 0); // just to make tellp work?
+					//size_t currentSize2 = pointCloudFile.tellg();
+					if (opts.pointCloudSizeLimit <= currentSize) {
+						availableSpace = 0;
+					}
+					else {
+						availableSpace = opts.pointCloudSizeLimit - currentSize;
+						availableSpace /= sizeof(pointCloudEntryFP32Full_t);
+						availableSpace *= sizeof(pointCloudEntryFP32Full_t); // make it align with the point cloud entry size
+					}
+				}
+				if (availableSpace) {
+					uint16_t maxval = 0;
+					size_t dupedCount = 0;
+					for (auto it2 = it->second.begin(); it2 != it->second.end() && availableSpace > 0; it2++) {
+						pointCloudFile.write((const char*)&it2->first, sizeof(pointCloudEntryFP32_t));
+						pointCloudFile.write((const char*)&it2->second, sizeof(uint16_t));
+						maxval = std::max(it2->second,maxval);
+						dupedCount += it2->second - 1;
+						availableSpace -= sizeof(pointCloudEntryFP32Full_t);
+					}
+					std::cout << "FP32 point cloud saved. Max duplication: " << maxval << ", dupes count: " << dupedCount << ", total count excl dupes: " << it->second.size() << "\n";
+					//pointCloudFile.write((const char*)it->second.data(), std::min(it->second.size() * sizeof(pointCloudEntryFP32Full_t), availableSpace));
 				}
 				pointCloudFile.close();
 			}
@@ -7226,6 +7287,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 				if (opts.savePointCloud) {
 					pointCloudEntries = &pointCloudEntriesMap[serverInfoMap["mapname"]];
+					pointCloudEntriesFP32 = &pointCloudEntriesMapFP32[serverInfoMap["mapname"]];
 				}
 
 				if (opts.makeVideo || opts.throughWallChecks) {
@@ -8612,7 +8674,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						if (lastFrameInfo.entityExists[i]) {
 							
 							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && !VectorCompare(lastFrameInfo.playerPositions[i], thisFrameInfo.playerPositions[i]) && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
-								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]],opts.savePointCloudS16);
+								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]],opts.savePointCloudS16, opts.savePointCloudFP32);
 							}
 
 							// script check part #2
@@ -8723,7 +8785,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 						else {
 							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
-								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]], opts.savePointCloudS16);
+								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]], opts.savePointCloudS16, opts.savePointCloudFP32);
 							}
 						}
 
@@ -13014,7 +13076,7 @@ int main(int argcO, char** argvO) {
 	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
 	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
 	auto B = op.add<popl::Implicit<int>>("B", "bot-filter", "Filter out kills by bots and on bots. Bitmask. 1=filter out any bot-on-bot kills",1);
-	auto i = op.add<popl::Implicit<int>>("i", "save-point-cloud", "Save a point-cloud file of all unique player positions, fp16ieee[3] and color byte[2] (4 bits per color). Optional: Value 2 to do shorts instead of fp16.",1);
+	auto i = op.add<popl::Implicit<int>>("i", "save-point-cloud", "Save a point-cloud file of all unique player positions, fp16ieee[3] and color byte[2] (4 bits per color). Optional: Value 2 to do shorts instead of fp16. Value 4 to do fp32",1);
 	auto I = op.add<popl::Implicit<size_t>>("I", "point-cloud-size-limit", "Limit a point cloud's file size. Optionally specify a number, default 2 GB. (unrestricted without -I optiion)",(size_t) 2147483648ULL);
 
 	
@@ -13074,6 +13136,7 @@ int main(int argcO, char** argvO) {
 	opts.filterBotOnBotKills = B->is_set() ? (B->value() & 1) : false;
 	opts.savePointCloud = i->is_set() ? i->value() : false;
 	opts.savePointCloudS16 = i->is_set() ? (i->value() & 2) : false;
+	opts.savePointCloudFP32 = i->is_set() ? (i->value() & 4) : false;
 	opts.pointCloudSizeLimit = I->is_set() ? I->value() : 0;
 	//opts.filterBotKills = B->is_set() ? (B->value() & 1) : false;
 	//opts.filterBotRets = B->is_set() ? (B->value() & 2) : false;
