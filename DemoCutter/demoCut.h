@@ -4771,7 +4771,10 @@ typedef struct {
 
 
 typedef struct {
-	uint16_t	pos[3]; // float16
+	union {
+		uint16_t	posfp16[3]; // float16
+		int16_t		poss16[3]; // float16
+	};
 	byte		color[2];
 } pointCloudEntry_t;
 

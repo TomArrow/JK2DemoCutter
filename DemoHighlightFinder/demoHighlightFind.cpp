@@ -534,6 +534,7 @@ public:
 	bool makeVideo = false;
 	bool filterBotOnBotKills = false;
 	bool savePointCloud = false;
+	bool savePointCloudS16 = true;
 	size_t pointCloudSizeLimit = 0;
 	//bool filterBotKills = false;
 	//bool filterBotRets = false;
@@ -1045,12 +1046,19 @@ std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
 ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntry_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMap;
 std::vector<pointCloudEntry_t>* pointCloudEntries = NULL;
 
-void addPointCloudEntry(vec3_t org, byte color[3]) {
+void addPointCloudEntry(vec3_t org, byte color[3], bool u16) {
 	if (pointCloudEntries) {
 		pointCloudEntry_t newEntry;
-		newEntry.pos[0] = fp16_ieee_from_fp32_value(org[0]);
-		newEntry.pos[1] = fp16_ieee_from_fp32_value(org[1]);
-		newEntry.pos[2] = fp16_ieee_from_fp32_value(org[2]);
+		if (u16) {
+			newEntry.poss16[0] = roundf(org[0]) + copysignf(0.5f, org[0]);
+			newEntry.poss16[1] = roundf(org[1]) + copysignf(0.5f, org[1]);
+			newEntry.poss16[2] = roundf(org[2]) + copysignf(0.5f, org[2]);
+		}
+		else {
+			newEntry.posfp16[0] = fp16_ieee_from_fp32_value(org[0]);
+			newEntry.posfp16[1] = fp16_ieee_from_fp32_value(org[1]);
+			newEntry.posfp16[2] = fp16_ieee_from_fp32_value(org[2]);
+		}
 		newEntry.color[0] = (color[0] & 240) | ((color[1] & 240) >> 4); // dumb but good enough for our very simple colors (full or half
 		newEntry.color[1] = (color[2] & 240); // dumb but good enough for our very simple colors (full or half
 		pointCloudEntries->push_back(newEntry);
@@ -5858,11 +5866,20 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			if (it->second.size()) {
 
 				std::filesystem::create_directory("pointClouds");
-				std::ofstream pointCloudFile;
-				pointCloudFile.open(va("pointClouds/pointCloud-%s.bin",it->first.c_str()), std::ios_base::app | std::ios_base::binary); // append instead of overwrite
+				std::fstream pointCloudFile;
+				pointCloudFile.open(va("pointClouds/pointCloud-%s-%s.bin",it->first.c_str(), opts.savePointCloudS16 ? "s16" : "fp16"), std::ios_base::ate | std::ios::in | std::ios::out | std::ios_base::binary); // append instead of overwrite
 				size_t availableSpace = SIZE_MAX;
+				size_t currentSize = pointCloudFile.tellp();
+				if (currentSize % sizeof(pointCloudEntry_t)) {
+					std::cerr << "wtf, pointcloud file size is not multiple of point cloud entry. trying to fixx\n";
+					// try to fix?
+					size_t writeStart = currentSize/ sizeof(pointCloudEntry_t);
+					writeStart *= sizeof(pointCloudEntry_t);
+					pointCloudFile.seekp(writeStart,std::ios_base::beg);
+				}
 				if (opts.pointCloudSizeLimit) {
-					size_t currentSize = pointCloudFile.tellp();
+					//pointCloudFile.write(NULL, 0); // just to make tellp work?
+					//size_t currentSize2 = pointCloudFile.tellg();
 					if (opts.pointCloudSizeLimit <= currentSize) {
 						availableSpace = 0;
 					}
@@ -8595,7 +8612,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						if (lastFrameInfo.entityExists[i]) {
 							
 							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && !VectorCompare(lastFrameInfo.playerPositions[i], thisFrameInfo.playerPositions[i]) && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
-								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]]);
+								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]],opts.savePointCloudS16);
 							}
 
 							// script check part #2
@@ -8706,7 +8723,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 						else {
 							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
-								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]]);
+								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]], opts.savePointCloudS16);
 							}
 						}
 
@@ -12997,7 +13014,7 @@ int main(int argcO, char** argvO) {
 	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
 	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
 	auto B = op.add<popl::Implicit<int>>("B", "bot-filter", "Filter out kills by bots and on bots. Bitmask. 1=filter out any bot-on-bot kills",1);
-	auto i = op.add<popl::Implicit<int>>("i", "save-point-cloud", "Save a point-cloud file of all unique player positions, fp16ieee[3] and color byte[2] (4 bits per color).",1);
+	auto i = op.add<popl::Implicit<int>>("i", "save-point-cloud", "Save a point-cloud file of all unique player positions, fp16ieee[3] and color byte[2] (4 bits per color). Optional: Value 2 to do shorts instead of fp16.",1);
 	auto I = op.add<popl::Implicit<size_t>>("I", "point-cloud-size-limit", "Limit a point cloud's file size. Optionally specify a number, default 2 GB. (unrestricted without -I optiion)",(size_t) 2147483648ULL);
 
 	
@@ -13055,7 +13072,8 @@ int main(int argcO, char** argvO) {
 	opts.writeChatsCategorized = L->is_set() ? (L->value() & 2) : false;
 	opts.doStatsDb = Q->is_set() ? !(Q->value() & 1) : true;
 	opts.filterBotOnBotKills = B->is_set() ? (B->value() & 1) : false;
-	opts.savePointCloud = i->is_set() ? (i->value() & 1) : false;
+	opts.savePointCloud = i->is_set() ? i->value() : false;
+	opts.savePointCloudS16 = i->is_set() ? (i->value() & 2) : false;
 	opts.pointCloudSizeLimit = I->is_set() ? I->value() : 0;
 	//opts.filterBotKills = B->is_set() ? (B->value() & 1) : false;
 	//opts.filterBotRets = B->is_set() ? (B->value() & 2) : false;
