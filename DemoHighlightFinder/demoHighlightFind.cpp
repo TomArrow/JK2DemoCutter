@@ -902,8 +902,8 @@ public:
 
 		if (!_isMOHAADemo) {
 			message = std::move(newGame->message); // WAIT WHAT ABOUT NWH PAUSES??! it sets CS_LEVEL_START_TIME back to a higher time.
-			scores1 = scores1;
-			scores2 = scores2;
+			scores1 = newGame->scores1;
+			scores2 = newGame->scores2;
 		}
 
 		// informative, not part of key
@@ -4275,6 +4275,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"directionX	REAL,"
 			"directionY	REAL,"
 			"directionZ	REAL,"
+			"victimDirectionX	REAL," // 1 frame earlier
+			"victimDirectionY	REAL,"// 1 frame earlier
+			"victimDirectionZ	REAL,"// 1 frame earlier
+			"currentSpeedVictim	REAL,"// 1 frame earlier
 			"demoTime INTEGER NOT NULL,"
 			"lastGamestateDemoTime INTEGER NOT NULL,"
 			"serverTime INTEGER NOT NULL,"
@@ -4651,13 +4655,13 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 #if TRACK_GROUNDFRAME
 ",groundFrameQuality,groundFrameAngleChange"
 #endif
-			",throughWallNormal,throughWallOcclusion,saberComboCount,victimHitCount,victimHitCountLenient,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
+			",throughWallNormal,throughWallOcclusion,saberComboCount,victimHitCount,victimHitCountLenient,lastSneak,lastSneakDuration,resultingCaptures,resultingSelfCaptures,resultingLaughs,metaEvents,maxAngularSpeedAttacker,maxAngularAccelerationAttacker,maxAngularJerkAttacker,maxAngularSnapAttacker,maxSpeedAttacker,maxSpeedTarget,currentSpeedAttacker,currentSpeedTarget,meansOfDeathString,probableKillingWeapon,demoTime,lastGamestateDemoTime,serverTime,lastSaberMoveChangeSpeed,timeSinceLastSaberMoveChange,timeSinceLastBackflip,nearbyPlayers,nearbyPlayerCount,attackerJumpHeight, victimJumpHeight,directionX,directionY,directionZ,victimDirectionX,victimDirectionY,victimDirectionZ,currentSpeedVictim,isSuicide,isModSuicide,attackerIsFollowedOrVisible,errorFlags,entryMeta)"
 			"VALUES "
 			"(@hash,@shorthash,@killerIsFlagCarrier,@isReturn,@isTeamKill,@victimCapperKills,@victimCapperRets,@victimCapperWasFollowedOrVisible,@victimCapperMaxNearbyEnemyCount,@victimCapperMoreThanOneNearbyEnemyTimePercent,@victimCapperAverageNearbyEnemyCount,@victimCapperMaxVeryCloseEnemyCount,@victimCapperAnyVeryCloseEnemyTimePercent,@victimCapperMoreThanOneVeryCloseEnemyTimePercent,@victimCapperAverageVeryCloseEnemyCount,@victimFlagPickupSource,@victimFlagHoldTime,@targetIsVisible,@targetIsFollowed,@targetIsFollowedOrVisible,@attackerIsVisible,@attackerIsFollowed,@demoRecorderClientnum,@boosts,@boostCountTotal,@boostCountAttacker,@boostCountVictim,@projectileWasAirborne,@sameFrameRet,@baseFlagDistance,@headJumps,@specialJumps,@timeSinceLastSelfSentryJump"
 #if TRACK_GROUNDFRAME
 ",@groundFrameQuality,@groundFrameAngleChange"
 #endif	
-",@throughWallNormal,@throughWallOcclusion,@saberComboCount,@victimHitCount,@victimHitCountLenient,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
+",@throughWallNormal,@throughWallOcclusion,@saberComboCount,@victimHitCount,@victimHitCountLenient,@lastSneak,@lastSneakDuration,@resultingCaptures,@resultingSelfCaptures,@resultingLaughs,@metaEvents,@maxAngularSpeedAttacker,@maxAngularAccelerationAttacker,@maxAngularJerkAttacker,@maxAngularSnapAttacker,@maxSpeedAttacker,@maxSpeedTarget,@currentSpeedAttacker,@currentSpeedTarget,@meansOfDeathString,@probableKillingWeapon,@demoTime, @lastGamestateDemoTime,@serverTime,@lastSaberMoveChangeSpeed,@timeSinceLastSaberMoveChange,@timeSinceLastBackflip,@nearbyPlayers,@nearbyPlayerCount,@attackerJumpHeight, @victimJumpHeight,@directionX,@directionY,@directionZ,@victimDirectionX,@victimDirectionY,@victimDirectionZ,@currentSpeedVictim,@isSuicide,@isModSuicide,@attackerIsFollowedOrVisible,@errorFlags,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertAngleStatement, NULL);
 		preparedStatementText = "INSERT INTO captures"
@@ -10435,6 +10439,17 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								SQLBIND_DELAYED_NULL(angleQuery,  "@directionY");
 								SQLBIND_DELAYED_NULL(angleQuery,  "@directionZ");
 								SQLBIND_DELAYED_NULL(angleQuery,  "@currentSpeedAttacker");
+							}
+							if (lastFrameInfo.entityExists[target]) { // have to take it from last frame. Cuz of knockback
+								SQLBIND_DELAYED(angleQuery, double, "@victimDirectionX", lastFrameInfo.playerVelocities[target][0]);
+								SQLBIND_DELAYED(angleQuery, double, "@victimDirectionY", lastFrameInfo.playerVelocities[target][1]);
+								SQLBIND_DELAYED(angleQuery, double, "@victimDirectionZ", lastFrameInfo.playerVelocities[target][2]);
+								SQLBIND_DELAYED(angleQuery, double, "@currentSpeedVictim", VectorLength(lastFrameInfo.playerVelocities[target]));
+							} else {
+								SQLBIND_DELAYED_NULL(angleQuery,  "@victimDirectionX");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@victimDirectionY");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@victimDirectionZ");
+								SQLBIND_DELAYED_NULL(angleQuery,  "@currentSpeedVictim");
 							}
 							if (targetIsFollowed) {
 								SQLBIND_DELAYED(angleQuery, double, "@currentSpeedTarget", VectorLength(demo.cut.Cl.snap.ps.velocity));
