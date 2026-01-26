@@ -2123,6 +2123,7 @@ constexpr inline size_t strlenConstExpr(const char* txt) {
 
 // string that can be a constexpr literal and already knows its size and can do epic fast unsafe comparisons with memcmp, 10-20x times faster than strcmp sometimes
 // TODO: when/if we switch to C++ 20, make len a template param.
+// TODO: use this for defrag finding pre-filtering where possible
 struct CoolString {
 	constexpr static size_t maxLen = 100;
 	char data[maxLen+1];

@@ -658,6 +658,9 @@ public:
 	IntermissionStatus getIntermissionStatus() {
 		return _intermissionStatus;
 	}
+	bool waitingForIntermission() {
+		return _intermissionStatus == IntermissionStatus::IntermissionAnnounced || _intermissionStatus == IntermissionStatus::GameEndStringFound;
+	}
 	void csIntermissionReceived() {
 		if (_intermissionStatus == IntermissionStatus::NoIntermission || _intermissionStatus == IntermissionStatus::GameEndStringFound) {
 			_intermissionStatus = IntermissionStatus::IntermissionAnnounced;
@@ -680,12 +683,12 @@ public:
 	}
 
 	void setLastScores(std::string scores) {
-		if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced) {
+		if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced || _intermissionStatus == IntermissionStatus::GameEndStringFound) {
 			_lastScores = scores;
 		}
 	}
 	void setMatchStatistics(std::string matchStatistics) {
-		if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced) {
+		if (_intermissionStatus == IntermissionStatus::IntermissionAnnounced || _intermissionStatus == IntermissionStatus::GameEndStringFound) {
 			_lastMatchStatistics = matchStatistics;
 		}
 	}
@@ -724,6 +727,27 @@ public:
 				_intermissionStatus = IntermissionStatus::Invalid; // idk what would lead us here
 			}
 		}
+	}
+
+
+
+	void bindAbstract(sqlite3_stmt* statement) {
+
+#define FIELDSFUNC(a,b,c) SQLBIND_NONDELAYED_TEXT(statement,QUOTE(@a),b.c_str());
+#define FIELDSFUNC_LAST(a,b,c) FIELDSFUNC(a,b,c)
+		UNIQUEGAME_ABSTRACT_TEXT()
+#define FIELDSFUNC(a,b,c) SQLBIND_NONDELAYED(statement,int64,QUOTE(@a),b);
+#define FIELDSFUNC_LAST(a,b,c) FIELDSFUNC(a,b,c)
+		UNIQUEGAME_ABSTRACT()
+	}
+	void bindConcrete(sqlite3_stmt* statement) {
+
+#define FIELDSFUNC(a,b,c) SQLBIND_NONDELAYED_TEXT(statement,QUOTE(@a),b.c_str());
+#define FIELDSFUNC_LAST(a,b,c) FIELDSFUNC(a,b,c)
+		UNIQUEGAME_CONCRETE_TEXT()
+#define FIELDSFUNC(a,b,c) SQLBIND_NONDELAYED(statement,int64,QUOTE(@a),(int64_t)b);
+#define FIELDSFUNC_LAST(a,b,c) FIELDSFUNC(a,b,c)
+		UNIQUEGAME_CONCRETE()
 	}
 
 
@@ -878,6 +902,7 @@ public:
 		// constructor only handles stuff that cannot change during a game (at least on an average server, cuz latched or cvar_rom)
 		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap, "g_weapondisable").c_str());
 		g_truejedi = atoi(Info_ValueForKey(serverInfoMap, "g_jedivmerc").c_str());
+		g_gametype = atoi(Info_ValueForKey(serverInfoMap, "g_gametype").c_str());
 		sv_maxclients = atoi(Info_ValueForKey(serverInfoMap, "sv_maxclients").c_str());
 		g_forcepowerdisable = atoi(Info_ValueForKey(serverInfoMap, "g_forcepowerdisable").c_str());
 		g_weapondisable = atoi(Info_ValueForKey(serverInfoMap, "g_weapondisable").c_str());
@@ -918,8 +943,8 @@ public:
 	}
 
 
-	int databaseId = -1;
-	int databaseIdFinished = -1;
+	int64_t databaseId[MAX_KILLDBS] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+	int64_t databaseIdFinished[MAX_KILLDBS] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
 
 	void buildCSHash(clientActive_t* clCut, demoType_t demoType) {
@@ -4498,7 +4523,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			" VALUES "
 			"(1,"
 #define FIELDSFUNC(a,b,c) QUOTE(@a ) QUOTE(COMMA) 
-#define FIELDSFUNC_LAST(a,b,c) QUOTE(a )
+#define FIELDSFUNC_LAST(a,b,c) QUOTE(@a )
 			UNIQUEGAME_ABSTRACT_TEXT()
 			UNIQUEGAME_ABSTRACT()
 			") ON CONFLICT ("
@@ -4508,7 +4533,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			UNIQUEGAME_ABSTRACT()
 			") DO UPDATE SET countDemos=countDemos+1 RETURNING id; ;";
 		;
-		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameAbstractStatement, NULL);
+		sqlResult = sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameAbstractStatement, NULL);
+		if (sqlResult != SQLITE_OK) {
+			std::cerr << "Error generating sql statement: " << sqlResult << ":" << sqlite3_errmsg(io.killDb[i].killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
 		
 		preparedStatementText = "INSERT INTO uniqueGamesConcrete"
 			"(abstractId,countDemos,"
@@ -4530,7 +4558,10 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			UNIQUEGAME_CONCRETE()
 			") DO UPDATE SET countDemos=countDemos+1 RETURNING id; ;";
 		;
-		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameStatement, NULL);
+		sqlResult = sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertUniqueGameStatement, NULL);
+		if (sqlResult != SQLITE_OK) {
+			std::cerr << "Error generating sql statement: " << sqlResult << ":" << sqlite3_errmsg(io.killDb[i].killDb) << "(" << DPrintFLocation << ")" << "\n";
+		}
 
 		preparedStatementText = "INSERT INTO kills"
 			"(hash,shorthash,map,killerId,victimId,killerTeam,victimTeam,redScore,blueScore,otherFlagStatus,redPlayerCount,bluePlayerCount,sumPlayerCount,killerClientNum,victimClientNum,isDoomKill,isExplosion,isSuicide,isModSuicide,meansOfDeath,positionX,positionY,positionZ)"
@@ -4989,6 +5020,55 @@ void insertComboMap(const char* type, csComboMap_t* comboMap, ioHandles_t& io, c
 	}
 }
 
+int64_t insertAbstractUniqueGame(UniqueGame_t* game, sqlite3_stmt* statement, sqlite3* db, ioHandles_t& io, const ExtraSearchOptions& opts) {
+
+	int64_t insertedRow = -1;
+	game->bindAbstract(statement);
+	int queryResult = sqlite3_step(statement);
+	if (queryResult != SQLITE_ROW) {
+		std::cerr << "Error inserting abstract unique game (getrow) into database: " << queryResult << ":" << sqlite3_errmsg(db) << "(" << DPrintFLocation << ")" << "\n";
+	}
+	else {
+		insertedRow = sqlite3_column_int64(statement, 0);
+	}
+	queryResult = sqlite3_step(statement);
+	if (queryResult != SQLITE_DONE) {
+		std::cerr << "Error inserting abstract unique game into database: " << queryResult << ":" << sqlite3_errmsg(db) << "(" << DPrintFLocation << ")" << "\n";
+	}
+	sqlite3_reset(statement);
+	return insertedRow;
+}
+int64_t insertConcreteUniqueGame(UniqueGame_t* game, int64_t abstractDbIndex, sqlite3_stmt* statement, sqlite3* db, ioHandles_t& io, const ExtraSearchOptions& opts) {
+
+	int64_t insertedRow = -1;
+	game->bindConcrete(statement);
+	SQLBIND_NONDELAYED(statement,int64,"@abstractId",abstractDbIndex);
+	int queryResult = sqlite3_step(statement);
+	if (queryResult != SQLITE_ROW) {
+		std::cerr << "Error inserting concrete unique game (getrow) into database: " << queryResult << ":" << sqlite3_errmsg(db) << "(" << DPrintFLocation << ")" << "\n";
+	}
+	else {
+		insertedRow = sqlite3_column_int64(statement, 0);
+	}
+	queryResult = sqlite3_step(statement);
+	if (queryResult != SQLITE_DONE) {
+		std::cerr << "Error inserting concrete unique game into database: " << queryResult << ":" << sqlite3_errmsg(db) << "(" << DPrintFLocation << ")" << "\n";
+	}
+	sqlite3_reset(statement);
+	return insertedRow;
+}
+
+void handleUniqueGame(UniqueGame_t* game, ioHandles_t& io, const ExtraSearchOptions& opts, bool isCurrent) {
+	for (int i = 0; i < opts.killDbsCount; i++) {
+		game->databaseId[i] = insertAbstractUniqueGame(game,io.killDb[i].insertUniqueGameAbstractStatement,io.killDb[i].killDb,io,opts);
+		UniqueGame_t::IntermissionStatus status = game->getIntermissionStatus();
+		if (status == UniqueGame_t::IntermissionStatus::IntermissionPSConfirmed || !isCurrent && status == UniqueGame_t::IntermissionStatus::NoIntermission) {
+			game->databaseIdFinished[i] = insertConcreteUniqueGame(game, game->databaseId[i], io.killDb[i].insertUniqueGameStatement, io.killDb[i].killDb, io, opts);
+		}
+
+	}
+}
+
 // anything we might need to reference in the later queries or just wanna do manually and not with buffered queries.
 void executeEarlyQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	if (opts.doStatsDb) {
@@ -4996,6 +5076,10 @@ void executeEarlyQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		insertComboMap("syi", &_systemInfoComboMap, io, opts);
 		insertComboMap("pi", &_playerInfoComboMap, io, opts);
 	}
+	for (auto it = uniqueGames.begin(); it != uniqueGames.end();it++) {
+		handleUniqueGame(&*it,io,opts,false);
+	}
+	handleUniqueGame(&uniqueGameCurrent,io,opts,true);
 }
 
 void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
@@ -12042,7 +12126,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				}
 			}
 
-			if (!isMOHAADemo && uniqueGameCurrent.getIntermissionStatus() == UniqueGame_t::IntermissionStatus::IntermissionAnnounced && !strcmp(cmd, "scores")) {
+			if (!isMOHAADemo && uniqueGameCurrent.waitingForIntermission() && !strcmp(cmd, "scores")) {
 				uniqueGameCurrent.setLastScores(command);
 			}
 			else if (!strcmp(cmd, "chat") || !strcmp(cmd, "tchat")) {
