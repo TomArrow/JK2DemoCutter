@@ -1046,10 +1046,16 @@ std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
 
 ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntry_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMap;
 std::vector<pointCloudEntry_t>* pointCloudEntries = NULL;
-//ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntryFP32_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMapFP32;
-//std::vector<pointCloudEntryFP32_t>* pointCloudEntriesFP32 = NULL;
+
+#define POINTCLOUDFP32_DUPECOUNTMAP 0 // turns out the savings arent worth it.
+
+#if POINTCLOUDFP32_DUPECOUNTMAP
 ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::map<pointCloudEntryFP32_t, uint16_t, ankerl::unordered_dense::hash<pointCloudEntryFP32_t>>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMapFP32;
 ankerl::unordered_dense::map<pointCloudEntryFP32_t, uint16_t, ankerl::unordered_dense::hash<pointCloudEntryFP32_t>>* pointCloudEntriesFP32 = NULL;
+#else
+ankerl::unordered_dense::map<std::string, std::vector<pointCloudEntryFP32_t>, ankerl::unordered_dense::hash<std::string>> pointCloudEntriesMapFP32;
+std::vector<pointCloudEntryFP32_t>* pointCloudEntriesFP32 = NULL;
+#endif
 
 void addPointCloudEntry(vec3_t org, byte color[3], bool u16, bool fp32) {
 	if (fp32 && pointCloudEntriesFP32) {
@@ -1059,8 +1065,12 @@ void addPointCloudEntry(vec3_t org, byte color[3], bool u16, bool fp32) {
 		//newEntry.color[3] = 0;
 		newEntry.color[0] = (color[0] & 240) | ((color[1] & 240) >> 4); // dumb but good enough for our very simple colors (full or half
 		newEntry.color[1] = (color[2] & 240); // dumb but good enough for our very simple colors (full or half
+#if POINTCLOUDFP32_DUPECOUNTMAP
 		uint16_t* count = &(*pointCloudEntriesFP32)[newEntry];
 		*count = std::min((int)UINT16_MAX, (int)*count + 1);// we have one more of these. avoid dupes :)
+#else
+		pointCloudEntriesFP32->push_back(newEntry);
+#endif
 	}
 	else if (pointCloudEntries) {
 		pointCloudEntry_t newEntry;
@@ -5879,10 +5889,15 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	if (pointCloudEntriesMap.size()) {
 		for (auto it = pointCloudEntriesMap.begin(); it != pointCloudEntriesMap.end(); it++) {
 			if (it->second.size()) {
-
+				const char* fileName = va("pointClouds/pointCloud-%s-%s.bin",it->first.c_str(), opts.savePointCloudS16 ? "s16" : "fp16");
+				{ // touch it if it doesn't exist yet. cuz otherwise this dumbass system wont create it or with other options wont be able to read the size. SIGH
+					std::fstream pointCloudFile;
+					pointCloudFile.open(fileName, std::ios_base::app | std::ios_base::binary); // to create.
+					pointCloudFile.close();
+				}
 				std::filesystem::create_directory("pointClouds");
 				std::fstream pointCloudFile;
-				pointCloudFile.open(va("pointClouds/pointCloud-%s-%s.bin",it->first.c_str(), opts.savePointCloudS16 ? "s16" : "fp16"), std::ios_base::ate | std::ios::out | std::ios_base::binary); // append instead of overwrite
+				pointCloudFile.open(fileName, std::ios_base::ate | std::ios::in | std::ios::out | std::ios_base::binary); // append instead of overwrite
 				size_t availableSpace = SIZE_MAX;
 				size_t currentSize = pointCloudFile.tellp();
 				if (currentSize % sizeof(pointCloudEntry_t)) {
@@ -5912,20 +5927,31 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		}
 	}
 	if (pointCloudEntriesMapFP32.size()) {
+#if POINTCLOUDFP32_DUPECOUNTMAP
+#define POINTCLOUDFP32_FULLENTRY pointCloudEntryFP32Full_t
+#else
+#define POINTCLOUDFP32_FULLENTRY pointCloudEntryFP32_t
+#endif
+
 		for (auto it = pointCloudEntriesMapFP32.begin(); it != pointCloudEntriesMapFP32.end(); it++) {
 			if (it->second.size()) {
-
+				const char* fileName = va("pointClouds/pointCloud-%s-fp32.bin", it->first.c_str());
+				{ // touch it if it doesn't exist yet. cuz otherwise this dumbass system wont create it or with other options wont be able to read the size. SIGH
+					std::fstream pointCloudFile;
+					pointCloudFile.open(fileName, std::ios_base::app | std::ios_base::binary); // to create.
+					pointCloudFile.close();
+				}
 				std::filesystem::create_directory("pointClouds");
 				std::fstream pointCloudFile;
-				pointCloudFile.open(va("pointClouds/pointCloud-%s-fp32.bin",it->first.c_str()), std::ios_base::ate | std::ios::out | std::ios_base::binary); // append instead of overwrite
+				pointCloudFile.open(fileName, std::ios_base::ate | std::ios::in  | std::ios::out | std::ios_base::binary); // append instead of overwrite
 				size_t availableSpace = SIZE_MAX;
-				//pointCloudFile.write(NULL, 0); // just to make tellp work?
+				pointCloudFile.write(NULL, 0); // just to make tellp work?
 				size_t currentSize = pointCloudFile.tellp();
-				if (currentSize % sizeof(pointCloudEntryFP32Full_t)) {
+				if (currentSize % sizeof(POINTCLOUDFP32_FULLENTRY)) {
 					std::cerr << "wtf, pointcloud file size is not multiple of point cloud entry. trying to fixx\n";
 					// try to fix?
-					size_t writeStart = currentSize/ sizeof(pointCloudEntryFP32Full_t);
-					writeStart *= sizeof(pointCloudEntryFP32Full_t);
+					size_t writeStart = currentSize/ sizeof(POINTCLOUDFP32_FULLENTRY);
+					writeStart *= sizeof(POINTCLOUDFP32_FULLENTRY);
 					pointCloudFile.seekp(writeStart,std::ios_base::beg);
 				}
 				if (opts.pointCloudSizeLimit) {
@@ -5936,22 +5962,25 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 					}
 					else {
 						availableSpace = opts.pointCloudSizeLimit - currentSize;
-						availableSpace /= sizeof(pointCloudEntryFP32Full_t);
-						availableSpace *= sizeof(pointCloudEntryFP32Full_t); // make it align with the point cloud entry size
+						availableSpace /= sizeof(POINTCLOUDFP32_FULLENTRY);
+						availableSpace *= sizeof(POINTCLOUDFP32_FULLENTRY); // make it align with the point cloud entry size
 					}
 				}
 				if (availableSpace) {
+#if POINTCLOUDFP32_DUPECOUNTMAP
 					uint16_t maxval = 0;
 					size_t dupedCount = 0;
 					for (auto it2 = it->second.begin(); it2 != it->second.end() && availableSpace > 0; it2++) {
 						pointCloudFile.write((const char*)&it2->first, sizeof(pointCloudEntryFP32_t));
 						pointCloudFile.write((const char*)&it2->second, sizeof(uint16_t));
-						maxval = std::max(it2->second,maxval);
+						maxval = std::max(it2->second, maxval);
 						dupedCount += it2->second - 1;
 						availableSpace -= sizeof(pointCloudEntryFP32Full_t);
 					}
 					std::cout << "FP32 point cloud saved. Max duplication: " << maxval << ", dupes count: " << dupedCount << ", total count excl dupes: " << it->second.size() << "\n";
-					//pointCloudFile.write((const char*)it->second.data(), std::min(it->second.size() * sizeof(pointCloudEntryFP32Full_t), availableSpace));
+#else
+					pointCloudFile.write((const char*)it->second.data(), std::min(it->second.size() * sizeof(pointCloudEntryFP32_t), availableSpace));
+#endif
 				}
 				pointCloudFile.close();
 			}
