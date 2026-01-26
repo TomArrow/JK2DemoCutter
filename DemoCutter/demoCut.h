@@ -572,6 +572,7 @@ typedef enum {
 } team_t;
 
 
+
 #define	GIB_HEALTH			-40
 
 
@@ -641,6 +642,14 @@ void CrossProduct(const vec3_t v1, const vec3_t v2, vec3_t cross);
 #ifdef _MSC_VER 
 int __builtin_ctzll(unsigned long long input);
 #endif
+
+
+static byte teamColors[TEAM_NUM_TEAMS][3]{
+	{127,255,127},
+	{255,127,127},
+	{127,127,255},
+	{255,255,127},
+};
 
 
 // past location encoding to get a ROUGH idea of the path a capper took.
@@ -4758,6 +4767,13 @@ typedef struct {
 	double divisor;
 } averageHelper_t;
 
+
+
+
+typedef struct {
+	uint16_t	pos[3]; // float16
+	byte		color[2];
+} pointCloudEntry_t;
 
 
 

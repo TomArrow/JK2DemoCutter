@@ -14,6 +14,7 @@
 #include "sqlite3.h"
 #include <set>
 #include "../shared/boostTupleHash.hpp"
+#include "../shared/fp16/fp16/fp16.h"
 #include <unordered_map>
 
 #include <iso646.h>
@@ -532,6 +533,7 @@ public:
 	bool findjumpbugs = false;
 	bool makeVideo = false;
 	bool filterBotOnBotKills = false;
+	bool savePointCloud = false;
 	//bool filterBotKills = false;
 	//bool filterBotRets = false;
 	//bool filterFightBotKills = false;
@@ -1038,6 +1040,19 @@ typedef struct playerDumpCSVPoint_t {
 	vec3_t viewangles;
 };
 std::vector<playerDumpCSVPoint_t> playerDumpCSVDataPoints[MAX_CLIENTS_MAX];
+
+
+std::vector<pointCloudEntry_t> pointCloudEntries;
+
+void addPointCloudEntry(vec3_t org, byte color[3]) {
+	pointCloudEntry_t newEntry;
+	newEntry.pos[0] = fp16_ieee_from_fp32_value(org[0]);
+	newEntry.pos[1] = fp16_ieee_from_fp32_value(org[1]);
+	newEntry.pos[2] = fp16_ieee_from_fp32_value(org[2]);
+	newEntry.color[0] = (color[0] & 240) | ((color[1] & 240) >> 4); // dumb but good enough for our very simple colors (full or half
+	newEntry.color[1] = (color[2] & 240); // dumb but good enough for our very simple colors (full or half
+	pointCloudEntries.push_back(newEntry);
+}
 
 typedef struct entityDumpCSVPoint_t {
 	int serverTime;
@@ -5835,6 +5850,12 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	}
 #ifdef BUFFERBAT
 
+	if (pointCloudEntries.size()) {
+		std::ofstream pointCloudFile;
+		pointCloudFile.open("pointCloud.bin", std::ios_base::app | std::ios_base::binary); // append instead of overwrite
+		pointCloudFile.write((const char*)pointCloudEntries.data(), pointCloudEntries.size() * sizeof(pointCloudEntry_t));
+		pointCloudFile.close();
+	}
 	if (streamsize(io.outputBatHandle)) {
 		std::ofstream outputBatHandle;
 		outputBatHandle.open(outputBatFile, std::ios_base::app); // append instead of overwrite
@@ -8546,6 +8567,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						}
 
 						if (lastFrameInfo.entityExists[i]) {
+							
+							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !VectorCompare(lastFrameInfo.playerPositions[i], thisFrameInfo.playerPositions[i])) {
+								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]]);
+							}
 
 							// script check part #2
 							if ((lastFrameInfo.frameInfoFlags[i] & FIF_SCRIPTCHECK) && thisFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 20) {
@@ -8652,6 +8677,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 #endif
+						}
+						else {
+							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR) {
+								addPointCloudEntry(thisFrameInfo.playerPositions[i], teamColors[playerTeams[i]]);
+							}
 						}
 
 						if (opts.playerCSVDump) {
@@ -12941,6 +12971,7 @@ int main(int argcO, char** argvO) {
 	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
 	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
 	auto B = op.add<popl::Implicit<int>>("B", "bot-filter", "Filter out kills by bots and on bots. Bitmask. 1=filter out any bot-on-bot kills",1);
+	auto i = op.add<popl::Implicit<int>>("i", "save-point-cloud", "Save a point-cloud file of all unique player positions, fp16ieee[3] and color byte[2] (4 bits per color).",1);
 
 	
 	op.parse(argcO, argvO);
@@ -12997,6 +13028,7 @@ int main(int argcO, char** argvO) {
 	opts.writeChatsCategorized = L->is_set() ? (L->value() & 2) : false;
 	opts.doStatsDb = Q->is_set() ? !(Q->value() & 1) : true;
 	opts.filterBotOnBotKills = B->is_set() ? (B->value() & 1) : false;
+	opts.savePointCloud = i->is_set() ? (i->value() & 1) : false;
 	//opts.filterBotKills = B->is_set() ? (B->value() & 1) : false;
 	//opts.filterBotRets = B->is_set() ? (B->value() & 2) : false;
 	//opts.filterFightBotKills = B->is_set() ? (B->value() & 4) : false;
