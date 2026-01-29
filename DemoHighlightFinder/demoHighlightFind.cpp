@@ -1462,6 +1462,8 @@ struct multiHitData_t {
 	int hitCountLenient; // hits withiin 1 second of each other
 };
 
+#define MULTIHIT_TIMEOUT 100
+#define MULTIHIT_TIMEOUT_LENIENT 1000
 multiHitData_t playerMultiHit[MAX_CLIENTS_MAX];
 
 // Tries to find all sorts of laughter in chat, but tries to exclude non-exuberant types (like a simple lol), and focus on big letter LOL, big letter XD, rofl, wtf etc and some misspelled variants.
@@ -10523,10 +10525,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								int deltaSinceOldHit = lastFrameInfo.demoTime + 1 - playerMultiHit[target].lastHitTime;
 								int theHitCount = 1;
 								int theHitCountLenient = 1;
-								if (deltaSinceOldHit <= 100) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
+								if (deltaSinceOldHit <= MULTIHIT_TIMEOUT) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
 									theHitCount += playerMultiHit[target].hitCount;
 								}
-								if (deltaSinceOldHit <= 1000) { 
+								if (deltaSinceOldHit <= MULTIHIT_TIMEOUT_LENIENT) {
 									theHitCountLenient += playerMultiHit[target].hitCountLenient;
 								}
 								SQLBIND_DELAYED(angleQuery, int, "@victimHitCount", theHitCount);
@@ -12367,13 +12369,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						// he was hit somewhere between last frame and this one. let's assume last frame + 1 frame
 						// so we can calculate the time delta between the hits
 						int deltaSinceOldHit = lastFrameInfo.demoTime + 1 - playerMultiHit[playerNum].lastHitTime;
-						if (deltaSinceOldHit > 100) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
+						if (deltaSinceOldHit > MULTIHIT_TIMEOUT) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
 							playerMultiHit[playerNum].hitCount = 1;
 						}
 						else {
 							playerMultiHit[playerNum].hitCount++;
 						}
-						if (deltaSinceOldHit > 1000) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
+						if (deltaSinceOldHit > MULTIHIT_TIMEOUT_LENIENT) { // multi hits happen within 100ms of each other. there can be more time but should we count it as a true multihit then? hm
 							playerMultiHit[playerNum].hitCountLenient = 1;
 						}
 						else {
