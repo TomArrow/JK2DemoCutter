@@ -3324,6 +3324,16 @@ const char* getPlayerName(int clientNum, int CS_PLAYERS_here, bool isMOHAADemo) 
 }
 
 template <unsigned int max_clients>
+const char* getPlayerNameSafe(int clientNum, int CS_PLAYERS_here, bool isMOHAADemo) {
+	if (clientNum < 0 || clientNum >= max_clients) {
+		return "";
+	}
+	int offset = demo.cut.Cl.gameState.stringOffsets[CS_PLAYERS_here + clientNum];
+	const char* playerInfo = demo.cut.Cl.gameState.stringData + offset;
+	return Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
+}
+
+template <unsigned int max_clients>
 void setPlayerAndTeamData(clientActive_t* clCut, demoType_t demoType) {
 	int stringOffset;
 	memset(teamInfo,0,sizeof(teamInfo));
@@ -6083,7 +6093,7 @@ static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& 
 		std::ofstream strafeCSVPlayerOutputHandle;
 		strafeCSVPlayerOutputHandle.open(va("playerUserCMDDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
 
-		strafeCSVPlayerOutputHandle << "flags,serverTime,serverTimeGroup,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
+		strafeCSVPlayerOutputHandle << "ping,droppedPackets,flags,serverTime,serverTimeGroup,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
 
 		int lastCommandTime = -9999999;
 		int64_t countSkipped = 0;
@@ -6092,7 +6102,7 @@ static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& 
 				countSkipped++;
 				continue;
 			}
-			strafeCSVPlayerOutputHandle << (int)it->flags << ","<< it->serverTime << "," << (int)it->serverTimeGroup << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
+			strafeCSVPlayerOutputHandle << (int)it->ping << ","<<(int)it->droppedPackets << ","<<(int)it->flags << ","<< it->serverTime << "," << (int)it->serverTimeGroup << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
 			lastCommandTime = it->serverTime;
 		}
 		if (countSkipped) {
@@ -7084,7 +7094,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			ocmd = MSG_ReadByte(&oldMsg);
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
-				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL,SEHExceptionCaught);
+				int flagsFound = 0;
+				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, &flagsFound,SEHExceptionCaught);
+
+				if (flagsFound) {
+					int likelyClient = demo.cut.Cl.snap.ps.clientNum;
+					logSpecialThing<max_clients>("USERCMDCHEATFLAG", va("FLAGS%d",flagsFound), "suspicious activity in usercmds", getPlayerNameSafe<max_clients>(likelyClient, CS_PLAYERS_here, isMOHAADemo), likelyClient, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+				}
 
 				const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
 				if (maybeMeta) {

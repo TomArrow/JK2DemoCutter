@@ -1463,6 +1463,8 @@ typedef struct usercmdEval_s {
 	byte			serverTimeGroup;
 	byte			flags;
 	int				serverTime;
+	int16_t			ping;
+	uint16_t		droppedPackets;
 	float			angleDelta[3];
 	int16_t			msecDelta;
 } usercmdEval_t;
@@ -5537,7 +5539,7 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 void demoCutWriteEmptyMessageMetadataPart(msg_t* msg, demoType_t demoType, const char* metaData);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave, bool& SEHExceptionCaught);
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave, int* flagsFound, bool& SEHExceptionCaught);
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
