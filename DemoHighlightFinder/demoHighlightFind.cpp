@@ -1098,7 +1098,7 @@ typedef struct entityDumpCSVPoint_t {
 	trajectory_t apos;
 };
 std::vector<entityDumpCSVPoint_t> entityDumpCSVDataPoints[MAX_GENTITIES];
-std::vector<usercmd_t> playerUserCmds[MAX_CLIENTS_MAX];
+std::vector<usercmdEval_t> playerUserCmds[MAX_CLIENTS_MAX];
 
 
 #define PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -6083,7 +6083,7 @@ static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& 
 		std::ofstream strafeCSVPlayerOutputHandle;
 		strafeCSVPlayerOutputHandle.open(va("playerUserCMDDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
 
-		strafeCSVPlayerOutputHandle << "commandTime,upmove,forwardmove,rightmove,angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
+		strafeCSVPlayerOutputHandle << "flags,serverTime,serverTimeGroup,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
 
 		int lastCommandTime = -9999999;
 		int64_t countSkipped = 0;
@@ -6092,7 +6092,7 @@ static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& 
 				countSkipped++;
 				continue;
 			}
-			strafeCSVPlayerOutputHandle << it->serverTime << "," << (int)it->upmove << "," << (int)it->forwardmove << "," << (int)it->rightmove << "," << it->angles[0] << "," << it->angles[1] << "," << it->angles[2] << "," << (int)it->buttons << "," << (int)it->weapon << "," << (int)it->forcesel << "," << (int)it->invensel << "," << (int)it->generic_cmd << "\n";
+			strafeCSVPlayerOutputHandle << (int)it->flags << ","<< it->serverTime << "," << (int)it->serverTimeGroup << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
 			lastCommandTime = it->serverTime;
 		}
 		if (countSkipped) {

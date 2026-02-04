@@ -1454,7 +1454,25 @@ typedef struct usercmd_s {
 	signed char	forwardmove, rightmove, upmove;
 } usercmd_t;
 
+#define		UCMDFLAG_SINGLEFRAMEKEY		(1<<0)
+#define		UCMDFLAG_SINGLEFRAMEZERO	(1<<1) // e.g. 1 0 -1. prolly unsuspicious, but curious.
+#define		UCMDFLAG_BIGDELTACHANGE		(1<<2)
 
+typedef struct usercmdEval_s {
+	usercmd_t		ucmd;
+	byte			serverTimeGroup;
+	byte			flags;
+	int				serverTime;
+	float			angleDelta[3];
+	int16_t			msecDelta;
+} usercmdEval_t;
+
+
+
+inline int signi(int32_t num)
+{
+	return ((uint32_t)-num >> 31) | (num >> 31);
+}
 
 usercmd_t CG_DirToCmd(int moveDir);
 
@@ -5519,7 +5537,7 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 void demoCutWriteEmptyMessageMetadataPart(msg_t* msg, demoType_t demoType, const char* metaData);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmd_t>* cmdsSave, bool& SEHExceptionCaught);
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave, bool& SEHExceptionCaught);
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);

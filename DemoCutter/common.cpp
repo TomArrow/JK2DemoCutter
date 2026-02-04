@@ -6321,7 +6321,7 @@ const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 	return MSG_ReadBigString(msg, demoType);
 }
 
-static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmd_t>* cmdsSave) {
+static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave) {
 
 	usercmd_t	nullcmd;
 
@@ -6386,7 +6386,43 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 			MSG_ReadDeltaUsercmdKey(msg, 0, &oldcmd, &cmd);
 			oldcmd = cmd;
 			if (cmdsSave) {
-				cmdsSave->push_back(cmd);
+				auto backIt = cmdsSave->rbegin();
+				usercmdEval_t* lastEval = (backIt != cmdsSave->rend()) ? &*backIt : NULL;
+				if (backIt != cmdsSave->rend()) {
+					backIt++;
+				}
+				usercmdEval_t* lastLastEval = (backIt != cmdsSave->rend()) ? &*backIt : NULL;
+				usercmdEval_t eval = { };
+				eval.ucmd = cmd;
+				eval.serverTime = cmd.serverTime + serverTimeOffset;
+				if(lastEval) {
+					eval.msecDelta = cmd.serverTime - lastEval->ucmd.serverTime;
+					eval.angleDelta[0] = AngleDelta(SHORT2ANGLE(cmd.angles[0]), SHORT2ANGLE(lastEval->ucmd.angles[0]));
+					eval.angleDelta[1] = AngleDelta(SHORT2ANGLE(cmd.angles[1]), SHORT2ANGLE(lastEval->ucmd.angles[1]));
+					eval.angleDelta[2] = AngleDelta(SHORT2ANGLE(cmd.angles[2]), SHORT2ANGLE(lastEval->ucmd.angles[2]));
+					eval.serverTimeGroup = eval.serverTime == lastEval->serverTime ? lastEval->serverTimeGroup : (lastEval->serverTimeGroup ^ 1);
+					if (lastLastEval) {
+						if (
+							signi(lastLastEval->ucmd.upmove) != signi(lastEval->ucmd.upmove) && signi(cmd.upmove) != signi(lastEval->ucmd.upmove) && (lastEval->ucmd.upmove != 0 || signi(lastLastEval->ucmd.upmove) == signi(cmd.upmove))
+							|| signi(lastLastEval->ucmd.forwardmove) != signi(lastEval->ucmd.forwardmove) && signi(cmd.forwardmove) != signi(lastEval->ucmd.forwardmove) && (lastEval->ucmd.forwardmove != 0 || signi(lastLastEval->ucmd.forwardmove) == signi(cmd.forwardmove))
+							|| signi(lastLastEval->ucmd.rightmove) != signi(lastEval->ucmd.rightmove) && signi(cmd.rightmove) != signi(lastEval->ucmd.rightmove) && (lastEval->ucmd.rightmove != 0 || signi(lastLastEval->ucmd.rightmove) == signi(cmd.rightmove))
+							) {
+							// button state changed in a single frame span
+							lastEval->flags |= UCMDFLAG_SINGLEFRAMEKEY;
+							std::cout << "UCMD: SINGLE FRAME KEY DETECTED AT " << cmd.serverTime << "!\n";
+						}
+
+						if (
+							copysignf(1, lastEval->angleDelta[0]) != copysignf(1, eval.angleDelta[0]) && fabsf(lastEval->angleDelta[0]) > 50.0f && fabsf(eval.angleDelta[0]) > 50.0f
+							|| copysignf(1, lastEval->angleDelta[1]) != copysignf(1, eval.angleDelta[1]) && fabsf(lastEval->angleDelta[1]) > 50.0f && fabsf(eval.angleDelta[1]) > 50.0f
+							|| copysignf(1, lastEval->angleDelta[2]) != copysignf(1, eval.angleDelta[2]) && fabsf(lastEval->angleDelta[2]) > 50.0f && fabsf(eval.angleDelta[2]) > 50.0f
+							) {
+							lastEval->flags |= UCMDFLAG_BIGDELTACHANGE;
+							std::cout << "UCMD: BIG DELTA CHANGE DETECTED AT "<<cmd.serverTime<<"!\n";
+						}
+					}
+				}
+				cmdsSave->push_back(eval);
 			}
 			if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
 				std::cerr << "New usercmd; readcount " << msg->readcount << "; serverTime  " << cmd.serverTime << ", angles[0] " << (int)cmd.angles[0]
@@ -6412,7 +6448,7 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 	return qtrue;
 }
 
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmd_t>* cmdsSave, bool& SEHExceptionCaught) {
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave, bool& SEHExceptionCaught) {
 	__TRY{
 		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType,cmdsSave);
 	}
