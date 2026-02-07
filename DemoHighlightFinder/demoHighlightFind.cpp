@@ -1119,7 +1119,8 @@ jp::Regex defragDarkRecordRegex(R"raw(\^1\[ GLOBAL \] \^7(?<playername>[^\n]+?) 
 jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat the WORLD RECORD and )?(is now ranked) \^\d#(\d) \^7with)\s\^3(\d+):(\d+))raw", "mSi");
 jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on this map!\s*\^\d\]:)raw", "mSi");
 
-jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+//jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?<SECRET>SECRET)|(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
 
 
 
@@ -1140,6 +1141,8 @@ public:
 	std::string style;
 	qboolean isValid = qtrue;
 	qboolean isProRun = qfalse;
+	qboolean isSecret = qfalse;
+	qboolean secretPossible = qfalse;
 	int teleports = 0;
 	int checkpoints = 0;
 	
@@ -2587,10 +2590,15 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 		info->playerName = vec_nas[matchNum]["name"];
 
-		int hours = atoi(vec_nas[matchNum]["hours"].c_str());
-		int minutes = atoi(vec_nas[matchNum]["minutes"].c_str());
-		int seconds = atoi(vec_nas[matchNum]["seconds"].c_str());
-		int milliSeconds = atoi(vec_nas[matchNum]["msec"].c_str());
+		int hours=0, minutes=0, seconds=0, milliSeconds=INT_MAX;
+		info->secretPossible = info->isSecret = qtrue;
+		if (!vec_nas[matchNum].find("SECRET")->second.size()) {
+			hours = atoi(vec_nas[matchNum]["hours"].c_str());
+			minutes = atoi(vec_nas[matchNum]["minutes"].c_str());
+			seconds = atoi(vec_nas[matchNum]["seconds"].c_str());
+			milliSeconds = atoi(vec_nas[matchNum]["msec"].c_str());
+			info->isSecret = qfalse;
+		}
 
 		int color = atoi(vec_nas[matchNum]["color"].c_str());
 		int nameColor = atoi(vec_nas[matchNum]["nameColor"].c_str());
@@ -2670,6 +2678,15 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 		if (playerNumber != -1) {
 			info->knownClientNum = playerNumber;
+
+			if (info->isSecret) {
+				// try to figure out the run time. best we can do is a guess tho.
+				int possibleTime = demo.cut.Cl.snap.serverTime - lastFrameInfo.duelTime[demo.cut.Cl.snap.ps.clientNum]/* + (demo.cut.Cl.snap.serverTime - lastFrameInfo.serverTime) / 2*/; // run time measured from this frame to run start. rather have a too high estimate than a too low one? could save a range too i guess. gonna start getting complicated tho with japros weird timer logic incorporating commandtime in weird ways etc
+				bool wasFollowed = playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - possibleTime);
+				if (wasFollowed) {
+					info->milliseconds = possibleTime;
+				}
+			}
 		}
 
 		return qtrue;
@@ -3861,7 +3878,13 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 	int pureSeconds = tmpSeconds % 60;
 	int minutes = tmpSeconds / 60;
 
+	bool timeUnknown = false;
+
 	int64_t runStart = meta->demoTime - runInfo->milliseconds;  // determine outside (because delayed PB/WR info)
+	if (runInfo->isSecret && runInfo->milliseconds == INT_MAX) {
+		timeUnknown = true;
+		runStart = meta->demoTime - 60000; // we just dont know :/
+	}
 
 	std::stringstream formattedTime;
 	formattedTime << std::setfill('0') << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds;
@@ -3898,6 +3921,12 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 		SQLBIND_DELAYED_NULL(query, "@runTeleProRun");
 		SQLBIND_DELAYED_NULL(query, "@runTeleTeleports");
 		SQLBIND_DELAYED_NULL(query, "@runTeleCheckpoints");
+	}
+	if (runInfo->secretPossible) {
+		SQLBIND_DELAYED(query, int, "@isSecretRun", runInfo->isSecret); // precise time unknown :/
+	}
+	else {
+		SQLBIND_DELAYED_NULL(query, "@isSecretRun");
 	}
 	SQLBIND_DELAYED_TEXT(query, "@demoName", sharedVars.oldBasename.c_str());
 	SQLBIND_DELAYED_TEXT(query, "@demoPath", sharedVars.oldPath.c_str());
@@ -3943,7 +3972,7 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 
 
 	std::stringstream ss;
-	ss << meta->mapName << (runInfo->style != "" ? va("___%s", runInfo->style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo->isProRun ? "_RTPRO" : "") << ((runInfo->teleports || runInfo->checkpoints) ? va("_RT%dT%dC", runInfo->teleports, runInfo->checkpoints) : "") << "___" << meta->playerName << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (meta->wasFollowed ? "" : (meta->wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << meta->playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
+	ss << meta->mapName << (runInfo->style != "" ? va("___%s", runInfo->style.c_str()) : "") << std::setfill('0') << "___" << std::setw(3) << minutes << "-" << std::setw(2) << pureSeconds << "-" << std::setw(3) << pureMilliseconds << (runInfo->isSecret ? "_SECRET" : "") << (runInfo->isProRun ? "_RTPRO" : "") << ((runInfo->teleports || runInfo->checkpoints) ? va("_RT%dT%dC", runInfo->teleports, runInfo->checkpoints) : "") << "___" << meta->playerName << (!isNumberOne && isLogged ? "___top10" : "") << (isLogged ? "" : (isNumberOne ? "___unloggedWR" : "___unlogged")) << (meta->wasFollowed ? "" : (meta->wasVisibleOrFollowed ? "___thirdperson" : "___NOTvisible")) << "_" << meta->playerNum << "_" << demo.cut.Clc.clientNum << (isTruncated ? va("_tr%d", truncationOffset) : "");
 
 	std::string targetFilename = ss.str();
 	char* targetFilenameFiltered = new char[targetFilename.length() + 1];
@@ -3951,13 +3980,13 @@ qboolean SaveDefragRun(const defragRunInfoFinal_t& runInfoFinal,const sharedVari
 
 	std::stringstream batSS;
 	batSS << "\nrem demoCurrentTime: " << meta->demoTime;
-	batSS << "\n" << (meta->wasVisibleOrFollowed ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
+	batSS << "\n" << (meta->wasVisibleOrFollowed && !timeUnknown ? "" : "rem ") << "DemoCutter \"" << sourceDemoFile << "\" \"" << targetFilenameFiltered << "\" " << startTime << " " << endTime;
 	queryWrapper->batchString1 = batSS.str();
 	queryWrapper->batchString2 = (isTruncated ? va(" --meta \"{\\\"trim\\\":%d}\"", truncationOffset) : "");
 
 	delete[] targetFilenameFiltered;
 	//std::cout << mapname << " " << playerNumber << " " << playername << " " << minutes << ":" << secondString << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << wasFollowed << " visible:" << wasVisible << " visibleOrFollowed:" << wasVisibleOrFollowed << "\n";
-	if (!opts.noFindOutput)  std::cout << meta->mapName << " " << meta->playerNum << " " << meta->playerName << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << meta->wasFollowed << " visible:" << meta->wasVisible << " visibleOrFollowed:" << meta->wasVisibleOrFollowed << (runInfo->isProRun ? " RUNTELE PRO" : "") << ((runInfo->teleports || runInfo->checkpoints) ? va(" RUNTELE %dT%dC", runInfo->teleports, runInfo->checkpoints) : "") << "\n";
+	if (!opts.noFindOutput)  std::cout << meta->mapName << " " << meta->playerNum << " " << meta->playerName << " " << minutes << ":" << std::setfill('0') << std::setw(2) << pureSeconds << ":" << std::setw(3) << pureMilliseconds << (runInfo->isSecret ? " SECRET" : "")  << " number1:" << isNumberOne << " logged:" << isLogged << " followed:" << meta->wasFollowed << " visible:" << meta->wasVisible << " visibleOrFollowed:" << meta->wasVisibleOrFollowed << (runInfo->isProRun ? " RUNTELE PRO" : "") << ((runInfo->teleports || runInfo->checkpoints) ? va(" RUNTELE %dT%dC", runInfo->teleports, runInfo->checkpoints) : "") << "\n";
 
 	return qtrue;
 }
@@ -4498,6 +4527,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"runTeleProRun	BOOLEAN,"
 			"runTeleTeleports	INTEGER,"
 			"runTeleCheckpoints	INTEGER,"
+			"isSecretRun	BOOLEAN,"
 			"wasVisible	BOOLEAN NOT NULL,"
 			"wasFollowed	BOOLEAN NOT NULL,"
 			"wasFollowedOrVisible	BOOLEAN NOT NULL,"
@@ -4743,9 +4773,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertFlagGrabStatement, NULL);
 
 		preparedStatementText = "INSERT INTO defragRuns"
-			"(readableTime,totalMilliseconds,style,playerId,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
+			"(readableTime,totalMilliseconds,style,playerId,demoRecorderClientnum,runnerClientNum,isTop10,isNumber1,isPersonalBest,runTeleProRun,runTeleTeleports,runTeleCheckpoints,isSecretRun,wasVisible,wasFollowed,wasFollowedOrVisible,averageStrafeDeviation,resultingLaughs,demoTime,lastGamestateDemoTime,serverTime,entryMeta)"
 			"VALUES "
-			"(@readableTime,@totalMilliseconds,@style,@playerId,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoTime, @lastGamestateDemoTime,@serverTime,@entryMeta);";
+			"(@readableTime,@totalMilliseconds,@style,@playerId,@demoRecorderClientnum,@runnerClientNum,@isTop10,@isNumber1,@isPersonalBest,@runTeleProRun,@runTeleTeleports,@runTeleCheckpoints,@isSecretRun,@wasVisible,@wasFollowed,@wasFollowedOrVisible,@averageStrafeDeviation,@resultingLaughs,@demoTime, @lastGamestateDemoTime,@serverTime,@entryMeta);";
 
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDefragRunStatement, NULL);
 
@@ -6966,6 +6996,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	cutcontinue:
 
 		int oldOldSize = oldSize;
+		qboolean hadOldSequenceNum = qtrue;
 
 		if (isCompressedFile) {
 			oldDataRaw.clear();
@@ -6973,6 +7004,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		}
 		else {
 			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
+		}
+		if (oldSequenceNum == -9999) {
+			hadOldSequenceNum = qfalse;
 		}
 		oldSequenceNum = demo.cut.Clc.serverMessageSequence;
 
@@ -7005,8 +7039,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			}
 		}
 		else {
-			currentPacketPeriodStats.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
-			demoFpsMetaTracker.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
+			if (hadOldSequenceNum) {
+				currentPacketPeriodStats.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
+				demoFpsMetaTracker.droppedPackets += demo.cut.Clc.serverMessageSequence - oldSequenceNum - 1; // Stats
+			}
 		}
 
 		oldSize -= 4;
