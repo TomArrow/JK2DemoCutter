@@ -4779,8 +4779,9 @@ typedef enum {
 } hexColorType_t;
 
 std::string Q_StripColorAll(std::string string, bool lenient);
-void Q_StripColorAll(char* text, bool lenient);
-
+void Q_StripColorAll(char* text, bool lenient); 
+std::string Q_StripColorOldJaPro(std::string string);
+void Q_StripColorOldJaPro(char* text);
 
 typedef struct {
 	double sum;

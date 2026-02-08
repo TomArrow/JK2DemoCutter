@@ -1120,7 +1120,8 @@ jp::Regex defragRazorFinishRegex(R"raw(\^\d:\[\s*\^7(.*?)\s\^7(finished in|(beat
 jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on this map!\s*\^\d\]:)raw", "mSi");
 
 //jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
-jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?<SECRET>SECRET)|(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+//jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?<SECRET>SECRET)|(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?<SECRET>SECRET)|(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*(?<averageName>avg|average):\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+(?:\s+[^\^\s]+)*)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
 
 
 
@@ -2590,6 +2591,10 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 		info->playerName = vec_nas[matchNum]["name"];
 
+		bool oldJaPro = vec_nas[matchNum]["averageName"].size() != 3; // older japro names avg as average and playernames as colorstripped netnames always. that was pre dec 22nd 2017 (a5b6afe62c4071f4b696930c690883ee3f871622)
+		// extra info: pre Feb 8, 2014 (ac8bbe30a4966b848f1223535a6e85caeeb59a24) was always ^7 and unstripped name, but im not sure theres a different solid clue to identify it. serverside demos didnt exist back then. (they arrived with a Mar 4, 2015 github commit but earliest available are from 2015-03-05)
+		// well actually the whole repo seems to have been started on 2014-01-11. so maybe that was an early alpha anyway and doesn't need to be supported
+
 		int hours=0, minutes=0, seconds=0, milliSeconds=INT_MAX;
 		info->secretPossible = info->isSecret = qtrue;
 		if (!vec_nas[matchNum].find("SECRET")->second.size()) {
@@ -2625,10 +2630,11 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 		int64_t clientNumBitmask = jaPRONameColorClientNumMap[nameColor];
 
 
-		bool isPossiblyRealName = color != 5;
+		bool isPossiblyRealName = color != 5 || oldJaPro;
 
 		int playerNumber = -1;
 		std::vector<int> possibleClientNums;
+		std::vector<int> matchingClientNums;
 		for (int clientNum = 0; clientNum < max_clients; clientNum++) {
 
 			if (!(clientNumBitmask & (1L << clientNum))) { // Color coding indicates this definitely wasn't the right player.
@@ -2647,9 +2653,24 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 			possibleClientNums.push_back(clientNum);
 			if (isPossiblyRealName) {
 				std::string playerNameCompare = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "name" : "n");
-				std::string playerNameCompareStripped = Q_StripColorAll(playerNameCompare, nwhHexColors);
+
 				if (playerNameCompare == info->playerName) {
 					playerNumber = clientNum;
+					matchingClientNums.push_back(clientNum);
+				}
+				else {
+					std::string playerNameCompareStripped = Q_StripColorAll(playerNameCompare, nwhHexColors);
+					if (playerNameCompareStripped == info->playerName) {
+						playerNumber = clientNum;
+						matchingClientNums.push_back(clientNum);
+					}
+					else {
+						playerNameCompareStripped = Q_StripColorOldJaPro(playerNameCompare); // i should prolly just always use this? maybe see if it changed in past 12 years?
+						if (playerNameCompareStripped == info->playerName) {
+							playerNumber = clientNum;
+							matchingClientNums.push_back(clientNum);
+						}
+					}
 				}
 			}
 		}
@@ -2671,6 +2692,19 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 							playerNumber = demo.cut.Cl.snap.ps.clientNum;
 							break;
 						}
+					}
+				}
+			}
+		}
+		else if (playerNumber != -1 && matchingClientNums.size() > 1) { // more than one name fit.
+			if (lastFrameInfo.duelTime[demo.cut.Cl.snap.ps.clientNum] && !demo.cut.Cl.snap.ps.duelTime && demo.cut.Cl.snap.ps.stats[11]) { // Was running last frame but not anymore. stats[11] means racemode in japro
+
+				for (int i = 0; i < matchingClientNums.size(); i++) {
+
+					if (matchingClientNums[i] == demo.cut.Cl.snap.ps.clientNum) {
+
+						playerNumber = demo.cut.Cl.snap.ps.clientNum;
+						break;
 					}
 				}
 			}

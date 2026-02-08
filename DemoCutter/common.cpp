@@ -3267,6 +3267,7 @@ std::string Q_StripColorAll(std::string string, bool lenient) {
 	strcpy_s(cString, stringLen + 1, sourceCString);
 	Q_StripColorAll(cString, lenient);
 	std::string colorStripped = cString;
+	delete[] cString;
 	return colorStripped;
 }
 
@@ -3301,6 +3302,63 @@ void Q_StripColorAll(char* text, bool lenient) {
 		*write = '\0';
 	}
 }
+
+/*
+==================
+Q_StripColorOldJaPro
+ 
+Strips coloured strings in-place using multiple passes: "fgs^^56fds" -> "fgs^6fds" -> "fgsfds"
+
+(Also strips ^8 and ^9)
+==================
+*/
+#define Q_IsColorStringExtOldJapro(p)	((p) && *(p) == Q_COLOR_ESCAPE && *((p)+1) && *((p)+1) >= '0' && *((p)+1) <= '9') // ^[0-9]
+void Q_StripColorOldJaPro(char *text)
+{
+	qboolean doPass = qtrue;
+	char *read;
+	char *write;
+
+	while ( doPass )
+	{
+		doPass = qfalse;
+		read = write = text;
+		while ( *read )
+		{
+			if ( Q_IsColorStringExtOldJapro(read) )
+			{
+				doPass = qtrue;
+				read += 2;
+			}
+			else
+			{
+				// Avoid writing the same data over itself
+				if (write != read)
+				{
+					*write = *read;
+				}
+				write++;
+				read++;
+			}
+		}
+		if ( write < read )
+		{
+			// Add trailing NUL byte if string has shortened
+			*write = '\0';
+		}
+	}
+}
+std::string Q_StripColorOldJaPro(std::string string) {
+	const char* sourceCString = string.c_str();
+	int stringLen = strlen(sourceCString);
+	char* cString = new char[stringLen + 1];
+	strcpy_s(cString, stringLen + 1, sourceCString);
+	Q_StripColorOldJaPro(cString);
+	std::string colorStripped = cString;
+	delete[] cString;
+	return colorStripped;
+}
+
 
 
 
