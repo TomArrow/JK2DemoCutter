@@ -2320,6 +2320,10 @@ std::set<std::string>	recorderPlayerNames;
 #define DERIV_SNAPSMANIP	(1<<1) // snaps manipulation by demo optimizer
 int	demoDerivativeFlags = 0;
 
+bool demoVersionParsed = false;
+int64_t demoServerBuildTime = 0;
+char demoServerBuildPlatform[100] = { 0 };
+
 // This also updates the playerNamesToClientNums trie
 template<unsigned int max_clients>
 void updatePlayerDemoStatsArrayPointers(demoType_t demoType, const ExtraSearchOptions& opts) {
@@ -2897,6 +2901,8 @@ void updateGameInfo(clientActive_t* clCut, demoType_t demoType, const ExtraSearc
 	}
 
 	if (configStringChanged[CS_SERVERINFO]) {
+
+		demoVersionParsed = parseVersion(Info_ValueForKey(serverInfoMap, "version").c_str(),&demoServerBuildTime, demoServerBuildPlatform,sizeof(demoServerBuildPlatform));
 
 		updateForcePowersInfo(clCut);
 
@@ -4677,6 +4683,8 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"demoErrorFlags INTEGER NOT NULL,"
 			"demoErrors	TEXT,"
 			"demoDerivativeFlags INTEGER NOT NULL,"
+			"demoServerBuildTime INTEGER,"
+			"demoServerBuildPlatform TEXT,"
 			"droppedPackets INTEGER NOT NULL,"
 			"minMsec INTEGER NOT NULL,"
 			"averageFrameDuration REAL NOT NULL,"
@@ -4852,9 +4860,9 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoDatabaseProperty, NULL);
 
 		preparedStatementText = "INSERT INTO demoMeta "
-			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors,demoDerivativeFlags,droppedPackets,minMsec,averageFrameDuration  )"
+			"( demoName, demoPath, fileSize, demoTimeDuration, demoDateTime, demoRecorderNames, demoRecorderNamesStripped, demoErrorFlags, demoErrors,demoDerivativeFlags,demoServerBuildTime,demoServerBuildPlatform,droppedPackets,minMsec,averageFrameDuration  )"
 			" VALUES "
-			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors,@demoDerivativeFlags,@droppedPackets,@minMsec,@averageFrameDuration)";
+			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors,@demoDerivativeFlags,@demoServerBuildTime,@demoServerBuildPlatform,@droppedPackets,@minMsec,@averageFrameDuration)";
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoMeta, NULL);
 
 		preparedStatementText = "SELECT last_insert_rowid();";
@@ -5835,6 +5843,14 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoErrors", demoErrorsString.c_str());
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@demoDerivativeFlags", demoDerivativeFlags);
 
+		if (demoVersionParsed) {
+			SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int64, "@demoServerBuildTime", demoServerBuildTime);
+			SQLBIND_NONDELAYED_TEXT(io.killDb[i].insertDemoMeta, "@demoServerBuildPlatform", demoServerBuildPlatform);
+		}
+		else {
+			SQLBIND_NONDELAYED_NULL(io.killDb[i].insertDemoMeta, "@demoServerBuildTime");
+			SQLBIND_NONDELAYED_NULL(io.killDb[i].insertDemoMeta, "@demoServerBuildPlatform");
+		}
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@minMsec", demoFpsMetaTracker.minMsec);
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, int, "@droppedPackets", demoFpsMetaTracker.droppedPackets);
 		SQLBIND_NONDELAYED(io.killDb[i].insertDemoMeta, double, "@averageFrameDuration", (demoFpsMetaTracker.averageMsec.sum / demoFpsMetaTracker.averageMsec.divisor));

@@ -7788,6 +7788,77 @@ void IntegerToBoundingBox(int num, int forceFieldTime2, vec3_t mins, vec3_t maxs
 #endif
 
 
+
+
+bool parseVersion(const char* str, int64_t* unixTime, char* platform, size_t platformMaxLen) {
+
+	const char moLut[16] = { 9,0,2,1,11,12,10,8,5,4,6,0,0,3,7,0 };
+#define MONTHINDEX(a) ((((unsigned int)(a)[0]<<(unsigned int)(a)[2])/(unsigned int)(a)[1])%16)
+
+	size_t len = strlen(str);
+	int64_t d, m, y;
+	if (len < 13) return false; // minimum: 11 for standardized __DATE__ and then empty space and one char of platform. MINIMUM.
+	const char* s = str + len - 1;
+	char* platformOut = platform;
+	const char* platformEnd;
+	if (*s == 'C' && *(s - 1) == 'T' && *(s - 2) == 'U') {
+		// "UTC" string in OpenMoHAA. idk whatever.
+		len -= 4;
+		s -= 4;
+	}
+	if (len < 13
+		|| !isdigit(*(s))
+		|| !isdigit(*(s - 1))
+		|| !isdigit(*(s - 2))
+		|| !isdigit(*(s - 3))
+		|| *(s - 4) != ' '
+		|| !isdigit(*(s - 5))
+		|| !isdigit(*(s - 6)) && *(s - 6) != ' '
+		|| *(s - 7) != ' '
+		|| !isalpha(*(s - 8))
+		|| !isalpha(*(s - 9))
+		|| !isalpha(*(s - 10))
+		|| *(s - 11) != ' '
+		) return false; // only do a basic check for the empty spaces real quick
+		// ok now be a little bit lazy and don't check too precisely.
+
+	y = *(s)-'0' + 10 * (*(s - 1) - '0') + 100 * (*(s - 2) - '0') + 1000 * (*(s - 3) - '0');
+	d = (*(s - 5) - '0') + (*(s - 6) == ' ' ? 0 : 10 * (*(s - 6) - '0'));
+
+	m = moLut[MONTHINDEX(s - 10)];
+
+	if (!m) return false;
+
+	s -= 12;
+	len -= 12;
+
+	tm thattime = { 0 };
+	thattime.tm_mday = d;
+	thattime.tm_mon = m - 1;
+	thattime.tm_year = y - 1900;
+	*unixTime = timegm(&thattime);
+
+	platformEnd = s + 1;
+	while (len > 0 && *s != ' ') {
+		s--;
+		len--;
+	}
+	s++;
+
+	while (s < platformEnd && platformMaxLen > 1) {
+		*platformOut = *s;
+		s++;
+		platformOut++;
+		platformMaxLen--;
+	}
+	*platformOut = '\0';
+
+	return true;
+}
+
+
+
+
 template<class T>
 T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, char** message) {
 	if (!**message) {

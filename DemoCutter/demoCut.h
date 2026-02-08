@@ -38,6 +38,7 @@ extern const char* DPrintFLocation;
 
 #ifdef _WIN32
 #define WINDOWS // For popl library
+#define timegm _mkgmtime
 #endif
 
 extern std::string errorInfo;
@@ -5960,6 +5961,8 @@ inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, dem
 	return specializedMappings[sourceDemoType][targetDemoType].weaponMapping.data[weapon];
 }*/
 
+
+bool parseVersion(const char* str, int64_t* unixTime, char* platform, size_t platformMaxLen);
 
 entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
 entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char, int>* playerMapClientNumMap);
