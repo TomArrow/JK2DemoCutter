@@ -1121,6 +1121,7 @@ jp::Regex defragRazorPersonalBestRegex(R"raw(\^\d:\[\s*\^7New personal record on
 
 //jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+)\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
 //jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?<SECRET>SECRET)|(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*avg:\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
+jp::Regex defragJaProSecretYourTimeRegex(R"raw(Your time: (?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))raw", "mSi");
 jp::Regex defragJaProFinishRegex(R"raw(\^(?:\d)(?<mapname>[^\s]+)?(?:(?:\s*\^\d\s*)?(?<c>c))ompleted(?:(?<prorun> \(PRO\))|(?<tpscps> with (?<tps>\d+) TPs & (?<cps>\d+) CPs))? in\s*\^3(?:(?<SECRET>SECRET)|(?:(?:(?<hours>\d+):)?(?<minutes>\d+):)?(?<seconds>\d+).(?<msec>\d+))\s*\^(?<color>\d)\s*max:\^3(?<maxSpeed>\d+)\s*\^\d\s*(?<averageName>avg|average):\^3(?<avgSpeed>\d+)\s*\^\d\s*style:\^3(?<style>[^\s]+)\s*\^\d\s*by \^(?<nameColor>\d)(?<name>[^\s]+(?:\s+[^\^\s]+)*)\s*(?:\^5\((?<recordType>[^\)]+)\))?\s*(?:\((?:(?<oldRank>\d+)->)?(?<newRank>\d+)\s*\+(?<addedScore>[^\)]+)\))?)raw", "mSi");
 
 
@@ -2573,6 +2574,7 @@ static constexpr auto jaPRONameColorClientNumMap{ []() constexpr {
 	return finalMap;
 }() };
 
+std::string lastJaProYourTimeCP = "";
 template<int max_clients>
 qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoType_t demoType) {
 	jp::VecNum vec_num;
@@ -2587,7 +2589,7 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 		.setNamedSubstringVector(&vec_nas)         //pass pointer to VecNum vector
 		.match();
 
-	auto test = jaPRONameColorClientNumMap.begin();
+	//auto test = jaPRONameColorClientNumMap.begin();
 	
 	for (int matchNum = 0; matchNum < vec_num.size(); matchNum++) { // really its just going to be 1 but whatever
 
@@ -2601,12 +2603,32 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 		int hours=0, minutes=0, seconds=0, milliSeconds=INT_MAX;
 		info->secretPossible = info->isSecret = qtrue;
+		bool yourTimeSolvedSecret = false;
 		if (!vec_nas[matchNum].find("SECRET")->second.size()) {
 			hours = atoi(vec_nas[matchNum]["hours"].c_str());
 			minutes = atoi(vec_nas[matchNum]["minutes"].c_str());
 			seconds = atoi(vec_nas[matchNum]["seconds"].c_str());
 			milliSeconds = atoi(vec_nas[matchNum]["msec"].c_str());
 			info->isSecret = qfalse;
+		}
+		else if(lastJaProYourTimeCP.size()) {
+			jp::VecNum vec_num2;
+			jp::VecNas vec_nas2;
+			jp::RegexMatch rm2;
+			size_t count2 = rm2.setRegexObject(&defragJaProSecretYourTimeRegex)                          //set associated Regex object
+				.setSubject(&lastJaProYourTimeCP)                         //set subject string
+				.setNumberedSubstringVector(&vec_num2)         //pass pointer to VecNum vector
+				.setNamedSubstringVector(&vec_nas2)         //pass pointer to VecNum vector
+				.match();
+			for (int matchNum2 = 0; matchNum2 < vec_num2.size(); matchNum2++) { // i prolly should stop using loops eh?
+				hours = atoi(vec_nas2[matchNum2]["hours"].c_str());
+				minutes = atoi(vec_nas2[matchNum2]["minutes"].c_str());
+				seconds = atoi(vec_nas2[matchNum2]["seconds"].c_str());
+				milliSeconds = atoi(vec_nas2[matchNum2]["msec"].c_str());
+				info->isSecret = qfalse;
+				yourTimeSolvedSecret = true; // might need to discard it if the race print isn't from the same client.
+				break;
+			}
 		}
 
 		int color = atoi(vec_nas[matchNum]["color"].c_str());
@@ -2716,6 +2738,25 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 		if (playerNumber != -1) {
 			info->knownClientNum = playerNumber;
+
+			if (!info->isSecret && yourTimeSolvedSecret) {
+				if (playerNumber != demo.cut.Clc.clientNum) { // this actually was a different player. rly shouldn't happen cuz the centerprint is sent right before the print but oh well
+					info->milliseconds = INT_MAX;
+					info->isSecret = qtrue;
+					yourTimeSolvedSecret = false;
+				}
+				else {
+					lastJaProYourTimeCP = ""; // ok we used it. now discard it.
+					// do a sanity check tho
+					int possibleTime = demo.cut.Cl.snap.serverTime - lastFrameInfo.duelTime[demo.cut.Cl.snap.ps.clientNum];
+					bool wasFollowed = playerFirstFollowed[playerNumber] != -1 && playerFirstFollowed[playerNumber] < (demo.cut.Cl.snap.serverTime - info->milliseconds);
+					if (wasFollowed && std::abs(possibleTime-info->milliseconds) > 1000) {
+						demoErrorFlags |= DERR_GAMELOGICFLAW;
+						demoErrors << "JaPRO secret run: Your time centerprint said " << info->milliseconds << ", but possible time based on playerstate is " << possibleTime <<", more than a second off";
+						std::cerr << "JaPRO secret run: Your time centerprint said " << info->milliseconds << ", but possible time based on playerstate is " << possibleTime <<", more than a second off" << "(" << DPrintFLocation << ")\n";
+					}
+				}
+			}
 
 			if (info->isSecret) {
 				// try to figure out the run time. best we can do is a guess tho.
@@ -7031,6 +7072,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 		Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
 		Com_Memset(&jumpDetected, 0, sizeof(jumpDetected));
+
+		lastJaProYourTimeCP = ""; // i assume the "Your Time:" centerprint always comes on the same frame as the race print
 
 		thisFrameInfo.demoTime = demoCurrentTime; // temporary, until snapshot assigns. bad? but i think we always use this inside snapshot anyway.
 		thisFrameInfo.serverTime = demo.cut.Cl.snap.serverTime; // temporary, until snapshot assigns. bad? but i think we always use this inside snapshot anyway.
@@ -12845,6 +12888,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				size_t cpTextLen = strlen(cpTextC);
 
 				static constexpr auto timerStartedMatcherPlus2 = "Race timer started!"_cs;
+				static constexpr auto jaProSecretRunYourTimeMatcher = "Your time: "_cs;
 				
 				if (timerStartedMatcherPlus2.us_isstart(cpTextC+2)) {
 					strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].lastReset = demoCurrentTime;
@@ -12856,6 +12900,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.divisor = 0;
 						strafeDeviationsDefrag[demo.cut.Cl.snap.ps.clientNum].averageHelper.sum = 0;
 					}
+				} else if (jaProSecretRunYourTimeMatcher.us_isstart(cpTextC)) {
+					lastJaProYourTimeCP = cpTextC;
 				}
 				if (opts.makeVideo) {
 					screenCenterText.push_back({ demoCurrentTime,cpTextC });
