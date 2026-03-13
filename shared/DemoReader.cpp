@@ -2247,7 +2247,11 @@ readNext:
 							ent->client->ps.generic1 = ent->s.generic1 = ((MAX(0, MIN(15, ent->client->ps.ammo[weaponData[WP_TRIP_MINE].ammoIndex])) & 15) << 4) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SENTRY_GUN))) << 3) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_MEDPAC))) << 2) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SHIELD))) << 1) | (!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SEEKER)));
 						*/
 						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] = (signed char)((thisEntity->trickedentindex3>>8) & 0xff);
-						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_ARMOR] = (signed char)((thisEntity->trickedentindex3) & 0xff);
+						if (thisEntity->eFlags & EF_DEAD && thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] > 0) { // for faulty implementations, or for extended health in the future, if needed (EF_DEAD reliably tells the signedness, so we could go up to 255 and down to -255)
+							thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] = -thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH];
+						}
+						//thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_ARMOR] = (signed char)((thisEntity->trickedentindex3) & 0xff);
+						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_ARMOR] = ((thisEntity->trickedentindex3) & 0xff); // not signed. armor is never negative actually.
 						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_FORCE] = thisEntity->trickedentindex4 & 127;
 						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_SABERDRAWANIMLEVEL] = (thisEntity->trickedentindex4 >> 14) & 3;
 						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_CURRENTWEAPONAMMO] = (thisEntity->trickedentindex4>>7) & 127;
