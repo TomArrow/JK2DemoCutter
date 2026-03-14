@@ -59,8 +59,9 @@ bool nwhHexColors = false;
 bool nwhMatchStatisticsGathering = false;
 std::stringstream nwhMatchStatistics;
 
-
-
+int64_t	nwhLastACDetectGeneric = -99999;
+int64_t nwhLastScriptDetectGeneric = -99999;
+int64_t nwhLastScriptDetect[MAX_CLIENTS_MAX] = {};
 
 #define VIDEOWIDTH 400
 #define VIDEOHEIGHT 300
@@ -6859,7 +6860,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	const int		speedTypesSkip = opts.findSuperSlowKillStreaks ? 0 : 1; // The different max delays between kills for killstreaks are in an array. Normally we skip the last one (veeery long 18 seconds), but some ppl might wanna activate those too.
 
 	
-
+	nwhLastACDetectGeneric = -99999;
+	nwhLastScriptDetectGeneric = -99999;
 	Com_Memset(&oldPsInfo,0,sizeof(oldPsInfo));
 	Com_Memset(saberComboCounter,0,sizeof(saberComboCounter));
 	Com_Memset(playerSpiralLocations,0,sizeof(playerSpiralLocations));
@@ -6870,6 +6872,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	Com_Memset(mohaaPlayerWeaponModelIndex,0,sizeof(mohaaPlayerWeaponModelIndex));
 	for (int i = 0; i < max_clients; i++) {
 		mohaaPlayerWeaponModelIndex[i] = -1;
+		nwhLastScriptDetect[i] = -99999;
 	}
 	Com_Memset(mohaaPlayerWeaponModelIndexThisFrame,0,sizeof(mohaaPlayerWeaponModelIndexThisFrame));
 	//Com_Memset(mohaaPlayerWeaponTagNum,0,sizeof(mohaaPlayerWeaponTagNum));
@@ -12983,6 +12986,35 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					}
 					qboolean result = SaveDefragRun<max_clients>(runInfo, sharedVars, sourceDemoFile, io, bufferTime, opts, searchMode, wasDoingSQLiteExecution);
 					if (!result) continue;
+				}
+
+
+				static constexpr auto nwhAC = "[NWH-AC]:"_cs;
+				if (NWHVersion.nwh && nwhAC.us_isstart(printTextC)) {
+					static constexpr auto nwhACScriptStart = "[NWH-AC]: Player "_cs;
+					static constexpr auto nwhACScriptEnd = " used a script.\n"_cs;
+					if (nwhACScriptStart.us_isstart(printTextC) && nwhACScriptEnd.us_isending(printTextC, printTextLen)) {
+						char playerName[256];
+						Q_strncpyz(playerName,sizeof(playerName),printTextC+ nwhACScriptStart.len, strlen(printTextC) - nwhACScriptStart.len - nwhACScriptEnd.len+1);
+						std::string playerNameStr = playerName;
+						int clientNum = getClientNumForDemo(&demo.cut.Cl,&playerNameStr,qtrue,demoType,max_clients,qfalse);
+						//std::cout << "playerName" << playerName;
+						if (clientNum == -1 && (demoCurrentTime - nwhLastScriptDetectGeneric) >= 1000 || clientNum != -1 && (demoCurrentTime - nwhLastScriptDetect[clientNum]) >= 1000 ) {
+							logSpecialThing<max_clients>("SCRIPTDETECT", clientNum == -1 ? "NWH-Detection-NoNameMatch" : "NWH-Detection", printText, playerNameStr, clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+						}
+						else {
+							//std::cout << "NWH-AC double detect skipped.";
+						}
+						if (clientNum == -1) {
+							nwhLastScriptDetectGeneric = demoCurrentTime;
+						}
+						else {
+							nwhLastScriptDetect[clientNum] = demoCurrentTime;
+						}
+					}
+					else {
+						logSpecialThing<max_clients>("SCRIPTDETECT", "NWH-Detection-Generic", printText, "", -1, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+					}
 				}
 
 				// TODO maybe check for v1.2.2, that's when it was introduced, but I guess who cares

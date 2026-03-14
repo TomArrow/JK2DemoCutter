@@ -7788,6 +7788,153 @@ void IntegerToBoundingBox(int num, int forceFieldTime2, vec3_t mins, vec3_t maxs
 #endif
 
 
+class NameMatchCommon {
+public:
+	std::string matchedName;
+	int clientNum;
+	int lenDiff;
+};
+int getClientNumForDemo(clientActive_t* clCut, std::string* playerSearchString, qboolean printEndLine, demoType_t demoType, int maxClientsThisDemo, qboolean doNumberMatch) {
+	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+	std::string* thisPlayer = playerSearchString;
+	const char* tmpConfigString;
+	int tmpConfigStringMaxLength;
+	int clientNumHere = -1;
+	int pstrlen = thisPlayer->size();
+	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
+	int stringOffset;
+
+	if (!pstrlen) return clientNumHere;
+	if (doNumberMatch && pstrlen <= 2 && isdigit((*thisPlayer)[0]) && (pstrlen == 1 || isdigit((*thisPlayer)[1]))) {
+		// It's a number. ClientNum. Just parse it.
+		clientNumHere = atoi(thisPlayer->c_str());
+		stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + clientNumHere];
+		tmpConfigString = clCut->gameState.stringData + stringOffset;
+		tmpConfigStringMaxLength = sizeof(clCut->gameState.stringData) - stringOffset;
+		std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, isMOHAADemo ? "name" : "n");
+		std::cout << *thisPlayer << " (interpreted as clientNum) matches '" << nameHere << "' (" << clientNumHere << ")";
+	}
+	else {
+		std::string thisPlayerLower = *thisPlayer;
+		std::transform(thisPlayerLower.begin(), thisPlayerLower.end(), thisPlayerLower.begin(), tolowerSignSafe);
+
+		std::vector<NameMatchCommon> colorStrippedMatches;
+		std::vector<NameMatchCommon> caseInsensitiveMatches;
+		std::vector<NameMatchCommon> matches;
+
+		// Find matching player name
+		for (int c = 0; c < maxClientsThisDemo; c++) {
+			stringOffset = clCut->gameState.stringOffsets[CS_PLAYERS_here + c];
+			tmpConfigString = clCut->gameState.stringData + stringOffset;
+			tmpConfigStringMaxLength = sizeof(clCut->gameState.stringData) - stringOffset;
+			std::string nameHere = Info_ValueForKey(tmpConfigString, tmpConfigStringMaxLength, isMOHAADemo ? "name" : "n");
+			std::string nameHereLower = nameHere;
+			std::transform(nameHereLower.begin(), nameHereLower.end(), nameHereLower.begin(), tolowerSignSafe);
+
+			// Make color stripped version
+			const char* sourceCStringName = nameHereLower.c_str();
+			int stringLen = strlen(sourceCStringName);
+			char* cStringName = new char[stringLen + 1];
+			strcpy_s(cStringName, stringLen + 1, sourceCStringName);
+			Q_StripColorAll(cStringName, false); // todo do nwh detect with lenience here.
+			std::string nameHereLowerColorStripped = cStringName;
+
+			if (strstr(nameHere.c_str(), thisPlayer->c_str())) {
+				NameMatchCommon nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				nm.lenDiff = nameHere.size() - pstrlen;
+				matches.push_back(nm);
+			}
+			if (strstr(nameHereLower.c_str(), thisPlayerLower.c_str())) {
+				NameMatchCommon nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				nm.lenDiff = nameHere.size() - pstrlen;
+				caseInsensitiveMatches.push_back(nm);
+			}
+			if (strstr(nameHereLowerColorStripped.c_str(), thisPlayerLower.c_str())) {
+				NameMatchCommon nm;
+				nm.clientNum = c;
+				nm.matchedName = nameHere;
+				nm.lenDiff = nameHere.size() - pstrlen;
+				colorStrippedMatches.push_back(nm);
+			}
+		}
+
+		if (matches.size() > 1) {
+			std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+			int closestMatchDiff = INT_MAX;
+			int closestMatchId = -1;
+			for (int c = 0; c < matches.size(); c++) {
+				std::cout << matches[c].matchedName << "(" << matches[c].clientNum << ")" << std::endl;
+				if (matches[c].lenDiff < closestMatchDiff || closestMatchId == -1) {
+					closestMatchDiff = matches[c].lenDiff;
+					closestMatchId = c;
+				}
+			}
+			std::cout << "Picking best match '" << matches[closestMatchId].matchedName << "' (" << matches[closestMatchId].clientNum << ")";
+			clientNumHere = matches[closestMatchId].clientNum;
+		}
+		else if (matches.size() == 1) {
+			std::cout << "'" << *thisPlayer << "' matches '" << matches[0].matchedName << "' (" << matches[0].clientNum << ")";
+			clientNumHere = matches[0].clientNum;
+		}
+		else {
+			// No match. Try case insensitive
+			if (caseInsensitiveMatches.size() > 1) {
+				std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+				int closestMatchDiff = INT_MAX;
+				int closestMatchId = -1;
+				for (int c = 0; c < caseInsensitiveMatches.size(); c++) {
+					std::cout << caseInsensitiveMatches[c].matchedName << "(" << caseInsensitiveMatches[c].clientNum << ")" << std::endl;
+					if (matches[c].lenDiff < closestMatchDiff || closestMatchId == -1) {
+						closestMatchDiff = matches[c].lenDiff;
+						closestMatchId = c;
+					}
+				}
+				std::cout << "Picking best match '" << caseInsensitiveMatches[closestMatchId].matchedName << "' (" << caseInsensitiveMatches[closestMatchId].clientNum << ")";
+				clientNumHere = caseInsensitiveMatches[closestMatchId].clientNum;
+			}
+			else if (caseInsensitiveMatches.size() == 1) {
+				std::cout << "'" << *thisPlayer << "' matches '" << caseInsensitiveMatches[0].matchedName << "' (" << caseInsensitiveMatches[0].clientNum << ")";
+				clientNumHere = caseInsensitiveMatches[0].clientNum;
+			}
+			else {
+				//std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
+				// No match. Try stripped colors 
+				if (colorStrippedMatches.size() > 1) {
+					std::cout << "Too many matches for player name '" << *thisPlayer << "': " << std::endl;
+					int closestMatchDiff = INT_MAX;
+					int closestMatchId = -1;
+					for (int c = 0; c < colorStrippedMatches.size(); c++) {
+						std::cout << colorStrippedMatches[c].matchedName << "(" << colorStrippedMatches[c].clientNum << ")" << std::endl;
+						if (matches[c].lenDiff < closestMatchDiff || closestMatchId == -1) {
+							closestMatchDiff = matches[c].lenDiff;
+							closestMatchId = c;
+						}
+					}
+					std::cout << "Picking best match '" << colorStrippedMatches[closestMatchId].matchedName << "' (" << colorStrippedMatches[closestMatchId].clientNum << ")";
+					clientNumHere = colorStrippedMatches[closestMatchId].clientNum;
+				}
+				else if (colorStrippedMatches.size() == 1) {
+					std::cout << "'" << *thisPlayer << "' matches '" << colorStrippedMatches[0].matchedName << "' (" << colorStrippedMatches[0].clientNum << ")";
+					clientNumHere = colorStrippedMatches[0].clientNum;
+				}
+				else {
+					std::cout << "[WARNING] '" << *thisPlayer << "' matches nothing. Discarding.";
+					// Done.
+
+				}
+			}
+		}
+	}
+	if (printEndLine) {
+		std::cout << std::endl;
+	}
+	return clientNumHere;
+}
+
 
 
 bool parseVersion(const char* str, int64_t* unixTime, char* platform, size_t platformMaxLen) {

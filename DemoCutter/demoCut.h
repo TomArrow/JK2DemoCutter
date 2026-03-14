@@ -5961,7 +5961,7 @@ inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, dem
 	return specializedMappings[sourceDemoType][targetDemoType].weaponMapping.data[weapon];
 }*/
 
-
+int getClientNumForDemo(clientActive_t* clCut, std::string* playerSearchString, qboolean printEndLine, demoType_t demoType, int maxClientsThisDemo, qboolean doNumberMatch);
 bool parseVersion(const char* str, int64_t* unixTime, char* platform, size_t platformMaxLen);
 
 entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
