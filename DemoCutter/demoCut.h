@@ -26,6 +26,14 @@
 #include "anims.h"
 #include "animsStanceMappings.h"
 
+// from rapidJSON
+class AssertException : public std::logic_error {
+public:
+	AssertException(const char* w) : std::logic_error(w) {}
+	AssertException(const AssertException& rhs) : std::logic_error(rhs) {}
+	~AssertException() throw() {}
+};
+#define RAPIDJSON_ASSERT(x) (!(x) ? throw AssertException(RAPIDJSON_STRINGIFY(x)) : (void)0u)
 #include "include/rapidjson/document.h"
 
 #include "tsl/htrie_map.h"
@@ -202,9 +210,6 @@ inline parsedArguments_t parseArguments(char** argv, int argc) {
 #define SQLBIND_DELAYED_NULL_FLAGS(delayedQuery,name,flags) delayedQuery->add(name,SQLDelayedValue_NULL,flags)
 #define SQLBIND_DELAYED_TEXT(delayedQuery,name,value) delayedQuery->add(name,value)
 #define SQLBIND_DELAYED_TEXT_FLAGS(delayedQuery,name,value,flags) delayedQuery->add(name,value,flags)
-
-
-
 
 
 typedef enum globalDebugOutputType_t {
@@ -5541,7 +5546,7 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 void demoCutWriteEmptyMessageMetadataPart(msg_t* msg, demoType_t demoType, const char* metaData);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave, int* flagsFound, bool& SEHExceptionCaught);
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave,std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, bool& SEHExceptionCaught);
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);

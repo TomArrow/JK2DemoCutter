@@ -1100,6 +1100,7 @@ typedef struct entityDumpCSVPoint_t {
 };
 std::vector<entityDumpCSVPoint_t> entityDumpCSVDataPoints[MAX_GENTITIES];
 std::vector<usercmdEval_t> playerUserCmds[MAX_CLIENTS_MAX];
+std::vector<usercmdEval_t> playerClientUserCmds[MAX_CLIENTS_MAX];
 
 
 #define PLAYERSTATEOTHERKILLERBOOSTDETECTION
@@ -2321,6 +2322,8 @@ std::set<std::string>	recorderPlayerNames;
 #define DERIV_FAKEDEMO		(1<<0) // dentified by fake demo server name. could be reframe merge etc
 #define DERIV_SNAPSMANIP	(1<<1) // snaps manipulation by demo optimizer
 int	demoDerivativeFlags = 0;
+
+bool demoHasClientUserCmds = false;
 
 bool demoVersionParsed = false;
 int64_t demoServerBuildTime = 0;
@@ -6210,28 +6213,31 @@ static void inline writePlayerDumpCSV(int clientNum, const ExtraSearchOptions& o
 }
 
 static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& opts) {
-	if (playerUserCmds[clientNum].size() > 0) {
+	std::vector<usercmdEval_t>* ucmdbuffers[2] = {&playerUserCmds[clientNum] ,&playerClientUserCmds[clientNum] };
+	for (int i = 0; i < 2; i++) {
+		if (ucmdbuffers[i]->size() > 0) {
 
-		std::ofstream strafeCSVPlayerOutputHandle;
-		strafeCSVPlayerOutputHandle.open(va("playerUserCMDDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
+			std::ofstream strafeCSVPlayerOutputHandle;
+			strafeCSVPlayerOutputHandle.open(va(i == 0 ? "playerUserCMDDumpCSV_client%d.csv" : "playerClientUserCMDDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
 
-		strafeCSVPlayerOutputHandle << "ping,droppedPackets,flags,serverTime,serverTimeGroup,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
+			strafeCSVPlayerOutputHandle << "ping,droppedPackets,flags,serverTime,serverTimeGroup,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
 
-		int lastCommandTime = -9999999;
-		int64_t countSkipped = 0;
-		for (auto it = playerUserCmds[clientNum].begin(); it != playerUserCmds[clientNum].end(); it++) {
-			if (false && lastCommandTime == it->serverTime) {
-				countSkipped++;
-				continue;
+			int lastCommandTime = -9999999;
+			int64_t countSkipped = 0;
+			for (auto it = ucmdbuffers[i]->begin(); it != ucmdbuffers[i]->end(); it++) {
+				if (false && lastCommandTime == it->serverTime) {
+					countSkipped++;
+					continue;
+				}
+				strafeCSVPlayerOutputHandle << (int)it->ping << ","<<(int)it->droppedPackets << ","<<(int)it->flags << ","<< it->serverTime << "," << (int)it->serverTimeGroup << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
+				lastCommandTime = it->serverTime;
 			}
-			strafeCSVPlayerOutputHandle << (int)it->ping << ","<<(int)it->droppedPackets << ","<<(int)it->flags << ","<< it->serverTime << "," << (int)it->serverTimeGroup << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
-			lastCommandTime = it->serverTime;
-		}
-		if (countSkipped) {
-			std::cout << "writeUserCMDDumpCSV: Skipped " << countSkipped << " frames with duplicate commandTime for player " << clientNum << ".\n";
-		}
+			if (countSkipped) {
+				std::cout << "writeUserCMDDumpCSV: Skipped " << countSkipped << " frames with duplicate commandTime for player " << clientNum << ".\n";
+			}
 
-		strafeCSVPlayerOutputHandle.close();
+			strafeCSVPlayerOutputHandle.close();
+		}
 	}
 }
 
@@ -7072,6 +7078,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	//	Com_SetLoadingMsg("Cutting the demo...");
 	while (oldSize > 0) {
 
+		bool duplicatedMessageNumberErrorQueued = false;
+
 		Com_Memset(&thisFrameInfo, 0, sizeof(thisFrameInfo));
 		Com_Memset(&hitDetectionData, 0, sizeof(hitDetectionData));
 		Com_Memset(&jumpDetected, 0, sizeof(jumpDetected));
@@ -7119,9 +7127,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 		sequenceNumOrderChanged = false;
 		if (demo.cut.Clc.serverMessageSequence == oldSequenceNum) {
-			demoErrorFlags |= DERR_DUPEMSGNUM;
-			std::cerr << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
-			demoErrors << "WARNING: Duplicated message number "<< oldSequenceNum << " at demotime " << demoCurrentTime << ")\n";
+			if (!demoHasClientUserCmds) {
+				demoErrorFlags |= DERR_DUPEMSGNUM;
+				std::cerr << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
+				demoErrors << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << ")\n";
+			}
+			else {
+				duplicatedMessageNumberErrorQueued = true;
+			}
 		}
 		else if (demo.cut.Clc.serverMessageSequence < oldSequenceNum) {
 			sequenceNumOrderChanged = true;
@@ -7227,7 +7240,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
 				int flagsFound = 0;
-				demoCutReadPossibleHiddenUserCMDs(&oldMsg,demoType,opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, &flagsFound,SEHExceptionCaught);
+				if (!demoCutReadPossibleHiddenUserCMDs(&oldMsg, demoType, opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, opts.userCMDCSVDump ? &playerClientUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, &flagsFound, SEHExceptionCaught) && duplicatedMessageNumberErrorQueued) {
+					demoErrorFlags |= DERR_DUPEMSGNUM;
+					std::cerr << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
+					demoErrors << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << ")\n";
+				}
 
 				if (flagsFound) {
 					int likelyClient = demo.cut.Cl.snap.ps.clientNum;
@@ -7237,23 +7254,47 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
 				if (maybeMeta) {
 
-					rapidjson::Document* jsonPreviousMetaDocument = new rapidjson::Document();
-					if (jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !jsonPreviousMetaDocument->IsObject()) {
-						// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
-						// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
-						// will quit the process. Because the user can after all just adjust and fix the commandline.
-						demoErrorFlags |= DERR_BADJSONMETA;
-						demoErrors << "Demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
-						std::cout << "Demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
-						break;
-					}
+					try {
 
-					const char* snapsmanipKey = jsonGetRealMetadataKeyName(jsonPreviousMetaDocument,"opt_snapsmanip");
-					if (snapsmanipKey) {
-						int opt_snapsmanip = (*jsonPreviousMetaDocument)[snapsmanipKey].GetInt();
-						if (opt_snapsmanip) {
-							demoDerivativeFlags |= DERIV_SNAPSMANIP;
+						rapidjson::Document* jsonPreviousMetaDocument = new rapidjson::Document();
+						if (jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !jsonPreviousMetaDocument->IsObject()) {
+							// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
+							// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
+							// will quit the process. Because the user can after all just adjust and fix the commandline.
+							demoErrorFlags |= DERR_BADJSONMETA;
+							demoErrors << "Demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+							std::cout << "Demo appears to contain metadata, but wasn't able to parse it. Discarding.\n";
+							break;
 						}
+
+						const char* snapsmanipKey = jsonGetRealMetadataKeyName(jsonPreviousMetaDocument, "opt_snapsmanip");
+						if (snapsmanipKey) {
+							int opt_snapsmanip = (*jsonPreviousMetaDocument)[snapsmanipKey].GetInt();
+							if (opt_snapsmanip) {
+								demoDerivativeFlags |= DERIV_SNAPSMANIP;
+							}
+						}
+
+						const char* clientUcmdActiveKey = jsonGetRealMetadataKeyName(jsonPreviousMetaDocument, "clucmdsv");
+						if (clientUcmdActiveKey) {
+							int value = (*jsonPreviousMetaDocument)[clientUcmdActiveKey].GetInt();
+							//if (opt_snapsmanip) {
+							//	demoDerivativeFlags |= DERIV_SNAPSMANIP;
+							//}
+							if (value > 0) {
+								demoHasClientUserCmds = true;
+							}
+						}
+					}
+					catch (const AssertException assertExc) {
+						demoErrorFlags |= DERR_BADJSONMETA;
+						demoErrors << "Some JSON parsing assert error. Error: "<< assertExc.what() <<". JSON: "<< maybeMeta << "\n";
+						std::cerr << "Some JSON parsing assert error. Error: "<< assertExc.what() <<". JSON: "<< maybeMeta << "\n";
+					}
+					catch (...) {
+						demoErrorFlags |= DERR_BADJSONMETA;
+						demoErrors << "Some JSON parsing error. JSON: "<< maybeMeta << "\n";
+						std::cerr << "Some JSON parsing error. JSON: "<< maybeMeta << "\n";
 					}
 
 				}

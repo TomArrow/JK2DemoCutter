@@ -15,6 +15,7 @@
 
 constexpr char* postEOFMetadataMarker = "HIDDENMETA";
 constexpr char* postEOFUcmdMarker = "HIDDENUCMD";
+constexpr char* postEOFUcmdMarkerCL = "HIDDCLUCMD";
 
 #ifdef MSG_READBITS_TRANSCODE
 extern msg_t* transcodeTargetMsg;
@@ -6379,7 +6380,7 @@ const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 	return MSG_ReadBigString(msg, demoType);
 }
 
-static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave, int* flagsFound) {
+static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSaveServer, std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound) {
 
 	usercmd_t	nullcmd;
 
@@ -6402,6 +6403,8 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 	int oldbit = msg->bit;
 	int oldreadcount = msg->readcount;
 
+	bool serverPossible = true;
+	bool clientPossible = true;
 	for (int i = 0; i < metaMarkerLength; i++) {
 		if (msg->cursize < msg->readcount + maxBytePerByteSaved)
 		{
@@ -6409,18 +6412,30 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 			msg->readcount = oldreadcount;
 			return qfalse;
 		}
-		if (MSG_ReadByte(msg) != postEOFUcmdMarker[i]) {
+		int newbyte = MSG_ReadByte(msg);
+		if (newbyte != postEOFUcmdMarker[i]) {
+			serverPossible = false;
+		}
+		if (newbyte != postEOFUcmdMarkerCL[i]) {
+			clientPossible = false;
+		}
+		if (!serverPossible && !clientPossible) {
 			msg->bit = oldbit;
 			msg->readcount = oldreadcount;
 			return qfalse;
 		}
 	}
 
+	std::vector<usercmdEval_t>* cmdsSave = cmdsSaveServer;
+	if (!serverPossible) {
+		cmdsSave = cmdsClientSave;
+	}
+
 	Com_Memset(&nullcmd, 0, sizeof(nullcmd));
 
 	int version = MSG_ReadBits(msg, 16);
 	if (GlobalDebugOutputFlags & (1 << DEBUG_HIDDENUSERCMD)) {
-		std::cerr << "Found hidden usermessage marker, version " << version << "\n";
+		std::cerr << "Found hidden usermessage marker (type:" << (serverPossible ? "SERVER" : "CLIENT") << "), version " << version << "\n";
 	}
 	usercmd_t cmd, oldcmd;
 	oldcmd = nullcmd;
@@ -6440,6 +6455,7 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 			oldcmd = nullcmd; // first prototype did this on every new msg but its wasteful..
 		}
 		int index = 0;
+		int theServerTime = 0;
 		while (MSG_ReadBits(msg, 1)) {
 			MSG_ReadDeltaUsercmdKey(msg, 0, &oldcmd, &cmd);
 			oldcmd = cmd;
@@ -6452,7 +6468,10 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 				usercmdEval_t* lastLastEval = (backIt != cmdsSave->rend()) ? &*backIt : NULL;
 				usercmdEval_t eval = { };
 				eval.ucmd = cmd;
-				eval.serverTime = cmd.serverTime + serverTimeOffset;
+				if (index == 0) {
+					theServerTime = cmd.serverTime + serverTimeOffset;
+				}
+				eval.serverTime = theServerTime;
 				eval.droppedPackets = droppedPackets;
 				eval.ping = ping;
 				if(lastEval) {
@@ -6510,9 +6529,9 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 	return qtrue;
 }
 
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave, int* flagsFound, bool& SEHExceptionCaught) {
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave, std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, bool& SEHExceptionCaught) {
 	__TRY{
-		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType,cmdsSave,flagsFound);
+		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType,cmdsSave,cmdsClientSave,flagsFound);
 	}
 	__EXCEPT{
 		SEHExceptionCaught = true;
