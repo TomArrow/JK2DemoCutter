@@ -7240,7 +7240,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
 				int flagsFound = 0;
-				if (!demoCutReadPossibleHiddenUserCMDs(&oldMsg, demoType, opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, opts.userCMDCSVDump ? &playerClientUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, &flagsFound, SEHExceptionCaught) && duplicatedMessageNumberErrorQueued) {
+				if (!demoCutReadPossibleHiddenUserCMDs(&oldMsg, demoType, opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, opts.userCMDCSVDump ? &playerClientUserCmds[demo.cut.Clc.clientNum] : NULL, &flagsFound, SEHExceptionCaught) && duplicatedMessageNumberErrorQueued) {
 					demoErrorFlags |= DERR_DUPEMSGNUM;
 					std::cerr << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
 					demoErrors << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << ")\n";
