@@ -1467,6 +1467,7 @@ typedef struct usercmd_s {
 typedef struct usercmdEval_s {
 	usercmd_t		ucmd;
 	byte			serverTimeGroup;
+	byte			messageGroup;
 	byte			flags;
 	int				serverTime;
 	int16_t			ping;
@@ -5546,7 +5547,9 @@ void demoCutWriteDemoMessage(msg_t* msg, fileHandle_t f, clientConnection_t* clc
 void demoCutWriteEmptyMessageMetadataPart(msg_t* msg, demoType_t demoType, const char* metaData);
 void demoCutWriteEmptyMessageWithMetadata(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw, const char* metaData);
 const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType);
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave,std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, bool& SEHExceptionCaught);
+#define HIDDENUSERCMDTYPE_SERVER	1
+#define HIDDENUSERCMDTYPE_CLIENT	2
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType,std::vector<usercmdEval_t>* cmdsSave,std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, int* typeFound, bool& SEHExceptionCaught);
 
 void demoCutWriteDemoHeader(fileHandle_t f, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);
 void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean forceNonDelta, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t demoType, qboolean raw);

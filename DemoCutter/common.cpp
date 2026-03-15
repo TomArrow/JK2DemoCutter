@@ -6380,7 +6380,7 @@ const char* demoCutReadPossibleMetadata(msg_t* msg, demoType_t demoType) {
 	return MSG_ReadBigString(msg, demoType);
 }
 
-static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSaveServer, std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound) {
+static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSaveServer, std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, int* typeFound) {
 
 	usercmd_t	nullcmd;
 
@@ -6426,9 +6426,18 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 		}
 	}
 
-	std::vector<usercmdEval_t>* cmdsSave = cmdsSaveServer;
+	std::vector<usercmdEval_t>* cmdsSave;
 	if (!serverPossible) {
 		cmdsSave = cmdsClientSave;
+		if (typeFound) {
+			*typeFound = HIDDENUSERCMDTYPE_CLIENT;
+		}
+	}
+	else {
+		cmdsSave = cmdsSaveServer;
+		if (typeFound) {
+			*typeFound = HIDDENUSERCMDTYPE_SERVER;
+		}
 	}
 
 	Com_Memset(&nullcmd, 0, sizeof(nullcmd));
@@ -6456,6 +6465,7 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 		}
 		int index = 0;
 		int theServerTime = 0;
+		int messageGroup = 0;
 		while (MSG_ReadBits(msg, 1)) {
 			MSG_ReadDeltaUsercmdKey(msg, 0, &oldcmd, &cmd);
 			oldcmd = cmd;
@@ -6470,10 +6480,14 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 				eval.ucmd = cmd;
 				if (index == 0) {
 					theServerTime = cmd.serverTime + serverTimeOffset;
+					if (lastEval) {
+						messageGroup = lastEval->messageGroup ^ 1;
+					}
 				}
 				eval.serverTime = theServerTime;
 				eval.droppedPackets = droppedPackets;
 				eval.ping = ping;
+				eval.messageGroup = messageGroup;
 				if(lastEval) {
 					eval.msecDelta = cmd.serverTime - lastEval->ucmd.serverTime;
 					eval.angleDelta[0] = AngleDelta(SHORT2ANGLE(cmd.angles[0]), SHORT2ANGLE(lastEval->ucmd.angles[0]));
@@ -6529,9 +6543,9 @@ static qboolean demoCutReadPossibleHiddenUserCMDsReal(msg_t* msg, demoType_t dem
 	return qtrue;
 }
 
-qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave, std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, bool& SEHExceptionCaught) {
+qboolean demoCutReadPossibleHiddenUserCMDs(msg_t* msg, demoType_t demoType, std::vector<usercmdEval_t>* cmdsSave, std::vector<usercmdEval_t>* cmdsClientSave, int* flagsFound, int* typeFound, bool& SEHExceptionCaught) {
 	__TRY{
-		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType,cmdsSave,cmdsClientSave,flagsFound);
+		return demoCutReadPossibleHiddenUserCMDsReal(msg,demoType,cmdsSave,cmdsClientSave,flagsFound,typeFound);
 	}
 	__EXCEPT{
 		SEHExceptionCaught = true;

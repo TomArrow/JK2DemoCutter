@@ -6220,17 +6220,23 @@ static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& 
 			std::ofstream strafeCSVPlayerOutputHandle;
 			strafeCSVPlayerOutputHandle.open(va(i == 0 ? "playerUserCMDDumpCSV_client%d.csv" : "playerClientUserCMDDumpCSV_client%d.csv", clientNum), std::ios_base::app); // append instead of overwrite
 
-			strafeCSVPlayerOutputHandle << "ping,droppedPackets,flags,serverTime,serverTimeGroup,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
+			strafeCSVPlayerOutputHandle << "messageGroup,serverTimeGroup,ping,droppedPackets,flags,serverTime,commandTime,msecDelta,upmove,forwardmove,rightmove,angledelta[0],angledelta[1],angledelta[2],angles[0],angles[1],angles[2],buttons,weapon,forcesel,invensel,generic_cmd\n";
 
 			int lastCommandTime = -9999999;
+			int lastMessageGroup = 0;
+			size_t messageGroupIndex = 0;
 			int64_t countSkipped = 0;
 			for (auto it = ucmdbuffers[i]->begin(); it != ucmdbuffers[i]->end(); it++) {
 				if (false && lastCommandTime == it->serverTime) {
 					countSkipped++;
 					continue;
 				}
-				strafeCSVPlayerOutputHandle << (int)it->ping << ","<<(int)it->droppedPackets << ","<<(int)it->flags << ","<< it->serverTime << "," << (int)it->serverTimeGroup << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
+				if (it->messageGroup != lastMessageGroup) {
+					messageGroupIndex++;
+				}
+				strafeCSVPlayerOutputHandle << (int)it->messageGroup << "," << (int)it->serverTimeGroup << "," << (int)it->ping << ","<<(int)it->droppedPackets << ","<<(int)it->flags << ","<< it->serverTime << "," << it->ucmd.serverTime << "," << it->msecDelta << "," << (int)it->ucmd.upmove << "," << (int)it->ucmd.forwardmove << "," << (int)it->ucmd.rightmove << "," << it->angleDelta[0] << "," << it->angleDelta[1] << "," << it->angleDelta[2] << "," << it->ucmd.angles[0] << "," << it->ucmd.angles[1] << "," << it->ucmd.angles[2] << "," << (int)it->ucmd.buttons << "," << (int)it->ucmd.weapon << "," << (int)it->ucmd.forcesel << "," << (int)it->ucmd.invensel << "," << (int)it->ucmd.generic_cmd << "\n";
 				lastCommandTime = it->serverTime;
+				lastMessageGroup = it->messageGroup;
 			}
 			if (countSkipped) {
 				std::cout << "writeUserCMDDumpCSV: Skipped " << countSkipped << " frames with duplicate commandTime for player " << clientNum << ".\n";
@@ -7240,14 +7246,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			cmd = generalizeGameSVCOp(ocmd, demoType);
 			if (cmd == svc_EOF_general) {
 				int flagsFound = 0;
-				if (!demoCutReadPossibleHiddenUserCMDs(&oldMsg, demoType, opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, opts.userCMDCSVDump ? &playerClientUserCmds[demo.cut.Clc.clientNum] : NULL, &flagsFound, SEHExceptionCaught) && duplicatedMessageNumberErrorQueued) {
+				int typeFound = 0;
+				if (!demoCutReadPossibleHiddenUserCMDs(&oldMsg, demoType, opts.userCMDCSVDump ? &playerUserCmds[demo.cut.Cl.snap.ps.clientNum] : NULL, opts.userCMDCSVDump ? &playerClientUserCmds[demo.cut.Clc.clientNum] : NULL, &flagsFound, &typeFound, SEHExceptionCaught) && duplicatedMessageNumberErrorQueued) {
 					demoErrorFlags |= DERR_DUPEMSGNUM;
 					std::cerr << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << " (" << DPrintFLocation << ")\n";
 					demoErrors << "WARNING: Duplicated message number " << oldSequenceNum << " at demotime " << demoCurrentTime << ")\n";
 				}
 
 				if (flagsFound) {
-					int likelyClient = demo.cut.Cl.snap.ps.clientNum;
+					int likelyClient = typeFound == HIDDENUSERCMDTYPE_CLIENT ? demo.cut.Clc.clientNum : demo.cut.Cl.snap.ps.clientNum;
 					logSpecialThing<max_clients>("USERCMDCHEATFLAG", va("FLAGS%d",flagsFound), "suspicious activity in usercmds", getPlayerNameSafe<max_clients>(likelyClient, CS_PLAYERS_here, isMOHAADemo), likelyClient, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 				}
 
