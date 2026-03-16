@@ -1376,10 +1376,11 @@ LastSaberMoveInfo playerLastSaberMove[MAX_CLIENTS_MAX];
 int playerFirstVisible[MAX_CLIENTS_MAX];
 int playerFirstFollowed[MAX_CLIENTS_MAX];
 int playerFirstFollowedOrVisible[MAX_CLIENTS_MAX];
-int playerLastSeen[MAX_CLIENTS_MAX];
+int64_t playerLastSeen[MAX_CLIENTS_MAX];
 int recentFlagHoldTimes[MAX_CLIENTS_MAX];
 int playerVisibleFrames[MAX_CLIENTS_MAX];
 int playerVisibleClientFrames[MAX_CLIENTS_MAX];
+int64_t playerLastBSDBS[MAX_CLIENTS_MAX];
 CapperKillsInfo recentKillsDuringFlagHold[MAX_CLIENTS_MAX];
 EnemyNearbyInfo recentFlagHoldEnemyNearbyTimes[MAX_CLIENTS_MAX]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
 VariousCappingInfo recentFlagHoldVariousInfo[MAX_CLIENTS_MAX]; // For each player: How much time during cap was spent with X amount of enemies nearby? To judge dangerousness of cap.
@@ -6885,6 +6886,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	for (int i = 0; i < max_clients; i++) {
 		mohaaPlayerWeaponModelIndex[i] = -1;
 		nwhLastScriptDetect[i] = -99999;
+		playerLastBSDBS[i] = -99999;
 	}
 	Com_Memset(mohaaPlayerWeaponModelIndexThisFrame,0,sizeof(mohaaPlayerWeaponModelIndexThisFrame));
 	//Com_Memset(mohaaPlayerWeaponTagNum,0,sizeof(mohaaPlayerWeaponTagNum));
@@ -8898,6 +8900,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							}
 						}
 
+						if (thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_CR_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACKSTAB_GENERAL) {
+							playerLastBSDBS[i] = demoCurrentTime;
+						}
+
 						if (lastFrameInfo.entityExists[i]) {
 							
 							if (opts.savePointCloud && playerTeams[i] != TEAM_SPECTATOR && !playerBotStatus[i] && !VectorCompare(lastFrameInfo.playerPositions[i], thisFrameInfo.playerPositions[i]) && VectorLengthSquared(thisFrameInfo.playerVelocities[i]) > 50.0f) {
@@ -8915,7 +8921,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								if (thisFrameInfo.movementDir[i] == 4 && lastFrameInfo.movementDir[i] != 4 && (thisFrameInfo.commandTime[i] - lastFrameInfo.commandTime[i]) < 20 && (thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_CR_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACK_GENERAL || thisFrameInfo.saberMoveGeneral[i] == LS_A_BACKSTAB_GENERAL)) {
 									thisFrameInfo.frameInfoFlags[i] |= FIF_SCRIPTCHECK;
 								}
-
 
 								// saber combo tracking
 								//saberMoveType_t oldType = classifySaberMove(lastFrameInfo.saberMoveGeneral[i]);
@@ -13048,7 +13053,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						int clientNum = getClientNumForDemo(&demo.cut.Cl,&playerNameStr,qtrue,demoType,max_clients,qfalse);
 						//std::cout << "playerName" << playerName;
 						if (clientNum == -1 && (demoCurrentTime - nwhLastScriptDetectGeneric) >= 1000 || clientNum != -1 && (demoCurrentTime - nwhLastScriptDetect[clientNum]) >= 1000 ) {
-							logSpecialThing<max_clients>("SCRIPTDETECT", clientNum == -1 ? "NWH-Detection-NoNameMatch" : "NWH-Detection", printText, playerNameStr, clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, & sharedVars.oldBasename, & sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
+							int64_t lastBsDbs = (clientNum == -1 || playerLastBSDBS[clientNum] < 0) ? -1 : (demoCurrentTime - playerLastBSDBS[clientNum]);
+							logSpecialThing<max_clients>("SCRIPTDETECT",va("%s%s",clientNum == -1 ? "NWH-Detection-NoNameMatch" : "NWH-Detection", lastBsDbs < 0 ? "" : va("DELAY%d",(int)lastBsDbs)), printText, playerNameStr, clientNum, -1, demoCurrentTime, 0, bufferTime, lastGameStateChangeInDemoTime, io, &sharedVars.oldBasename, &sharedVars.oldPath, sharedVars.oldDemoDateModified, sourceDemoFile, qtrue, wasDoingSQLiteExecution, opts, searchMode, demoType);
 						}
 						else {
 							//std::cout << "NWH-AC double detect skipped.";
