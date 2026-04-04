@@ -2118,6 +2118,25 @@ void S3L_drawTriangle(
     }\
     s##Err += s##ErrAdd;
 
+  // TA: trying to replicate the above function while making 100% sure there's no infinite loop from weird value combinations
+  #undef stepSide
+  #define stepSide(s)\
+    {\
+        int subCount;\
+        if (s##Err - s##Dy < s##ErrCmp) {\
+            subCount = 0;\
+        }\
+        else if (s##ErrSub < 0) {\
+            subCount = (((32768 - s##Err - s##ErrSub - 1) / -s##ErrSub));\
+        }\
+        else {\
+            subCount = (s##Err - (s##ErrCmp + s##Dy - 1) + s##ErrSub - 1) / s##ErrSub;\
+        }\
+        s##Err = s##Err - s##ErrSub * subCount;\
+        s##X += s##Inc * subCount;\
+        s##Err += s##ErrAdd;\
+    }
+
   initSide(r,t,r,1)
   initSide(l,t,l,1)
 
