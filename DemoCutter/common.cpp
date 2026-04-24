@@ -2453,6 +2453,56 @@ int getMOHTeam(entityState_t* s) {
 	return (s->eFlags & EF_ANY_TEAM_MOH) ? ((s->eFlags & EF_AXIS_MOH) ? TEAM_AXIS_MOH : TEAM_ALLIES_MOH) : TEAM_FREEFORALL_MOH;
 }
 
+void SetPlayerStateExtraVals(playerState_t* ps,int entityExtraValuesBitmask, short* entityExtraValues) {
+	bool hasAnyInventory = false;
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_HEALTH)) {
+		ps->stats[STAT_HEALTH] = entityExtraValues[ENTITYEXTRA_HEALTH];
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_ARMOR)) {
+		ps->stats[STAT_ARMOR] = entityExtraValues[ENTITYEXTRA_ARMOR];
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_FORCE)) {
+		ps->fd.forcePower = entityExtraValues[ENTITYEXTRA_FORCE];
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_SABERDRAWANIMLEVEL)) {
+		ps->fd.saberDrawAnimLevel = entityExtraValues[ENTITYEXTRA_SABERDRAWANIMLEVEL];
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_CURRENTWEAPONAMMO) && ps->weapon < WP_NUM_WEAPONS_JK2 && ps->weapon >= 0) {
+		// TODO Make this work for other stuff than jk2 1.02?
+		ps->ammo[weaponData_1_02[ps->weapon].ammoIndex] = entityExtraValues[ENTITYEXTRA_CURRENTWEAPONAMMO];
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_TRIPMINEAMMO) && entityExtraValues[ENTITYEXTRA_TRIPMINEAMMO]) {
+		// TODO Make this work for other stuff than jk2 1.02?
+		ps->ammo[weaponData_1_02[WP_TRIP_MINE_JK2].ammoIndex] = entityExtraValues[ENTITYEXTRA_TRIPMINEAMMO];
+		ps->stats[STAT_WEAPONS] |= (1 << WP_TRIP_MINE_JK2);
+		hasAnyInventory = true;
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_HASSENTRY) && entityExtraValues[ENTITYEXTRA_HASSENTRY]) {
+		// TODO Make this work for other stuff than jk2 1.02?
+		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_SENTRY_GUN);
+		hasAnyInventory = true;
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_HASMEDPACK) && entityExtraValues[ENTITYEXTRA_HASMEDPACK]) {
+		// TODO Make this work for other stuff than jk2 1.02?
+		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_MEDPAC);
+		hasAnyInventory = true;
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_HASFORCEFIELD) && entityExtraValues[ENTITYEXTRA_HASFORCEFIELD]) {
+		// TODO Make this work for other stuff than jk2 1.02?
+		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_SHIELD);
+		hasAnyInventory = true;
+	}
+	if (entityExtraValuesBitmask & (1 << ENTITYEXTRA_HASSEEKER) && entityExtraValues[ENTITYEXTRA_HASSEEKER]) {
+		// TODO Make this work for other stuff than jk2 1.02?
+		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_SEEKER);
+		hasAnyInventory = true;
+	}
+	if (hasAnyInventory) {
+
+		ps->stats[STAT_HOLDABLE_ITEM] = 7;// stupid lol, setting it to datapad. its just used for inventory selection stuff and we need it to draw inventory on screen.
+	}
+}
+
 // baseState is my modification. It will use values from the base Snap that an entity just doesn't have. PERS_SPAWN_COUNT and precise health/armor
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues, playerState_t* baseState, qboolean enhanceOnly) {
 	int		i;
@@ -2767,54 +2817,8 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 	thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HASSEEKER] = (thisEntity->generic1) & 1;
 	thisEntity->demoToolsData.entityExtraValuesBitmask = g_entHUDFieldsExtraFields;
 	*/
-	bool hasAnyInventory = false;
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_HEALTH)) {
-		ps->stats[STAT_HEALTH] = s->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH];
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_ARMOR)) {
-		ps->stats[STAT_ARMOR] = s->demoToolsData.entityExtraValues[ENTITYEXTRA_ARMOR];
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_FORCE)) {
-		ps->fd.forcePower = s->demoToolsData.entityExtraValues[ENTITYEXTRA_FORCE];
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_SABERDRAWANIMLEVEL)) {
-		ps->fd.saberDrawAnimLevel = s->demoToolsData.entityExtraValues[ENTITYEXTRA_SABERDRAWANIMLEVEL];
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_CURRENTWEAPONAMMO) && s->weapon < WP_NUM_WEAPONS_JK2 && s->weapon >= 0) {
-		// TODO Make this work for other stuff than jk2 1.02?
-		ps->ammo[weaponData_1_02[s->weapon].ammoIndex] = s->demoToolsData.entityExtraValues[ENTITYEXTRA_CURRENTWEAPONAMMO];
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1 << ENTITYEXTRA_TRIPMINEAMMO) && s->demoToolsData.entityExtraValues[ENTITYEXTRA_TRIPMINEAMMO]) {
-		// TODO Make this work for other stuff than jk2 1.02?
-		ps->ammo[weaponData_1_02[WP_TRIP_MINE_JK2].ammoIndex] = s->demoToolsData.entityExtraValues[ENTITYEXTRA_TRIPMINEAMMO];
-		ps->stats[STAT_WEAPONS] |= (1 << WP_TRIP_MINE_JK2);
-		hasAnyInventory = true;
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_HASSENTRY) && s->demoToolsData.entityExtraValues[ENTITYEXTRA_HASSENTRY]) {
-		// TODO Make this work for other stuff than jk2 1.02?
-		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_SENTRY_GUN);
-		hasAnyInventory = true;
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_HASMEDPACK) && s->demoToolsData.entityExtraValues[ENTITYEXTRA_HASMEDPACK]) {
-		// TODO Make this work for other stuff than jk2 1.02?
-		ps->stats[STAT_HOLDABLE_ITEMS] |= (1<< HI_MEDPAC);
-		hasAnyInventory = true;
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_HASFORCEFIELD) && s->demoToolsData.entityExtraValues[ENTITYEXTRA_HASFORCEFIELD]) {
-		// TODO Make this work for other stuff than jk2 1.02?
-		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_SHIELD);
-		hasAnyInventory = true;
-	}
-	if (s->demoToolsData.entityExtraValuesBitmask & (1<< ENTITYEXTRA_HASSEEKER) && s->demoToolsData.entityExtraValues[ENTITYEXTRA_HASSEEKER]) {
-		// TODO Make this work for other stuff than jk2 1.02?
-		ps->stats[STAT_HOLDABLE_ITEMS] |= (1 << HI_SEEKER);
-		hasAnyInventory = true;
-	}
-	if (hasAnyInventory) {
-
-		ps->stats[STAT_HOLDABLE_ITEM] = 7;// stupid lol, setting it to datapad. its just used for inventory selection stuff and we need it to draw inventory on screen.
-	}
-
+	SetPlayerStateExtraVals(ps, s->demoToolsData.entityExtraValuesBitmask, s->demoToolsData.entityExtraValues);
+	
 
 	if (demoType == DM_14) {
 		ps->saberColor = (saber_colors_t)s->modelindex3;

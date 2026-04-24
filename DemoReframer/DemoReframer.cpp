@@ -217,7 +217,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoReader->reader.getDemoType());
 
-
+	demo.cut.Clc.checksumFeed = demoReader->reader.GetChecksumFeed(true); // get checksumfeed or autogenerate one (it doesnt need to be any concrete value, it just needs to trigger a file system reset in the client so jk2mv can load dl_ pk3 files for autodownloaded maps)
 	demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType,createCompressedOutput);
 	demo.cut.Clc.reliableSequence++;
 	demo.cut.Clc.serverMessageSequence++;

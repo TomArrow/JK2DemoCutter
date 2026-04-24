@@ -79,6 +79,7 @@ public:
 		gottenMetaEventsIterator = metaEvents.begin();
 	}
 
+	int GetChecksumFeed(bool randomIf0 = false);
 	qboolean ReadMessage();
 	virtual qboolean ReadMessageReal() = 0;
 

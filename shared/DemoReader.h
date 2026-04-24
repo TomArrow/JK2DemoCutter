@@ -111,6 +111,7 @@ typedef std::map<int, std::unique_ptr<SnapshotInfo>> SnapshotInfoMap;
 typedef SnapshotInfoMap::iterator SnapshotInfoMapIterator;
 typedef SnapshotInfoMap::reverse_iterator SnapshotInfoMapIteratorReverse;
 
+
 inline bool snapshotInfosServerTimeSmallerPredicate(const std::pair<const int, std::unique_ptr<SnapshotInfo>>& it, const int& serverTime) {
 	return it.second->serverTime < serverTime;
 };
@@ -164,6 +165,8 @@ class DemoReader : public DemoReaderBase {
 
 
 	SnapshotInfoMap snapshotInfos;
+	ESPFrameMap espFrames;
+	ESPFrameMapIterator lastEspFrame = espFrames.end();
 	std::vector<Command> readCommands;
 	std::vector<Event> readEvents;
 

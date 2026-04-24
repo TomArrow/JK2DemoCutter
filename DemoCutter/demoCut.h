@@ -956,6 +956,7 @@ typedef enum entityExtraValues_t {
 	ENTITYEXTRA_HASMEDPACK,
 	ENTITYEXTRA_HASFORCEFIELD,
 	ENTITYEXTRA_HASSEEKER,
+	ENTITYEXTRA_ALIVESTATUS,
 	ENTITYEXTRA_COUNT
 };
 
@@ -972,10 +973,28 @@ typedef enum demoToolsEntityFlags_s {
 	DTFLAG_JK2MP_ITEMBOUNCE = (1<<2),
 }demoToolsEntityFlags_s;
 
+typedef struct espDataPoint_t {
+	int16_t				clientNum;
+	unsigned short		entityExtraValuesBitmask;
+	short				entityExtraValues[ENTITYEXTRA_COUNT];
+};
+
+//typedef std::vector<espDataPoint_t> EspPoints;
+
+typedef struct espFrame_t {
+	std::vector<std::unique_ptr<espDataPoint_t>>	points;
+	uint64_t										playerMask;
+};
+
+typedef std::map<int, std::unique_ptr<espFrame_t>> ESPFrameMap;
+typedef ESPFrameMap::iterator ESPFrameMapIterator;
+typedef ESPFrameMap::reverse_iterator ESPFrameMapIteratorReverse;
+
+
 typedef struct demoToolsEntityData_t{
-	int entityExtraValuesBitmask;
+	unsigned short entityExtraValuesBitmask;
 	short entityExtraValues[ENTITYEXTRA_COUNT];
-	int detectedDimension;
+	byte detectedDimension;
 	bool globalDimension;
 	bool globalEvent;
 	int serverTime; // Server time of this entity state. To be used where necessary/useful.
@@ -4406,6 +4425,7 @@ inline saberMoveType_t classifySaberMove(saberMoveName_t saberMove) {
 void BG_PlayerStateToEntityState(playerState_t* ps, entityState_t* s, qboolean snap, demoType_t demoType, qboolean writeCommandTime = qtrue, qboolean clientSideStyleEventConversion=qfalse);
 void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t demoType, qboolean allValues=qtrue, playerState_t* baseState=NULL, qboolean enhanceOnly=qfalse);
 void EnhancePlayerStateWithBaseState(playerState_t* ps, playerState_t* baseState, demoType_t demoType);
+void SetPlayerStateExtraVals(playerState_t* ps, int entityExtraValuesBitmask, short* entityExtraValues);
 
 float LerpAngle(float from, float to, float frac);
 
@@ -5507,6 +5527,8 @@ static inline SnapshotEntitiesOrderedPointers SnapShotEntitiesToOrderedPointers(
 	return ptrs;
 }
 
+
+
 // Shared demo parsing functions
 class SnapshotInfo {
 public:
@@ -5521,6 +5543,8 @@ public:
 	byte areamask[MAX_MAP_AREA_BYTES];
 	bool playerStateTeleport;
 	bool snapFlagServerCount; // Used for considering teleports for non-playerstate clients
+	//ESPFrameMapIteratorReverse* lastEspFrame = nullptr;
+	ESPFrameMapIterator lastEspFrame;
 };
 
 

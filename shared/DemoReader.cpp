@@ -557,11 +557,15 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		return snap->playerState;
 	}
 	else {
+		espDataPoint_t esp = { 0 };
 		playerState_t retVal;
 		Com_Memset(&retVal, 0, sizeof(playerState_t));
 
 		const auto nullSnapIt = snapshotInfos.end();
 		auto baseSnapIt = nullSnapIt;
+
+		entityState_t* thisEntity = &snap->entities[clientNum];
+
 		//int baseSnap = -1;
 		if(detailedPS){ // Try to restore stuff like health/armor, pers_spawn_count etc. Use for main player in demo.
 
@@ -679,12 +683,60 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 			}
 			baseSnapIt = pastSnapIt != nullSnapIt ? pastSnapIt : futureSnapIt;
 			//baseSnap = pastSnap != -1 ? pastSnap : futureSnap;
+			
+			// search for esp info
+			// TODO limit how far back we go?
+			if (snap->lastEspFrame != espFrames.end()) {
+				ESPFrameMapIteratorReverse espIt = std::make_reverse_iterator(std::next(snap->lastEspFrame));
+				ESPFrameMapIteratorReverse espNullIt = espFrames.rend();
+				int back = 0;
+				bool done = false;
+				while (espIt != espNullIt && back < 100 && !done) { // we only have esp frames for frames that actually had esp data, so it's a "low framerate". so dont go back infinitely long
+					if (pastSnapIt != nullSnapIt && espIt->first <= baseSnapIt->first) {
+						break;
+					}
+					if (espIt->second->playerMask & (1 << clientNum)) {
+						for (std::unique_ptr<espDataPoint_t>& point : espIt->second->points) {
+							if (point->clientNum != clientNum) {
+								continue;
+							}
+							if (point->entityExtraValuesBitmask & (1 << ENTITYEXTRA_ALIVESTATUS)) {
+								if (!(point->entityExtraValues[ENTITYEXTRA_ALIVESTATUS] & 1)) {
+									// obituary invalidates
+									int efdead = (demoType < DM_25 || demoType > DM_26_XBOX) ? EF_DEAD : EF_DEAD_JKA;
+									if (!(thisEntity->eFlags & efdead)) {
+										// and we set to 100/25 if we're not dead. meh
+										esp.entityExtraValuesBitmask |= ENTITYEXTRA_HEALTH;
+										esp.entityExtraValuesBitmask |= ENTITYEXTRA_ARMOR;
+										esp.entityExtraValues[ENTITYEXTRA_HEALTH] = 100;
+										esp.entityExtraValues[ENTITYEXTRA_ARMOR] = 25;
+									}
+									done = true;
+									break;
+								}
+							}
+							else {
+								int diff = point->entityExtraValuesBitmask ^ esp.entityExtraValuesBitmask;
+								esp.entityExtraValuesBitmask |= point->entityExtraValuesBitmask;
+								for (int i = 0; i < ENTITYEXTRA_COUNT; i++) {
+									if (diff & (1 << i)) {
+										esp.entityExtraValues[i] = point->entityExtraValues[i];
+									}
+								}
+							}
+						}
+					}
+					espIt++;
+					back++;
+				}
+			}
 		}
 
-		entityState_t* thisEntity = &snap->entities[clientNum];
 		// Need to convert the entity.
 		if (baseSnapIt != nullSnapIt && playerStateSourceSnap) *playerStateSourceSnap = baseSnapIt;
 		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second->playerState : &basePlayerStates[clientNum]);
+
+		SetPlayerStateExtraVals(&retVal,esp.entityExtraValuesBitmask,esp.entityExtraValues);
 
 		if (isMOHAADemo) {
 
@@ -2233,6 +2285,7 @@ readNext:
 			if (thisDemo.cut.Cl.lastSnapshotFinishedParsing) { // it can return true if the last snapshot was invalid too. but then we dont do this.
 				std::unique_ptr<SnapshotInfo> snapshotInfo = std::make_unique<SnapshotInfo>();
 				snapshotInfo->serverTime = thisDemo.cut.Cl.snap.serverTime;
+				snapshotInfo->lastEspFrame = espFrames.end();
 				for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
@@ -2500,6 +2553,31 @@ readNext:
 					thisEvent.serverTime = thisDemo.cut.Cl.snap.serverTime;
 					thisEvent.theEvent = *thisEs;
 					thisEvent.eventNumber = eventNumber;
+
+					int generalized = generalizeGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber, demoType);
+					if (generalized == EV_PAIN_GENERAL || generalized == EV_OBITUARY_GENERAL) {
+						if (thisSnapshotInfo->lastEspFrame == espFrames.end()) {
+							std::unique_ptr<espFrame_t> espFrame = std::make_unique<espFrame_t>();
+							ESPFrameMapIterator newEsp = espFrames.insert_or_assign(thisDemo.cut.Cl.snap.messageNum, std::move(espFrame)).first;
+							thisSnapshotInfo->lastEspFrame = newEsp;
+						}
+						ESPFrameMapIterator espIt = thisSnapshotInfo->lastEspFrame;
+						espFrame_t* espFrame = espIt->second.get();
+						std::unique_ptr<espDataPoint_t> dataPoint = std::make_unique<espDataPoint_t>();
+						if (generalized == EV_PAIN_GENERAL) {
+							dataPoint->clientNum = thisEs->number < maxClientsThisDemo ? thisEs->number : thisEs->otherEntityNum;
+							dataPoint->entityExtraValuesBitmask |= (1 << ENTITYEXTRA_HEALTH);
+							dataPoint->entityExtraValues[ENTITYEXTRA_HEALTH] = thisEs->eventParm;
+						}
+						else if (generalized == EV_OBITUARY_GENERAL) {
+							dataPoint->clientNum = thisEs->otherEntityNum;
+							dataPoint->entityExtraValuesBitmask |= (1 << ENTITYEXTRA_ALIVESTATUS);
+							dataPoint->entityExtraValues[ENTITYEXTRA_ALIVESTATUS] = 0;
+						}
+						espFrame->playerMask |= ((uint64_t)1 << dataPoint->clientNum);
+						espFrame->points.push_back(std::move(dataPoint));
+					}
+
 					if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber, DM_14, DM_15);
 						if (thisEvent.theEvent.eType > getET_EVENTS(demoType)) {
@@ -2582,6 +2660,13 @@ readNext:
 					playerFirstFollowedOrVisible[p] = -1;
 				}
 			}*/
+
+			if (thisSnapshotInfo->lastEspFrame != espFrames.end()) {
+				lastEspFrame = thisSnapshotInfo->lastEspFrame;
+			}
+			else {
+				thisSnapshotInfo->lastEspFrame = lastEspFrame;
+			}
 
 			break;
 		case svc_download_general:

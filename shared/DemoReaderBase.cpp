@@ -212,6 +212,16 @@ qboolean DemoReaderBase::SeekToServerTime(int serverTime) {
 int DemoReaderBase::GetMetaEventCount(){
 	return metaEvents.size();
 }
+int DemoReaderBase::GetChecksumFeed(bool randomIf0){
+
+	if (!thisDemo.cut.Clc.checksumFeed && randomIf0) {
+		// ok then. at least make sure its not 0.
+		int thetime = time(NULL); // this is a bit shit because its just seconds i think. so it wont be a fresh value every millisecond or whatever. but we prolly only have to do this once anyway.
+		srand(time(NULL));
+		return (((int)rand() << 16) ^ rand()) ^ thetime;
+	}
+	return thisDemo.cut.Clc.checksumFeed;
+}
 qboolean DemoReaderBase::EndReachedAtServerTime(int serverTime) {
 	SeekToServerTime(serverTime);
 	return (qboolean)(lastKnownTime < serverTime);
