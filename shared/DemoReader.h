@@ -11,6 +11,7 @@
 #endif
 
 #include <DemoReaderBase.h>
+#include <ValuesHelper.h>
 
 #define PLAYERSTATE_FUTURE_SEEK 60000
 
@@ -130,7 +131,7 @@ inline bool snapshotInfosSnapNumPredicate(const std::pair<const int, std::unique
 class DemoReader : public DemoReaderBase {
 
 
-
+	ValuesHelper* valuesHelper = nullptr;
 
 	struct {
 		gametype_general_t	gameTypeGeneral = GT_FFA_GENERAL;

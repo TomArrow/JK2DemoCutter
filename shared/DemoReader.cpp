@@ -262,6 +262,8 @@ qboolean DemoReader::LoadDemo(const char* sourceDemoFile) {
 
 	maxClientsThisDemo = getMAX_CLIENTS(demoType);
 
+	valuesHelper = new ValuesHelper(maxClientsThisDemo);
+
 	wasFirstCommandByte = qfalse;
 	firstCommandByteRead = qfalse;
 
@@ -700,27 +702,43 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 							if (point->clientNum != clientNum) {
 								continue;
 							}
-							if (point->entityExtraValuesBitmask & (1 << ENTITYEXTRA_ALIVESTATUS)) {
+							if (point->entityExtraValuesBitmask & (1 << ENTITYEXTRA_VALIDSTATUS)) {
+								if (!(point->entityExtraValues[ENTITYEXTRA_VALIDSTATUS] & 1)) {
+									// entity wasn't visible for longer than event time - invalidated
+									done = true;
+									break;
+								}
+							}
+							else if (point->entityExtraValuesBitmask & (1 << ENTITYEXTRA_ALIVESTATUS)) {
 								if (!(point->entityExtraValues[ENTITYEXTRA_ALIVESTATUS] & 1)) {
 									// obituary invalidates
 									int efdead = (demoType < DM_25 || demoType > DM_26_XBOX) ? EF_DEAD : EF_DEAD_JKA;
 									if (!(thisEntity->eFlags & efdead)) {
 										// and we set to 100/25 if we're not dead. meh
-										esp.entityExtraValuesBitmask |= ENTITYEXTRA_HEALTH;
-										esp.entityExtraValuesBitmask |= ENTITYEXTRA_ARMOR;
-										esp.entityExtraValues[ENTITYEXTRA_HEALTH] = 100;
-										esp.entityExtraValues[ENTITYEXTRA_ARMOR] = 25;
+										if (!(esp.entityExtraValuesBitmask & (1 << ENTITYEXTRA_HEALTH))) {
+											esp.entityExtraValuesBitmask |= (1 << ENTITYEXTRA_HEALTH);
+											esp.entityExtraValues[ENTITYEXTRA_HEALTH] = 125;
+										}
+										if (!(esp.entityExtraValuesBitmask & (1 << ENTITYEXTRA_ARMOR))) {
+											esp.entityExtraValuesBitmask |= (1 << ENTITYEXTRA_ARMOR);
+											esp.entityExtraValues[ENTITYEXTRA_ARMOR] = 25;
+										}
 									}
 									done = true;
 									break;
 								}
 							}
 							else {
-								int diff = point->entityExtraValuesBitmask ^ esp.entityExtraValuesBitmask;
+								int newbits = point->entityExtraValuesBitmask & ~esp.entityExtraValuesBitmask;
 								esp.entityExtraValuesBitmask |= point->entityExtraValuesBitmask;
 								for (int i = 0; i < ENTITYEXTRA_COUNT; i++) {
-									if (diff & (1 << i)) {
-										esp.entityExtraValues[i] = point->entityExtraValues[i];
+									if (newbits & (1 << i)) {
+										if (i == ENTITYEXTRA_HEALTH || i == ENTITYEXTRA_ARMOR) {
+											esp.entityExtraValues[i] = ValuesHelper::decayValue(point->entityExtraValues[i], snap->serverTime, espIt->second->serverTime);
+										}
+										else {
+											esp.entityExtraValues[i] = point->entityExtraValues[i];
+										}
 									}
 								}
 							}
@@ -736,6 +754,7 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		if (baseSnapIt != nullSnapIt && playerStateSourceSnap) *playerStateSourceSnap = baseSnapIt;
 		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second->playerState : &basePlayerStates[clientNum]);
 
+		esp.entityExtraValuesBitmask &= ~(thisEntity->demoToolsData.entityExtraValuesBitmask); // don't set anything the entity already provided itself.
 		SetPlayerStateExtraVals(&retVal,esp.entityExtraValuesBitmask,esp.entityExtraValues);
 
 		if (isMOHAADemo) {
@@ -2300,7 +2319,8 @@ readNext:
 							ent->client->ps.generic1 = ent->s.generic1 = ((MAX(0, MIN(15, ent->client->ps.ammo[weaponData[WP_TRIP_MINE].ammoIndex])) & 15) << 4) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SENTRY_GUN))) << 3) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_MEDPAC))) << 2) | ((!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SHIELD))) << 1) | (!!(ent->client->ps.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_SEEKER)));
 						*/
 						thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] = (signed char)((thisEntity->trickedentindex3>>8) & 0xff);
-						if (thisEntity->eFlags & EF_DEAD && thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] > 0) { // for faulty implementations, or for extended health in the future, if needed (EF_DEAD reliably tells the signedness, so we could go up to 255 and down to -255)
+						int efdead = (demoType < DM_25 || demoType > DM_26_XBOX) ? EF_DEAD : EF_DEAD_JKA;
+						if (thisEntity->eFlags & efdead && thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] > 0) { // for faulty implementations, or for extended health in the future, if needed (EF_DEAD reliably tells the signedness, so we could go up to 255 and down to -255)
 							thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH] = -thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_HEALTH];
 						}
 						//thisEntity->demoToolsData.entityExtraValues[ENTITYEXTRA_ARMOR] = (signed char)((thisEntity->trickedentindex3) & 0xff);
@@ -2408,7 +2428,10 @@ readNext:
 							mohaaPlayerWeaponModelIndex[thisEntity->parent] = thisEntity->modelindex;
 						}
 					}
+
+					valuesHelper->noticeEntity(thisEntity->number,thisEntity,thisDemo.cut.Cl.snap.serverTime,demoType);
 				}
+				valuesHelper->noticePlayerState(thisDemo.cut.Cl.snap.ps.clientNum,&thisDemo.cut.Cl.snap.ps, thisDemo.cut.Cl.snap.serverTime);
 				Com_Memcpy(snapshotInfo->areamask, thisDemo.cut.Cl.snap.areamask, sizeof(thisDemo.cut.Cl.snap.areamask));
 				Com_Memcpy(snapshotInfo->mohaaPlayerWeapon, mohaaPlayerWeapon, sizeof(mohaaPlayerWeapon));
 				snapshotInfo->snapNum = thisDemo.cut.Cl.snap.messageNum;
@@ -2555,9 +2578,13 @@ readNext:
 					thisEvent.eventNumber = eventNumber;
 
 					int generalized = generalizeGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber, demoType);
-					if (generalized == EV_PAIN_GENERAL || generalized == EV_OBITUARY_GENERAL) {
+
+					valuesHelper->noticeEvent(generalized, thisEs, thisDemo.cut.Cl.snap.serverTime, demoType);
+
+					/*if (generalized == EV_PAIN_GENERAL || generalized == EV_OBITUARY_GENERAL) {
 						if (thisSnapshotInfo->lastEspFrame == espFrames.end()) {
 							std::unique_ptr<espFrame_t> espFrame = std::make_unique<espFrame_t>();
+							espFrame->serverTime = thisDemo.cut.Cl.snap.serverTime;
 							ESPFrameMapIterator newEsp = espFrames.insert_or_assign(thisDemo.cut.Cl.snap.messageNum, std::move(espFrame)).first;
 							thisSnapshotInfo->lastEspFrame = newEsp;
 						}
@@ -2576,7 +2603,7 @@ readNext:
 						}
 						espFrame->playerMask |= ((uint64_t)1 << dataPoint->clientNum);
 						espFrame->points.push_back(std::move(dataPoint));
-					}
+					}*/
 
 					if (demoType == DM_14) { // Map events for JKA demos. Dunno if I'm doing it quite right. We'll see I guess.
 						thisEvent.eventNumber = convertGameValue<GMAP_EVENTS, UNSAFE>(thisEvent.eventNumber, DM_14, DM_15);
@@ -2607,6 +2634,27 @@ readNext:
 					}
 					readEvents.push_back(thisEvent);
 					
+				}
+			}
+
+			{
+				std::vector<espDataPoint_t> espData = valuesHelper->getDataPoints();
+				if (espData.size()) {
+					if (thisSnapshotInfo->lastEspFrame == espFrames.end()) {
+						std::unique_ptr<espFrame_t> espFrame = std::make_unique<espFrame_t>();
+						espFrame->serverTime = thisDemo.cut.Cl.snap.serverTime;
+						ESPFrameMapIterator newEsp = espFrames.insert_or_assign(thisDemo.cut.Cl.snap.messageNum, std::move(espFrame)).first;
+						thisSnapshotInfo->lastEspFrame = newEsp;
+					}
+					ESPFrameMapIterator espIt = thisSnapshotInfo->lastEspFrame;
+					espFrame_t* espFrame = espIt->second.get();
+
+					for (auto it = espData.begin(); it != espData.end(); it++) {
+						std::unique_ptr<espDataPoint_t> dataPoint = std::make_unique<espDataPoint_t>();
+						*dataPoint = *it;
+						espFrame->playerMask |= (1 << dataPoint->clientNum);
+						espFrame->points.push_back(std::move(dataPoint));
+					}
 				}
 			}
 

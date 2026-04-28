@@ -75,6 +75,7 @@
     <ClCompile Include="..\shared\lzmaSDK\XzEnc.c" />
     <ClCompile Include="..\shared\lzmaSDK\XzIn.c" />
     <ClCompile Include="..\shared\PMove.cpp" />
+    <ClCompile Include="..\shared\ValuesHelper.cpp" />
     <ClCompile Include="..\shared\zlib\adler32.c" />
     <ClCompile Include="..\shared\zlib\compress.c" />
     <ClCompile Include="..\shared\zlib\crc32.c" />

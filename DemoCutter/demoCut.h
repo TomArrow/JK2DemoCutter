@@ -956,7 +956,8 @@ typedef enum entityExtraValues_t {
 	ENTITYEXTRA_HASMEDPACK,
 	ENTITYEXTRA_HASFORCEFIELD,
 	ENTITYEXTRA_HASSEEKER,
-	ENTITYEXTRA_ALIVESTATUS,
+	ENTITYEXTRA_ALIVESTATUS, // obituary
+	ENTITYEXTRA_VALIDSTATUS, // entity missing too long?
 	ENTITYEXTRA_COUNT
 };
 
@@ -984,6 +985,7 @@ typedef struct espDataPoint_t {
 typedef struct espFrame_t {
 	std::vector<std::unique_ptr<espDataPoint_t>>	points;
 	uint64_t										playerMask;
+	int												serverTime;
 };
 
 typedef std::map<int, std::unique_ptr<espFrame_t>> ESPFrameMap;
