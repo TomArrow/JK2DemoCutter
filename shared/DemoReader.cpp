@@ -754,6 +754,8 @@ playerState_t DemoReader::GetPlayerFromSnapshot(int clientNum, SnapshotInfoMapIt
 		if (baseSnapIt != nullSnapIt && playerStateSourceSnap) *playerStateSourceSnap = baseSnapIt;
 		CG_EntityStateToPlayerState(thisEntity, &retVal, demoType, qtrue, baseSnapIt != nullSnapIt ? &baseSnapIt->second->playerState : &basePlayerStates[clientNum]);
 
+		retVal.persistant[PERS_TEAM] = thisEntity->demoToolsData.team; // because baseplayerstate might be too new from forward seeking.
+
 		esp.entityExtraValuesBitmask &= ~(thisEntity->demoToolsData.entityExtraValuesBitmask); // don't set anything the entity already provided itself.
 		SetPlayerStateExtraVals(&retVal,esp.entityExtraValuesBitmask,esp.entityExtraValues);
 
@@ -2308,7 +2310,7 @@ readNext:
 				for (int pe = thisDemo.cut.Cl.snap.parseEntitiesNum; pe < thisDemo.cut.Cl.snap.parseEntitiesNum + thisDemo.cut.Cl.snap.numEntities; pe++) {
 					entityState_t* thisEntity = &thisDemo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 
-					if (extraFieldInfo.g_entHUDieldsValue) {
+					if (extraFieldInfo.g_entHUDieldsValue && thisEntity->number < maxClientsThisDemo) {
 						const int g_entHUDFieldsExtraFields = (1 << ENTITYEXTRA_HEALTH) | (1 << ENTITYEXTRA_ARMOR) | (1 << ENTITYEXTRA_FORCE) | (1 << ENTITYEXTRA_SABERDRAWANIMLEVEL) | (1 << ENTITYEXTRA_CURRENTWEAPONAMMO) | (1 << ENTITYEXTRA_TRIPMINEAMMO) | (1 << ENTITYEXTRA_HASSENTRY) | (1 << ENTITYEXTRA_HASMEDPACK) | (1 << ENTITYEXTRA_HASFORCEFIELD) | (1 << ENTITYEXTRA_HASSEEKER);
 						/*
 							// trickedentindex3: armor (8 bits), health (8 bits)
@@ -2371,6 +2373,10 @@ readNext:
 								//|| generalEvent == EV_SCOREPLUM_GENERAL
 								|| generalEvent == EV_OBITUARY_GENERAL;
 						}
+					}
+
+					if (thisEntity->number >= 0 && thisEntity->number < maxClientsThisDemo) {
+						thisEntity->demoToolsData.team = basePlayerStates[thisEntity->number].persistant[PERS_TEAM]; // cuz base playerstate may become outdated if we forward seek a lot and then get the playerstate
 					}
 
 					snapshotInfo->entities[thisEntity->number] = *thisEntity;

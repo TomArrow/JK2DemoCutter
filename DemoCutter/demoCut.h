@@ -1006,6 +1006,7 @@ typedef struct demoToolsEntityData_t{
 	entityMeta_t entityMeta; // for combiner. modelscale etc. to know when to change entcs
 	vec3_t mins, maxs;
 	int flags; // demoToolsEntityFlags_s
+	int team;
 };
 
 

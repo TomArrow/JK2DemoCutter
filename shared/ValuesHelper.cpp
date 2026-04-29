@@ -1,7 +1,7 @@
 #include "ValuesHelper.h"
 
 
-
+// TODO tinfo
 
 void ValuesHelper::checkTime(int serverTime) {
 	if (serverTime < oldServerTime) {
