@@ -2651,6 +2651,7 @@ void CG_EntityStateToPlayerState(entityState_t* s, playerState_t* ps, demoType_t
 		else
 		{
 			ps->stats[STAT_HEALTH] = 100;
+			ps->stats[STAT_ARMOR] = 25;
 			if (generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(ps->pm_type, demoType) == PM_DEAD_GENERAL) { // Correct this if needed.
 				ps->pm_type = 0;// specializeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(PM_NORMAL_GENERAL, demoType); //(PM_NORMAL is always 0)
 			}

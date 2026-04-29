@@ -65,6 +65,37 @@ void ValuesHelper::noticePlayerState(int eventnum, playerState_t* ps, int server
 	residual[ps->clientNum].time[ENTITYEXTRA_HASMEDPACK] = serverTime;
 	clientSeen[ps->clientNum] = serverTime;
 }
+void ValuesHelper::noticeTeamInfo(int serverTime, demoType_t demoType) {
+	int		i;
+	int		client;
+
+	checkTime(serverTime);
+
+	int numSortedTeamPlayers = atoi(Cmd_Argv(1));
+
+	for (i = 0; i < numSortedTeamPlayers; i++) {
+		client = atoi(Cmd_Argv(i * 6 + 2));
+
+		//sortedTeamPlayers[i] = client;
+
+		//int location = atoi(Cmd_Argv(i * 6 + 3));
+		int health = atoi(Cmd_Argv(i * 6 + 4));
+		int armor = atoi(Cmd_Argv(i * 6 + 5));
+		//int curWeapon = atoi(Cmd_Argv(i * 6 + 6));
+		//int powerups = atoi(Cmd_Argv(i * 6 + 7));
+
+		if (health <= 0) {
+			isDead[client] = true;
+			haveKeyFrame[client] = 0;
+			haveValue(client, ENTITYEXTRA_ALIVESTATUS, 0);
+			continue;
+		}
+
+		haveKeyFrame[client] |= (1 << ENTITYEXTRA_HEALTH) | (1 << ENTITYEXTRA_ARMOR);
+		haveValue(client, ENTITYEXTRA_HEALTH, health);
+		haveValue(client, ENTITYEXTRA_ARMOR, armor);
+	}
+}
 void ValuesHelper::noticeEntity(int entityNum, entityState_t* ent, int serverTime, demoType_t demoType) {
 	checkTime(serverTime);
 	if (entityNum < 0 || entityNum >= maxclients) {

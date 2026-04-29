@@ -42,6 +42,7 @@ public:
 	void			noticeEvent(int eventnum, entityState_t* eventEnt, int serverTime, demoType_t demoType);
 	void			noticePlayerState(int eventnum, playerState_t* ps, int serverTime);
 	void			noticeEntity(int entityNum, entityState_t* ent, int serverTime, demoType_t demoType);
+	void			noticeTeamInfo(int serverTime, demoType_t demoType);
 	static int		decayValue(int value, int serverTime, int referenceTime);
 	std::vector<espDataPoint_t> getDataPoints();
 };

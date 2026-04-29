@@ -2122,6 +2122,7 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 		int team = atoi(Info_ValueForKey(playerCS, maxLength, "t"));
 		basePlayerStates[i].persistant[PERS_TEAM] = team;
 		basePlayerStates[i].stats[STAT_HEALTH] = 100;
+		basePlayerStates[i].stats[STAT_ARMOR] = 25;
 		basePlayerStates[i].stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = 100;
 	}
 }
@@ -2202,6 +2203,9 @@ readNext:
 	MSG_BeginReading(&oldMsg);
 	// Skip the reliable sequence acknowledge number
 	MSG_ReadLong(&oldMsg);
+
+	SnapshotInfo* thisSnapshotInfo = NULL;
+
 	//
 	// parse the message
 	//
@@ -2234,8 +2238,6 @@ readNext:
 			goto readNext;
 		}
 
-
-		SnapshotInfo* thisSnapshotInfo = NULL;
 
 		// other commands
 		switch (cmd) {
@@ -2643,28 +2645,6 @@ readNext:
 				}
 			}
 
-			{
-				std::vector<espDataPoint_t> espData = valuesHelper->getDataPoints();
-				if (espData.size()) {
-					if (thisSnapshotInfo->lastEspFrame == espFrames.end()) {
-						std::unique_ptr<espFrame_t> espFrame = std::make_unique<espFrame_t>();
-						espFrame->serverTime = thisDemo.cut.Cl.snap.serverTime;
-						ESPFrameMapIterator newEsp = espFrames.insert_or_assign(thisDemo.cut.Cl.snap.messageNum, std::move(espFrame)).first;
-						thisSnapshotInfo->lastEspFrame = newEsp;
-					}
-					ESPFrameMapIterator espIt = thisSnapshotInfo->lastEspFrame;
-					espFrame_t* espFrame = espIt->second.get();
-
-					for (auto it = espData.begin(); it != espData.end(); it++) {
-						std::unique_ptr<espDataPoint_t> dataPoint = std::make_unique<espDataPoint_t>();
-						*dataPoint = *it;
-						espFrame->playerMask |= (1 << dataPoint->clientNum);
-						espFrame->points.push_back(std::move(dataPoint));
-					}
-				}
-			}
-
-
 			oldPS[thisDemo.cut.Cl.snap.ps.clientNum] = thisDemo.cut.Cl.snap.ps;
 
 			// Find out which players are visible / followed
@@ -2714,13 +2694,6 @@ readNext:
 					playerFirstFollowedOrVisible[p] = -1;
 				}
 			}*/
-
-			if (thisSnapshotInfo->lastEspFrame != espFrames.end()) {
-				lastEspFrame = thisSnapshotInfo->lastEspFrame;
-			}
-			else {
-				thisSnapshotInfo->lastEspFrame = lastEspFrame;
-			}
 
 			break;
 		case svc_download_general:
@@ -2797,7 +2770,10 @@ readNext:
 			}
 			hadConfigStringChanges = qtrue;
 		}
-		if (!strcmp(cmd, "print")) {
+		else if (!strcmp(cmd, "tinfo")) {
+			valuesHelper->noticeTeamInfo(thisDemo.cut.Cl.snap.serverTime,demoType);
+		}
+		else if (!strcmp(cmd, "print")) {
 			//Looking for 
 			//"^2[^7OC-System^2]: bizzle^7 has finished in [^200:24.860^7] which is his personal best time. ^2Top10 time!^7 Difference to best: [^200:00.000^7]."
 			// regex: \^2\[\^7OC-System\^2\]: (.*?)\^7 has finished in \[\^2(\d+:\d+.\d+)\^7\] which is his personal best time.( \^2Top10 time!\^7)? Difference to best: \[\^200:00.000\^7\]\.
@@ -2861,6 +2837,47 @@ readNext:
 
 
 
+		}
+	}
+
+	{
+		std::vector<espDataPoint_t> espData = valuesHelper->getDataPoints();
+		if (espData.size()) {
+			espFrame_t* espFrame = nullptr;
+			if (thisSnapshotInfo) {
+				if (thisSnapshotInfo->lastEspFrame == espFrames.end()) {
+					std::unique_ptr<espFrame_t> espFrameee = std::make_unique<espFrame_t>();
+					espFrameee->serverTime = thisDemo.cut.Cl.snap.serverTime;
+					ESPFrameMapIterator newEsp = espFrames.insert_or_assign(thisDemo.cut.Cl.snap.messageNum, std::move(espFrameee)).first;
+					thisSnapshotInfo->lastEspFrame = newEsp;
+				}
+				ESPFrameMapIterator espIt = thisSnapshotInfo->lastEspFrame;
+				espFrame = espIt->second.get();
+			}
+			else {
+				// huh. message without snapshot.
+				std::unique_ptr<espFrame_t> espFrameee = std::make_unique<espFrame_t>();
+				espFrameee->serverTime = thisDemo.cut.Cl.snap.serverTime;
+				ESPFrameMapIterator newEsp = espFrames.insert_or_assign(thisDemo.cut.Cl.snap.messageNum, std::move(espFrameee)).first;
+				lastEspFrame = newEsp;
+				espFrame = newEsp->second.get();
+			}
+
+			for (auto it = espData.begin(); it != espData.end(); it++) {
+				std::unique_ptr<espDataPoint_t> dataPoint = std::make_unique<espDataPoint_t>();
+				*dataPoint = *it;
+				espFrame->playerMask |= (1 << dataPoint->clientNum);
+				espFrame->points.push_back(std::move(dataPoint));
+			}
+		}
+
+		if (thisSnapshotInfo) {
+			if (thisSnapshotInfo->lastEspFrame != espFrames.end()) {
+				lastEspFrame = thisSnapshotInfo->lastEspFrame;
+			}
+			else {
+				thisSnapshotInfo->lastEspFrame = lastEspFrame;
+			}
 		}
 	}
 
