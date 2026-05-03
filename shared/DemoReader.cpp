@@ -2121,8 +2121,8 @@ void DemoReader::generateBasePlayerStates() { // TODO expand this to be time-rel
 		const char* playerCS = GetPlayerConfigString(i,&maxLength);
 		int team = atoi(Info_ValueForKey(playerCS, maxLength, "t"));
 		basePlayerStates[i].persistant[PERS_TEAM] = team;
-		basePlayerStates[i].stats[STAT_HEALTH] = 100;
-		basePlayerStates[i].stats[STAT_ARMOR] = 25;
+		basePlayerStates[i].stats[STAT_HEALTH] = DEFAULT_REFRAME_HEALTH;
+		basePlayerStates[i].stats[STAT_ARMOR] = DEFAULT_REFRAME_ARMOR;
 		basePlayerStates[i].stats[isMOHAADemo ? STAT_MAXHEALTH_MOH : STAT_MAX_HEALTH] = 100;
 	}
 }

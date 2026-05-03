@@ -26,6 +26,9 @@
 #include "anims.h"
 #include "animsStanceMappings.h"
 
+#define DEFAULT_REFRAME_HEALTH 100
+#define DEFAULT_REFRAME_ARMOR 0
+
 // from rapidJSON
 class AssertException : public std::logic_error {
 public:
