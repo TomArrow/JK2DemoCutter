@@ -5797,8 +5797,12 @@ configStringReadRetry:
 			MSG_ReadDeltaEntity(msg, &nullstate, es, newnum, *demoType, clCut->serverFrameTime);
 		}
 		else {
-			Com_DPrintf("demoCutParseGameState: bad command byte %d (%d)", cmd, ocmd);
+		Com_DPrintf("demoCutParseGameState: bad command byte %d (%d)", cmd, ocmd);
+#ifdef ERROR_TOLERANT
+			break;
+#else
 			return qfalse;
+#endif
 		}
 	}
 	clcCut->clientNum = MSG_ReadLong(msg);

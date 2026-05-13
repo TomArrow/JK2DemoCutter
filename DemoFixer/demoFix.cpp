@@ -222,16 +222,13 @@ demoTime_t timeParse(std::string timeText) {
 #endif
 
 
-
-
-
-//qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
-qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const std::vector<std::string>* metaDataStrings, bool noForcedMeta, const char* reframeString) {
+class StateVars {
+public:
 	fileHandle_t	oldHandle = 0;
 	fileHandle_t	newHandle = 0;
 	msg_t			oldMsg;
 	byte			oldData[MAX_MSGLEN];
-	std::vector<byte>	oldDataRaw;
+	//std::vector<byte>	oldDataRaw;
 	int64_t			oldSize;
 	char			oldName[MAX_OSPATH];
 	char			newName[MAX_OSPATH];
@@ -255,28 +252,60 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 	int				mapRestartCounter = 0;
 	bool			SEHExceptionCaught = false;
 	int				psGeneralPMType = 0;
-	//mvprotocol_t	protocol;
-
-	qboolean demoCutStartsAtZero = (qboolean)(startTime.type == DEMOTIME && startTime.time == 0 && startTime.skips == 0);
-
+	int maxSequenceNum;
+	qboolean demoCutStartsAtZero;
 	int64_t originalFileAbsoluteCutOffset = 0;
 
 	rapidjson::Document* jsonMetaDocument = NULL;
 	rapidjson::Document* jsonPreviousMetaDocument = NULL;
 
+	qboolean wasFirstCommandByte = qfalse;
+	qboolean firstCommandByteRead = qfalse;
+
+	qboolean originalCutOffsetRead = qfalse;
+	int64_t fileOffset = 0;
+
+};
+
+
+int64_t FS_Read_FromBufferedFile(void* buffer, int64_t len, fileHandle_t f, byte* bufferSrc, int64_t oldSize, int64_t* fileOffset) {
+	int64_t read = len;
+	if (read > oldSize) {
+		read = oldSize;
+	}
+	if (read < 0) {
+		read = 0;
+	}
+	memcpy(buffer,bufferSrc+*fileOffset,read);
+	*fileOffset += read;
+	return read;
+
+}
+
+
+//qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
+qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::vector<std::string>* metaDataStrings, bool noForcedMeta, const char* reframeString) {
+	
+	//mvprotocol_t	protocol;
+
+	StateVars* state = new StateVars();
+
+	state->demoCutStartsAtZero = qtrue;
+
+
 	/*if (jsonMetaData) {
-		jsonMetaDocument = new rapidjson::Document();
-		if (jsonMetaDocument->Parse(jsonMetaData).HasParseError() || !jsonMetaDocument->IsObject()) {
+		state->jsonMetaDocument = new rapidjson::Document();
+		if (state->jsonMetaDocument->Parse(jsonMetaData).HasParseError() || !state->jsonMetaDocument->IsObject()) {
 			std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
 			return qfalse;
 		}
-		if (jsonMetaDocument->HasMember("oco")) {
-			originalFileAbsoluteCutOffset = (*jsonMetaDocument)["oco"].GetInt64();
+		if (state->jsonMetaDocument->HasMember("oco")) {
+			state->originalFileAbsoluteCutOffset = (*state->jsonMetaDocument)["oco"].GetInt64();
 		}
 	}*/
 	if (metaDataStrings->size() > 1) {
-		jsonMetaDocument = new rapidjson::Document();
-		jsonMetaDocument->SetObject();
+		state->jsonMetaDocument = new rapidjson::Document();
+		state->jsonMetaDocument->SetObject();
 		for (int i = 0; i < metaDataStrings->size(); i++) {
 
 			rapidjson::Document* tmpMetaDoc = new rapidjson::Document();
@@ -289,8 +318,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 					std::cout << "Metadata member name '" << it->name.GetString() << "' is invalid. Names starting with underscore are reserved for old metadata in re-cut demos.\n";
 					return qfalse;
 				}
-				if (!jsonMetaDocument->HasMember(it->name)) {
-					jsonMetaDocument->AddMember(it->name, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+				if (!state->jsonMetaDocument->HasMember(it->name)) {
+					state->jsonMetaDocument->AddMember(it->name, it->value, state->jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
 				}
 				else {
 					std::cout << "Metadata member '" << it->name.GetString() << "' provided more than once. Error.\n";
@@ -300,8 +329,8 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 		}
 	}
 	else if (metaDataStrings->size() == 1) {
-		jsonMetaDocument = new rapidjson::Document();
-		if (jsonMetaDocument->Parse((*metaDataStrings)[0].c_str()).HasParseError() || !jsonMetaDocument->IsObject()) {
+		state->jsonMetaDocument = new rapidjson::Document();
+		if (state->jsonMetaDocument->Parse((*metaDataStrings)[0].c_str()).HasParseError() || !state->jsonMetaDocument->IsObject()) {
 			std::cout << "-m/--meta metadata: Unable to parse as JSON.\n";
 			return qfalse;
 		}
@@ -319,15 +348,15 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	//protocol = MV_GetCurrentProtocol();
 	//if (protocol == PROTOCOL_UNDEF)
-	//	ext = ".dm_16";
+	//	state->ext = ".dm_16";
 	//else
-	//	ext = va(".dm_%i", protocol);
-	//ext = Cvar_FindVar("mme_demoExt")->string;
+	//	state->ext = va(".dm_%i", protocol);
+	//state->ext = Cvar_FindVar("mme_demostate->Ext")->string;
 	demo.cut.Clc.demoCheckFor103 = qfalse;
-	//strncpy_s(oldName, sizeof(oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
-	//ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
-	//strncpy_s(ext, sizeof(ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
-	//strncpy_s(originalExt, sizeof(originalExt), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(state->oldName, sizeof(state->oldName),sourceDemoFile, strlen(sourceDemoFile) - 6);
+	//state->ext = (char*)sourceDemoFile + strlen(sourceDemoFile) - 6;
+	//strncpy_s(state->ext, sizeof(state->ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
+	//strncpy_s(originalstate->Ext, sizeof(originalstate->Ext), (char*)sourceDemoFile + strlen(sourceDemoFile) - 6, 6);
 
 	qboolean isCompressedFile = qfalse;
 	qboolean createCompressedOutput = qfalse;
@@ -335,10 +364,10 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
-	demoCutGetDemoType(sourceDemoFile,ext,oldName,&demoType,&isCompressedFile,&demo.cut.Clc);
+	demoCutGetDemoType(sourceDemoFile, state->ext, state->oldName,&state->demoType,&isCompressedFile,&demo.cut.Clc);
 	/*
-	char specialTypeChar = ext[3];
-	ext[3] = '_';
+	char specialTypeChar = state->ext[3];
+	state->ext[3] = '_';
 
 	if (specialTypeChar == 'c') {
 		isCompressedFile = qtrue;
@@ -346,114 +375,142 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 
 	createCompressedOutput = isCompressedFile;
 
-
-	/*if (!*ext) {
-		demoType = DM_16;
-		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
+	if (isCompressedFile) {
+		return qfalse;
 	}
-	else if (!_stricmp(ext,".dm_15")) {
 
-		demoType = DM_15;
-		strncpy_s(ext, sizeof(ext), ".dm_15", 6);
+	/*if (!*state->ext) {
+		state->demoType = DM_16;
+		strncpy_s(state->ext, sizeof(state->ext), ".dm_16", 6);
+	}
+	else if (!_stricmp(state->ext,".dm_15")) {
+
+		state->demoType = DM_15;
+		strncpy_s(state->ext, sizeof(state->ext), ".dm_15", 6);
 		demo.cut.Clc.demoCheckFor103 = qtrue;
 	}
-	else if (!_stricmp(ext,".dm_16")) {
+	else if (!_stricmp(state->ext,".dm_16")) {
 
-		demoType = DM_16;
-		strncpy_s(ext, sizeof(ext), ".dm_16", 6);
+		state->demoType = DM_16;
+		strncpy_s(state->ext, sizeof(state->ext), ".dm_16", 6);
 	}*/
 
 	fileCompressionScheme_t compressionSchemeUsed = FILECOMPRESSION_NONE;
 
-	const char* oldPath = va("%s%s", oldName, ext);
-	oldSize = FS_FOpenFileRead(oldPath, &oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed,qtrue);
-	if (!oldHandle) {
-		Com_DPrintf("Failed to open %s for cutting.\n", oldName);
+	const char* oldPath = va("%s%s", state->oldName, state->ext);
+	state->oldSize = FS_FOpenFileRead(oldPath, &state->oldHandle, qtrue, isCompressedFile,&compressionSchemeUsed,qtrue);
+	if (!state->oldHandle) {
+		Com_DPrintf("Failed to open %s for cutting.\n", state->oldName);
 		return qfalse;
 	}
 
 	int messageOffset = 0;
 
+	// read in the entire file so we can start reading at random offsets
+	byte* fileBuffer = new byte[state->oldSize];
+	FS_Read(fileBuffer, state->oldSize, state->oldHandle);
+
+#define FS_Read(buffer,len,handle) FS_Read_FromBufferedFile(buffer,len,handle,fileBuffer,state->oldSize,&state->fileOffset)
 
 	if (createCompressedOutput) {
-		ext[3] = 'c';
+		state->ext[3] = 'c';
 	}
 
-	bool isMOHAADemo = demoTypeIsMOHAA(demoType);
-
-	qboolean wasFirstCommandByte = qfalse;
-	qboolean firstCommandByteRead = qfalse;
-
-	qboolean originalCutOffsetRead = qfalse;
+	bool isMOHAADemo = demoTypeIsMOHAA(state->demoType);
 
 	//	Com_SetLoadingMsg("Cutting the demo...");
 
-	int maxSequenceNum = -9999;
-	while (oldSize > 0) {
-	cutcontinue:
-		if (isCompressedFile) {
-			oldDataRaw.clear();
-			MSG_InitRaw(&oldMsg, &oldDataRaw); // Input message
+	state->maxSequenceNum = -9999;
+
+	demo_t* demoBackup = new demo_t(); 
+	StateVars* stateBackup = new StateVars();
+
+	qboolean recovering = qfalse;
+	while (state->oldSize > 0) {
+		*demoBackup = demo;
+		*stateBackup = *state;
+		recovering = qfalse;
+		Com_Printf(".");
+		goto cutcontinue;
+	cutreset:
+		// message had some kind of bug. reset and go again.
+		demo = *demoBackup;
+		*state = *stateBackup;
+		if (state->oldSize <= 0) {
+			goto cuterror;
 		}
-		else {
-			MSG_Init(&oldMsg, oldData, sizeof(oldData)); // Input message
+		state->fileOffset++; // just go one byte further and try again (cringe i know)
+		stateBackup->fileOffset++; // just go one byte further and try again (cringe i know)
+		Com_Printf("X");
+		recovering = qtrue;
+	cutcontinue:
+		//if (isCompressedFile) {
+		//	state->oldDataRaw.clear();
+		//	MSG_InitRaw(&state->oldMsg, &state->oldDataRaw); // Input message
+		//}
+		//else 
+		{
+			MSG_Init(&state->oldMsg, state->oldData, sizeof(state->oldData)); // Input message
 		}
 		/* Read the sequence number */
-		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, oldHandle) != 4)
+		if (FS_Read(&demo.cut.Clc.serverMessageSequence, 4, state->oldHandle) != 4)
 			goto cuterror;
 		demo.cut.Clc.serverMessageSequence = LittleLong(demo.cut.Clc.serverMessageSequence);
-		maxSequenceNum = std::max(maxSequenceNum, demo.cut.Clc.serverMessageSequence);
-		oldSize -= 4;
+		state->maxSequenceNum = std::max(state->maxSequenceNum, demo.cut.Clc.serverMessageSequence);
+		state->oldSize -= 4;
 		/* Read the message size */
-		if (FS_Read(&oldMsg.cursize, 4, oldHandle) != 4)
+		if (FS_Read(&state->oldMsg.cursize, 4, state->oldHandle) != 4)
 			goto cuterror;
-		oldMsg.cursize = LittleLong(oldMsg.cursize);
-		oldSize -= 4;
+		state->oldMsg.cursize = LittleLong(state->oldMsg.cursize);
+		state->oldSize -= 4;
 		/* Negative size signals end of demo */
-		if (oldMsg.cursize < 0)
-			break;
-		if (oldMsg.cursize > oldMsg.maxsize)
-			goto cuterror;
+		if (state->oldMsg.cursize < 0)
+			goto cutreset;
+		if (state->oldMsg.cursize > state->oldMsg.maxsize)
+			goto cutreset;
 		/* Read the actual message */
-		if (oldMsg.raw) {
-			oldMsg.dataRaw->resize(oldMsg.cursize);
-			if (FS_Read(oldMsg.dataRaw->data(), oldMsg.cursize, oldHandle) != oldMsg.cursize) {
-				goto cuterror;
-			}
+		//if (state->oldMsg.raw) {
+		//	state->oldMsg.dataRaw->resize(state->oldMsg.cursize);
+		//	if (FS_Read(state->oldMsg.dataRaw->data(), state->oldMsg.cursize, state->oldHandle) != state->oldMsg.cursize) {
+		//		goto cuterror;
+		//	}
+		//}
+		//else 
+		{
+			if (FS_Read(state->oldMsg.data, state->oldMsg.cursize, state->oldHandle) != state->oldMsg.cursize)
+				goto cutreset;
 		}
-		else {
-			if (FS_Read(oldMsg.data, oldMsg.cursize, oldHandle) != oldMsg.cursize)
-				goto cuterror;
-		}
-		oldSize -= oldMsg.cursize;
+		state->oldSize -= state->oldMsg.cursize;
 		// init the bitstream
-		MSG_BeginReading(&oldMsg);
+		MSG_BeginReading(&state->oldMsg);
 		// Skip the reliable sequence acknowledge number
-		MSG_ReadLong(&oldMsg);
+		MSG_ReadLong(&state->oldMsg);
 		//
 		// parse the message
 		//
 		while (1) {
 			bool malformedMessageCaught = false;
 			byte cmd;
-			if (oldMsg.readcount > oldMsg.cursize) {
-				Com_DPrintf("Demo cutter, read past end of server message.\n");
-				goto cuterror;
+			if (state->oldMsg.readcount > state->oldMsg.cursize) {
+				if (!recovering) {
+					Com_DPrintf("Demo cutter, read past end of server message.\n");
+				}
+				goto cutreset;
 			}
-			cmd = MSG_ReadByte(&oldMsg);
-			wasFirstCommandByte = (qboolean)!firstCommandByteRead;
-			firstCommandByteRead = qtrue;
-			cmd = generalizeGameSVCOp(cmd,demoType);
+			cmd = MSG_ReadByte(&state->oldMsg);
+			state->wasFirstCommandByte = (qboolean)!state->firstCommandByteRead;
+			state->firstCommandByteRead = qtrue;
+			cmd = generalizeGameSVCOp(cmd,state->demoType);
 			if (cmd == svc_EOF_general) {
-				int testlookahead = MSG_LookaheadByte(&oldMsg);
-				// TODO Check for svc_extension/svc_voip (ioq3/wolfcamql)
-				if (wasFirstCommandByte) {
+				int testlookahead = MSG_LookaheadByte(&state->oldMsg);
+				// TODO Check for svc_state->extension/svc_voip (ioq3/wolfcamql)
+				if (state->wasFirstCommandByte) {
 					// check for hidden meta content
-					const char* maybeMeta = demoCutReadPossibleMetadata(&oldMsg, demoType);
+					const char* maybeMeta = demoCutReadPossibleMetadata(&state->oldMsg, state->demoType);
 					if (maybeMeta) {
 
-						jsonPreviousMetaDocument = new rapidjson::Document();
-						if (jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !jsonPreviousMetaDocument->IsObject()) {
+						state->jsonPreviousMetaDocument = new rapidjson::Document();
+						if (state->jsonPreviousMetaDocument->Parse(maybeMeta).HasParseError() || !state->jsonPreviousMetaDocument->IsObject()) {
 							// We won't quit demo cutting over this. It's whatever. We don't wanna make a demo unusable just because it contains bad
 							// metadata. Kinda goes against the spirit. This is a different approach from above with the main metadata, where an error in that
 							// will quit the process. Because the user can after all just adjust and fix the commandline.
@@ -462,21 +519,21 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 						}
 
 						// Copy any old values to the new meta unless they already exist.
-						if (!jsonMetaDocument) {
-							jsonMetaDocument = new rapidjson::Document();
-							jsonMetaDocument->SetObject();
+						if (!state->jsonMetaDocument) {
+							state->jsonMetaDocument = new rapidjson::Document();
+							state->jsonMetaDocument->SetObject();
 						}
 
-						if (jsonPreviousMetaDocument->HasMember("oco") && !originalCutOffsetRead) {
-							originalFileAbsoluteCutOffset += (*jsonPreviousMetaDocument)["oco"].GetInt64();
-							originalCutOffsetRead = qtrue;
+						if (state->jsonPreviousMetaDocument->HasMember("oco") && !state->originalCutOffsetRead) {
+							state->originalFileAbsoluteCutOffset += (*state->jsonPreviousMetaDocument)["oco"].GetInt64();
+							state->originalCutOffsetRead = qtrue;
 						}
 
-						for (rapidjson::Value::MemberIterator it = jsonPreviousMetaDocument->MemberBegin(); it != jsonPreviousMetaDocument->MemberEnd(); it++) {
+						for (rapidjson::Value::MemberIterator it = state->jsonPreviousMetaDocument->MemberBegin(); it != state->jsonPreviousMetaDocument->MemberEnd(); it++) {
 							
 							const char* newName = NULL;
 							
-							if (demoCutStartsAtZero || it->name == "of" || it->name == "oco" || it->name == "odm" || it->name == "oip" || it->name == "ost") {
+							if (state->demoCutStartsAtZero || it->name == "of" || it->name == "oco" || it->name == "odm" || it->name == "oip" || it->name == "ost") {
 								newName = it->name.GetString();
 							} else {
 								// We add "_" before the name because a lot of metadata can potentially stop being meaningful once we do a cut to the file with existing metadata,
@@ -487,12 +544,12 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 								newName = va("_%s", it->name.GetString());
 							}
 
-							if (!jsonMetaDocument->HasMember(newName)) {
+							if (!state->jsonMetaDocument->HasMember(newName)) {
 
-								rapidjson::Value newNameRapid(newName, jsonMetaDocument->GetAllocator());
+								rapidjson::Value newNameRapid(newName, state->jsonMetaDocument->GetAllocator());
 								//newNameRapid.SetString(newName,strlen(newName));
 								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo copied to new demo as " << newName << ".\n";
-								jsonMetaDocument->AddMember(newNameRapid, it->value, jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
+								state->jsonMetaDocument->AddMember(newNameRapid, it->value, state->jsonMetaDocument->GetAllocator()); // This is move semantics, it will invalidate the original value but thats ok (?)
 							}
 							else {
 								std::cout << "Metadata member '" << it->name.GetString() << "' from original demo overridden by new metadata. Discarding.\n";
@@ -503,10 +560,10 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				break;
 			}
 			// skip all the gamestates until we reach needed
-			if (readGamestate < demo.currentNum) {
-				//if (readGamestate < (demo.nextNum-1)) { // not sure if this is correct tbh... but I dont wanna rewrite entire cl_demos
+			if (state->readGamestate < demo.currentNum) {
+				//if (state->readGamestate < (demo.nstate->extNum-1)) { // not sure if this is correct tbh... but I dont wanna rewrite entire cl_demos
 				if (cmd == svc_gamestate_general) {
-					readGamestate++;
+					state->readGamestate++;
 				}
 				goto cutcontinue;
 			}
@@ -516,109 +573,109 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 			case svc_locprint_general:
 			case svc_cgameMessage_general:
 				if (isMOHAADemo) {
-					demoCutParseMOHAASVC(&oldMsg, demoType, cmd, SEHExceptionCaught);
+					demoCutParseMOHAASVC(&state->oldMsg, state->demoType, cmd, state->SEHExceptionCaught);
 					break;
 				}
 			default:
 				Com_DPrintf("ERROR: CL_ParseServerMessage: Illegible server message\n");
-				goto cuterror;
+				goto cutreset;
 			case svc_nop_general:
 				break;
 			case svc_serverCommand_general:
-				if (!demoCutParseCommandString(&oldMsg, &demo.cut.Clc, demoType, SEHExceptionCaught)) {
-					goto cuterror;
+				if (!demoCutParseCommandString(&state->oldMsg, &demo.cut.Clc, state->demoType, state->SEHExceptionCaught)) {
+					goto cutreset;
 				}
 				break;
 			case svc_gamestate_general:
-				//if (readGamestate > demo.currentNum && demoCurrentTime >= startTime) {
-				if (readGamestate > demo.currentNum && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(psGeneralPMType == PM_SPINTERMISSION_GENERAL), demoCurrentTime - demo.lastPMTChange, mapRestartCounter, NULL)) {
+				//if (state->readGamestate > demo.currentNum && state->demoCurrentTime >= startTime) {
+				if (state->readGamestate > demo.currentNum) {
 					//Com_DPrintf("Warning: unexpected new gamestate, finishing cutting.\n"); // We dont like this. Unless its not currently cutting anyway.
 					//goto cutcomplete;// Actually, who cares. Let's keep the map changes in the cut demo too. Shrug.
-					newGameStateAfterDemoCutBegun = qtrue;
+					state->newGameStateAfterDemoCutBegun = qtrue;
 				} 
-				if (!demoCutParseGamestate(&oldMsg, &demo.cut.Clc, &demo.cut.Cl,&demoType, (qboolean)(readGamestate == 0), SEHExceptionCaught)) {
-					goto cuterror;
+				if (!demoCutParseGamestate(&state->oldMsg, &demo.cut.Clc, &demo.cut.Cl,&state->demoType, (qboolean)(state->readGamestate == 0), state->SEHExceptionCaught)) {
+					goto cutreset;
 				}
-				//if(readGamestate > 0 ) mapRestartCounter++; // we might still get snaps with the old serverTime. so do it at the serverTime reset. idk maybe find a better way in the future but otherwise it makes cutting precisely in later games difficult.
+				//if(state->readGamestate > 0 ) state->mapRestartCounter++; // we might still get snaps with the old serverTime. so do it at the serverTime reset. idk maybe find a better way in the future but otherwise it makes cutting precisely in later games difficult.
 				// Only open if none opened yet.
-				if (!newHandle) {
+				if (!state->newHandle) {
 					{int dupeIterator = 0;
-					while (!dupeIterator || FS_FileExists(newName)) {
+					while (!dupeIterator || FS_FileExists(state->newName)) {
 						if (!dupeIterator) {
 							if (outputName) {
-								Com_sprintf(newName, sizeof(newName), "%s%s", outputName, ext);
+								Com_sprintf(state->newName, sizeof(state->newName), "%s%s", outputName, state->ext);
 							}
 							else {
-								Com_sprintf(newName, sizeof(newName), "%s_cut%s", oldName, ext);
+								Com_sprintf(state->newName, sizeof(state->newName), "%s_fix%s", state->oldName, state->ext);
 							}
 						}
 						else {
 							if (outputName) {
-								Com_sprintf(newName, sizeof(newName), "%s(%d)%s", outputName, 1 + dupeIterator, ext);
+								Com_sprintf(state->newName, sizeof(state->newName), "%s(%d)%s", outputName, 1 + dupeIterator, state->ext);
 							}
 							else {
-								Com_sprintf(newName, sizeof(newName), "%s_cut(%d)%s", oldName, 1 + dupeIterator, ext);
+								Com_sprintf(state->newName, sizeof(state->newName), "%s_fix(%d)%s", state->oldName, 1 + dupeIterator, state->ext);
 							}
 						}
 						dupeIterator++;
 					}}
-					newHandle = FS_FOpenFileWrite(newName, compressionSchemeUsed, qfalse); // Maintain the compression scheme of the original file
-					if (!newHandle) {
-						Com_DPrintf("Failed to open %s for target cutting.\n", newName);
+					state->newHandle = FS_FOpenFileWrite(state->newName, compressionSchemeUsed, qfalse); // Maintain the compression scheme of the original file
+					if (!state->newHandle) {
+						Com_DPrintf("Failed to open %s for target cutting.\n", state->newName);
 						return qfalse;
 					}
 				}
-				readGamestate++;
+				state->readGamestate++;
 				break;
 			case svc_snapshot_general:
-				if (!demoCutParseSnapshot(&oldMsg, &demo.cut.Clc, &demo.cut.Cl, demoType, SEHExceptionCaught, malformedMessageCaught)) {
-					goto cuterror;
+				if (!demoCutParseSnapshot(&state->oldMsg, &demo.cut.Clc, &demo.cut.Cl, state->demoType, state->SEHExceptionCaught, malformedMessageCaught)) {
+					goto cutreset;
 				}
-				psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,demoType);
+				state->psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,state->demoType);
 				if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
-					demoStartTime = demo.cut.Cl.snap.serverTime;
+					state->demoStartTime = demo.cut.Cl.snap.serverTime;
 					//startTime += demo.cut.Cl.snap.serverTime;
 					//endTime += demo.cut.Cl.snap.serverTime;
 				}
-				if (demo.cut.Clc.serverMessageSequence == maxSequenceNum) { // See demoHighlightFind.cpp for detailed commentary
-					if (demo.cut.Cl.snap.serverTime < lastKnownInOrderTime) {
+				if (demo.cut.Clc.serverMessageSequence == state->maxSequenceNum) { // See demoHighlightFind.cpp for detailed commentary
+					if (demo.cut.Cl.snap.serverTime < state->lastKnownInOrderTime) {
 
 						if (demo.cut.Cl.snap.serverTime > 10000) {
 							// This is a non-critical warning, mostly for debugging. It used to be more dangerous.
-							std::cerr << "demo.cut.Cl.snap.serverTime < lastKnownTime && demo.cut.Clc.serverMessageSequence == maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (lastKnownTime - demo.cut.Cl.snap.serverTime) << ", demoCurrentTime " << demoCurrentTime << ", demoBaseTime " << demoBaseTime << ", demoStartTime " << demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", lastKnownTime " << lastKnownTime << " (" << sourceDemoFile << ")\n";
+							std::cerr << "demo.cut.Cl.snap.serverTime < state->lastKnownTime && demo.cut.Clc.serverMessageSequence == state->maxSequenceNum but demo.cut.Cl.snap.serverTime > 10000;  delta " << (state->lastKnownTime - demo.cut.Cl.snap.serverTime) << ", state->demoCurrentTime " << state->demoCurrentTime << ", state->demoBaseTime " << state->demoBaseTime << ", state->demoStartTime " << state->demoStartTime << ", serverTime " << demo.cut.Cl.snap.serverTime << ", state->lastKnownTime " << state->lastKnownTime << " (" << sourceDemoFile << ")\n";
 						}
 
-						demoBaseTime = demoCurrentTime; // Remember fixed offset into demo time.
-						demoStartTime = demo.cut.Cl.snap.serverTime;
-						mapRestartCounter++;
+						state->demoBaseTime = state->demoCurrentTime; // Remember fixed offset into demo time.
+						state->demoStartTime = demo.cut.Cl.snap.serverTime;
+						state->mapRestartCounter++;
 					}
-					lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
+					state->lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}
-				demoCurrentTime = demoBaseTime + demo.cut.Cl.snap.serverTime - demoStartTime;
-				lastKnownTime = demo.cut.Cl.snap.serverTime;
+				state->demoCurrentTime = state->demoBaseTime + demo.cut.Cl.snap.serverTime - state->demoStartTime;
+				state->lastKnownTime = demo.cut.Cl.snap.serverTime;
 				if (demo.lastPMT != demo.cut.Cl.snap.ps.pm_type) {
-					demo.lastPMTChange = demoCurrentTime;
+					demo.lastPMTChange = state->demoCurrentTime;
 					demo.lastPMT = demo.cut.Cl.snap.ps.pm_type;
 				}
 				break;
 			case svc_download_general:
 				// read block number
-				buf = MSG_ReadShort(&oldMsg);
-				if (!buf)	//0 block, read file size
-					MSG_ReadLong(&oldMsg);
+				state->buf = MSG_ReadShort(&state->oldMsg);
+				if (!state->buf)	//0 block, read file size
+					MSG_ReadLong(&state->oldMsg);
 				// read block size
-				buf = MSG_ReadShort(&oldMsg);
+				state->buf = MSG_ReadShort(&state->oldMsg);
 				// read the data block
-				for (; buf > 0; buf--)
-					MSG_ReadByte(&oldMsg);
+				for (; state->buf > 0; state->buf--)
+					MSG_ReadByte(&state->oldMsg);
 				break;
 			case svc_setgame_general:
 				{
 					static char	newGameDir[MAX_QPATH];
 					int i = 0;
 					while (i < MAX_QPATH) {
-						int next = MSG_ReadByte(&oldMsg);
+						int next = MSG_ReadByte(&state->oldMsg);
 						if (next) {
 							newGameDir[i] = next;
 						}
@@ -659,123 +716,120 @@ qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t en
 				}
 			}
 			if (!strcmp(cmd, "cs")) {
-				if (!demoCutConfigstringModified(&demo.cut.Cl,demoType)) {
-					goto cuterror;
+				if (!demoCutConfigstringModified(&demo.cut.Cl,state->demoType)) {
+					goto cutreset;
 				}
 			}
 			else if (!strcmp(cmd, "map_restart")) {
-				mapRestartCounter++;
+				state->mapRestartCounter++;
 			}
 		}
 
 		int64_t cutStartOffset = 0;
 
-		//if (demoCurrentTime > endTime) {
-		if (endTime.isSurpassed(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(psGeneralPMType == PM_SPINTERMISSION_GENERAL), demoCurrentTime - demo.lastPMTChange,mapRestartCounter)) {
-			goto cutcomplete;
-		}
-		else if (framesSaved > 0) {
+		//if (state->demoCurrentTime > endTime) {
+		if (state->framesSaved > 0) {
 			/* this msg is in range, write it */
-			if (framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum) || newGameStateAfterDemoCutBegun) { // Hmm did I do this? I don't recall... NEW: newGameStateAfterDemoCutBegun: If there is a new gamestate, may as well just start just dumping the messages now.
-				demoCutWriteDemoMessage(&oldMsg, newHandle, &demo.cut.Clc);
+			if (state->framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum) || state->newGameStateAfterDemoCutBegun) { // Hmm did I do this? I don't recall... NEW: state->newGameStateAfterDemoCutBegun: If there is a new gamestate, may as well just start just dumping the messages now.
+				demoCutWriteDemoMessage(&state->oldMsg, state->newHandle, &demo.cut.Clc);
 			}
 			else {
-				demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl,demoType, createCompressedOutput);
+				demoCutWriteDeltaSnapshot(firstServerCommand, state->newHandle, qfalse, &demo.cut.Clc, &demo.cut.Cl,state->demoType, createCompressedOutput);
 			}
-			framesSaved++;
+			state->framesSaved++;
 		}
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
-		//else if (demoCurrentTime >= startTime) {
-		else if (demo.cut.Cl.newSnapshots && startTime.isReached(demoCurrentTime, demo.cut.Cl.snap.serverTime, atoi(demo.cut.Cl.gameState.stringData + demo.cut.Cl.gameState.stringOffsets[getCS_LEVEL_START_TIME(demoType)]), (qboolean)(psGeneralPMType == PM_SPINTERMISSION_GENERAL), demoCurrentTime - demo.lastPMTChange,mapRestartCounter,&cutStartOffset)) {
-			if (!jsonMetaDocument && !noForcedMeta) {
-				jsonMetaDocument = new rapidjson::Document();
-				jsonMetaDocument->SetObject();
+		//else if (state->demoCurrentTime >= startTime) {
+		else if(demo.cut.Cl.newSnapshots){
+			if (!state->jsonMetaDocument && !noForcedMeta) {
+				state->jsonMetaDocument = new rapidjson::Document();
+				state->jsonMetaDocument->SetObject();
 			}
-			if (jsonMetaDocument) {
+			if (state->jsonMetaDocument) {
 				// TODO: Save "oto": Original total offset. Throughout all cuts, what's the offset from the original file now?
 
-				if (!jsonMetaDocument->HasMember("of")) { // original filename
+				if (!state->jsonMetaDocument->HasMember("of")) { // original filename
 					std::string oldPathStr(oldPath);
 					std::string oldBasename = oldPathStr.substr(oldPathStr.find_last_of("/\\") + 1);
-					jsonMetaDocument->AddMember("of", rapidjson::Value(oldBasename.c_str(), jsonMetaDocument->GetAllocator()).Move(),jsonMetaDocument->GetAllocator());
+					state->jsonMetaDocument->AddMember("of", rapidjson::Value(oldBasename.c_str(), state->jsonMetaDocument->GetAllocator()).Move(),state->jsonMetaDocument->GetAllocator());
 				}
-				if (!jsonMetaDocument->HasMember("odm")) { // original date modified (unix)
+				if (!state->jsonMetaDocument->HasMember("odm")) { // original date modified (unix)
 					std::filesystem::file_time_type filetime = std::filesystem::last_write_time(oldPath);
 					//time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 					time_t oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime - std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
-					jsonMetaDocument->AddMember("odm", oldDemoDateModified, jsonMetaDocument->GetAllocator());
+					state->jsonMetaDocument->AddMember("odm", oldDemoDateModified, state->jsonMetaDocument->GetAllocator());
 				}
-				if (!jsonMetaDocument->HasMember("cso")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
-					jsonMetaDocument->AddMember("cso", cutStartOffset, jsonMetaDocument->GetAllocator());
+				if (!state->jsonMetaDocument->HasMember("cso")) { // cut start offset? to detect imperfect timing and adjust for it? Easier than to feed it from the outside.
+					state->jsonMetaDocument->AddMember("cso", cutStartOffset, state->jsonMetaDocument->GetAllocator());
 				}
 				else {
-					(*jsonMetaDocument)["cso"] = cutStartOffset;
+					(*state->jsonMetaDocument)["cso"] = cutStartOffset;
 					std::cout << "Overriding old 'cso' (cut start offset) metadata value with '"<<cutStartOffset << "'\n";
 				}
 
-				originalFileAbsoluteCutOffset += demoCurrentTime;
-				if (!jsonMetaDocument->HasMember("oco")) { // original cut offset. aka absolute offset from start of the once ancestral original demo before any cutting was done. this value is read back by subsequent cutting into originalFileAbsoluteCutOffset and then added to the new offset.
-					jsonMetaDocument->AddMember("oco", originalFileAbsoluteCutOffset, jsonMetaDocument->GetAllocator());
+				state->originalFileAbsoluteCutOffset += state->demoCurrentTime;
+				if (!state->jsonMetaDocument->HasMember("oco")) { // original cut offset. aka absolute offset from start of the once ancestral original demo before any cutting was done. this value is read back by subsequent cutting into state->originalFileAbsoluteCutOffset and then added to the new offset.
+					state->jsonMetaDocument->AddMember("oco", state->originalFileAbsoluteCutOffset, state->jsonMetaDocument->GetAllocator());
 				}
 				else {
-					(*jsonMetaDocument)["oco"] = originalFileAbsoluteCutOffset;
-					std::cout << "Overriding old 'oco' (original cut offset) metadata value with '"<< originalFileAbsoluteCutOffset << "'\n";
+					(*state->jsonMetaDocument)["oco"] = state->originalFileAbsoluteCutOffset;
+					std::cout << "Overriding old 'oco' (original cut offset) metadata value with '"<< state->originalFileAbsoluteCutOffset << "'\n";
 				}
 
 
-				if (!jsonMetaDocument->HasMember("wr")) {
-					jsonMetaDocument->AddMember("wr", "DemoCutter", jsonMetaDocument->GetAllocator());
+				if (!state->jsonMetaDocument->HasMember("wr")) {
+					state->jsonMetaDocument->AddMember("wr", "DemoCutter", state->jsonMetaDocument->GetAllocator());
 				}
 				else {
-					(*jsonMetaDocument)["wr"] = "DemoCutter";
+					(*state->jsonMetaDocument)["wr"] = "DemoCutter";
 					std::cout << "Overriding old 'wr' (writer) metadata value with 'DemoCutter'\n";
 				}
 				rapidjson::StringBuffer sb;
 				rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-				jsonMetaDocument->Accept(writer);
+				state->jsonMetaDocument->Accept(writer);
 				const char* finalJsonMetaString = sb.GetString();
-				demoCutWriteEmptyMessageWithMetadata(newHandle, &demo.cut.Clc, &demo.cut.Cl, demoType, createCompressedOutput,finalJsonMetaString);
-				delete jsonMetaDocument;
-				if (jsonPreviousMetaDocument) {
-					delete jsonPreviousMetaDocument;
+				demoCutWriteEmptyMessageWithMetadata(state->newHandle, &demo.cut.Clc, &demo.cut.Cl, state->demoType, createCompressedOutput,finalJsonMetaString);
+				delete state->jsonMetaDocument;
+				if (state->jsonPreviousMetaDocument) {
+					delete state->jsonPreviousMetaDocument;
 				}
 			}
-			demoCutWriteDemoHeader(newHandle, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
-			demoCutWriteDeltaSnapshot(firstServerCommand, newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,demoType,createCompressedOutput);
+			demoCutWriteDemoHeader(state->newHandle, &demo.cut.Clc, &demo.cut.Cl,state->demoType,createCompressedOutput);
+			demoCutWriteDeltaSnapshot(firstServerCommand, state->newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,state->demoType,createCompressedOutput);
 			// copy rest
-			framesSaved = 1;
+			state->framesSaved = 1;
 		}
 	}
 cutcomplete:
-	if (newHandle) {
-		buf = -1;
-		FS_Write(&buf, 4, newHandle);
-		FS_Write(&buf, 4, newHandle);
-		ret = qtrue;
+	if (state->newHandle) {
+		state->buf = -1;
+		FS_Write(&state->buf, 4, state->newHandle);
+		FS_Write(&state->buf, 4, state->newHandle);
+		state->ret = qtrue;
 	}
 cuterror:
 	//remove previosly converted demo from the same cut
-	if (newHandle) {
+	if (state->newHandle) {
 		/*memset(newName, 0, sizeof(newName));
 		if (demo.currentNum > 0) {
-			Com_sprintf(newName, sizeof(newName), "mmedemos/%s.%d_cut.mme", oldName, demo.currentNum);
+			Com_sprintf(newName, sizeof(newName), "mmedemos/%s.%d_cut.mme", state->oldName, demo.currentNum);
 		}
 		else {
-			Com_sprintf(newName, sizeof(newName), "mmedemos/%s_cut.mme", oldName);
+			Com_sprintf(newName, sizeof(newName), "mmedemos/%s_cut.mme", state->oldName);
 		}
 		if (FS_FileExists(newName))
 			FS_FileErase(newName);*/
 	}
-	FS_FCloseFile(oldHandle);
-	FS_FCloseFile(newHandle);
+	FS_FCloseFile(state->oldHandle);
+	FS_FCloseFile(state->newHandle);
 
 #ifdef _WIN32
 	// On Windows we now change the Date modified to that of the original file.
 	// TODO Implement for other OSes?
 	wchar_t newNameWide[MAX_OSPATH];
 	wchar_t oldNameWide[MAX_OSPATH];
-	mbstowcs(newNameWide,newName,MAX_OSPATH);
-	mbstowcs(oldNameWide, va("%s%s", oldName, ext),MAX_OSPATH); 
+	mbstowcs(newNameWide, state->newName,MAX_OSPATH);
+	mbstowcs(oldNameWide, va("%s%s", state->oldName, state->ext),MAX_OSPATH); 
 	HANDLE hFile = CreateFile(newNameWide, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	HANDLE hFileOld = CreateFile(oldNameWide, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile != INVALID_HANDLE_VALUE && hFileOld != INVALID_HANDLE_VALUE) // INVALID_FILE_HANDLE / INVALID_HANDLE_VALUE ? 
@@ -793,51 +847,9 @@ cuterror:
 #endif
 
 	//
-	if (reframeString) {
-
-		std::cout << "Reframing after cutting... \n";
-
-		char			reframedFilename[MAX_OSPATH];
-
-		int baseFilenameLength = strlen(newName) - strlen(ext);
-		strncpy_s(reframedFilename,newName, baseFilenameLength); // Get filename without extension.
-		reframedFilename[baseFilenameLength] = 0; // Null-terminate it.
-		strncat_s(reframedFilename, "_reframe", sizeof("_reframe")-1); // TODO uh am i using this correctly?
-		strncat_s(reframedFilename, ext, strlen(ext)); // TODO uh am i using this correctly?
-
-		for (int i = 0; i < 2; i++) {
 
 
-			std::stringstream cmdLine;
-			//cmdLine << "\"";
-#ifndef WIN32
-			if (i == 0) cmdLine << "./"; // First try calling reframer .exe in same directory.
-#endif
-			cmdLine << "DemoReframer \"" << newName << "\" \"" << reframedFilename << "\" \"" << reframeString << "\"";
-			std::cout << "trying: " << cmdLine.str() << "\n";
-			int returnValue = system(cmdLine.str().c_str());
-			if (!returnValue) {
-				// Success
-				std::cout << "Reframe seems successful.\n";
-				break;
-			}
-			else {
-				if (i == 0) {
-
-					std::cout << "Reframe apparently unsuccessful. Trying global executable path next.\n";
-				}
-				else {
-					std::cout << "Reframe apparently failed, sorry.\n";
-				}
-			}
-#ifdef WIN32
-			break; // On linux, we try ./DemoReframer and then just DemoReframer to always prefer same folder. On Windows that's default behavior anyway so no need to try twice
-#endif
-		}
-	}
-
-
-	return ret;
+	return state->ret;
 }
 
 /*void CL_DemoCut_f(void) {
@@ -876,20 +888,19 @@ int main(int argcO, char** argvO) {
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto m = op.add<popl::Value<std::string>>("m", "meta", "Optionally, add {}-enclosed JSON data that will be attached past the end of an empty first message in the demo.");
 	auto n = op.add<popl::Switch>("n", "no-forced-meta", "Don't write any metadata at all if neither --meta is supplied nor metadata found in original demofile. By default a 'of' key is added containing the original demo filename. This is overridden by an 'of' value existing already in the demo to be cut.");
-	auto r = op.add<popl::Value<std::string>>("r", "reframe", "Optionally, reframe by calling reframer using system() call on the output file. Value same as would be with DemoReframer: Search string or clientnum");
 	op.parse(argcO, argvO);
 	auto args = op.non_option_args();
 
 
 	//if (argc < 4) {
-	if (args.size() < 3) {
-		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime";
+	if (args.size() < 1) {
+		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
 		std::cout << "Extra options:\n";
 		std::cout << op << "\n";
 		return 1;
 	}
 	else if (h->is_set()) {
-		std::cout << "need 3 arguments at least: demoname, outputfile(optional), start and endtime\n";
+		std::cout << "need 3 arguments at least: demoname, outputfile(optional)\n";
 		std::cout << "Extra options:\n";
 		std::cout << op << "\n";
 		return 0;
@@ -897,24 +908,14 @@ int main(int argcO, char** argvO) {
 	initializeGameInfos();
 	const char* demoName = NULL;
 	const char* outputName = NULL;
-	//float startTime = 0;
-	//float endTime = 0;
-	demoTime_t startTime;
-	demoTime_t endTime;
 	bool mustDeleteOutputName = false;
 	//if (argc == 4) {
-	if (args.size() == 3) {
+	if (args.size() == 1) {
 		//demoName = argv[1];
 		demoName = args[0].c_str();
-		//startTime = atof(argv[2]);
-		//startTime = timeParse(argv[2]);
-		startTime = timeParse(args[1].c_str());
-		//endTime = atof(argv[3]);
-		//endTime = timeParse(argv[3]);
-		endTime = timeParse(args[2].c_str());
 	}
 	//else if(argc == 5) {
-	else if(args.size() == 4) {
+	else if(args.size() == 2) {
 		//demoName = argv[1];
 		demoName = args[0].c_str();
 		//outputName = argv[2];
@@ -923,13 +924,6 @@ int main(int argcO, char** argvO) {
 		sanitizeFilename(outputName, filteredOutputName);
 		outputName = filteredOutputName;
 		mustDeleteOutputName = true;
-		//strcpy(outputName, filteredOutputName);
-		//startTime = atof(argv[3]);
-		//startTime = timeParse(argv[3]);
-		startTime = timeParse(args[2].c_str());
-		//endTime = atof(argv[4]);
-		//endTime = timeParse(argv[4]);
-		endTime = timeParse(args[3].c_str());
 	}
 
 	std::vector<std::string> metaDataStrings;
@@ -938,12 +932,12 @@ int main(int argcO, char** argvO) {
 	}
 	//std::string metaData = m->is_set() ? m->value() : "";
 
-	std::string reframeString = r->is_set() ? r->value() : "";
-	const char* reframeStringC = r->is_set() ? reframeString.c_str() : NULL;
+	std::string reframeString = "";
+	const char* reframeStringC = NULL;
 
 	std::chrono::high_resolution_clock::time_point benchmarkStartTime = std::chrono::high_resolution_clock::now();
 	//if (demoCut(demoName, startTime, endTime, outputName, (m->is_set() && metaData.size()) ? metaData.c_str() : NULL, n->is_set())) {
-	if (demoCut(demoName, startTime, endTime, outputName, &metaDataStrings, n->is_set(), reframeStringC)) {
+	if (demoFix(demoName,outputName, &metaDataStrings, n->is_set(), reframeStringC)) {
 		std::chrono::high_resolution_clock::time_point benchmarkEndTime = std::chrono::high_resolution_clock::now();
 		double seconds = std::chrono::duration_cast<std::chrono::microseconds>(benchmarkEndTime - benchmarkStartTime).count() / 1000000.0f;
 		Com_Printf("Demo %s got successfully cut in %.5f seconds\n", demoName,seconds);
