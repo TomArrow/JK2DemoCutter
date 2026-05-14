@@ -440,9 +440,13 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 			goto cuterror;
 		}
 		state->fileOffset++; // just go one byte further and try again (cringe i know)
-		stateBackup->fileOffset++; // just go one byte further and try again (cringe i know)
+		stateBackup->fileOffset++;
+		state->oldSize--;
+		stateBackup->oldSize--;
 		Com_Printf("X");
 		recovering = qtrue;
+		state->framesSaved = 0;
+		stateBackup->framesSaved = 0;
 	cutcontinue:
 		//if (isCompressedFile) {
 		//	state->oldDataRaw.clear();
@@ -631,6 +635,9 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 				if (!demoCutParseSnapshot(&state->oldMsg, &demo.cut.Clc, &demo.cut.Cl, state->demoType, state->SEHExceptionCaught, malformedMessageCaught)) {
 					goto cutreset;
 				}
+				if (demo.cut.Cl.snap.snapIssues) {
+					state->framesSaved = std::min(state->framesSaved,1); // force writing non delta again
+				}
 				state->psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,state->demoType);
 				if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
@@ -790,8 +797,10 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 				const char* finalJsonMetaString = sb.GetString();
 				demoCutWriteEmptyMessageWithMetadata(state->newHandle, &demo.cut.Clc, &demo.cut.Cl, state->demoType, createCompressedOutput,finalJsonMetaString);
 				delete state->jsonMetaDocument;
+				state->jsonMetaDocument = NULL;
 				if (state->jsonPreviousMetaDocument) {
 					delete state->jsonPreviousMetaDocument;
+					state->jsonPreviousMetaDocument = NULL;
 				}
 			}
 			demoCutWriteDemoHeader(state->newHandle, &demo.cut.Clc, &demo.cut.Cl,state->demoType,createCompressedOutput);

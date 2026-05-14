@@ -6779,7 +6779,7 @@ void demoCutWriteDeltaSnapshot(int firstServerCommand, fileHandle_t f, qboolean 
 	frame = &clCut->snap;
 	if (clCut->snap.messageNum > 0 && !forceNonDelta) {
 		oldframe = &clCut->snapshots[(clCut->snap.messageNum - 1) & PACKET_MASK]; // 1 frame previous
-		if (!oldframe->valid) {
+		if (!oldframe->valid || oldframe->messageNum != (clCut->snap.messageNum - 1)) {
 			// not yet set
 			oldframe = NULL;
 		}
