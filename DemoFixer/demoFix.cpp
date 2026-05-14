@@ -282,6 +282,7 @@ int64_t FS_Read_FromBufferedFile(void* buffer, int64_t len, fileHandle_t f, byte
 
 }
 
+// TODO: WARNING: newSnap.serverTime < cl.oldFrameServerTime
 
 //qboolean demoCut(const char* sourceDemoFile, demoTime_t startTime, demoTime_t endTime, const char* outputName, const char* jsonMetaData, bool noForcedMeta) {
 qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::vector<std::string>* metaDataStrings, bool noForcedMeta, const char* reframeString) {
@@ -663,6 +664,7 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 						state->demoBaseTime = state->demoCurrentTime; // Remember fixed offset into demo time.
 						state->demoStartTime = demo.cut.Cl.snap.serverTime;
 						state->mapRestartCounter++;
+						state->framesSaved = 0;
 					}
 					state->lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}

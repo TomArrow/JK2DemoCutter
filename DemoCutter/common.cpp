@@ -6079,9 +6079,11 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 		oldSnap = NULL;
 	}
 	else {
+		int retrycount = 0;
 		newSnap.deltaNum = newSnap.messageNum - deltaNum;
 		int lastOneNum = newSnap.deltaNum;
 		oldSnap = &clCut->snapshots[newSnap.deltaNum & PACKET_MASK];
+		tryagain:
 
 		// Try work with it anyway?
 		if (!oldSnap->valid && clcCut->lastValidSnapSet) {
@@ -6116,6 +6118,23 @@ static inline qboolean demoCutParseSnapshotReal(msg_t* msg, clientConnection_t* 
 		else {
 			newSnap.valid = qtrue;	// valid delta parse
 		}
+#if ERROR_TOLERANT
+		if (!newSnap.valid) {
+			Com_DPrintf("Trying to use last valid.\n");
+			if (retrycount == 0 && clcCut->lastValidSnapSet) {
+				newSnap.deltaNum = clcCut->lastValidSnap;
+				oldSnap = &clCut->snapshots[clcCut->lastValidSnap & PACKET_MASK];
+				lastOneNum = clcCut->lastValidSnap;
+				retrycount = 1;
+				goto tryagain;
+			}
+			else {
+				newSnap.deltaNum = -1;
+				newSnap.valid = qtrue;		// uncompressed frame
+				oldSnap = NULL;
+			}
+		}
+#endif
 	}
 	try {
 		// read areamask
