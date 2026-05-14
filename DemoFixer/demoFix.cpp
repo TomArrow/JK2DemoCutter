@@ -264,7 +264,7 @@ public:
 
 	qboolean originalCutOffsetRead = qfalse;
 	int64_t fileOffset = 0;
-
+	qboolean jsonWritten = qfalse;
 };
 
 
@@ -336,6 +336,13 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 		}
 	}
 
+	if (!state->jsonMetaDocument) {
+
+		state->jsonMetaDocument = new rapidjson::Document();
+		state->jsonMetaDocument->SetObject();
+	}
+
+	state->jsonMetaDocument->AddMember("fixeddemo", 1, state->jsonMetaDocument->GetAllocator());
 
 	// Since not in MME:
 	/*if (!play) {
@@ -748,11 +755,11 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 		//else if (demo.cut.Cl.snap.serverTime >= startTime) {
 		//else if (state->demoCurrentTime >= startTime) {
 		else if(demo.cut.Cl.newSnapshots){
-			if (!state->jsonMetaDocument && !noForcedMeta) {
+			if (!state->jsonMetaDocument && !noForcedMeta && !state->jsonWritten) {
 				state->jsonMetaDocument = new rapidjson::Document();
 				state->jsonMetaDocument->SetObject();
 			}
-			if (state->jsonMetaDocument) {
+			if (state->jsonMetaDocument && !state->jsonWritten) {
 				// TODO: Save "oto": Original total offset. Throughout all cuts, what's the offset from the original file now?
 
 				if (!state->jsonMetaDocument->HasMember("of")) { // original filename
@@ -785,7 +792,7 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 
 
 				if (!state->jsonMetaDocument->HasMember("wr")) {
-					state->jsonMetaDocument->AddMember("wr", "DemoCutter", state->jsonMetaDocument->GetAllocator());
+					state->jsonMetaDocument->AddMember("wr", "DemoFixer", state->jsonMetaDocument->GetAllocator());
 				}
 				else {
 					(*state->jsonMetaDocument)["wr"] = "DemoCutter";
@@ -796,6 +803,7 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 				state->jsonMetaDocument->Accept(writer);
 				const char* finalJsonMetaString = sb.GetString();
 				demoCutWriteEmptyMessageWithMetadata(state->newHandle, &demo.cut.Clc, &demo.cut.Cl, state->demoType, createCompressedOutput,finalJsonMetaString);
+				state->jsonWritten = qtrue;
 				delete state->jsonMetaDocument;
 				state->jsonMetaDocument = NULL;
 				if (state->jsonPreviousMetaDocument) {

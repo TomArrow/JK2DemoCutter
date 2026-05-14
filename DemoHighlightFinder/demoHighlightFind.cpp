@@ -2322,6 +2322,7 @@ std::set<std::string>	recorderPlayerNames;
 
 #define DERIV_FAKEDEMO		(1<<0) // dentified by fake demo server name. could be reframe merge etc
 #define DERIV_SNAPSMANIP	(1<<1) // snaps manipulation by demo optimizer
+#define DERIV_FIXEDDEMO		(1<<2) // fixed version of possibly corrupted demo (written by DemoFixer)
 int	demoDerivativeFlags = 0;
 
 bool demoHasClientUserCmds = false;
@@ -7281,6 +7282,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							int opt_snapsmanip = (*jsonPreviousMetaDocument)[snapsmanipKey].GetInt();
 							if (opt_snapsmanip) {
 								demoDerivativeFlags |= DERIV_SNAPSMANIP;
+							}
+						}
+						
+						const char* fixedDemoKey = jsonGetRealMetadataKeyName(jsonPreviousMetaDocument, "fixeddemo");
+						if (fixedDemoKey) {
+							int fixedDemo = (*jsonPreviousMetaDocument)[fixedDemoKey].GetInt();
+							if (fixedDemo) {
+								demoDerivativeFlags |= DERIV_FIXEDDEMO;
 							}
 						}
 
