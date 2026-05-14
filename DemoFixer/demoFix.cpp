@@ -265,6 +265,7 @@ public:
 	qboolean originalCutOffsetRead = qfalse;
 	int64_t fileOffset = 0;
 	qboolean jsonWritten = qfalse;
+	qboolean headerWritten = qfalse;
 };
 
 
@@ -434,9 +435,13 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 	StateVars* stateBackup = new StateVars();
 
 	qboolean recovering = qfalse;
+	qboolean wasRecovering = qfalse;
 	while (state->oldSize > 0) {
 		*demoBackup = demo;
 		*stateBackup = *state;
+		if (recovering) {
+			wasRecovering = qtrue;
+		}
 		recovering = qfalse;
 		Com_Printf(".");
 		goto cutcontinue;
@@ -451,6 +456,24 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 		stateBackup->fileOffset++;
 		state->oldSize--;
 		stateBackup->oldSize--;
+
+		// check if we are in a pure 0 area so we can get through it faster
+		int64_t nextNonZero = 0;
+		while (nextNonZero < state->oldSize && *(fileBuffer+ state->fileOffset +nextNonZero) == 0) {
+			nextNonZero++;
+		}
+		nextNonZero = std::max(0LL, nextNonZero - 50LL); // leave some safety buffer tho, 0s arent totally invalid after all, just large blocks of them are
+		state->fileOffset += nextNonZero;
+		stateBackup->fileOffset += nextNonZero;
+		state->oldSize -= nextNonZero;
+		stateBackup->oldSize -= nextNonZero;
+		if (nextNonZero > 0) {
+			Com_Printf("Skipped %d zero bytes\n",(int)nextNonZero);
+		}
+
+		demo.cut.Cl.newSnapshots = qfalse;
+		demoBackup->cut.Cl.newSnapshots = qfalse;
+
 		Com_Printf("X");
 		recovering = qtrue;
 		state->framesSaved = 0;
@@ -646,6 +669,16 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 				if (demo.cut.Cl.snap.snapIssues) {
 					state->framesSaved = std::min(state->framesSaved,1); // force writing non delta again
 				}
+				else if (demo.cut.Cl.newSnapshots && state->headerWritten && state->framesSaved == 0 && (recovering || wasRecovering) && demo.cut.Cl.snap.serverTime > state->lastKnownInOrderTime) {
+					// looks like we can safely continue without a new gamestate
+					if (demo.cut.Cl.snap.serverTime - state->lastKnownInOrderTime < 60000*2) {
+						// but make sure the jump isnt bigger than 2 minutes or we are likely dealing with some different demos overwriting each other, in which case keep giving us a fresh gamestate
+						state->framesSaved = 1;
+					}
+				}
+				if (demo.cut.Cl.newSnapshots && !demo.cut.Cl.snap.snapIssues) {
+					wasRecovering = qfalse;
+				}
 				state->psGeneralPMType = generalizeGameValue<GMAP_PLAYERMOVETYPE, SAFE>(demo.cut.Cl.snap.ps.pm_type,state->demoType);
 				if (messageOffset++ == 0) {
 					// first message in demo. Get servertime offset from here to cut correctly.
@@ -664,7 +697,9 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 						state->demoBaseTime = state->demoCurrentTime; // Remember fixed offset into demo time.
 						state->demoStartTime = demo.cut.Cl.snap.serverTime;
 						state->mapRestartCounter++;
-						state->framesSaved = 0;
+						if (demo.cut.Cl.newSnapshots) {
+							state->framesSaved = 0;
+						}
 					}
 					state->lastKnownInOrderTime = demo.cut.Cl.snap.serverTime;
 				}
@@ -744,7 +779,7 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 		int64_t cutStartOffset = 0;
 
 		//if (state->demoCurrentTime > endTime) {
-		if (state->framesSaved > 0) {
+		if (state->framesSaved > 0 && demo.cut.Cl.newSnapshots) {
 			/* this msg is in range, write it */
 			if (state->framesSaved > Q_max(10, demo.cut.Cl.snap.messageNum - demo.cut.Cl.snap.deltaNum) || state->newGameStateAfterDemoCutBegun) { // Hmm did I do this? I don't recall... NEW: state->newGameStateAfterDemoCutBegun: If there is a new gamestate, may as well just start just dumping the messages now.
 				demoCutWriteDemoMessage(&state->oldMsg, state->newHandle, &demo.cut.Clc);
@@ -814,6 +849,7 @@ qboolean demoFix(const char* sourceDemoFile, const char* outputName, const std::
 				}
 			}
 			demoCutWriteDemoHeader(state->newHandle, &demo.cut.Clc, &demo.cut.Cl,state->demoType,createCompressedOutput);
+			state->headerWritten = qtrue;
 			demoCutWriteDeltaSnapshot(firstServerCommand, state->newHandle, qtrue, &demo.cut.Clc, &demo.cut.Cl,state->demoType,createCompressedOutput);
 			// copy rest
 			state->framesSaved = 1;
