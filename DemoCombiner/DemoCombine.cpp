@@ -586,6 +586,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 						if (asG2AnimEnt) {
 							// Can't be ET_PLAYER. Has to be ET_GRAPPLE (G2 anim ent)
 							tmpES.eType = ET_GRAPPLE_JK2;
+							tmpES.g2radius = 64; // for proper culling behavior, or getting close will make models disappear. TODO make it model dependent? ATST?
 							// We don't have a player model. So instead get a ModelIndex for this playermodel
 							{	// TODO It's kinda wasteful to do this on every frame. Maybe figure out way to do it only when the model changes.
 								PlayerInfo pi = demoReaders[i]->reader.GetPlayerInfo(clientNumHere, &tmpPS);
@@ -797,6 +798,7 @@ qboolean demoCut( const char* outputName, std::vector<DemoSource>* inputFiles, s
 							//entityState_t tmpEntity = it->second;
 							entityState_t tmpEntity = demoReaders[i]->reader.GetInterpolatedNPC(it->first, sourceTime - demoReaders[i]->sourceInfo->delay,NULL);
 							tmpEntity.eType = ET_GRAPPLE_JK2;
+							tmpEntity.g2radius = 64; // for proper culling behavior, or getting close will make models disappear. TODO make it model dependent? ATST?
 							remapConfigStrings(&tmpEntity, &demo.cut.Cl, &demoReaders[i]->reader, &commandsToAdd, qtrue, qfalse, demoType);
 							tmpEntity.modelindex = tmpEntity.modelindex ? tmpEntity.modelindex : G_ModelIndex(va("models/players/stormtrooper/model.glm"), &demo.cut.Cl, &commandsToAdd, demoType); // By unmodded default these don't contain a modelIndex as that is sent directly between server and client in SP.
 							bool skinFound = false;
