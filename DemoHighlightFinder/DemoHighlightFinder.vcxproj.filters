@@ -224,6 +224,9 @@
     <ClCompile Include="..\shared\base58\base58.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\VideoRenderer.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -326,6 +329,9 @@
     </ClInclude>
     <ClInclude Include="..\shared\sqlite_tabledefs.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\VideoRenderer.h">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

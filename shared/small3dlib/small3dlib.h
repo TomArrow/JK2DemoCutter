@@ -381,26 +381,26 @@ static inline void S3L_vec4Set(S3L_Vec4 *v, S3L_Unit x, S3L_Unit y,
   S3L_Unit z, S3L_Unit w);
 static inline void S3L_vec3Add(S3L_Vec4 *result, S3L_Vec4 added);
 static inline void S3L_vec3Sub(S3L_Vec4 *result, S3L_Vec4 substracted);
-S3L_Unit S3L_vec3Length(S3L_Vec4 v);
+static inline S3L_Unit S3L_vec3Length(S3L_Vec4 v);
 
 /** Normalizes Vec3. Note that this function tries to normalize correctly
   rather than quickly! If you need to normalize quickly, do it yourself in a
   way that best fits your case. */
-void S3L_vec3Normalize(S3L_Vec4 *v);
+static inline void S3L_vec3Normalize(S3L_Vec4 *v);
 
 /** Like S3L_vec3Normalize, but doesn't perform any checks on the input vector,
   which is faster, but can be very innacurate or overflowing. You are supposed
   to provide a "nice" vector (not too big or small). */
 static inline void S3L_vec3NormalizeFast(S3L_Vec4 *v);
 
-S3L_Unit S3L_vec2Length(S3L_Vec4 v);
-void S3L_vec3Cross(S3L_Vec4 a, S3L_Vec4 b, S3L_Vec4 *result);
+static inline S3L_Unit S3L_vec2Length(S3L_Vec4 v);
+static inline void S3L_vec3Cross(S3L_Vec4 a, S3L_Vec4 b, S3L_Vec4 *result);
 static inline S3L_Unit S3L_vec3Dot(S3L_Vec4 a, S3L_Vec4 b);
 
 /** Computes a reflection direction (typically used e.g. for specular component
   in Phong illumination). The input vectors must be normalized. The result will
   be normalized as well. */
-void S3L_reflect(S3L_Vec4 toLight, S3L_Vec4 normal, S3L_Vec4 *result);
+static inline void S3L_reflect(S3L_Vec4 toLight, S3L_Vec4 normal, S3L_Vec4 *result);
 
 /** Determines the winding of a triangle, returns 1 (CW, clockwise), -1 (CCW,
   counterclockwise) or 0 (points lie on a single line). */
@@ -430,9 +430,9 @@ typedef struct
 
 static inline void S3L_transform3DInit(S3L_Transform3D *t);
 
-void S3L_lookAt(S3L_Vec4 pointTo, S3L_Transform3D *t);
+static inline void S3L_lookAt(S3L_Vec4 pointTo, S3L_Transform3D *t);
 
-void S3L_transform3DSet(
+static inline void S3L_transform3DSet(
   S3L_Unit tx,
   S3L_Unit ty,
   S3L_Unit tz,
@@ -446,7 +446,7 @@ void S3L_transform3DSet(
 
 /** Converts rotation transformation to three direction vectors of given length
   (any one can be NULL, in which case it won't be computed). */
-void S3L_rotationToDirections(
+static inline void S3L_rotationToDirections(
   S3L_Vec4 rotation,
   S3L_Unit length,
   S3L_Vec4 *forw, 
@@ -467,11 +467,11 @@ typedef S3L_Unit S3L_Mat4[4][4];
 /** Initializes a 4x4 matrix to identity. */
 static inline void S3L_mat4Init(S3L_Mat4 m);
 
-void S3L_mat4Copy(S3L_Mat4 src, S3L_Mat4 dst);
+static inline void S3L_mat4Copy(S3L_Mat4 src, S3L_Mat4 dst);
 
-void S3L_mat4Transpose(S3L_Mat4 m);
+static inline void S3L_mat4Transpose(S3L_Mat4 m);
 
-void S3L_makeTranslationMat(
+static inline void S3L_makeTranslationMat(
   S3L_Unit offsetX,
   S3L_Unit offsetY,
   S3L_Unit offsetZ,
@@ -479,35 +479,35 @@ void S3L_makeTranslationMat(
 
 /** Makes a scaling matrix. DON'T FORGET: scale of 1.0 is set with
   S3L_FRACTIONS_PER_UNIT! */
-void S3L_makeScaleMatrix(
+static inline void S3L_makeScaleMatrix(
   S3L_Unit scaleX,
   S3L_Unit scaleY,
   S3L_Unit scaleZ,
   S3L_Mat4 m);
 
 /** Makes a matrix for rotation in the ZXY order. */
-void S3L_makeRotationMatrixZXY(
+static inline void S3L_makeRotationMatrixZXY(
   S3L_Unit byX,
   S3L_Unit byY,
   S3L_Unit byZ,
   S3L_Mat4 m);
 
-void S3L_makeWorldMatrix(S3L_Transform3D worldTransform, S3L_Mat4 m);
-void S3L_makeCameraMatrix(S3L_Transform3D cameraTransform, S3L_Mat4 m);
+static inline void S3L_makeWorldMatrix(S3L_Transform3D worldTransform, S3L_Mat4 m);
+static inline void S3L_makeCameraMatrix(S3L_Transform3D cameraTransform, S3L_Mat4 m);
 
 /** Multiplies a vector by a matrix with normalization by
   S3L_FRACTIONS_PER_UNIT. Result is stored in the input vector. */
-void S3L_vec4Xmat4(S3L_Vec4 *v, S3L_Mat4 m);
+static inline void S3L_vec4Xmat4(S3L_Vec4 *v, S3L_Mat4 m);
 
 /** Same as S3L_vec4Xmat4 but faster, because this version doesn't compute the
   W component of the result, which is usually not needed. */
-void S3L_vec3Xmat4(S3L_Vec4 *v, S3L_Mat4 m);
+static inline void S3L_vec3Xmat4(S3L_Vec4 *v, S3L_Mat4 m);
 
 /** Multiplies two matrices with normalization by S3L_FRACTIONS_PER_UNIT.
   Result is stored in the first matrix. The result represents a transformation
   that has the same effect as applying the transformation represented by m1 and
   then m2 (in that order). */
-void S3L_mat4Xmat4(S3L_Mat4 m1, S3L_Mat4 m2);
+static inline void S3L_mat4Xmat4(S3L_Mat4 m1, S3L_Mat4 m2);
 
 typedef struct
 {
@@ -517,7 +517,7 @@ typedef struct
   S3L_Transform3D transform;
 } S3L_Camera;
 
-void S3L_cameraInit(S3L_Camera *camera);
+static inline void S3L_cameraInit(S3L_Camera *camera);
 
 typedef struct
 {
@@ -529,7 +529,7 @@ typedef struct
   int8_t visible;             /**< Can be used to easily hide the model. */
 } S3L_DrawConfig;
 
-void S3L_drawConfigInit(S3L_DrawConfig *config);
+static inline void S3L_drawConfigInit(S3L_DrawConfig *config);
 
 typedef struct
 {
@@ -545,7 +545,7 @@ typedef struct
   S3L_DrawConfig config;
 } S3L_Model3D;                ///< Represents a 3D model.
 
-void S3L_model3DInit(
+static inline void S3L_model3DInit(
   const S3L_Unit *vertices,
   S3L_Index vertexCount,
   const S3L_Index *triangles,
@@ -559,7 +559,7 @@ typedef struct
   S3L_Camera camera;
 } S3L_Scene;                  ///< Represent the 3D scene to be rendered.
 
-void S3L_sceneInit(
+static inline void S3L_sceneInit(
   S3L_Model3D *models,
   S3L_Index modelCount,
   S3L_Scene *scene);
@@ -612,24 +612,24 @@ static inline S3L_Unit S3L_wrap(S3L_Unit value, S3L_Unit mod);
 static inline S3L_Unit S3L_nonZero(S3L_Unit value);
 static inline S3L_Unit S3L_zeroClamp(S3L_Unit value);
 
-S3L_Unit S3L_sin(S3L_Unit x);
-S3L_Unit S3L_asin(S3L_Unit x);
+static inline S3L_Unit S3L_sin(S3L_Unit x);
+static inline S3L_Unit S3L_asin(S3L_Unit x);
 static inline S3L_Unit S3L_cos(S3L_Unit x);
 
-S3L_Unit S3L_vec3Length(S3L_Vec4 v);
-S3L_Unit S3L_sqrt(S3L_Unit value);
+static inline S3L_Unit S3L_vec3Length(S3L_Vec4 v);
+static inline S3L_Unit S3L_sqrt(S3L_Unit value);
 
 /** Projects a single point from 3D space to the screen space (pixels), which
   can be useful e.g. for drawing sprites. The w component of input and result
   holds the point size. If this size is 0 in the result, the sprite is outside
   the view. */
-void S3L_project3DPointToScreen(
+static inline void S3L_project3DPointToScreen(
   S3L_Vec4 point,
   S3L_Camera camera,
   S3L_Vec4 *result);
 
 /** Computes a normalized normal of given triangle. */
-void S3L_triangleNormal(S3L_Vec4 t0, S3L_Vec4 t1, S3L_Vec4 t2,
+static inline void S3L_triangleNormal(S3L_Vec4 t0, S3L_Vec4 t1, S3L_Vec4 t2,
   S3L_Vec4 *n);
 
 /** Helper function for retrieving per-vertex indexed values from an array,
@@ -640,7 +640,7 @@ void S3L_triangleNormal(S3L_Vec4 t0, S3L_Vec4 t1, S3L_Vec4 t2,
   vectors (into x, y, z and w, depending on 'numComponents'). This function is
   meant to be used per-triangle (typically from a cache), NOT per-pixel, as it
   is not as fast as possible! */
-void S3L_getIndexedTriangleValues(
+static inline void S3L_getIndexedTriangleValues(
   S3L_Index triangleIndex,
   const S3L_Index *indices,
   const S3L_Unit *values,
@@ -660,7 +660,7 @@ void S3L_getIndexedTriangleValues(
   the triangles containing the vertex. The maximum number of these triangle
   normals that will be averaged is set with
   S3L_NORMAL_COMPUTE_MAXIMUM_AVERAGE. */
-void S3L_computeModelNormals(S3L_Model3D model, S3L_Unit *dst,
+static inline void S3L_computeModelNormals(S3L_Model3D model, S3L_Unit *dst,
   int8_t transformNormals);
 
 /** Interpolated between two values, v1 and v2, in the same ratio as t is to
@@ -708,7 +708,7 @@ static inline void S3L_mapProjectionPlaneToScreen(
   Screen Space space (pixels). If perspective correction is enabled, each
   vertex has to have a depth (Z position in camera space) specified in the Z
   component. */
-void S3L_drawTriangle(
+static inline void S3L_drawTriangle(
   S3L_Vec4 point0,
   S3L_Vec4 point1,
   S3L_Vec4 point2,
@@ -717,18 +717,18 @@ void S3L_drawTriangle(
 
 /** This should be called before rendering each frame. The function clears
   buffers and does potentially other things needed for the frame. */
-void S3L_newFrame(void);
+static inline void S3L_newFrame(void);
 
-void S3L_zBufferClear(void);
-void S3L_stencilBufferClear(void);
+static inline void S3L_zBufferClear(void);
+static inline void S3L_stencilBufferClear(void);
 
 /** Writes a value (not necessarily depth! depends on the format of z-buffer)
   to z-buffer (if enabled). Does NOT check boundaries! */
-void S3L_zBufferWrite(S3L_ScreenCoord x, S3L_ScreenCoord y, S3L_Unit value);
+static inline void S3L_zBufferWrite(S3L_ScreenCoord x, S3L_ScreenCoord y, S3L_Unit value);
 
 /** Reads a value (not necessarily depth! depends on the format of z-buffer)
   from z-buffer (if enabled). Does NOT check boundaries! */
-S3L_Unit S3L_zBufferRead(S3L_ScreenCoord x, S3L_ScreenCoord y);
+static inline S3L_Unit S3L_zBufferRead(S3L_ScreenCoord x, S3L_ScreenCoord y);
 
 static inline void S3L_rotate2DPoint(S3L_Unit *x, S3L_Unit *y, S3L_Unit angle);
 
@@ -801,11 +801,11 @@ static inline void S3L_rotate2DPoint(S3L_Unit *x, S3L_Unit *y, S3L_Unit angle);
 
 #if S3L_Z_BUFFER == 1
   #define S3L_MAX_DEPTH 2147483647
-  S3L_Unit S3L_zBuffer[S3L_MAX_PIXELS];
+  static inline S3L_Unit S3L_zBuffer[S3L_MAX_PIXELS];
   #define S3L_zBufferFormat(depth) (depth)
 #elif S3L_Z_BUFFER == 2
   #define S3L_MAX_DEPTH 255
-  uint8_t S3L_zBuffer[S3L_MAX_PIXELS];
+static inline uint8_t S3L_zBuffer[S3L_MAX_PIXELS];
   #define S3L_zBufferFormat(depth)\
     S3L_min(255,(depth) >> S3L_REDUCED_Z_BUFFER_GRANULARITY)
 #endif
@@ -842,7 +842,7 @@ static inline int8_t S3L_zTest(
 }
 #endif
 
-S3L_Unit S3L_zBufferRead(S3L_ScreenCoord x, S3L_ScreenCoord y)
+static inline S3L_Unit S3L_zBufferRead(S3L_ScreenCoord x, S3L_ScreenCoord y)
 {
 #if S3L_Z_BUFFER
   return S3L_zBuffer[y * S3L_RESOLUTION_X + x];
@@ -854,7 +854,7 @@ S3L_Unit S3L_zBufferRead(S3L_ScreenCoord x, S3L_ScreenCoord y)
 #endif
 }
 
-void S3L_zBufferWrite(S3L_ScreenCoord x, S3L_ScreenCoord y, S3L_Unit value)
+static inline void S3L_zBufferWrite(S3L_ScreenCoord x, S3L_ScreenCoord y, S3L_Unit value)
 {
 #if S3L_Z_BUFFER
   S3L_zBuffer[y * S3L_RESOLUTION_X + x] = value;
@@ -971,12 +971,12 @@ static const S3L_Unit S3L_sinTable[S3L_SIN_TABLE_LENGTH] =
 #define S3L_SIN_TABLE_UNIT_STEP\
   (S3L_F / (S3L_SIN_TABLE_LENGTH * 4))
 
-void S3L_vec4Init(S3L_Vec4 *v)
+static inline void S3L_vec4Init(S3L_Vec4 *v)
 {
   v->x = 0; v->y = 0; v->z = 0; v->w = S3L_F;
 }
 
-void S3L_vec4Set(S3L_Vec4 *v, S3L_Unit x, S3L_Unit y, S3L_Unit z, S3L_Unit w)
+static inline void S3L_vec4Set(S3L_Vec4 *v, S3L_Unit x, S3L_Unit y, S3L_Unit z, S3L_Unit w)
 {
   v->x = x;
   v->y = y;
@@ -984,21 +984,21 @@ void S3L_vec4Set(S3L_Vec4 *v, S3L_Unit x, S3L_Unit y, S3L_Unit z, S3L_Unit w)
   v->w = w;
 }
 
-void S3L_vec3Add(S3L_Vec4 *result, S3L_Vec4 added)
+static inline void S3L_vec3Add(S3L_Vec4 *result, S3L_Vec4 added)
 {
   result->x += added.x;
   result->y += added.y;
   result->z += added.z;
 }
 
-void S3L_vec3Sub(S3L_Vec4 *result, S3L_Vec4 substracted)
+static inline void S3L_vec3Sub(S3L_Vec4 *result, S3L_Vec4 substracted)
 {
   result->x -= substracted.x;
   result->y -= substracted.y;
   result->z -= substracted.z;
 }
 
-void S3L_mat4Init(S3L_Mat4 m)
+static inline void S3L_mat4Init(S3L_Mat4 m)
 {
   #define M(x,y) m[x][y]
   #define S S3L_F
@@ -1012,19 +1012,19 @@ void S3L_mat4Init(S3L_Mat4 m)
   #undef S
 }
 
-void S3L_mat4Copy(S3L_Mat4 src, S3L_Mat4 dst)
+static inline void S3L_mat4Copy(S3L_Mat4 src, S3L_Mat4 dst)
 {
   for (uint8_t j = 0; j < 4; ++j)
     for (uint8_t i = 0; i < 4; ++i)
       dst[i][j] = src[i][j];
 }
 
-S3L_Unit S3L_vec3Dot(S3L_Vec4 a, S3L_Vec4 b)
+static inline S3L_Unit S3L_vec3Dot(S3L_Vec4 a, S3L_Vec4 b)
 {
   return (a.x * b.x + a.y * b.y + a.z * b.z) / S3L_F;
 }
 
-void S3L_reflect(S3L_Vec4 toLight, S3L_Vec4 normal, S3L_Vec4 *result)
+static inline void S3L_reflect(S3L_Vec4 toLight, S3L_Vec4 normal, S3L_Vec4 *result)
 {
   S3L_Unit d = 2 * S3L_vec3Dot(toLight,normal);
 
@@ -1033,14 +1033,14 @@ void S3L_reflect(S3L_Vec4 toLight, S3L_Vec4 normal, S3L_Vec4 *result)
   result->z = (normal.z * d) / S3L_F - toLight.z;
 }
 
-void S3L_vec3Cross(S3L_Vec4 a, S3L_Vec4 b, S3L_Vec4 *result)
+static inline void S3L_vec3Cross(S3L_Vec4 a, S3L_Vec4 b, S3L_Vec4 *result)
 {
   result->x = a.y * b.z - a.z * b.y;
   result->y = a.z * b.x - a.x * b.z;
   result->z = a.x * b.y - a.y * b.x;
 }
 
-void S3L_triangleNormal(S3L_Vec4 t0, S3L_Vec4 t1, S3L_Vec4 t2, S3L_Vec4 *n)
+static inline void S3L_triangleNormal(S3L_Vec4 t0, S3L_Vec4 t1, S3L_Vec4 t2, S3L_Vec4 *n)
 {
   #define ANTI_OVERFLOW 32
 
@@ -1059,7 +1059,7 @@ void S3L_triangleNormal(S3L_Vec4 t0, S3L_Vec4 t1, S3L_Vec4 t2, S3L_Vec4 *n)
   S3L_vec3Normalize(n);
 }
 
-void S3L_getIndexedTriangleValues(
+static inline void S3L_getIndexedTriangleValues(
   S3L_Index triangleIndex,
   const S3L_Index *indices,
   const S3L_Unit *values,
@@ -1108,7 +1108,7 @@ void S3L_getIndexedTriangleValues(
   }
 }
 
-void S3L_computeModelNormals(S3L_Model3D model, S3L_Unit *dst,
+static inline void S3L_computeModelNormals(S3L_Model3D model, S3L_Unit *dst,
   int8_t transformNormals)
 {
   S3L_Index vPos = 0;
@@ -1210,7 +1210,7 @@ void S3L_computeModelNormals(S3L_Model3D model, S3L_Unit *dst,
     }
 }
 
-void S3L_vec4Xmat4(S3L_Vec4 *v, S3L_Mat4 m)
+static inline void S3L_vec4Xmat4(S3L_Vec4 *v, S3L_Mat4 m)
 {
   S3L_Vec4 vBackup;
 
@@ -1231,7 +1231,7 @@ void S3L_vec4Xmat4(S3L_Vec4 *v, S3L_Mat4 m)
   v->w = dotCol(3);
 }
 
-void S3L_vec3Xmat4(S3L_Vec4 *v, S3L_Mat4 m)
+static inline void S3L_vec3Xmat4(S3L_Vec4 *v, S3L_Mat4 m)
 {
   S3L_Vec4 vBackup;
 
@@ -1255,62 +1255,62 @@ void S3L_vec3Xmat4(S3L_Vec4 *v, S3L_Mat4 m)
 
 #undef dotCol
 
-S3L_Unit S3L_abs(S3L_Unit value)
+static inline S3L_Unit S3L_abs(S3L_Unit value)
 {
   return value * (((value >= 0) << 1) - 1);
 }
 
-S3L_Unit S3L_min(S3L_Unit v1, S3L_Unit v2)
+static inline S3L_Unit S3L_min(S3L_Unit v1, S3L_Unit v2)
 {
   return v1 >= v2 ? v2 : v1;
 }
 
-S3L_Unit S3L_max(S3L_Unit v1, S3L_Unit v2)
+static inline S3L_Unit S3L_max(S3L_Unit v1, S3L_Unit v2)
 {
   return v1 >= v2 ? v1 : v2;
 }
 
-S3L_Unit S3L_clamp(S3L_Unit v, S3L_Unit v1, S3L_Unit v2)
+static inline S3L_Unit S3L_clamp(S3L_Unit v, S3L_Unit v1, S3L_Unit v2)
 {
   return v >= v1 ? (v <= v2 ? v : v2) : v1;
 }
 
-S3L_Unit S3L_zeroClamp(S3L_Unit value)
+static inline S3L_Unit S3L_zeroClamp(S3L_Unit value)
 {
   return (value * (value >= 0));
 }
 
-S3L_Unit S3L_wrap(S3L_Unit value, S3L_Unit mod)
+static inline S3L_Unit S3L_wrap(S3L_Unit value, S3L_Unit mod)
 {
   return value >= 0 ? (value % mod) : (mod + (value % mod) - 1);
 }
 
-S3L_Unit S3L_nonZero(S3L_Unit value)
+static inline S3L_Unit S3L_nonZero(S3L_Unit value)
 {
   return (value + (value == 0));
 }
 
-S3L_Unit S3L_interpolate(S3L_Unit v1, S3L_Unit v2, S3L_Unit t, S3L_Unit tMax)
+static inline S3L_Unit S3L_interpolate(S3L_Unit v1, S3L_Unit v2, S3L_Unit t, S3L_Unit tMax)
 {
   return v1 + ((v2 - v1) * t) / tMax;
 }
 
-S3L_Unit S3L_interpolateByUnit(S3L_Unit v1, S3L_Unit v2, S3L_Unit t)
+static inline S3L_Unit S3L_interpolateByUnit(S3L_Unit v1, S3L_Unit v2, S3L_Unit t)
 {
   return v1 + ((v2 - v1) * t) / S3L_F;
 }
 
-S3L_Unit S3L_interpolateByUnitFrom0(S3L_Unit v2, S3L_Unit t)
+static inline S3L_Unit S3L_interpolateByUnitFrom0(S3L_Unit v2, S3L_Unit t)
 {
   return (v2 * t) / S3L_F;
 }
 
-S3L_Unit S3L_interpolateFrom0(S3L_Unit v2, S3L_Unit t, S3L_Unit tMax)
+static inline S3L_Unit S3L_interpolateFrom0(S3L_Unit v2, S3L_Unit t, S3L_Unit tMax)
 {
   return (v2 * t) / tMax;
 }
 
-S3L_Unit S3L_distanceManhattan(S3L_Vec4 a, S3L_Vec4 b)
+static inline S3L_Unit S3L_distanceManhattan(S3L_Vec4 a, S3L_Vec4 b)
 {
   return
     S3L_abs(a.x - b.x) +
@@ -1318,7 +1318,7 @@ S3L_Unit S3L_distanceManhattan(S3L_Vec4 a, S3L_Vec4 b)
     S3L_abs(a.z - b.z);
 }
 
-void S3L_mat4Xmat4(S3L_Mat4 m1, S3L_Mat4 m2)
+static inline void S3L_mat4Xmat4(S3L_Mat4 m1, S3L_Mat4 m2)
 {
   S3L_Mat4 mat1;
 
@@ -1337,7 +1337,7 @@ void S3L_mat4Xmat4(S3L_Mat4 m1, S3L_Mat4 m2)
     }
 }
 
-S3L_Unit S3L_sin(S3L_Unit x)
+static inline S3L_Unit S3L_sin(S3L_Unit x)
 {
 #if S3L_SIN_METHOD == 0
   x = S3L_wrap(x / S3L_SIN_TABLE_UNIT_STEP,S3L_SIN_TABLE_LENGTH * 4);
@@ -1390,7 +1390,7 @@ S3L_Unit S3L_sin(S3L_Unit x)
 #endif
 }
 
-S3L_Unit S3L_asin(S3L_Unit x)
+static inline S3L_Unit S3L_asin(S3L_Unit x)
 {
 #if S3L_SIN_METHOD == 0
   x = S3L_clamp(x,-S3L_F,S3L_F);
@@ -1445,12 +1445,12 @@ S3L_Unit S3L_asin(S3L_Unit x)
 #endif
 }
 
-S3L_Unit S3L_cos(S3L_Unit x)
+static inline S3L_Unit S3L_cos(S3L_Unit x)
 {
   return S3L_sin(x + S3L_F / 4);
 }
 
-void S3L_correctBarycentricCoords(S3L_Unit barycentric[3])
+static inline void S3L_correctBarycentricCoords(S3L_Unit barycentric[3])
 {
   barycentric[0] = S3L_clamp(barycentric[0],0,S3L_F);
   barycentric[1] = S3L_clamp(barycentric[1],0,S3L_F);
@@ -1466,7 +1466,7 @@ void S3L_correctBarycentricCoords(S3L_Unit barycentric[3])
     barycentric[2] = d;
 }
 
-void S3L_makeTranslationMat(
+static inline void S3L_makeTranslationMat(
   S3L_Unit offsetX,
   S3L_Unit offsetY,
   S3L_Unit offsetZ,
@@ -1484,7 +1484,7 @@ void S3L_makeTranslationMat(
   #undef S
 }
 
-void S3L_makeScaleMatrix(
+static inline void S3L_makeScaleMatrix(
   S3L_Unit scaleX,
   S3L_Unit scaleY,
   S3L_Unit scaleZ,
@@ -1500,7 +1500,7 @@ void S3L_makeScaleMatrix(
   #undef M
 }
 
-void S3L_makeRotationMatrixZXY(
+static inline void S3L_makeRotationMatrixZXY(
   S3L_Unit byX,
   S3L_Unit byY,
   S3L_Unit byZ,
@@ -1545,7 +1545,7 @@ void S3L_makeRotationMatrixZXY(
   #undef S 
 }
 
-S3L_Unit S3L_sqrt(S3L_Unit value)
+static inline S3L_Unit S3L_sqrt(S3L_Unit value)
 {
   int8_t sign = 1;
 
@@ -1577,17 +1577,17 @@ S3L_Unit S3L_sqrt(S3L_Unit value)
   return result * sign;
 }
 
-S3L_Unit S3L_vec3Length(S3L_Vec4 v)
+static inline S3L_Unit S3L_vec3Length(S3L_Vec4 v)
 {
   return S3L_sqrt(v.x * v.x + v.y * v.y + v.z * v.z);  
 }
 
-S3L_Unit S3L_vec2Length(S3L_Vec4 v)
+static inline S3L_Unit S3L_vec2Length(S3L_Vec4 v)
 {
   return S3L_sqrt(v.x * v.x + v.y * v.y);  
 }
 
-void S3L_vec3Normalize(S3L_Vec4 *v)
+static inline void S3L_vec3Normalize(S3L_Vec4 *v)
 {
   #define SCALE 16
   #define BOTTOM_LIMIT 16
@@ -1631,7 +1631,7 @@ void S3L_vec3Normalize(S3L_Vec4 *v)
   v->z = (v->z * S3L_F) / l;
 }
 
-void S3L_vec3NormalizeFast(S3L_Vec4 *v)
+static inline void S3L_vec3NormalizeFast(S3L_Vec4 *v)
 {
   S3L_Unit l = S3L_vec3Length(*v);
 
@@ -1643,7 +1643,7 @@ void S3L_vec3NormalizeFast(S3L_Vec4 *v)
   v->z = (v->z * S3L_F) / l;
 }
 
-void S3L_transform3DInit(S3L_Transform3D *t)
+static inline void S3L_transform3DInit(S3L_Transform3D *t)
 {
   S3L_vec4Init(&(t->translation));
   S3L_vec4Init(&(t->rotation));
@@ -1665,7 +1665,7 @@ static inline void S3L_perspectiveDivide(S3L_Vec4 *vector,
   vector->y = (vector->y * focalLength) / vector->z;
 }
 
-void S3L_project3DPointToScreen(
+static inline void S3L_project3DPointToScreen(
   S3L_Vec4 point,
   S3L_Camera camera,
   S3L_Vec4 *result)
@@ -1718,7 +1718,7 @@ void S3L_project3DPointToScreen(
     );
 }
 
-void S3L_lookAt(S3L_Vec4 pointTo, S3L_Transform3D *t)
+static inline void S3L_lookAt(S3L_Vec4 pointTo, S3L_Transform3D *t)
 {
   S3L_Vec4 v;
 
@@ -1745,7 +1745,7 @@ void S3L_lookAt(S3L_Vec4 pointTo, S3L_Transform3D *t)
   t->rotation.x = S3L_asin(dx);
 }
 
-void S3L_transform3DSet(
+static inline void S3L_transform3DSet(
   S3L_Unit tx,
   S3L_Unit ty,
   S3L_Unit tz,
@@ -1770,13 +1770,13 @@ void S3L_transform3DSet(
   t->scale.z = sz;
 }
 
-void S3L_cameraInit(S3L_Camera *camera)
+static inline void S3L_cameraInit(S3L_Camera *camera)
 {
   camera->focalLength = S3L_F;
   S3L_transform3DInit(&(camera->transform));
 }
 
-void S3L_rotationToDirections(
+static inline void S3L_rotationToDirections(
   S3L_Vec4 rotation,
   S3L_Unit length,
   S3L_Vec4 *forw, 
@@ -1812,7 +1812,7 @@ void S3L_rotationToDirections(
   }
 }
 
-void S3L_pixelInfoInit(S3L_PixelInfo *p)
+static inline void S3L_pixelInfoInit(S3L_PixelInfo *p)
 {
   p->x = 0;
   p->y = 0;
@@ -1826,7 +1826,7 @@ void S3L_pixelInfoInit(S3L_PixelInfo *p)
   p->previousZ = 0;
 }
 
-void S3L_model3DInit(
+static inline void S3L_model3DInit(
   const S3L_Unit *vertices,
   S3L_Index vertexCount,
   const S3L_Index *triangles,
@@ -1843,7 +1843,7 @@ void S3L_model3DInit(
   S3L_drawConfigInit(&(model->config));
 }
 
-void S3L_sceneInit(
+static inline void S3L_sceneInit(
   S3L_Model3D *models,
   S3L_Index modelCount,
   S3L_Scene *scene)
@@ -1853,7 +1853,7 @@ void S3L_sceneInit(
   S3L_cameraInit(&(scene->camera));
 }
 
-void S3L_drawConfigInit(S3L_DrawConfig *config)
+static inline void S3L_drawConfigInit(S3L_DrawConfig *config)
 {
   config->backfaceCulling = 2;
   config->visible = 1;
@@ -1903,7 +1903,7 @@ static inline S3L_Unit S3L_interpolateBarycentric(
     ) / S3L_F;
 }
 
-void S3L_mapProjectionPlaneToScreen(
+static inline void S3L_mapProjectionPlaneToScreen(
   S3L_Vec4 point,
   S3L_ScreenCoord *screenX,
   S3L_ScreenCoord *screenY)
@@ -1917,7 +1917,7 @@ void S3L_mapProjectionPlaneToScreen(
     (point.y * S3L_HALF_RESOLUTION_X) / S3L_F;
 }
 
-void S3L_zBufferClear(void)
+static inline void S3L_zBufferClear(void)
 {
 #if S3L_Z_BUFFER
   for (uint32_t i = 0; i < S3L_RESOLUTION_X * S3L_RESOLUTION_Y; ++i)
@@ -1925,7 +1925,7 @@ void S3L_zBufferClear(void)
 #endif
 }
 
-void S3L_stencilBufferClear(void)
+static inline void S3L_stencilBufferClear(void)
 {
 #if S3L_STENCIL_BUFFER
   for (uint32_t i = 0; i < S3L_STENCIL_BUFFER_SIZE; ++i)
@@ -1933,7 +1933,7 @@ void S3L_stencilBufferClear(void)
 #endif
 }
 
-void S3L_newFrame(void)
+static inline void S3L_newFrame(void)
 {
   S3L_zBufferClear();
   S3L_stencilBufferClear();
@@ -1941,13 +1941,13 @@ void S3L_newFrame(void)
 
 /* the following serves to communicate info about if the triangle has been split
   and how the barycentrics should be remapped. */
-uint8_t _S3L_projectedTriangleState = 0; // 0 = normal, 1 = cut, 2 = split
+static inline uint8_t _S3L_projectedTriangleState = 0; // 0 = normal, 1 = cut, 2 = split
 
 #if S3L_NEAR_CROSS_STRATEGY == 3
-S3L_Vec4 _S3L_triangleRemapBarycentrics[6];
+static inline S3L_Vec4 _S3L_triangleRemapBarycentrics[6];
 #endif
 
-void S3L_drawTriangle(
+static inline void S3L_drawTriangle(
   S3L_Vec4 point0,
   S3L_Vec4 point1,
   S3L_Vec4 point2,
@@ -2519,7 +2519,7 @@ void S3L_drawTriangle(
   #undef Z_RECIP_NUMERATOR 
 }
 
-void S3L_rotate2DPoint(S3L_Unit *x, S3L_Unit *y, S3L_Unit angle)
+static inline void S3L_rotate2DPoint(S3L_Unit *x, S3L_Unit *y, S3L_Unit angle)
 {
   if (angle < S3L_SIN_TABLE_UNIT_STEP)
     return; // no visible rotation
@@ -2538,7 +2538,7 @@ void S3L_rotate2DPoint(S3L_Unit *x, S3L_Unit *y, S3L_Unit angle)
     (angleCos * (*y)) / S3L_F;
 }
 
-void S3L_makeWorldMatrix(S3L_Transform3D worldTransform, S3L_Mat4 m)
+static inline void S3L_makeWorldMatrix(S3L_Transform3D worldTransform, S3L_Mat4 m)
 {
   S3L_makeScaleMatrix(
     worldTransform.scale.x,
@@ -2565,7 +2565,7 @@ void S3L_makeWorldMatrix(S3L_Transform3D worldTransform, S3L_Mat4 m)
   S3L_mat4Xmat4(m,t);
 }
 
-void S3L_mat4Transpose(S3L_Mat4 m)
+static inline void S3L_mat4Transpose(S3L_Mat4 m)
 {
   S3L_Unit tmp;
 
@@ -2578,7 +2578,7 @@ void S3L_mat4Transpose(S3L_Mat4 m)
     }
 }
 
-void S3L_makeCameraMatrix(S3L_Transform3D cameraTransform, S3L_Mat4 m)
+static inline void S3L_makeCameraMatrix(S3L_Transform3D cameraTransform, S3L_Mat4 m)
 {
   S3L_makeTranslationMat(
     -1 * cameraTransform.translation.x,
@@ -2678,7 +2678,7 @@ _S3L_TriangleToSort S3L_sortArray[S3L_MAX_TRIANGES_DRAWN];
 uint16_t S3L_sortArrayLength;
 #endif
 
-void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
+static inline void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
   uint8_t vertex, S3L_Mat4 projectionMatrix, S3L_Vec4 *result)
 {
   uint32_t vertexIndex = model->triangles[triangleIndex * 3 + vertex] * 3;
@@ -2694,7 +2694,7 @@ void _S3L_projectVertex(const S3L_Model3D *model, S3L_Index triangleIndex,
   /* We'll keep the non-clamped z in w for sorting. */ 
 }
 
-void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength)
+static inline void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength)
 {
   vertex->z = vertex->z >= S3L_NEAR ? vertex->z : S3L_NEAR;
   /* ^ This firstly prevents zero division in the follwoing z-divide and
@@ -2716,7 +2716,7 @@ void _S3L_mapProjectedVertexToScreen(S3L_Vec4 *vertex, S3L_Unit focalLength)
   subdivided into two if it crosses the near plane, in which case two projected
   triangles are returned (the info about splitting or cutting the triangle is
   passed in global variables, see above). */
-void _S3L_projectTriangle(
+static inline void _S3L_projectTriangle(
   const S3L_Model3D *model,
   S3L_Index triangleIndex,
   S3L_Mat4 matrix,
@@ -2846,7 +2846,7 @@ void _S3L_projectTriangle(
   _S3L_mapProjectedVertexToScreen(&transformed[2],focalLength);
 }
 
-void S3L_drawScene(S3L_Scene scene)
+static inline void S3L_drawScene(S3L_Scene scene)
 {
   S3L_Mat4 matFinal, matCamera;
   S3L_Vec4 transformed[6]; // transformed triangle coords, for 2 triangles

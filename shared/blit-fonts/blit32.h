@@ -80,7 +80,7 @@ blit_inline void blit32_Scale(blit32_font *Font, int Scale) { blit32_SCALE(Font,
 do { int blit32_TempScale = (scale); blit32_SCALE((Font), blit32_TempScale); } while (0)
 #endif/*blit32_MACRO_INLINE*/
 
-blit32_font Blit32 = {
+static inline blit32_font Blit32 = {
 #else/*blit32_ARRAY_ONLY*/
 blit32_glyph blit32_Glyphs[blit_NUM_GLYPHS] =
 #endif/*blit32_ARRAY_ONLY*/
@@ -109,7 +109,7 @@ blit32_glyph blit32_Glyphs[blit_NUM_GLYPHS] =
 };
 
 /* StartX/Y refers to the top left corner of the glyph's bounding box */
-int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int BufWidth, int BufHeight, int Wrap, int StartX, int StartY, int StrLen, const char*String)
+static inline int blit32_TextNExplicit(blit_pixel *Buffer, blit_pixel Value, int Scale, int BufWidth, int BufHeight, int Wrap, int StartX, int StartY, int StrLen, const char*String)
 {
 	int IsNegative = BufWidth < 0;
 	int DrawDir = IsNegative ? -1 : 1;

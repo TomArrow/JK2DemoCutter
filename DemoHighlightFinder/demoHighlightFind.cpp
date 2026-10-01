@@ -27,7 +27,6 @@
 #include <mutex>
 #include "named_mutex.hpp"
 #include "tsl/htrie_map.h"
-#include "../shared/libgmavi/libgmavi.h"
 
 #include "include/rapidjson/document.h"
 
@@ -43,7 +42,7 @@
 
 #define KILLVECARRAY 1
 
-
+#include "VideoRenderer.h"
 
 
 // notable: 
@@ -63,137 +62,33 @@ int64_t	nwhLastACDetectGeneric = -99999;
 int64_t nwhLastScriptDetectGeneric = -99999;
 int64_t nwhLastScriptDetect[MAX_CLIENTS_MAX] = {};
 
-#define VIDEOWIDTH 400
-#define VIDEOHEIGHT 300
-#define S3L_POSMULT 8
-// we need to define screen resolution before including the library:
-#define S3L_RESOLUTION_X VIDEOWIDTH
-#define S3L_RESOLUTION_Y VIDEOHEIGHT
-// and a name of the function we'll be using to draw individual pixels:
-#define S3L_PIXEL_FUNCTION drawPixel
-#define S3L_NEAR_CROSS_STRATEGY 3 // 3
-#define S3L_USE_WIDER_TYPES 0
-#define S3L_PERSPECTIVE_CORRECTION 2
-//#define S3L_STENCIL_BUFFER 1
-//#define S3L_SORT 1
-#define S3L_MAX_TRIANGES_DRAWN 100000
-//#define S3L_FAR S3L_POSMULT*2048
-#define S3L_Z_BUFFER 1
-#define S3L_USE_WIDER_TYPES 1
-#include "../shared/small3dlib/small3dlib.h" // now include the library
+
+int64_t lastTorsoAnim[MAX_GENTITIES];
+int64_t lastTorsoAnimChange[MAX_GENTITIES];
+template<unsigned int max_clients>
+void sceneAdd3DSaberForPlayer(vec3_t playerOrigin, vec3_t playerAngles, int torsoAnim, vec3_t camerapos, demoType_t demoType, int entityNum, int64_t demoCurrentTime, VideoRenderer* renderer) {
 
 
-static byte drawBuffer[VIDEOWIDTH * VIDEOHEIGHT * 3];
-S3L_Unit cubeVertices[] = { S3L_CUBE_VERTICES(S3L_F) };
-S3L_Index cubeTriangles[] = { S3L_CUBE_TRIANGLES };
-S3L_Model3D mapModel; 
-bool haveMapModel = false;
-S3L_Model3D cubeModel; // 3D model, has a geometry, position, rotation etc.
-S3L_Scene scene;       // scene we'll be rendring (can have multiple models)
-typedef struct drawProperties3dModel_s {
-	byte	color[3];
-	bool	transparent;
-	bool	isCube;
-} drawProperties3dModel_t;
-std::vector<S3L_Unit>		mapVertices;
-std::vector<S3L_Unit>		mapUVs;
-std::vector<S3L_Index>		mapTriangles;
-std::vector<S3L_Index>		mapTrianglesVisFiltered;
-std::vector<lightmap_t>		mapLightmaps;
-std::vector<S3L_Model3D>	scene3dmodels;
-std::vector<drawProperties3dModel_t>	scene3dmodelProperties;
-std::vector<std::vector<S3L_Unit>>		scene3dmodelVertices;
-std::vector<std::vector<S3L_Index>>		scene3dmodelTriangles;
-#define S3L_POSX(y) ((y)*S3L_POSMULT)
-#define S3L_POSY(z) ((z)*S3L_POSMULT)
-#define S3L_POSZ(x) ((x)*S3L_POSMULT)
-#define S3L_ROTX(x) ((-x)*S3L_F/360)
-#define S3L_ROTY(y) ((-y)*S3L_F/360)
-#define S3L_ROTZ(z) ((-z)*S3L_F/360)
-//#define S3L_ROTX(x) ((-x)*S3L_F/360)
-//#define S3L_ROTY(y) ((-y)*S3L_F/360)
-//#define S3L_ROTZ(z) ((-z)*S3L_F/360)
-bool renderingMap = false;
-uint32_t previousTriangle = -1;
-int drawLightmapNum = 0;
-S3L_Vec4 uv0, uv1, uv2;
-void drawPixel(S3L_PixelInfo* p)
-{
-	uint8_t c[3];  // ASCII pixel we'll write to the screen
-
-	/* We'll draw different triangles with different ASCII symbols to give the
-	illusion of lighting. */
-	bool transparency = false;
-
-	if (renderingMap && p->modelIndex == 0) { // rendering world
-		if (p->triangleID != previousTriangle)
-		{
-
-			S3L_getIndexedTriangleValues(p->triangleIndex, mapTrianglesVisFiltered.data(), mapUVs.data(), 3, &uv0, &uv1, &uv2);
-			drawLightmapNum = uv0.z;
-			previousTriangle = p->triangleID;
-		}
-
-		// kind of a fog sort of thing.
-		if (drawLightmapNum >= mapLightmaps.size()) {
-			c[0] = c[1] = c[2] = std::min(p->depth / S3L_POSMULT / 8, (S3L_Unit)128);
-			//c[0] = (p->triangleID) & 255;
-			//c[1] = (p->triangleID >> 8) & 255;
-			//c[2] = (p->triangleID >> 16) & 255;
-		}
-		else {
-			lightmap_t* lm = &mapLightmaps[drawLightmapNum];
-			S3L_Unit uv[2];
-			uv[0] = std::clamp(S3L_interpolateBarycentric(uv0.x, uv1.x, uv2.x, p->barycentric), (S3L_Unit)0, (S3L_Unit)LIGHTMAP_SIZE-1);
-			uv[1] = std::clamp(S3L_interpolateBarycentric(uv0.y, uv1.y, uv2.y, p->barycentric), (S3L_Unit)0, (S3L_Unit)LIGHTMAP_SIZE-1);
-
-			c[2] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3];
-			c[1] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 + 1];
-			c[0] = lm->data[uv[1] * 3 * LIGHTMAP_SIZE + uv[0] * 3 + 2];
-		}
+	if (lastTorsoAnim[entityNum] != torsoAnim) {
+		lastTorsoAnimChange[entityNum] = demoCurrentTime;
+		lastTorsoAnim[entityNum] = torsoAnim;
 	}
-	else {
+	int64_t animationTime = demoCurrentTime - lastTorsoAnimChange[entityNum];
 
-		if (scene3dmodelProperties[p->modelIndex].isCube) {
-			if (p->triangleIndex == 0 || p->triangleIndex == 1 ||
-				p->triangleIndex == 4 || p->triangleIndex == 5)
-				c[0] = c[1] = c[2] = '#';
-			else if (p->triangleIndex == 2 || p->triangleIndex == 3 ||
-				p->triangleIndex == 6 || p->triangleIndex == 7)
-				c[0] = c[1] = c[2] = 'x';
-			else
-				c[0] = c[1] = c[2] = '.';
+	vec3_t points[6];
+	//if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, playerOrigin, playerAngles, 3, demoType, camerapos, points)) {
+	if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, vec3_origin, playerAngles, 3, demoType, camerapos, points)) {
+		//int startIndex = scene3dmodelVertices.size();
 
-			c[0] = std::min(((int)c[0] * (int)scene3dmodelProperties[p->modelIndex].color[2]) >> 8, 255);
-			c[1] = std::min(((int)c[1] * (int)scene3dmodelProperties[p->modelIndex].color[1]) >> 8, 255);
-			c[2] = std::min(((int)c[2] * (int)scene3dmodelProperties[p->modelIndex].color[0]) >> 8, 255);
-		}
-		else {
-			c[0] = scene3dmodelProperties[p->modelIndex].color[2];
-			c[1] = scene3dmodelProperties[p->modelIndex].color[1];
-			c[2] = scene3dmodelProperties[p->modelIndex].color[0];
-		}
-
-		transparency = scene3dmodelProperties[p->modelIndex].transparent;
+		int indices[6] = { 0,1,2,3,4,5 };
+		
+		drawProperties3dModel_t* modelProps2 = renderer->startDrawingObject(indices, 6, points, 6, playerOrigin, NULL, NULL,false);
+		setModelColor<max_clients>(modelProps2, entityNum);
+		modelProps2->transparent = false;
+		modelProps2->isCube = false;
 	}
-
-	// draw to ASCII screen
-	int y = p->y;// S3L_RESOLUTION_Y - 1 - p->y;
-	int x = S3L_RESOLUTION_X - 1 - p->x;
-	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3] = c;
-	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+1] = c;
-	//drawBuffer[(S3L_RESOLUTION_Y - 1 - p->y) * S3L_RESOLUTION_X * 3 + p->x*3+2] = c;
-	if (transparency) {
-		c[0] = std::min(((int)c[0] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3]) / 2, 255);
-		c[1] = std::min(((int)c[1] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1]) / 2, 255);
-		c[2] = std::min(((int)c[2] + (int)drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2]) / 2, 255);
-		S3L_zBufferWrite(p->x,p->y,p->previousZ);
-	}
-
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3] = c[0];
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 1] = c[1];
-	drawBuffer[y * S3L_RESOLUTION_X * 3 + x * 3 + 2] = c[2];
 }
+
 template<unsigned int max_clients>
 void setModelColor(drawProperties3dModel_t* modelProps, int number) {
 
@@ -233,107 +128,8 @@ void setModelColor(drawProperties3dModel_t* modelProps, int number) {
 		modelProps->color[2] = 255;
 	}
 }
-int64_t lastTorsoAnim[MAX_GENTITIES];
-int64_t lastTorsoAnimChange[MAX_GENTITIES];
-template<unsigned int max_clients>
-void sceneAdd3DSaberForPlayer(vec3_t playerOrigin, vec3_t playerAngles, int torsoAnim, vec3_t camerapos, demoType_t demoType, int entityNum, int64_t demoCurrentTime) {
 
 
-	if (lastTorsoAnim[entityNum] != torsoAnim) {
-		lastTorsoAnimChange[entityNum] = demoCurrentTime;
-		lastTorsoAnim[entityNum] = torsoAnim;
-	}
-	int64_t animationTime = demoCurrentTime - lastTorsoAnimChange[entityNum];
-
-	vec3_t points[6];
-	//if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, playerOrigin, playerAngles, 3, demoType, camerapos, points)) {
-	if (SaberAnimationStuff::GetSaberSpritePos(torsoAnim & ~getANIM_TOGGLEBIT(demoType), animationTime, vec3_origin, playerAngles, 3, demoType, camerapos, points)) {
-		int startIndex = scene3dmodelVertices.size();
-		std::vector<S3L_Unit> vertices;
-		vertices.reserve(6 * 3);
-		std::vector<S3L_Index> indices;
-		indices.reserve(6);
-		for (int i = 0; i < 6; i++) {
-			vertices.push_back(S3L_POSX(points[i][1]));
-			vertices.push_back(S3L_POSY(points[i][2]));
-			vertices.push_back(S3L_POSZ(points[i][0]));
-			indices.push_back(i);
-		}
-		scene3dmodelVertices.push_back(std::move(vertices));
-		scene3dmodelTriangles.push_back(std::move(indices));
-
-		S3L_Model3D saberModel;
-		S3L_model3DInit(scene3dmodelVertices.back().data(), 6, scene3dmodelTriangles.back().data(), 2, &saberModel);
-		saberModel.transform.translation.x = S3L_POSX(playerOrigin[1]);
-		saberModel.transform.translation.y = S3L_POSY(playerOrigin[2]);
-		saberModel.transform.translation.z = S3L_POSZ(playerOrigin[0]);
-		saberModel.config.backfaceCulling = 0;
-		scene3dmodels.push_back(saberModel);
-		drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
-		setModelColor<max_clients>(modelProps2, entityNum);
-		modelProps2->transparent = false;
-		modelProps2->isCube = false;
-	}
-}
-
-typedef struct color3ub_s {
-	byte b, g, r;
-} color3ub_t;
-color3ub_t whitefont = { 255,255,255 };
-#define blit_pixel color3ub_t
-#define blit16_ADJUST_COLOR_FUNC videoAdjustTextColor
-#define blit32_ADJUST_COLOR_FUNC videoAdjustTextColor
-#include "../shared/blit-fonts/blit16.h"
-#include "../shared/blit-fonts/blit32.h"
-typedef std::tuple<int64_t, std::string> consoleText;
-std::deque<consoleText> videoConsole; // deque cuz i need to iterate over it for drawing, but rly just want a fifo.
-std::deque<consoleText> screenCenterText; // deque cuz i need to iterate over it for drawing, but rly just want a fifo.
-void videoDrawText(int64_t demoCurrentTime) {
-	while (videoConsole.size() && demoCurrentTime - std::get<0>(videoConsole.front()) > 3000LL) {
-		videoConsole.pop_front();
-	}
-	int y = 1;
-	for (auto it = videoConsole.begin(); it != videoConsole.end(); it++) {
-		y += blit16_ROW_ADVANCE*blit16_TextExplicit((color3ub_t*)drawBuffer, whitefont, 1, VIDEOWIDTH, VIDEOHEIGHT, 1, 1, y, std::get<1>(*it).c_str());
-	}
-	while (screenCenterText.size() && demoCurrentTime - std::get<0>(screenCenterText.front()) > 3000LL) {
-		screenCenterText.pop_front();
-	}
-	y = VIDEOHEIGHT/2-VIDEOHEIGHT/8;
-	for (auto it = screenCenterText.begin(); it != screenCenterText.end(); it++) {
-		char* cleanStr = new char[std::get<1>(*it).size() + 1];
-		Q_strncpyz(cleanStr, std::get<1>(*it).size() + 1, std::get<1>(*it).c_str(), std::get<1>(*it).size()+1);
-		Q_StripColorAll(cleanStr,nwhHexColors);
-		int x = VIDEOWIDTH / 2 - strlen(cleanStr)*blit32_ADVANCE/2;
-		delete[] cleanStr;
-		y += blit32_ROW_ADVANCE*blit32_TextExplicit((color3ub_t*)drawBuffer, whitefont, 1, VIDEOWIDTH, VIDEOHEIGHT, 1, x, y, std::get<1>(*it).c_str());
-	}
-}
-
-bool videoAdjustTextColor(color3ub_t* Value, int* i, const char* txt, int strLen) {
-	if (*i+1 < strLen) {
-		if (Q_IsColorStringHex(txt,nwhHexColors)) {
-			vec4_t color;
-			int skipCount;
-			if (Q_parseColorHex(txt+1, color, &skipCount, nwhHexColors)) {
-				*i += skipCount;
-				Value->r = (byte)std::min(color[0] * 255.0f, 255.0f);
-				Value->g = (byte)std::min(color[1] * 255.0f, 255.0f);
-				Value->b = (byte)std::min(color[2] * 255.0f, 255.0f);
-				return true;
-			}
-		}
-		else {
-			*i += 1;
-			int colorIndex = ColorIndex(txt[1]);
-			Value->r = (byte)std::min(g_color_table[colorIndex][0] * 255.0f, 255.0f);
-			Value->g = (byte)std::min(g_color_table[colorIndex][1] * 255.0f, 255.0f);
-			Value->b = (byte)std::min(g_color_table[colorIndex][2] * 255.0f, 255.0f);
-			return true;
-		}
-	}
-	return false;
-}
 
 CModel* cm = NULL;
 
@@ -459,6 +255,8 @@ struct sharedVariables_t {
 	std::string oldBasename;
 	time_t oldDemoDateModified;
 	int64_t demoFilesize;
+
+	VideoRenderer* renderer;
 };
 
 
@@ -551,29 +349,7 @@ public:
 	int	killDbsCount = 1; // pretty much sorta just filters.size() but minimum 1 always gg
 };
 
-typedef struct videoFrame_s {
-	int64_t	demoTime;
-	byte	image[VIDEOWIDTH * VIDEOHEIGHT * 3];
-} videoFrame_t;
 
-std::vector<videoFrame_t> videoFrames;
-
-void saveVideo(const ExtraSearchOptions& opts) {
-	void* gmav = gmav_open(opts.videoPath.c_str(), VIDEOWIDTH, VIDEOHEIGHT, 1000);
-	int64_t lastTime = videoFrames.size() ? videoFrames.front().demoTime : 0;
-	for (auto it = videoFrames.begin(); it != videoFrames.end(); it++) {
-		while (it->demoTime - lastTime > 1) {
-			if (it->demoTime - lastTime > 100) {
-				lastTime = it->demoTime - 100;
-			}
-			gmav_add(gmav, NULL);
-			lastTime++;
-		}
-		gmav_add(gmav, it->image);
-		lastTime = it->demoTime;
-	}
-	gmav_finish(gmav);
-}
 
 
 
@@ -5776,6 +5552,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 
 	sharedVariables_t sharedVars;
 
+	if (opts.makeVideo) {
+		sharedVars.renderer = new S3LRenderer();
+	}
+
 	int64_t			demoCurrentTime = 0;
 
 	qboolean success = demoHighlightFindExceptWrapper2<max_clients>(sourceDemoFile, bufferTime, searchMode, opts, SEHExceptionCaught, demoCurrentTime, wasDoingSQLiteExecution, io, sharedVars);
@@ -5788,8 +5568,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		}
 	}
 
-	if (opts.makeVideo && videoFrames.size()) {
-		saveVideo(opts);
+	if (opts.makeVideo && sharedVars.renderer) {
+		sharedVars.renderer->saveVideo(opts.videoPath.c_str());
 	}
 
 	if (opts.testOnly) return qtrue;
@@ -7048,15 +6828,12 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	sharedVars.oldDemoDateModified = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(filetime -std::filesystem::_File_time_clock::now() + std::chrono::system_clock::now()));
 
 
+	VideoRenderer* renderer = NULL;
 
 	if (opts.makeVideo) {
 		SaberAnimationStuff::init();
-		S3L_model3DInit(
-			cubeVertices,
-			S3L_CUBE_VERTEX_COUNT,
-			cubeTriangles,
-			S3L_CUBE_TRIANGLE_COUNT,
-			&cubeModel);
+
+		renderer = sharedVars.renderer;
 	}
 
 
@@ -7534,7 +7311,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					if (cm) {
 						delete cm;
 						cm = NULL;
-						haveMapModel = false;
+						if (renderer) {
+							renderer->resetMap();
+						}
 					}
 					int offset = demo.cut.Cl.gameState.stringOffsets[CS_SERVERINFO];
 					const char* info = demo.cut.Cl.gameState.stringData + offset;
@@ -7551,35 +7330,9 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::string mappath = CModel::GetMapPath(mapname, &opts.bspDirectories);
 							if (mappath.size() > 0) {
 								cm = new CModel(mappath.c_str(), opts.makeVideo);
-								if (opts.makeVideo) {
+								if (opts.makeVideo && renderer) {
 
-									auto faceVerts = cm->GetFaceVerts();
-									auto faceVertIndices = cm->GetFaceVertIndices();
-									auto lightmaps = cm->GetLightmaps();
-									mapVertices.clear();
-									mapUVs.clear();
-									mapLightmaps.clear();
-									for (auto it = lightmaps.begin(); it != lightmaps.end(); it++) {
-										mapLightmaps.push_back(*it);
-									}
-									//if (!mapLightmaps.size()) {
-									//	mapLightmaps.emplace_back();
-									//}
-									for (auto it = faceVerts.begin(); it != faceVerts.end(); it++) {
-										mapVertices.push_back(S3L_POSX(it->xyz[1]));
-										mapVertices.push_back(S3L_POSY(it->xyz[2]));
-										mapVertices.push_back(S3L_POSZ(it->xyz[0]));
-										mapUVs.push_back(it->lightmapSt[0] * LIGHTMAP_SIZE);
-										mapUVs.push_back(it->lightmapSt[1] * LIGHTMAP_SIZE);
-										mapUVs.push_back(it->lightmapNum >= mapLightmaps.size() ? mapLightmaps.size() - 1 : it->lightmapNum);
-									}
-									mapTriangles.clear();
-									for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
-										mapTriangles.push_back(*it);
-									}
-									S3L_model3DInit(mapVertices.data(), mapVertices.size() / 3, mapTriangles.data(), mapTriangles.size() / 3, &mapModel);
-									//mapModel.config.backfaceCulling = 1;
-									haveMapModel = true;
+									renderer->initMap(cm);
 								}
 							}
 						}
@@ -7704,15 +7457,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					playerTeams[demo.cut.Cl.snap.ps.clientNum] = demo.cut.Cl.snap.ps.stats[STAT_TEAM_MOH];
 				}
 
-				if (opts.makeVideo) {
+				if (opts.makeVideo && renderer) {
 					static int64_t lastDemoRenderFrameTime = -1000;
 					//const int minmsecpassed = 90; // 42;
 					if (demoCurrentTime - lastDemoRenderFrameTime >= opts.videoMinMsec) {
 						lastDemoRenderFrameTime = demoCurrentTime;
-						scene3dmodels.clear();
-						scene3dmodelProperties.clear();
-						scene3dmodelVertices.clear();
-						scene3dmodelTriangles.clear();
+
+						renderer->startNewFrame();
 
 						// set up camera pos
 						vec3_t camerapos;
@@ -7721,23 +7472,11 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 						VectorMA(demo.cut.Cl.snap.ps.origin, -80.0f, forward, camerapos);
 						camerapos[2] += demo.cut.Cl.snap.ps.viewheight;
 
-						// world/models
-						if (haveMapModel) {
-							renderingMap = true;
+						renderer->setCameraPos(camerapos);
 
-							S3L_Model3D visFilteredWorld = mapModel;
-							auto faceVertIndices = cm->GetVisFilteredFaceVertIndices(camerapos);
-							mapTrianglesVisFiltered.clear();
-							for (auto it = faceVertIndices.begin(); it != faceVertIndices.end(); it++) {
-								mapTrianglesVisFiltered.push_back(*it);
-							}
-							S3L_model3DInit(mapVertices.data(), mapVertices.size() / 3, mapTrianglesVisFiltered.data(), mapTrianglesVisFiltered.size() / 3, &visFilteredWorld);
-							scene3dmodels.push_back(visFilteredWorld);
-							//scene3dmodels.push_back(mapModel);
-							scene3dmodelProperties.emplace_back();
-						}
-						else {
-							renderingMap = false;
+						// world/models
+						if (renderer->haveMapModel) {
+							renderer->startDrawingMap(cm);
 						}
 						vec3_t mins, maxs;
 
@@ -7747,7 +7486,6 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							entityState_t* thisEs = &demo.cut.Cl.parseEntities[pe & (MAX_PARSE_ENTITIES - 1)];
 							//if (thisEs->number >= 32) break;
-							S3L_Model3D model = cubeModel;
 							int thisEntityType = generalizeGameValue<GMAP_ENTITYTYPE, UNSAFE>(thisEs->eType, demoType);
 							bool isPlayerEnt = (thisEntityType == ET_PLAYER_GENERAL || thisEntityType == ET_GRAPPLE_GENERAL);
 							bool isDeadPlayer = false;
@@ -7771,15 +7509,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							float zCenter = thisEs->pos.trBase[2];
 							zCenter += (mins[2] + maxs[2]) * 0.5f;
 
-							model.transform.translation.x = S3L_POSX(thisEs->pos.trBase[1]);
-							model.transform.translation.y = S3L_POSY(zCenter);
-							model.transform.translation.z = S3L_POSZ(thisEs->pos.trBase[0]);
-							model.transform.scale.x = (maxs[1] - mins[1]) * S3L_POSMULT;
-							model.transform.scale.y = (maxs[2] - mins[2]) * S3L_POSMULT;
-							model.transform.scale.z = (maxs[0] - mins[0]) * S3L_POSMULT;
+							vec3_t playerDrawPos;
+							VectorCopy(thisEs->pos.trBase, playerDrawPos);
+							playerDrawPos[2] = zCenter;
+							vec3_t cubeScale;
+							VectorSubtract(maxs, mins, cubeScale);
+							drawProperties3dModel_t* modelProps = renderer->startDrawingCube(playerDrawPos, cubeScale, vec3_origin);
 
-							scene3dmodels.push_back(model);
-							drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
 							setModelColor<max_clients>(modelProps, isForceField ? -(thisEs->otherEntityNum2+1) : thisEs->number);
 							if (isDeadPlayer) {
 								modelProps->color[0] >>= 2;
@@ -7798,13 +7534,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								// draw "flag"
 								int flagTeam = (thisEs->powerups & (1 << PW_REDFLAG)) ? TEAM_RED : ((thisEs->powerups & (1 << PW_BLUEFLAG)) ? TEAM_BLUE : TEAM_FREE);
 								zCenter += 35;
-								model.transform.translation.y = S3L_POSY(zCenter);
-								model.transform.scale.x = 10 * S3L_POSMULT;
-								model.transform.scale.y = 15 * S3L_POSMULT;
-								model.transform.scale.z = 2 * S3L_POSMULT;
-								model.transform.rotation.y = S3L_ROTY(thisEs->apos.trBase[1]);
-								scene3dmodels.push_back(model);
-								drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
+
+								vec3_t flagDrawPos;
+								VectorCopy(playerDrawPos, flagDrawPos);
+								flagDrawPos[2] = zCenter;
+								VectorSet(cubeScale, 2, 10, 15);
+								drawProperties3dModel_t*  modelProps2 = renderer->startDrawingCube(playerDrawPos, cubeScale, thisEs->apos.trBase);
+
 								setModelColor<max_clients>(modelProps2, -(flagTeam+1));
 								modelProps2->transparent = false;
 								modelProps2->isCube = true;
@@ -7812,11 +7548,10 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (isPlayerEnt && thisEs->weapon == saberWeap) {
 								// draw saber
-								sceneAdd3DSaberForPlayer<max_clients>(thisEs->pos.trBase,thisEs->apos.trBase,thisEs->torsoAnim,camerapos,demoType,thisEs->number,demoCurrentTime);
+								sceneAdd3DSaberForPlayer<max_clients>(thisEs->pos.trBase,thisEs->apos.trBase,thisEs->torsoAnim,camerapos,demoType,thisEs->number,demoCurrentTime, renderer);
 							}
 						}
 
-						S3L_Model3D model = cubeModel;
 						float zCenter = demo.cut.Cl.snap.ps.origin[2];
 						if (demo.cut.Cl.snap.ps.viewheight >= DEFAULT_VIEWHEIGHT) {
 							maxs[2] = DEFAULT_MAXS_2;
@@ -7826,15 +7561,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							maxs[2] = -8;
 						} 
 						zCenter += (MINS_Z + maxs[2]) * 0.5f;
-						model.transform.translation.x = S3L_POSX(demo.cut.Cl.snap.ps.origin[1]);
-						model.transform.translation.y = S3L_POSY(zCenter);
-						model.transform.translation.z = S3L_POSZ(demo.cut.Cl.snap.ps.origin[0]);
-						model.transform.scale.x = 30 * S3L_POSMULT;
-						model.transform.scale.y = (maxs[2]-MINS_Z) * S3L_POSMULT;
-						model.transform.scale.z = 30 * S3L_POSMULT;
 
-						scene3dmodels.push_back(model);
-						drawProperties3dModel_t* modelProps = &scene3dmodelProperties.emplace_back();
+
+						vec3_t playerDrawPos;
+						VectorCopy(demo.cut.Cl.snap.ps.origin, playerDrawPos);
+						playerDrawPos[2] = zCenter;
+						vec3_t cubeScale;
+						VectorSet(cubeScale, 30, 30, maxs[2] - MINS_Z);
+						drawProperties3dModel_t* modelProps = renderer->startDrawingCube(playerDrawPos, cubeScale, vec3_origin);
+
 						setModelColor<max_clients>(modelProps, demo.cut.Cl.snap.ps.clientNum);
 						modelProps->transparent = true;
 						modelProps->isCube = true;
@@ -7843,13 +7578,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							// draw "flag"
 							int flagTeam = demo.cut.Cl.snap.ps.powerups[PW_REDFLAG] ? TEAM_RED : (demo.cut.Cl.snap.ps.powerups[PW_BLUEFLAG] ? TEAM_BLUE : TEAM_FREE);
 							zCenter += 35;
-							model.transform.translation.y = S3L_POSY(zCenter);
-							model.transform.scale.x = 10 * S3L_POSMULT;
-							model.transform.scale.y = 15 * S3L_POSMULT;
-							model.transform.scale.z = 2 * S3L_POSMULT;
-							model.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
-							scene3dmodels.push_back(model);
-							drawProperties3dModel_t* modelProps2 = &scene3dmodelProperties.emplace_back();
+							vec3_t flagDrawPos;
+							VectorCopy(playerDrawPos, flagDrawPos);
+							flagDrawPos[2] = zCenter;
+							VectorSet(cubeScale, 2, 10, 15);
+
+							drawProperties3dModel_t* modelProps2 = renderer->startDrawingCube(playerDrawPos, cubeScale, demo.cut.Cl.snap.ps.viewangles);
+
 							setModelColor<max_clients>(modelProps2, -(flagTeam + 1));
 							modelProps2->transparent = false;
 							modelProps2->isCube = true;
@@ -7857,40 +7592,16 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 						if (demo.cut.Cl.snap.ps.weapon == saberWeap) {
 							// draw saber
-							sceneAdd3DSaberForPlayer<max_clients>(demo.cut.Cl.snap.ps.origin, demo.cut.Cl.snap.ps.viewangles, demo.cut.Cl.snap.ps.torsoAnim, camerapos, demoType, demo.cut.Cl.snap.ps.clientNum,demoCurrentTime);
+							sceneAdd3DSaberForPlayer<max_clients>(demo.cut.Cl.snap.ps.origin, demo.cut.Cl.snap.ps.viewangles, demo.cut.Cl.snap.ps.torsoAnim, camerapos, demoType, demo.cut.Cl.snap.ps.clientNum,demoCurrentTime,renderer);
 						}
 
-						S3L_Model3D* models = scene3dmodels.data();
-
-						S3L_sceneInit( // Initialize the scene we'll be rendering.
-							models,  // This is like an array with only one model in it.
-							scene3dmodels.size(),
-							&scene);
-
-						scene.camera.transform.translation.x = S3L_POSX(camerapos[1]);
-						scene.camera.transform.translation.y = S3L_POSY(camerapos[2]);
-						scene.camera.transform.translation.z = S3L_POSZ(camerapos[0]);
-
-						scene.camera.transform.rotation.x = S3L_ROTX(demo.cut.Cl.snap.ps.viewangles[0]);
-						scene.camera.transform.rotation.y = S3L_ROTY(demo.cut.Cl.snap.ps.viewangles[1]);
-						scene.camera.transform.rotation.z = S3L_ROTZ(demo.cut.Cl.snap.ps.viewangles[2]);
-
-						scene.camera.focalLength = 300;
+						renderer->initScene(demo.cut.Cl.snap.ps.viewangles);
 
 						// shift the camera a little bit backwards so that it's not inside the cube:
 
 						//scene.camera.transform.translation.z = -2 * S3L_F;
 
-						memset(drawBuffer, 0, sizeof(drawBuffer));
-
-						previousTriangle = -1;
-						S3L_newFrame();        // has to be called before each frame
-						S3L_drawScene(scene);  /* This starts the scene rendering. The drawPixel
-													function will be called to draw it. */
-						videoDrawText(demoCurrentTime);
-
-						videoFrames.push_back({ demoCurrentTime,{0} });
-						memcpy(videoFrames.back().image, drawBuffer, sizeof(drawBuffer));
+						renderer->drawFrame(demoCurrentTime,nwhHexColors);
 					}
 
 				}
@@ -10562,15 +10273,15 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							std::string logModString = logModStringSS.str();
 							const char* modString = logModString.c_str();
 
-							if (opts.makeVideo) {
+							if (opts.makeVideo && renderer) {
 								if (isSuicide) {
-									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s",playername.c_str(),modString) });
+									renderer->addConsoleText( demoCurrentTime,va("^7%s ^7%s",playername.c_str(),modString) );
 								}
 								else {
-									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) });
+									renderer->addConsoleText( demoCurrentTime,va("^7%s ^7%s ^7%s",playername.c_str(),modString,victimname.c_str()) );
 								}
 								if (attackerIsFollowed && !isSuicide) {
-									screenCenterText.push_back({ demoCurrentTime,va("^7%s ^7%s",modString,victimname.c_str()) });
+									renderer->addCenterText( demoCurrentTime,va("^7%s ^7%s",modString,victimname.c_str()) );
 								}
 							}
 
@@ -10972,8 +10683,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
 								}
 
-								if (opts.makeVideo) {
-									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7got the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
+								if (opts.makeVideo && renderer) {
+									renderer->addConsoleText( demoCurrentTime,va("^7%s ^7got the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")));
 								}
 							}
 							//Flaggrab.
@@ -11610,8 +11321,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
 								}
 
-								if (opts.makeVideo) {
-									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7killed %s's flag carrier",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
+								if (opts.makeVideo && renderer) {
+									renderer->addConsoleText( demoCurrentTime,va("^7%s ^7killed %s's flag carrier",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) );
 								}
 							}
 						}
@@ -11627,8 +11338,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									playername = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - offset, isMOHAADemo ? "name" : "n");
 								}
 
-								if (opts.makeVideo) {
-									videoConsole.push_back({ demoCurrentTime,va("^7%s ^7returned the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) });
+								if (opts.makeVideo && renderer) {
+									renderer->addConsoleText( demoCurrentTime,va("^7%s ^7returned the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")) );
 								}
 							}
 						}
@@ -11901,8 +11612,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 
 							if (opts.onlyLogCapturesWithSaberKills && flagCarrierSaberKillCount == 0) continue;
 
-							if (opts.makeVideo) {
-								videoConsole.push_back({ demoCurrentTime,va("^7%s ^7captured the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW"))});
+							if (opts.makeVideo && renderer) {
+								renderer->addConsoleText( demoCurrentTime,va("^7%s ^7captured the %s flag",playername.c_str(),flagTeam == TEAM_RED ? "RED" : (flagTeam == TEAM_BLUE ? "BLUE" : "YELLOW")));
 							}
 
 							SQLDelayedQueryWrapper_t* queryWrapper = new SQLDelayedQueryWrapper_t();
@@ -12703,8 +12414,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				std::string rawChatCommand = command;
 				std::string chatCommand = Q_StripColorAll(rawChatCommand, nwhHexColors);
 
-				if (opts.makeVideo) {
-					videoConsole.push_back({ demoCurrentTime,Cmd_Argv(1)});
+				if (opts.makeVideo && renderer) {
+					renderer->addConsoleText( demoCurrentTime,Cmd_Argv(1));
 				}
 
 				if (Q_stristr(rawChatCommand.c_str(), "!mark") || Q_stristr(chatCommand.c_str(), "[DEMOMOMENT]")) {
@@ -12968,8 +12679,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				} else if (jaProSecretRunYourTimeMatcher.us_isstart(cpTextC)) {
 					lastJaProYourTimeCP = cpTextC;
 				}
-				if (opts.makeVideo) {
-					screenCenterText.push_back({ demoCurrentTime,cpTextC });
+				if (opts.makeVideo && renderer) {
+					renderer->addCenterText(demoCurrentTime, cpTextC);
 				}
 			}
 			else if (!strcmp(cmd, "print")) {
@@ -12991,8 +12702,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				std::string printText = printTextC;
 				size_t printTextLen = printText.size();
 
-				if (opts.makeVideo) {
-					videoConsole.push_back({ demoCurrentTime,printText });
+				if (opts.makeVideo && renderer) {
+					renderer->addConsoleText( demoCurrentTime,printText );
 				}
 
 				if (opts.doPrintSearch) {
