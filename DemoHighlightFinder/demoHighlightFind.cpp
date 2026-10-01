@@ -45,6 +45,74 @@
 #include "VideoRenderer.h"
 
 
+// forward declarations for v142 :/
+extern int playerTeams[MAX_CLIENTS_MAX];
+
+
+enum trackedEntityType_t {
+	TET_NONE,
+	TET_TRIPMINE,
+	TET_SENTRY,
+	TET_FORCEFIELD
+};
+
+#define TETFLAG_EXPLODED 1
+#define TETFLAG_AIRBORNE 2
+
+typedef struct entityOwnerInfo_t {
+	int64_t firstSeen; // Demo time of time we started tracking this item
+	trackedEntityType_t type;
+	int owner;
+	int flags;
+}; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
+
+
+struct samplePoint_t {
+	float value;
+	double time;
+};
+
+#define FIF_SCRIPTCHECK (1<<0) // set if no more than 10ms commandtime passed since last frame and mvement dir changed to backwards (4) but wasnt before.
+typedef struct frameInfo_s {
+	int64_t demoTime;
+	int serverTime;
+	qboolean isAlive[MAX_CLIENTS_MAX];
+	qboolean canBlockSimplified[MAX_CLIENTS_MAX];
+	qboolean entityExists[MAX_GENTITIES];
+	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
+	vec3_t playerPositions[MAX_CLIENTS_MAX];
+	vec3_t playerVelocities[MAX_CLIENTS_MAX];
+	vec3_t playerAngles[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularVelocities[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularAccelerations[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularJerks[MAX_CLIENTS_MAX];
+	samplePoint_t playerAngularSnaps[MAX_CLIENTS_MAX];
+	//float playerGSpeeds[max_clients]; // "speed" value that basically contains g_speed
+	//float playerMaxWalkSpeed[max_clients]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
+#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
+	int otherKillerValue[max_clients];
+	int otherKillerTime[max_clients];
+#endif
+	//qboolean pmFlagKnockback[MAX_CLIENTS_MAX];
+	int pmFlags[MAX_CLIENTS_MAX];
+	qboolean psTeleportBit[MAX_CLIENTS_MAX];
+	int pmFlagTime[MAX_CLIENTS_MAX];
+	float jumpzstart[MAX_CLIENTS_MAX];
+	int duelTime[MAX_CLIENTS_MAX];
+	int commandTime[MAX_CLIENTS_MAX];
+	int legsAnimGeneral[MAX_CLIENTS_MAX];
+	int torsoAnimGeneral[MAX_CLIENTS_MAX];
+	int groundEntityNum[MAX_CLIENTS_MAX];
+	int psStats12[MAX_CLIENTS_MAX];
+	int saberMoveGeneral[MAX_CLIENTS_MAX];
+	int movementDir[MAX_CLIENTS_MAX];
+	int frameInfoFlags[MAX_CLIENTS_MAX];
+} frameInfo_t;
+
+frameInfo_t lastFrameInfo;
+
+frameInfo_t thisFrameInfo;
+
 // notable: 
 // - 1.1 introduces hexcolors (tho thats technically a clientside thing)
 // - 1.2.2 introduces match statistics
@@ -1295,7 +1363,7 @@ typedef enum frameInfoType_t {
 	WEAPON,
 	WEAPON_HIGHWEIGHT
 };
-char* frameInfoTypeNames[] = {
+const char* frameInfoTypeNames[] = {
 	"player",
 	"player_highweight",
 	"weapon",
@@ -1772,70 +1840,6 @@ inline void addMetaEventNearby(vec3_t origin, float maxDistance, metaEventType_t
 }
 
 
-
-enum trackedEntityType_t {
-	TET_NONE,
-	TET_TRIPMINE,
-	TET_SENTRY,
-	TET_FORCEFIELD
-};
-
-#define TETFLAG_EXPLODED 1
-#define TETFLAG_AIRBORNE 2
-
-struct entityOwnerInfo_t {
-	int64_t firstSeen; // Demo time of time we started tracking this item
-	trackedEntityType_t type;
-	int owner;
-	int flags;
-}; // For items like mines, we wanna track the owner. Reason: Detect stuff like boosted mine kills. No use to detect a boost for a mine kill if the mine that did the kill was fired before the boost.
-
-
-struct samplePoint_t {
-	float value;
-	double time;
-};
-
-#define FIF_SCRIPTCHECK (1<<0) // set if no more than 10ms commandtime passed since last frame and mvement dir changed to backwards (4) but wasnt before.
-struct frameInfo_t {
-	int64_t demoTime;
-	int serverTime;
-	qboolean isAlive[MAX_CLIENTS_MAX];
-	qboolean canBlockSimplified[MAX_CLIENTS_MAX];
-	qboolean entityExists[MAX_GENTITIES];
-	entityOwnerInfo_t entityOwnerInfo[MAX_GENTITIES];
-	vec3_t playerPositions[MAX_CLIENTS_MAX];
-	vec3_t playerVelocities[MAX_CLIENTS_MAX];
-	vec3_t playerAngles[MAX_CLIENTS_MAX];
-	samplePoint_t playerAngularVelocities[MAX_CLIENTS_MAX];
-	samplePoint_t playerAngularAccelerations[MAX_CLIENTS_MAX];
-	samplePoint_t playerAngularJerks[MAX_CLIENTS_MAX];
-	samplePoint_t playerAngularSnaps[MAX_CLIENTS_MAX];
-	//float playerGSpeeds[max_clients]; // "speed" value that basically contains g_speed
-	//float playerMaxWalkSpeed[max_clients]; // Kind of naive guess of how fast this client could theoretically walk: sqrt(g_speed*g_speed+g_speed*g_speed)
-#ifdef PLAYERSTATEOTHERKILLERBOOSTDETECTION
-	int otherKillerValue[max_clients];
-	int otherKillerTime[max_clients];
-#endif
-	//qboolean pmFlagKnockback[MAX_CLIENTS_MAX];
-	int pmFlags[MAX_CLIENTS_MAX];
-	qboolean psTeleportBit[MAX_CLIENTS_MAX];
-	int pmFlagTime[MAX_CLIENTS_MAX];
-	float jumpzstart[MAX_CLIENTS_MAX];
-	int duelTime[MAX_CLIENTS_MAX];
-	int commandTime[MAX_CLIENTS_MAX];
-	int legsAnimGeneral[MAX_CLIENTS_MAX];
-	int torsoAnimGeneral[MAX_CLIENTS_MAX];
-	int groundEntityNum[MAX_CLIENTS_MAX];
-	int psStats12[MAX_CLIENTS_MAX];
-	int saberMoveGeneral[MAX_CLIENTS_MAX];
-	int movementDir[MAX_CLIENTS_MAX];
-	int frameInfoFlags[MAX_CLIENTS_MAX];
-}; 
-
-frameInfo_t lastFrameInfo;
-
-frameInfo_t thisFrameInfo;
 
 
 inline void TET_LastSeenUpdate(int entityNum, int demoCurrentTime) {
@@ -2342,7 +2346,7 @@ qboolean findOCDefragRun(std::string printText, defragRunInfo_t* info) {
 
 
 static constexpr auto jaPRONameColorClientNumMap{ []() constexpr {
-	std::array<int64_t, 8> finalMap{};
+	std::array<uint64_t, 8> finalMap{};
 	for (int clientNum = 0; clientNum < 64; clientNum++) {
 		// JAPRO time report name coloring code
 		int nameColor = 7 - (clientNum % 8);//sad hack
@@ -2350,7 +2354,7 @@ static constexpr auto jaPRONameColorClientNumMap{ []() constexpr {
 			nameColor = 2;
 		else if (nameColor > 7 || nameColor == 5)
 			nameColor = 7;
-		finalMap[nameColor] |= (1L << clientNum);
+		finalMap[nameColor] |= (1ULL << clientNum);
 	}
 	
 	return finalMap;
@@ -2454,7 +2458,7 @@ qboolean findJAProDefragRun(std::string printText, defragRunInfo_t* info, demoTy
 
 			if (!*playerInfo) continue;
 
-			char* team = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "team" : "t");
+			const char* team = Info_ValueForKey(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, isMOHAADemo ? "team" : "t");
 
 			if (!*team || atoi(team)==3) continue;
 
@@ -4063,7 +4067,7 @@ void logSpecialThing(const char* specialType, const std::string details, const s
 
 void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 
-	char* preparedStatementText;
+	const char* preparedStatementText;
 	int sqlResult = 0;
 	int readonlyResult = 0;
 	for (int i = 0; i < opts.killDbsCount; i++) {
@@ -5504,7 +5508,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 static void inline writeStrafeCSV(int i, const ExtraSearchOptions& opts);
 static void inline writePlayerDumpCSV(int i, const ExtraSearchOptions& opts);
 static void inline writeTeleportRelatedStuff(const ExtraSearchOptions& opts);
-
+static void inline writeUserCMDDumpCSV(int clientNum, const ExtraSearchOptions& opts);
+qboolean inline saveStatisticsToDb(ioHandles_t& io, bool& wasDoingSQLiteExecution, const sharedVariables_t& sharedVars, bool& SEHExceptionCaught);
 
 inline size_t streamsize(std::ostream* stream) {
 	size_t oldPointer = stream->tellp();
@@ -7136,13 +7141,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				// Change: Also do it in any demo for flag status
 				if(true || isMOHAADemo){
 					for (; demo.cut.Clc.lastPreExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastPreExecutedServerCommand++) {
-						char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastPreExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
+						const char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastPreExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 						Cmd_TokenizeString(command);
 
-						char* cmd = Cmd_Argv(0);
+						const char* cmd = Cmd_Argv(0);
 
 						if (!strcmp(cmd, "bcs0") || !strcmp(cmd, "bcs1") || !strcmp(cmd, "bcs2")) {
-							char* test = demoCutHandleBigConfigString(cmd, 0);
+							const char* test = demoCutHandleBigConfigString(cmd, 0);
 							if (test) {
 								//demoErrorFlags |= DERR_ATYPICALBUTLEGAL; // already doing this further down...
 								//demoErrors << "Not an error: Demo uses bcs0/bcs1/bcs2\n";
@@ -7173,7 +7178,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 									}
 								}
 								else if (index == CS_FLAGSTATUS) {
-									char* str = Cmd_Argv(2);
+									const char* str = Cmd_Argv(2);
 
 									int flagTmp[TEAM_NUM_TEAMS];
 									//int redflagTmp, blueflagTmp, yellowflagTmp;
@@ -9459,7 +9464,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 								}
 							}
 
-							char* mohHitLocationString = NULL;
+							const char* mohHitLocationString = NULL;
 							if (isMOHAADemo) {
 								if (thisEs->time == 1) {
 									modInfo << "_SNIPE";
@@ -12378,14 +12383,14 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 		bool rebuildUniqueGameCSHash = false;
 		// process any new server commands
 		for (; demo.cut.Clc.lastExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
-			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
+			const char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
-			char* cmd = Cmd_Argv(0);
+			const char* cmd = Cmd_Argv(0);
 			//if (cmd[0] && !firstServerCommand) {
 			//	firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 			//}
 			if (!strcmp(cmd, "bcs0") || !strcmp(cmd, "bcs1") || !strcmp(cmd, "bcs2")) {
-				char* test = demoCutHandleBigConfigString(cmd, 1);
+				const char* test = demoCutHandleBigConfigString(cmd, 1);
 				if (test) {
 					demoErrorFlags |= DERR_ATYPICALBUTLEGAL;
 					demoErrors << "Not an error: Demo uses bcs0/bcs1/bcs2\n";
@@ -12579,7 +12584,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					rebuildUniqueGameCSHash = true;
 				}
 				else if (index >= CS_PLAYERS_here && index < CS_PLAYERS_here+max_clients) {
-					char* str = Cmd_Argv(2);
+					const char* str = Cmd_Argv(2);
 					while (*str == ' ') {
 						str++;
 					}
@@ -12592,7 +12597,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					playerInfoMap[index - CS_PLAYERS_here] = Info_MakeMap(playerInfo, sizeof(demo.cut.Cl.gameState.stringData) - stringOffset, playerInfoComboMap);
 				}
 				else if (index == CS_FLAGSTATUS) {
-					char* str = Cmd_Argv(2);
+					const char* str = Cmd_Argv(2);
 
 					int redflagTmp, blueflagTmp, yellowflagTmp;
 					// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped

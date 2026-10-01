@@ -247,6 +247,9 @@
     <Filter Include="libgmavi">
       <UniqueIdentifier>{488660f6-1262-42c9-91a3-fe730fbf51e1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="fastpix3d">
+      <UniqueIdentifier>{2de65fda-8679-4551-b1c0-481ec7366914}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\DemoCutter\demoCut.h">

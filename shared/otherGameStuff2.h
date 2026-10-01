@@ -1553,7 +1553,7 @@ static const int mohaaEntityTypeToGeneral[]{ // based on wolfcamql
 typedef struct mohMeansOfDeath_t {
 	qboolean attackerExistsAndIsClient;
 	qboolean isSelfKill;
-	char* s2[MOH_MAX_KILLMSG_S2_VARIATIONS]; // 2 means maximum 2 variations. Increase if more needed.
+	const char* s2[MOH_MAX_KILLMSG_S2_VARIATIONS]; // 2 means maximum 2 variations. Increase if more needed.
 	meansOfDeathMOH_t meansOfDeath;
 	int weaponClass;
 	qboolean wasZoomed;
@@ -1657,7 +1657,6 @@ static const tsl::htrie_map<char, mohMeansOfDeath_t> mohMeansOfDeathArray = {
 	{"Se disparó el mismo",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	{"Se disparó él mismo",{qtrue,qtrue,{},MOD_BULLET_MOH}},  // Could also be MOD_FAST_BULLET
 	//{"died",{qtrue,qtrue,"",MOD_NONE_MOH}},  // Could also be MOD_FAST_BULLET  // Can't tell this apart from no client attacker
-
 
 };
 

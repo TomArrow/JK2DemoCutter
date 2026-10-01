@@ -732,9 +732,9 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 		int firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 		// process any new server commands
 		for (; demo.cut.Clc.lastExecutedServerCommand <= demo.cut.Clc.serverCommandSequence; demo.cut.Clc.lastExecutedServerCommand++) {
-			char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
+			const char* command = demo.cut.Clc.serverCommands[demo.cut.Clc.lastExecutedServerCommand & (MAX_RELIABLE_COMMANDS - 1)];
 			Cmd_TokenizeString(command);
-			char* cmd = Cmd_Argv(0);
+			const char* cmd = Cmd_Argv(0);
 			//if (cmd[0] && !firstServerCommand) {
 			//	firstServerCommand = demo.cut.Clc.lastExecutedServerCommand;
 			//}
@@ -743,7 +743,7 @@ qboolean demoCompress(const char* sourceDemoFile, const char* outputName, double
 			}
 
 			if (!strcmp(cmd, "bcs0") || !strcmp(cmd, "bcs1") || !strcmp(cmd, "bcs2")) {
-				char* test = demoCutHandleBigConfigString(cmd, 0);
+				const char* test = demoCutHandleBigConfigString(cmd, 0);
 				if (test) {
 					//demoErrorFlags |= DERR_ATYPICALBUTLEGAL; // already doing this further down...
 					//demoErrors << "Not an error: Demo uses bcs0/bcs1/bcs2\n";

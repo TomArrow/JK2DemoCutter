@@ -13,9 +13,9 @@
 #include "include/rapidjson/document.h"
 
 
-constexpr char* postEOFMetadataMarker = "HIDDENMETA";
-constexpr char* postEOFUcmdMarker = "HIDDENUCMD";
-constexpr char* postEOFUcmdMarkerCL = "HIDDCLUCMD";
+constexpr const char* postEOFMetadataMarker = "HIDDENMETA";
+constexpr const char* postEOFUcmdMarker = "HIDDENUCMD";
+constexpr const char* postEOFUcmdMarkerCL = "HIDDCLUCMD";
 
 #ifdef MSG_READBITS_TRANSCODE
 extern msg_t* transcodeTargetMsg;
@@ -378,7 +378,7 @@ qboolean encodeNewLocation(vec_t* origin, spiralLocation_t* oldLocation, spiralL
 int		Cmd_Argc(void) {
 	return cmd_argc;
 }
-char* Cmd_Argv(int arg) {
+const char* Cmd_Argv(int arg) {
 	if ((unsigned)arg >= cmd_argc) {
 		return "";
 	}
@@ -402,7 +402,7 @@ void Q_strncpyz(char* dest, int destCapacity, const char* src, int destsize) {
 	dest[destsize - 1] = 0;
 }
 
-char* Q_stristr(const char* str, char* charset) {
+const char* Q_stristr(const char* str, const char* charset) {
 	int i;
 
 	while (*str) {
@@ -916,7 +916,7 @@ key and returns the associated value, or an empty string.
 FIXME: overflow check?
 ===============
 */
-char* Info_ValueForKey(const char* s,int maxLength, const char* key) {
+const char* Info_ValueForKey(const char* s,int maxLength, const char* key) {
 	char	pkey[BIG_INFO_KEY];
 	static	char value[2][BIG_INFO_VALUE];	// use two buffers so compares
 											// work without stomping on each other
@@ -1028,7 +1028,7 @@ key and returns the associated value, or an empty string.
 FIXME: overflow check?
 ===============
 */
-char* Info_ValueForKey_Exists(const char* s,int maxLength, const char* key, qboolean* exists) {
+const char* Info_ValueForKey_Exists(const char* s,int maxLength, const char* key, qboolean* exists) {
 	char	pkey[BIG_INFO_KEY];
 	static	char value[2][BIG_INFO_VALUE];	// use two buffers so compares
 											// work without stomping on each other
@@ -5734,7 +5734,7 @@ configStringReadRetry:
 			if (clcCut->demoCheckProtocol && i == CS_SERVERINFO && *demoType == DM3_MOHAA_PROT_6) {
 				// Medal of Honor .dm3 file format. Check protocol version because the demo file ending is same for all.
 				// This is produced by stock MOH with unlocked demo functionality. OpenMOHAA has different naming.
-				char* protocolString = Info_ValueForKey(s, BIG_INFO_STRING, "protocol");
+				const char* protocolString = Info_ValueForKey(s, BIG_INFO_STRING, "protocol");
 				if (*protocolString == 0) {
 					// This might be spearhead/breakthrough demo, in which case all we get here is garbled nonsense and obviously no value for protocol, since string reading/writing uses a funny lookup table.
 					// All we can try is set directly to protocol15/16/17 and retry string reading and hope it works.
@@ -5904,9 +5904,9 @@ void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t*
 	}
 }
 
-char* demoCutHandleBigConfigString(const char* cmd, int index) { // index: in case we are parsing commands in multiple places (cringe yea)
+const char* demoCutHandleBigConfigString(const char* cmd, int index) { // index: in case we are parsing commands in multiple places (cringe yea)
 
-	char* s;
+	const char* s;
 	static char bigConfigString[2][BIG_INFO_STRING];
 
 	if (!strcmp(cmd, "bcs0")) {
@@ -8068,7 +8068,7 @@ bool parseVersion(const char* str, int64_t* unixTime, char* platform, size_t pla
 
 
 template<class T>
-T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, char** message) {
+T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, const char** message) {
 	if (!**message) {
 		return NULL; // Not a death message
 	}
@@ -8081,7 +8081,7 @@ T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, char** message) {
 		int matchCount = 99999;
 
 		int consecutiveCharCount = 0;
-		char* msgTmp = *message;
+		const char* msgTmp = *message;
 		int msgLen = strlen(*message);
 		while (true) {
 			if ((*msgTmp == ' ' || *msgTmp == '\'' || *msgTmp == '\n') && consecutiveCharCount < MAX_NAME_LENGTH_MOHAA - 1) {
@@ -8143,19 +8143,21 @@ T* mohaaMatchString(const tsl::htrie_map<char,T>* stringMap, char** message) {
 }
 
 
-entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientNumMap, char* message) {
+entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientNumMap, const char* message) {
 	if (*message != 4 && *message != 5) {
 		return NULL; // Not a death message
 	}
 	else {
 		static entityState_t tmpEs;
+		int* matchedKillLocation = NULL;
+		int* matchedPlayer2 = NULL, msgLen = 0, s2Count = 0, s2Match = false;
 
 		Com_Memset(&tmpEs,0,sizeof(tmpEs));
 
 		tmpEs.event = EV_OBITUARY_GENERAL;
 		tmpEs.time = -1;
 
-		char* oMsg = message;
+		const char* oMsg = message;
 		message++;
 		int* matchedPlayer1 = mohaaMatchString(playerMapClientNumMap,&message);
 		if (matchedPlayer1 == NULL) return NULL;
@@ -8184,15 +8186,16 @@ entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientN
 
 		message++; // Empty space
 
-		int* matchedPlayer2 = mohaaMatchString(playerMapClientNumMap, &message);
+
+		matchedPlayer2 = mohaaMatchString(playerMapClientNumMap, &message);
 		if (matchedPlayer2 == NULL) return NULL;
 
 		tmpEs.otherEntityNum2 = *matchedPlayer2; // attacker
 
 		char stringCompare[MAX_NAME_LENGTH_MOHAA];
-		int msgLen = strlen(message);
-		int s2Count = 0;
-		bool s2Match = false;
+		msgLen = strlen(message);
+		s2Count = 0;
+		s2Match = false;
 		for (int i = 0; i < MOH_MAX_KILLMSG_S2_VARIATIONS; i++) {
 
 			if (mohMod->s2[i]) {
@@ -8243,7 +8246,7 @@ entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char,int>* playerMapClientN
 			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
 		}
 
-		int* matchedKillLocation = mohaaMatchString(&mohKillLocationArray, &message);
+		matchedKillLocation = mohaaMatchString(&mohKillLocationArray, &message);
 		if (matchedKillLocation == NULL) {
 			goto mohParseDeathMsgReturnEntityState; // No kill location ig.
 		}
@@ -8263,6 +8266,9 @@ entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char,int>* pl
 	}
 	else {
 		static entityState_t tmpEs;
+		const char* s2 = NULL;
+		bool s2Match = false;
+		int s2Count = 0;
 
 		Com_Memset(&tmpEs,0,sizeof(tmpEs));
 
@@ -8311,9 +8317,10 @@ entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char,int>* pl
 			tmpEs.otherEntityNum2 = matchedPlayer2; // attacker
 		}
 
-		const char* s2 = Cmd_Argv(2);
-		bool s2Match = false;
-		int s2Count = 0;
+
+		s2 = Cmd_Argv(2);
+		s2Match = false;
+		s2Count = 0;
 		for (int i = 0; i < MOH_MAX_KILLMSG_S2_VARIATIONS; i++) {
 
 			if (mohMod.s2[i]) {
@@ -8761,7 +8768,7 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char output
 	char normalizedExt[7]{};
 
 	int lastChar = strlen(demoFile)-1;
-
+	bool isStandardDemoNameFormat = true;
 
 	int lastDot = -1;
 	for (int i = lastChar; i >= 0; i--) {
@@ -8800,7 +8807,7 @@ qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char output
 		goto demoCutGetTypeReturnDefaultFaulted2;
 	}
 
-	bool isStandardDemoNameFormat = extOutput[1] == 'd' && extOutput[2] == 'm' && (extOutput[3] == '_' || extOutput[3] == 'c') && extOutput[4] >= '0' && extOutput[4] <= '9' && extOutput[5] >= '0' && extOutput[5] <= '9';
+	isStandardDemoNameFormat = extOutput[1] == 'd' && extOutput[2] == 'm' && (extOutput[3] == '_' || extOutput[3] == 'c') && extOutput[4] >= '0' && extOutput[4] <= '9' && extOutput[5] >= '0' && extOutput[5] <= '9';
 
 	//strncpy_s(normalizedExt, sizeof(normalizedExt), (char*)demoFile + strlen(demoFile) - 6, 6);
 	strncpy_s(normalizedExt, sizeof(normalizedExt), (char*)demoFile + lastDot, lastChar - lastDot + 1);

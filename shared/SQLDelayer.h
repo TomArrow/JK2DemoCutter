@@ -81,7 +81,7 @@ public:
 	}
 
 	template<class T>
-	SQLDelayedValue(char* columnName, T valueA, int flagsA):SQLDelayedValue(columnName,valueA){
+	SQLDelayedValue(const char* columnName, T valueA, int flagsA):SQLDelayedValue(columnName,valueA){
 		flags = flagsA;
 	}
 
@@ -158,15 +158,15 @@ class SQLDelayedQuery {
 	}
 public:
 	template<class T>
-	void inline add(char* name, T value) {
+	void inline add(const char* name, T value) {
 		values.push_back(new SQLDelayedValue(name,value));
 	}
 	template<class T>
-	void inline add(char* name, T value, int flags) {
+	void inline add(const char* name, T value, int flags) {
 		values.push_back(new SQLDelayedValue(name,value,flags));
 	}
 	template<class T>
-	void inline replace(char* name, T value) {
+	void inline replace(const char* name, T value) {
 		remove(name);
 		values.push_back(new SQLDelayedValue(name,value));
 	}

@@ -425,7 +425,7 @@ qboolean demoReframe( const char* demoName,const char* outputName, const char* p
 						const char* command = newCommandsHere[c].c_str();
 						Cmd_TokenizeString(command);
 
-						char* cmd = Cmd_Argv(0);
+						const char* cmd = Cmd_Argv(0);
 
 						if (!strcmp(cmd, "print")) {
 							

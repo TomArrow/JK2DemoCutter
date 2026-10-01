@@ -2,7 +2,7 @@
 //   without any warranty.
 //   by Gregory Pakosz (@gpakosz)
 // https://github.com/gpakosz/whereami
-
+typedef struct IUnknown IUnknown;
 // in case you want to #include "whereami.c" in a larger compilation unit
 #if !defined(WHEREAMI_H)
 #include <whereami.h>

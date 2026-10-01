@@ -7,6 +7,8 @@
 #ifndef DEMOCUT_H
 #define DEMOCUT_H
 
+typedef struct IUnknown IUnknown;
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -21,6 +23,26 @@
 #include <unordered_map>
 #include <vector>
 #include <sstream>
+
+
+
+enum gameMappingType_t { // When changing this, also update gameMappingTypeGeneralArrayLength array
+	GMAP_EVENTS,
+	GMAP_WEAPONS,
+	GMAP_MEANSOFDEATH,
+	GMAP_LIGHTSABERMOVE,
+	GMAP_ITEMLIST,
+	GMAP_ANIMATIONS,
+	GMAP_ENTITYTYPE,
+	GMAP_GAMETYPE,
+	GMAP_PLAYERMOVETYPE,
+	GAMEMAPPINGTYPES_COUNT
+};
+
+typedef enum {
+	UNSAFE,
+	SAFE
+} arrayAccessType_t;
 
 
 #include "anims.h"
@@ -68,7 +90,7 @@ extern std::string errorInfo;
 
 typedef struct exceptionCodeName_t {
 	DWORD64 code;
-	char* name;
+	const char* name;
 };
 #define EXCEPTNAME(name) {name,#name}
 static const exceptionCodeName_t codeNames[] = {
@@ -228,7 +250,7 @@ typedef enum globalDebugOutputType_t {
 // OpenMOHAA
 #define NUM_BONE_CONTROLLERS 5
 #define MAX_FRAMEINFOS			16
-typedef struct frameInfo_s {
+typedef struct frameInfoMOHAA_s {
 	int index;
 	float time;
 	float weight;
@@ -2160,11 +2182,11 @@ typedef enum {
 } errorParm_t;
 
 void	Q_strncpyz(char* dest, int destCapacity, const char* src, int destsize);
-char* Q_stristr(const char* str, char* charset);
+const char* Q_stristr(const char* str, const char* charset);
 char* QDECL va(const char* format, ...);
 
 int		Cmd_Argc(void);
-char* Cmd_Argv(int arg);
+const char* Cmd_Argv(int arg);
 
 char* Cmd_ArgsFrom(int arg);
 
@@ -2390,9 +2412,9 @@ inline std::string Info_ValueForKey(csMap_t in,const char* search,const char* se
 }
 
 csMap_t Info_MakeMap(const char* s, int maxLength, csComboMap_t* comboMap);
-char* Info_ValueForKey(const char* s,int maxLength, const char* key);
+const char* Info_ValueForKey(const char* s,int maxLength, const char* key);
 qboolean Info_HasKey(const char* s, int maxLength, const char* key);
-char* Info_ValueForKey_Exists(const char* s, int maxLength, const char* key, qboolean* exists);
+const char* Info_ValueForKey_Exists(const char* s, int maxLength, const char* key, qboolean* exists);
 void Info_RemoveKey(char* s, const char* key, bool isMOHAADemo);
 void Info_RemoveKey_Big(char* s, const char* key);
 qboolean Info_SetValueForKey(char* s, int capacity, const char* key, const char* value, bool isMOHAADemo);
@@ -4380,7 +4402,7 @@ typedef enum {
 
 typedef struct
 {
-	char* name;
+	const char* name;
 	int animToUseGeneral; // If you ever use this, fix the animations/generalize them
 	int	startQuad;
 	int	endQuad;
@@ -4394,7 +4416,7 @@ typedef struct
 
 typedef struct
 {
-	char* name;
+	const char* name;
 	int animToUseDM16;
 	int	startQuad;
 	int	endQuad;
@@ -4885,113 +4907,6 @@ extern const float forceJumpStrength[NUM_FORCE_POWER_LEVELS];
 
 
 
-template<qboolean animIsGeneral>
-qboolean inline isBackflip(int anim, demoType_t demoType) {
-
-	if constexpr (!animIsGeneral) {
-		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim,demoType);
-	}
-	int animRaw = anim & ~ANIM_TOGGLEBIT;
-	//return (qboolean)(
-	//	(demoType == DM_15 && animRaw >= BOTH_FLIP_BACK1_15 && animRaw <= BOTH_FLIP_BACK3_15)
-	//	|| (demoType == DM_16 && animRaw >= BOTH_FLIP_BACK1 && animRaw <= BOTH_FLIP_BACK3) // TODO JKA?
-	//	);
-	return (qboolean)(
-		(animRaw >= BOTH_FLIP_BACK1_GENERAL && animRaw <= BOTH_FLIP_BACK3_GENERAL)
-		);
-}
-template<qboolean animIsGeneral>
-qboolean inline isYellowDFA(int anim, demoType_t demoType) {
-
-	if constexpr (!animIsGeneral) {
-		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
-	}
-	int animRaw = anim & ~ANIM_TOGGLEBIT;
-	//return (qboolean)(
-	//	(demoType == DM_15 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && animRaw <= BOTH_JUMPFLIPSTABDOWN_15)
-	//	|| (demoType == DM_16 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1 && animRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
-	//	);
-	return (qboolean)(
-		(animRaw >= BOTH_JUMPFLIPSLASHDOWN1_GENERAL && animRaw <= BOTH_JUMPFLIPSTABDOWN_GENERAL)
-		);
-}
-template<qboolean animIsGeneral>
-qboolean inline isDFA(int anim, demoType_t demoType) {
-
-	if constexpr (!animIsGeneral) {
-		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
-	}
-	int animRaw = anim & ~ANIM_TOGGLEBIT;
-	//return (qboolean)(
-	//	(demoType == DM_15 && animRaw == BOTH_FORCELEAP2_T__B__15)
-	//	|| (demoType == DM_16 && animRaw == BOTH_FORCELEAP2_T__B_) // TODO JKA?
-	//	);
-	return (qboolean)(
-		(animRaw == BOTH_FORCELEAP2_T__B__GENERAL)
-		);
-}
-template<qboolean animIsGeneral>
-qboolean inline BG_SaberInSpecialAttack(int anim, demoType_t demoType)
-{
-	if constexpr (!animIsGeneral) {
-		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
-	}
-	switch (anim & ~ANIM_TOGGLEBIT)
-	{
-	case BOTH_A2_STABBACK1_GENERAL:
-	case BOTH_ATTACK_BACK_GENERAL:
-	case BOTH_CROUCHATTACKBACK1_GENERAL:
-	case BOTH_ROLL_STAB_GENERAL:
-	case BOTH_BUTTERFLY_LEFT_GENERAL:
-	case BOTH_BUTTERFLY_RIGHT_GENERAL:
-	case BOTH_BUTTERFLY_FL1_GENERAL:
-	case BOTH_BUTTERFLY_FR1_GENERAL:
-	case BOTH_FJSS_TR_BL_GENERAL:
-	case BOTH_FJSS_TL_BR_GENERAL:
-	case BOTH_LUNGE2_B__T__GENERAL:
-	case BOTH_FORCELEAP2_T__B__GENERAL:
-	case BOTH_JUMPFLIPSLASHDOWN1_GENERAL://#
-	case BOTH_JUMPFLIPSTABDOWN_GENERAL://#
-	case BOTH_JUMPATTACK6_GENERAL:
-	case BOTH_JUMPATTACK7_GENERAL:
-	case BOTH_SPINATTACK6_GENERAL:
-	case BOTH_SPINATTACK7_GENERAL:
-	case BOTH_FORCELONGLEAP_ATTACK_GENERAL:
-	case BOTH_VS_ATR_S_GENERAL:
-	case BOTH_VS_ATL_S_GENERAL:
-	case BOTH_VT_ATR_S_GENERAL:
-	case BOTH_VT_ATL_S_GENERAL:
-	case BOTH_A7_KICK_F_GENERAL:
-	case BOTH_A7_KICK_B_GENERAL:
-	case BOTH_A7_KICK_R_GENERAL:
-	case BOTH_A7_KICK_L_GENERAL:
-	case BOTH_A7_KICK_S_GENERAL:
-	case BOTH_A7_KICK_BF_GENERAL:
-	case BOTH_A7_KICK_RL_GENERAL:
-	case BOTH_A7_KICK_F_AIR_GENERAL:
-	case BOTH_A7_KICK_B_AIR_GENERAL:
-	case BOTH_A7_KICK_R_AIR_GENERAL:
-	case BOTH_A7_KICK_L_AIR_GENERAL:
-	case BOTH_STABDOWN_GENERAL:
-	case BOTH_STABDOWN_STAFF_GENERAL:
-	case BOTH_STABDOWN_DUAL_GENERAL:
-	case BOTH_A6_SABERPROTECT_GENERAL:
-	case BOTH_A7_SOULCAL_GENERAL:
-	case BOTH_A1_SPECIAL_GENERAL:
-	case BOTH_A2_SPECIAL_GENERAL:
-	case BOTH_A3_SPECIAL_GENERAL:
-	case BOTH_FLIP_ATTACK7_GENERAL:
-	case BOTH_PULL_IMPALE_STAB_GENERAL:
-	case BOTH_PULL_IMPALE_SWING_GENERAL:
-	case BOTH_ALORA_SPIN_SLASH_GENERAL:
-	case BOTH_A6_FB_GENERAL:
-	case BOTH_A6_LR_GENERAL:
-	case BOTH_A7_HILT_GENERAL:
-		return qtrue;
-	}
-	return qfalse;
-}
-
 typedef enum netFieldType_e { // OpenMOHAA
 	regular,
 	angle,
@@ -5229,192 +5144,6 @@ float calculateStrafeDeviation(T* state, qboolean* isApplicable) { // Handles en
 
 
 
-template<qboolean saberMoveIsGeneralized>
-qboolean inline PM_SaberInBrokenParry(int move, demoType_t demoType)
-{
-	if constexpr (!saberMoveIsGeneralized) {
-
-		move = generalizeGameValue<GMAP_LIGHTSABERMOVE>(move, demoType);
-	}
-	if (move >= LS_V1_BR_GENERAL && move <= LS_V1_B__GENERAL && demoType != DM_15) // This should be actually be check for 1.02 specifically TODO
-	{
-		return qtrue;
-	}
-	if (move >= LS_H1_T__GENERAL && move <= LS_H1_BL_GENERAL)
-	{
-		return qtrue;
-	}
-	return qfalse;
-}
-
-template<qboolean animIsGeneral>
-qboolean inline PM_InSaberAnim(int anim, demoType_t demoType)
-{
-	if constexpr (!animIsGeneral) {
-		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
-	}
-	//if (demoType == DM_16 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B_ && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR
-	//	|| demoType == DM_15 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__15 && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_15
-	//	)
-	if ((anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__GENERAL && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_GENERAL)
-	{
-		return qtrue;
-	}
-	return qfalse;
-}
-
-template<qboolean saberMoveIsGeneralized>
-qboolean inline BG_SaberInAttack(int move, demoType_t demoType)
-{
-	if constexpr (!saberMoveIsGeneralized) {
-		move = generalizeGameValue<GMAP_LIGHTSABERMOVE>(move, demoType);
-	}
-	if (move >= LS_A_TL2BR_GENERAL && move <= LS_A_T2B_GENERAL)
-	{
-		return qtrue;
-	}
-	switch (move)
-	{
-	case LS_A_BACK_GENERAL:
-	case LS_A_BACK_CR_GENERAL:
-	case LS_A_BACKSTAB_GENERAL:
-	case LS_ROLL_STAB_GENERAL:
-	case LS_A_LUNGE_GENERAL:
-	case LS_A_JUMP_T__B__GENERAL:
-	case LS_A_FLIP_STAB_GENERAL:
-	case LS_A_FLIP_SLASH_GENERAL:
-	case LS_JUMPATTACK_DUAL_GENERAL:
-	case LS_JUMPATTACK_ARIAL_LEFT_GENERAL:
-	case LS_JUMPATTACK_ARIAL_RIGHT_GENERAL:
-	case LS_JUMPATTACK_CART_LEFT_GENERAL:
-	case LS_JUMPATTACK_CART_RIGHT_GENERAL:
-	case LS_JUMPATTACK_STAFF_LEFT_GENERAL:
-	case LS_JUMPATTACK_STAFF_RIGHT_GENERAL:
-	case LS_BUTTERFLY_LEFT_GENERAL:
-	case LS_BUTTERFLY_RIGHT_GENERAL:
-	case LS_A_BACKFLIP_ATK_GENERAL:
-	case LS_SPINATTACK_DUAL_GENERAL:
-	case LS_SPINATTACK_GENERAL:
-	case LS_LEAP_ATTACK_GENERAL:
-	case LS_SWOOP_ATTACK_RIGHT_GENERAL:
-	case LS_SWOOP_ATTACK_LEFT_GENERAL:
-	case LS_TAUNTAUN_ATTACK_RIGHT_GENERAL:
-	case LS_TAUNTAUN_ATTACK_LEFT_GENERAL:
-	case LS_KICK_F_GENERAL:
-	case LS_KICK_B_GENERAL:
-	case LS_KICK_R_GENERAL:
-	case LS_KICK_L_GENERAL:
-	case LS_KICK_S_GENERAL:
-	case LS_KICK_BF_GENERAL:
-	case LS_KICK_RL_GENERAL:
-	case LS_KICK_F_AIR_GENERAL:
-	case LS_KICK_B_AIR_GENERAL:
-	case LS_KICK_R_AIR_GENERAL:
-	case LS_KICK_L_AIR_GENERAL:
-	case LS_STABDOWN_GENERAL:
-	case LS_STABDOWN_STAFF_GENERAL:
-	case LS_STABDOWN_DUAL_GENERAL:
-	case LS_DUAL_SPIN_PROTECT_GENERAL:
-	case LS_STAFF_SOULCAL_GENERAL:
-	case LS_A1_SPECIAL_GENERAL:
-	case LS_A2_SPECIAL_GENERAL:
-	case LS_A3_SPECIAL_GENERAL:
-	case LS_UPSIDE_DOWN_ATTACK_GENERAL:
-	case LS_PULL_ATTACK_STAB_GENERAL:
-	case LS_PULL_ATTACK_SWING_GENERAL:
-	case LS_SPINATTACK_ALORA_GENERAL:
-	case LS_DUAL_FB_GENERAL:
-	case LS_DUAL_LR_GENERAL:
-	case LS_HILT_BASH_GENERAL:
-		return qtrue;
-		break;
-	}
-	return qfalse;
-}
-
-
-
-
-
-template<class T>
-qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke support JKA properly? Or too much work...
-{
-
-	int saberMove, torsoAnim, saberHolstered, usingATST, weapon, weaponstate, saberInFlight;
-	if constexpr (std::is_same<T, playerState_t>::value) {
-		saberMove = ((playerState_t*)state)->saberMove;
-		torsoAnim = ((playerState_t*)state)->torsoAnim;
-		saberHolstered = ((playerState_t*)state)->saberHolstered;
-		usingATST = ((playerState_t*)state)->usingATST;
-		weapon = ((playerState_t*)state)->weapon;
-		weaponstate = ((playerState_t*)state)->weaponstate;
-		saberInFlight = ((playerState_t*)state)->saberInFlight;
-	}
-	else if constexpr (std::is_same<T, entityState_t>::value) {
-		saberMove = ((entityState_t*)state)->saberMove;
-		torsoAnim = ((entityState_t*)state)->torsoAnim;
-		saberHolstered = ((entityState_t*)state)->shouldtarget;
-		usingATST = ((entityState_t*)state)->teamowner;
-		weapon = ((entityState_t*)state)->weapon;
-		weaponstate = ((entityState_t*)state)->modelindex2;
-		saberInFlight = ((entityState_t*)state)->saberInFlight;
-	}
-	else {
-		return qfalse;
-	}
-
-	saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE,UNSAFE>(saberMove, demoType);
-	torsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(torsoAnim, demoType);
-
-	if (BG_SaberInAttack<qtrue>(saberMove, demoType))
-	{
-		return qfalse;
-	}
-
-	if (PM_InSaberAnim<qtrue>(torsoAnim, demoType) &&
-		saberMove != LS_READY_GENERAL && saberMove != LS_NONE_GENERAL)
-	{
-		if (saberMove < LS_PARRY_UP_GENERAL || saberMove > LS_REFLECT_LL_GENERAL)
-		{
-			return qfalse;
-		}
-	}
-
-	if (demoType != DM_15 && PM_SaberInBrokenParry<qtrue>(saberMove,demoType)) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
-	{
-		return qfalse;
-	}
-
-	if (saberHolstered)
-	{
-		return qfalse;
-	}
-
-	if (usingATST)
-	{
-		return qfalse;
-	}
-
-	if (generalizeGameValue<GMAP_WEAPONS, UNSAFE>( weapon,demoType) != WP_SABER_GENERAL)
-	{
-		return qfalse;
-	}
-
-	if (weaponstate == WEAPON_RAISING)
-	{
-		return qfalse;
-	}
-
-	if (saberInFlight)
-	{
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-
-
 
 
 
@@ -5557,7 +5286,7 @@ public:
 
 
 
-char* demoCutHandleBigConfigString(const char* cmd, int index);
+const char* demoCutHandleBigConfigString(const char* cmd, int index);
 //qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType);
 qboolean demoCutParseGamestate(msg_t* msg, clientConnection_t* clcCut, clientActive_t* clCut, demoType_t* demoType, qboolean isDemoHeader, bool& SEHExceptionCaught);
 void demoCutParsePacketEntities(msg_t* msg, clSnapshot_t* oldSnap, clSnapshot_t* newSnap, clientActive_t* clCut, demoType_t demoType);
@@ -5617,12 +5346,6 @@ int atoiWhileNumber(const char* s);
 int atoiWhileNumber(const char** s);
 
 
-
-
-typedef enum {
-	UNSAFE,
-	SAFE
-} arrayAccessType_t;
 
 extern void initializeGameInfos();
 
@@ -5694,18 +5417,6 @@ struct gameInfoMapping_t {
 	wannabeArray_t<const int>	reversedMapping; // auto-filled
 };
 
-enum gameMappingType_t { // When changing this, also update gameMappingTypeGeneralArrayLength array
-	GMAP_EVENTS,
-	GMAP_WEAPONS,
-	GMAP_MEANSOFDEATH,
-	GMAP_LIGHTSABERMOVE,
-	GMAP_ITEMLIST,
-	GMAP_ANIMATIONS,
-	GMAP_ENTITYTYPE,
-	GMAP_GAMETYPE,
-	GMAP_PLAYERMOVETYPE,
-	GAMEMAPPINGTYPES_COUNT
-};
 
 static const int gameMappingTypeGeneralArrayLength[GAMEMAPPINGTYPES_COUNT] {
 	EV_ENTITY_EVENT_COUNT_GENERAL+1, //GMAP_EVENTS,
@@ -6002,7 +5713,7 @@ inline int specializedWeaponMapUnsafe(int weapon, demoType_t sourceDemoType, dem
 int getClientNumForDemo(clientActive_t* clCut, std::string* playerSearchString, qboolean printEndLine, demoType_t demoType, int maxClientsThisDemo, qboolean doNumberMatch);
 bool parseVersion(const char* str, int64_t* unixTime, char* platform, size_t platformMaxLen);
 
-entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, char* message);
+entityState_t* parseMOHAADeathMessage(tsl::htrie_map<char, int>* playerMapClientNumMap, const char* message);
 entityState_t* parseMOHAAPrintDeathMsgFromTokenized(tsl::htrie_map<char, int>* playerMapClientNumMap);
 
 typedef enum chatType_t
@@ -6358,7 +6069,300 @@ public:
 
 
 
+template<qboolean animIsGeneral>
+qboolean inline isBackflip(int anim, demoType_t demoType) {
 
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim,demoType);
+	}
+	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	//return (qboolean)(
+	//	(demoType == DM_15 && animRaw >= BOTH_FLIP_BACK1_15 && animRaw <= BOTH_FLIP_BACK3_15)
+	//	|| (demoType == DM_16 && animRaw >= BOTH_FLIP_BACK1 && animRaw <= BOTH_FLIP_BACK3) // TODO JKA?
+	//	);
+	return (qboolean)(
+		(animRaw >= BOTH_FLIP_BACK1_GENERAL && animRaw <= BOTH_FLIP_BACK3_GENERAL)
+		);
+}
+template<qboolean animIsGeneral>
+qboolean inline isYellowDFA(int anim, demoType_t demoType) {
+
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
+	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	//return (qboolean)(
+	//	(demoType == DM_15 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1_15 && animRaw <= BOTH_JUMPFLIPSTABDOWN_15)
+	//	|| (demoType == DM_16 && animRaw >= BOTH_JUMPFLIPSLASHDOWN1 && animRaw <= BOTH_JUMPFLIPSTABDOWN) // TODO JKA?
+	//	);
+	return (qboolean)(
+		(animRaw >= BOTH_JUMPFLIPSLASHDOWN1_GENERAL && animRaw <= BOTH_JUMPFLIPSTABDOWN_GENERAL)
+		);
+}
+template<qboolean animIsGeneral>
+qboolean inline isDFA(int anim, demoType_t demoType) {
+
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
+	int animRaw = anim & ~ANIM_TOGGLEBIT;
+	//return (qboolean)(
+	//	(demoType == DM_15 && animRaw == BOTH_FORCELEAP2_T__B__15)
+	//	|| (demoType == DM_16 && animRaw == BOTH_FORCELEAP2_T__B_) // TODO JKA?
+	//	);
+	return (qboolean)(
+		(animRaw == BOTH_FORCELEAP2_T__B__GENERAL)
+		);
+}
+template<qboolean animIsGeneral>
+qboolean inline BG_SaberInSpecialAttack(int anim, demoType_t demoType)
+{
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
+	switch (anim & ~ANIM_TOGGLEBIT)
+	{
+	case BOTH_A2_STABBACK1_GENERAL:
+	case BOTH_ATTACK_BACK_GENERAL:
+	case BOTH_CROUCHATTACKBACK1_GENERAL:
+	case BOTH_ROLL_STAB_GENERAL:
+	case BOTH_BUTTERFLY_LEFT_GENERAL:
+	case BOTH_BUTTERFLY_RIGHT_GENERAL:
+	case BOTH_BUTTERFLY_FL1_GENERAL:
+	case BOTH_BUTTERFLY_FR1_GENERAL:
+	case BOTH_FJSS_TR_BL_GENERAL:
+	case BOTH_FJSS_TL_BR_GENERAL:
+	case BOTH_LUNGE2_B__T__GENERAL:
+	case BOTH_FORCELEAP2_T__B__GENERAL:
+	case BOTH_JUMPFLIPSLASHDOWN1_GENERAL://#
+	case BOTH_JUMPFLIPSTABDOWN_GENERAL://#
+	case BOTH_JUMPATTACK6_GENERAL:
+	case BOTH_JUMPATTACK7_GENERAL:
+	case BOTH_SPINATTACK6_GENERAL:
+	case BOTH_SPINATTACK7_GENERAL:
+	case BOTH_FORCELONGLEAP_ATTACK_GENERAL:
+	case BOTH_VS_ATR_S_GENERAL:
+	case BOTH_VS_ATL_S_GENERAL:
+	case BOTH_VT_ATR_S_GENERAL:
+	case BOTH_VT_ATL_S_GENERAL:
+	case BOTH_A7_KICK_F_GENERAL:
+	case BOTH_A7_KICK_B_GENERAL:
+	case BOTH_A7_KICK_R_GENERAL:
+	case BOTH_A7_KICK_L_GENERAL:
+	case BOTH_A7_KICK_S_GENERAL:
+	case BOTH_A7_KICK_BF_GENERAL:
+	case BOTH_A7_KICK_RL_GENERAL:
+	case BOTH_A7_KICK_F_AIR_GENERAL:
+	case BOTH_A7_KICK_B_AIR_GENERAL:
+	case BOTH_A7_KICK_R_AIR_GENERAL:
+	case BOTH_A7_KICK_L_AIR_GENERAL:
+	case BOTH_STABDOWN_GENERAL:
+	case BOTH_STABDOWN_STAFF_GENERAL:
+	case BOTH_STABDOWN_DUAL_GENERAL:
+	case BOTH_A6_SABERPROTECT_GENERAL:
+	case BOTH_A7_SOULCAL_GENERAL:
+	case BOTH_A1_SPECIAL_GENERAL:
+	case BOTH_A2_SPECIAL_GENERAL:
+	case BOTH_A3_SPECIAL_GENERAL:
+	case BOTH_FLIP_ATTACK7_GENERAL:
+	case BOTH_PULL_IMPALE_STAB_GENERAL:
+	case BOTH_PULL_IMPALE_SWING_GENERAL:
+	case BOTH_ALORA_SPIN_SLASH_GENERAL:
+	case BOTH_A6_FB_GENERAL:
+	case BOTH_A6_LR_GENERAL:
+	case BOTH_A7_HILT_GENERAL:
+		return qtrue;
+	}
+	return qfalse;
+}
+
+
+
+
+
+template<qboolean saberMoveIsGeneralized>
+qboolean inline PM_SaberInBrokenParry(int move, demoType_t demoType)
+{
+	if constexpr (!saberMoveIsGeneralized) {
+
+		move = generalizeGameValue<GMAP_LIGHTSABERMOVE>(move, demoType);
+	}
+	if (move >= LS_V1_BR_GENERAL && move <= LS_V1_B__GENERAL && demoType != DM_15) // This should be actually be check for 1.02 specifically TODO
+	{
+		return qtrue;
+	}
+	if (move >= LS_H1_T__GENERAL && move <= LS_H1_BL_GENERAL)
+	{
+		return qtrue;
+	}
+	return qfalse;
+}
+
+template<qboolean animIsGeneral>
+qboolean inline PM_InSaberAnim(int anim, demoType_t demoType)
+{
+	if constexpr (!animIsGeneral) {
+		anim = generalizeGameValue<GMAP_ANIMATIONS>(anim, demoType);
+	}
+	//if (demoType == DM_16 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B_ && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR
+	//	|| demoType == DM_15 && (anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__15 && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_15
+	//	)
+	if ((anim & ~ANIM_TOGGLEBIT) >= BOTH_A1_T__B__GENERAL && (anim & ~ANIM_TOGGLEBIT) <= BOTH_H1_S1_BR_GENERAL)
+	{
+		return qtrue;
+	}
+	return qfalse;
+}
+
+template<qboolean saberMoveIsGeneralized>
+qboolean inline BG_SaberInAttack(int move, demoType_t demoType)
+{
+	if constexpr (!saberMoveIsGeneralized) {
+		move = generalizeGameValue<GMAP_LIGHTSABERMOVE>(move, demoType);
+	}
+	if (move >= LS_A_TL2BR_GENERAL && move <= LS_A_T2B_GENERAL)
+	{
+		return qtrue;
+	}
+	switch (move)
+	{
+	case LS_A_BACK_GENERAL:
+	case LS_A_BACK_CR_GENERAL:
+	case LS_A_BACKSTAB_GENERAL:
+	case LS_ROLL_STAB_GENERAL:
+	case LS_A_LUNGE_GENERAL:
+	case LS_A_JUMP_T__B__GENERAL:
+	case LS_A_FLIP_STAB_GENERAL:
+	case LS_A_FLIP_SLASH_GENERAL:
+	case LS_JUMPATTACK_DUAL_GENERAL:
+	case LS_JUMPATTACK_ARIAL_LEFT_GENERAL:
+	case LS_JUMPATTACK_ARIAL_RIGHT_GENERAL:
+	case LS_JUMPATTACK_CART_LEFT_GENERAL:
+	case LS_JUMPATTACK_CART_RIGHT_GENERAL:
+	case LS_JUMPATTACK_STAFF_LEFT_GENERAL:
+	case LS_JUMPATTACK_STAFF_RIGHT_GENERAL:
+	case LS_BUTTERFLY_LEFT_GENERAL:
+	case LS_BUTTERFLY_RIGHT_GENERAL:
+	case LS_A_BACKFLIP_ATK_GENERAL:
+	case LS_SPINATTACK_DUAL_GENERAL:
+	case LS_SPINATTACK_GENERAL:
+	case LS_LEAP_ATTACK_GENERAL:
+	case LS_SWOOP_ATTACK_RIGHT_GENERAL:
+	case LS_SWOOP_ATTACK_LEFT_GENERAL:
+	case LS_TAUNTAUN_ATTACK_RIGHT_GENERAL:
+	case LS_TAUNTAUN_ATTACK_LEFT_GENERAL:
+	case LS_KICK_F_GENERAL:
+	case LS_KICK_B_GENERAL:
+	case LS_KICK_R_GENERAL:
+	case LS_KICK_L_GENERAL:
+	case LS_KICK_S_GENERAL:
+	case LS_KICK_BF_GENERAL:
+	case LS_KICK_RL_GENERAL:
+	case LS_KICK_F_AIR_GENERAL:
+	case LS_KICK_B_AIR_GENERAL:
+	case LS_KICK_R_AIR_GENERAL:
+	case LS_KICK_L_AIR_GENERAL:
+	case LS_STABDOWN_GENERAL:
+	case LS_STABDOWN_STAFF_GENERAL:
+	case LS_STABDOWN_DUAL_GENERAL:
+	case LS_DUAL_SPIN_PROTECT_GENERAL:
+	case LS_STAFF_SOULCAL_GENERAL:
+	case LS_A1_SPECIAL_GENERAL:
+	case LS_A2_SPECIAL_GENERAL:
+	case LS_A3_SPECIAL_GENERAL:
+	case LS_UPSIDE_DOWN_ATTACK_GENERAL:
+	case LS_PULL_ATTACK_STAB_GENERAL:
+	case LS_PULL_ATTACK_SWING_GENERAL:
+	case LS_SPINATTACK_ALORA_GENERAL:
+	case LS_DUAL_FB_GENERAL:
+	case LS_DUAL_LR_GENERAL:
+	case LS_HILT_BASH_GENERAL:
+		return qtrue;
+		break;
+	}
+	return qfalse;
+}
+
+
+
+
+
+template<class T>
+qboolean WP_SaberCanBlock_Simple(T* state, demoType_t demoType) // TODO MAke support JKA properly? Or too much work...
+{
+
+	int saberMove, torsoAnim, saberHolstered, usingATST, weapon, weaponstate, saberInFlight;
+	if constexpr (std::is_same<T, playerState_t>::value) {
+		saberMove = ((playerState_t*)state)->saberMove;
+		torsoAnim = ((playerState_t*)state)->torsoAnim;
+		saberHolstered = ((playerState_t*)state)->saberHolstered;
+		usingATST = ((playerState_t*)state)->usingATST;
+		weapon = ((playerState_t*)state)->weapon;
+		weaponstate = ((playerState_t*)state)->weaponstate;
+		saberInFlight = ((playerState_t*)state)->saberInFlight;
+	}
+	else if constexpr (std::is_same<T, entityState_t>::value) {
+		saberMove = ((entityState_t*)state)->saberMove;
+		torsoAnim = ((entityState_t*)state)->torsoAnim;
+		saberHolstered = ((entityState_t*)state)->shouldtarget;
+		usingATST = ((entityState_t*)state)->teamowner;
+		weapon = ((entityState_t*)state)->weapon;
+		weaponstate = ((entityState_t*)state)->modelindex2;
+		saberInFlight = ((entityState_t*)state)->saberInFlight;
+	}
+	else {
+		return qfalse;
+	}
+
+	saberMove = generalizeGameValue<GMAP_LIGHTSABERMOVE,UNSAFE>(saberMove, demoType);
+	torsoAnim = generalizeGameValue<GMAP_ANIMATIONS, UNSAFE>(torsoAnim, demoType);
+
+	if (BG_SaberInAttack<qtrue>(saberMove, demoType))
+	{
+		return qfalse;
+	}
+
+	if (PM_InSaberAnim<qtrue>(torsoAnim, demoType) &&
+		saberMove != LS_READY_GENERAL && saberMove != LS_NONE_GENERAL)
+	{
+		if (saberMove < LS_PARRY_UP_GENERAL || saberMove > LS_REFLECT_LL_GENERAL)
+		{
+			return qfalse;
+		}
+	}
+
+	if (demoType != DM_15 && PM_SaberInBrokenParry<qtrue>(saberMove,demoType)) // Hmm. This is supposed to only be for 1.02. Idk how it will handle 1.03 TODO
+	{
+		return qfalse;
+	}
+
+	if (saberHolstered)
+	{
+		return qfalse;
+	}
+
+	if (usingATST)
+	{
+		return qfalse;
+	}
+
+	if (generalizeGameValue<GMAP_WEAPONS, UNSAFE>( weapon,demoType) != WP_SABER_GENERAL)
+	{
+		return qfalse;
+	}
+
+	if (weaponstate == WEAPON_RAISING)
+	{
+		return qfalse;
+	}
+
+	if (saberInFlight)
+	{
+		return qfalse;
+	}
+
+	return qtrue;
+}
 
 
 

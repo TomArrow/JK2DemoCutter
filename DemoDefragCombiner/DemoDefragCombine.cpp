@@ -315,7 +315,7 @@ qboolean demoCut( const char* outputName, std::vector<std::string>* inputFiles) 
 				for (int c = 0; c < newCommandsHere.size(); c++) {
 
 					Cmd_TokenizeString(newCommandsHere[c].c_str());
-					char* cmd = Cmd_Argv(0);
+					const char* cmd = Cmd_Argv(0);
 					if (!strcmp(cmd, "print") || !strcmp(cmd, "chat")/* || !strcmp(cmd, "cp")*/) {
 						if (!strstr(newCommandsHere[c].c_str(),"!respos") && !strstr(newCommandsHere[c].c_str(), "!savepos")) { // TODO Make this case insensitive for absolute protection!
 							commandsToAdd.push_back(newCommandsHere[c]);

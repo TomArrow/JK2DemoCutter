@@ -16,7 +16,7 @@
  *  #include "lzma_c.hpp"
  *
  */
-
+typedef struct IUnknown IUnknown;
 #ifdef _WIN32
 #include <windows.h>
 #endif
