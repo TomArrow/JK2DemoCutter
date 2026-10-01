@@ -1633,6 +1633,29 @@ void CModel::R_RecursiveWorldNode(mnode_t* node, int planeBits, unsigned int dli
 	}
 
 }
+
+
+/*
+=================
+R_inPVS
+=================
+*/
+qboolean CModel::R_inPVS( const vec3_t p1, const vec3_t p2 ) {
+	mnode_t *leaf;
+	byte	*vis;
+
+	leaf = R_PointInLeaf( p1 );
+	vis = CM_ClusterPVS( leaf->cluster );
+	leaf = R_PointInLeaf( p2 );
+
+	if ( !(vis[leaf->cluster>>3] & (1<<(leaf->cluster&7))) ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+
+
 const std::vector<int>& CModel::GetVisFilteredFaceVertIndices(vec3_t origin) {
 	if (R_MarkLeaves(origin)) {
 		visFilteredIndices.clear();

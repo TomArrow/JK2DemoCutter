@@ -1009,6 +1009,7 @@ public:
 			return CM_PointContents(point, 0);
 		}
 	}
+	qboolean R_inPVS(const vec3_t p1, const vec3_t p2);
 
 };
 
