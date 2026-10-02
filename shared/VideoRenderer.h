@@ -583,6 +583,7 @@ public:
 		Mesh* world = new Mesh();
 
 		int count = faceVertIndices.size();
+		int countAdded = 0;
 		for (int i = 0, j = 0; i < count; i++) {
 			int from = faceVertIndices[i];
 			vertXYZ_t* vert = &faceVerts[from];
@@ -590,19 +591,22 @@ public:
 				int index2 = faceVertIndices[j];
 				vertXYZ_t* vert2 = &faceVerts[index2];
 				if (vert2->lightmapNum != vert->lightmapNum) {
-					j--;
 					break;
 				}
 			}
+			j--;
+			int tris = (j + 1 - i) / 3;
+			assert(tris * 3 == (j + 1 - i));
 			if (vert->lightmapNum == -1) {
 				// skip non lightmapped for now (Skies and some others)
 				i = j;
+				countAdded += 3*tris;
 				continue;
 			}
-			int to = faceVertIndices[j-1];
-			int tris = (j + 1 - i) / 3;
 			Surface* surf = world->AddSurface(tris*3,tris);
-			surf->Texture = lightmapTextures[std::clamp((int)vert->lightmapNum,0, (int)lightmapTextures.size()-1)].get();
+			if (!vert->lightmapNum != -1 && lightmapTextures.size()) {
+				surf->Texture = lightmapTextures[std::clamp((int)vert->lightmapNum, 0, (int)lightmapTextures.size() - 1)].get();
+			}
 			surf->CullMode = CullMode::Back;
 
 			for (int k = 0; k < tris; k++) {
@@ -613,9 +617,11 @@ public:
 					surf->SetVertex(k*3+b, vfloat3(TOFASTPIXCOORDS(vert3->xyz[0], vert3->xyz[1], vert3->xyz[2])), vfloat3(0,0,0), vfloat2(vert3->lightmapSt[0], vert3->lightmapSt[1]));
 				}
 				surf->SetTriangle(k, k * 3, k * 3 + 1, k * 3 + 2);
+				countAdded += 3;
 			}
 			i = j;
 		}
+		assert(countAdded == count);
 
 		renderMeshes.push_back(std::unique_ptr<Mesh>(world));
 
@@ -711,6 +717,7 @@ public:
 		state.ClipNear = 1.0f;
 
 		state.Zoom = 0.5f;
+		//state.Rasterizer = Rasterizer::Wireframe;
 
 		state.ViewMatrix = Matrix4::Translate(vfloat3(TOFASTPIXCOORDS(-camerapos[0], -camerapos[1], -camerapos[2]))) *Matrix4::RotateY(viewangles[YAW]+180.0f )* Matrix4::RotateX(-viewangles[PITCH]);
 
