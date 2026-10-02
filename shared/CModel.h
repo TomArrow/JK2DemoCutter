@@ -636,7 +636,7 @@ typedef struct triangle_s {
 typedef struct vertXYZ_s {
 	vec3_t	xyz;
 	vec2_t	lightmapSt;
-	uint16_t	lightmapNum;
+	int16_t	lightmapNum;
 } vertXYZ_t;
 #define	LIGHTMAP_SIZE	128
 typedef struct lightmap_s {

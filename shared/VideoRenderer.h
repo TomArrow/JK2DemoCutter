@@ -3,10 +3,23 @@
 #ifndef VIDEO_RENDERER_H
 #define VIDEO_RENDERER_H
 
+#ifdef _WIN64
+#define DOFASTPIX 1
+#else
+#define DOFASTPIX 0
+#endif 
+
 #include "demoCut.h"
 #include "CModel.h"
 #include <deque>
 #include "../shared/libgmavi/libgmavi.h"
+#if DOFASTPIX
+//#include "../shared/fastpix3d/FastPix3D/FastPix3D.h"
+#include "../shared/fastpix3d/FastPix3D/Mesh/Mesh.h"
+#include "../shared/fastpix3d/FastPix3D/Mesh/Texture.h"
+#include "../shared/fastpix3d/FastPix3D/RenderUnit.h"
+#include "../shared/fastpix3d/FastPix3D/Interop/ThreadPool.h"
+#endif
 
 static inline class S3LRenderer* lastRenderer = NULL; // disgusting
 
@@ -17,7 +30,7 @@ typedef struct drawProperties3dModel_s {
 } drawProperties3dModel_t;
 
 #define VIDEOWIDTH 400
-#define VIDEOHEIGHT 300
+#define VIDEOHEIGHT 304
 
 #define S3L_POSMULT 8
 // we need to define screen resolution before including the library:
@@ -140,6 +153,7 @@ protected:
 		}
 		inline virtual void startNewFrame() {
 			renderingMap = false;
+			scene3dmodelProperties.clear();
 		};
 		inline virtual  drawProperties3dModel_t* startDrawingMap(CModel* cm) {
 
@@ -148,10 +162,16 @@ protected:
 		};
 		inline virtual void initMap(CModel* cm) {
 
+			mapLightmaps.clear();
+			auto lightmaps = cm->GetLightmaps();
+			for (auto it = lightmaps.begin(); it != lightmaps.end(); it++) {
+				mapLightmaps.push_back(*it);
+			}
 			haveMapModel = true;
 		};
 		inline virtual void resetMap() {
 
+			mapLightmaps.clear();
 			haveMapModel = false;
 		};
 		inline virtual drawProperties3dModel_t* startDrawingCube(const vec3_t position, const vec3_t scale, const vec3_t rotation) {
@@ -316,21 +336,16 @@ public:
 
 			VideoRenderer::startNewFrame();
 			scene3dmodels.clear();
-			scene3dmodelProperties.clear();
 			scene3dmodelVertices.clear();
 			scene3dmodelTriangles.clear();
 		};
 		inline void initMap(CModel* cm) override {
 
+			VideoRenderer::initMap(cm);
 			auto faceVerts = cm->GetFaceVerts();
 			auto faceVertIndices = cm->GetFaceVertIndices();
-			auto lightmaps = cm->GetLightmaps();
 			mapVertices.clear();
 			mapUVs.clear();
-			mapLightmaps.clear();
-			for (auto it = lightmaps.begin(); it != lightmaps.end(); it++) {
-				mapLightmaps.push_back(*it);
-			}
 			//if (!mapLightmaps.size()) {
 			//	mapLightmaps.emplace_back();
 			//}
@@ -348,7 +363,6 @@ public:
 			}
 			S3L_model3DInit(mapVertices.data(), mapVertices.size() / 3, mapTriangles.data(), mapTriangles.size() / 3, &mapModel);
 			//mapModel.config.backfaceCulling = 1;
-			VideoRenderer::initMap(cm);
 		}
 		inline virtual void resetMap() {
 			VideoRenderer::resetMap();
@@ -478,11 +492,192 @@ public:
 };
 
 
-
 static inline void drawPixel(S3L_PixelInfo* p) {
 	if (lastRenderer) {
 		lastRenderer->drawPixel(p);
 	}
 }
+
+#if DOFASTPIX
+
+#define TOFASTPIXCOORDS(x,y,z) (y),(z),-(x)
+
+class FastPix3DRenderer : public VideoRenderer {
+	
+	std::vector<std::unique_ptr<Texture>>		lightmapTextures;
+	std::vector<vertXYZ_t>						faceVerts;
+
+	std::vector<std::unique_ptr<Mesh>>			renderMeshes;
+
+	RenderStates state;
+	RenderUnit ru;
+public:
+
+	FastPix3DRenderer() {
+	}
+
+	inline void startNewFrame() override {
+
+		VideoRenderer::startNewFrame();
+		renderMeshes.clear();
+	};
+	inline void initMap(CModel* cm) override {
+
+
+		VideoRenderer::initMap(cm);
+
+		// Load lightmaps
+		for (lightmap_t& lm : mapLightmaps) {
+			Bitmap* bm = new Bitmap(LIGHTMAP_WIDTH, LIGHTMAP_HEIGHT);
+			for (int i = 0; i < LIGHTMAP_WIDTH * LIGHTMAP_HEIGHT; i++) {
+				bm->Pixels[i].R = lm.data[i * 3 + 0];
+				bm->Pixels[i].G = lm.data[i * 3 + 1];
+				bm->Pixels[i].B = lm.data[i * 3 + 2];
+			}
+			Texture* tex = Texture::FromBitmap(bm);
+			delete bm;
+			lightmapTextures.push_back(std::unique_ptr<Texture>(tex));
+		}
+
+		faceVerts = cm->GetFaceVerts();
+	}
+	inline virtual void resetMap() {
+		VideoRenderer::resetMap();
+	};
+	inline drawProperties3dModel_t* startDrawingMap(CModel* cm) override {
+
+		drawProperties3dModel_t* props =  VideoRenderer::startDrawingMap(cm);
+
+		auto faceVertIndices = cm->GetVisFilteredFaceVertIndices(camerapos);
+
+		Mesh* world = new Mesh();
+
+		int count = faceVertIndices.size();
+		for (int i = 0, j = 0; i < count; i++) {
+			int from = faceVertIndices[i];
+			vertXYZ_t* vert = &faceVerts[from];
+			for (j = i + 1; j < count; j++) {
+				int index2 = faceVertIndices[j];
+				vertXYZ_t* vert2 = &faceVerts[index2];
+				if (vert2->lightmapNum != vert->lightmapNum) {
+					j--;
+					break;
+				}
+			}
+			if (vert->lightmapNum == -1) {
+				// skip non lightmapped for now (Skies and some others)
+				i = j;
+				continue;
+			}
+			int to = faceVertIndices[j-1];
+			int tris = (j + 1 - i) / 3;
+			Surface* surf = world->AddSurface(tris*3,tris);
+			surf->Texture = lightmapTextures[std::clamp((int)vert->lightmapNum,0, (int)lightmapTextures.size()-1)].get();
+			surf->CullMode = CullMode::Back;
+
+			for (int k = 0; k < tris; k++) {
+				for (int b = 0; b < 3; b++) {
+
+					int curVert = faceVertIndices[i + k * 3 + b];
+					vertXYZ_t* vert3 = &faceVerts[curVert];
+					surf->SetVertex(k*3+b, vfloat3(TOFASTPIXCOORDS(vert3->xyz[0], vert3->xyz[1], vert3->xyz[2])), vfloat3(0,0,0), vfloat2(vert3->lightmapSt[0], vert3->lightmapSt[1]));
+				}
+				surf->SetTriangle(k, k * 3, k * 3 + 1, k * 3 + 2);
+			}
+			i = j;
+		}
+
+		renderMeshes.push_back(std::unique_ptr<Mesh>(world));
+
+		return props;
+	};
+
+	inline drawProperties3dModel_t* startDrawingCube(const vec3_t position, const vec3_t scale, const vec3_t rotation) override {
+
+		drawProperties3dModel_t* props = VideoRenderer::startDrawingCube(position, scale, rotation);
+
+			
+
+		return props;
+	}
+
+	inline drawProperties3dModel_t* startDrawingObject(int* indices, int indexCount, vec3_t* points, int pointCount, const vec3_t position, const vec3_t scale, const vec3_t rotation, bool backFaceCulling) override {
+		drawProperties3dModel_t* props = VideoRenderer::startDrawingObject(indices, indexCount, points, pointCount, position, scale, rotation, backFaceCulling);
+
+
+		return props;
+	}
+
+	inline void initScene(vec3_t viewangles) override {
+		VideoRenderer::initScene(viewangles);
+
+
+		state.ClipFar = 32768.0f;
+		state.ClipNear = 1.0f;
+
+		state.Zoom = 0.5f;
+
+		state.ViewMatrix = Matrix4::Translate(vfloat3(TOFASTPIXCOORDS(-camerapos[0], -camerapos[1], -camerapos[2]))) *Matrix4::RotateY(viewangles[YAW]+180.0f )* Matrix4::RotateX(-viewangles[PITCH]);
+
+		state.TextureEnable = true;
+		state.TextureFilteringEnable = false;
+		state.DepthMode = DepthMode::ReadWrite;
+	}
+
+	inline void drawFrame(int64_t demoCurrentTime, bool nwhHexColors) override {
+
+		int dimAlign = 8; 
+		// don't ask me why, it draws fine(?) with any dimensions, but if the buffer dimensions aren't multiples of 8,
+		// it poops itself and causes memory access errors/corruption
+		// maybe it does 8 rows in one go? idk
+		int ceilWidth = dimAlign * ((VIDEOWIDTH + (dimAlign-1)) / dimAlign);
+		int ceilHeight = dimAlign * ((VIDEOHEIGHT + (dimAlign-1)) / dimAlign);
+		void* pixelBuf = _aligned_malloc(ceilWidth * ceilHeight * 4, 32);
+		void* depth = _aligned_malloc(ceilWidth * ceilHeight * sizeof(float), 32);
+
+		if (!pixelBuf || !depth) {
+			if (pixelBuf) {
+				_aligned_free(pixelBuf);
+			}
+			if (depth) {
+				_aligned_free(depth);
+			}
+			return;
+		}
+
+		state.FrameBuffer = RenderTarget(VIDEOWIDTH, VIDEOHEIGHT, pixelBuf);
+		state.DepthBuffer = RenderTarget(VIDEOWIDTH, VIDEOHEIGHT, depth);
+
+		ru.ClearFrameBuffer(state, 0, 0, 0);
+		ru.ClearDepthBuffer(state);
+
+
+		ThreadPool::Run(8, [this](WorkPartition workPartition)
+		{
+			RenderStates stateCopy = state;
+
+			for (auto& thing : renderMeshes) {
+				ru.DrawMesh(stateCopy, workPartition, *thing.get(), Matrix4::Identity());
+			}
+		});
+
+		byte* asbyte = (byte*)pixelBuf;
+		for (int y = 0; y < VIDEOHEIGHT; y++) {
+			for (int x = 0; x < VIDEOWIDTH; x++) {
+				drawBuffer[y * VIDEOWIDTH * 3 + x * 3] = asbyte[y * VIDEOWIDTH * 4 + x * 4];
+				drawBuffer[y * VIDEOWIDTH * 3 + x * 3 + 1] = asbyte[y * VIDEOWIDTH * 4 + x * 4 + 1];
+				drawBuffer[y * VIDEOWIDTH * 3 + x * 3 + 2] = asbyte[y * VIDEOWIDTH * 4 + x * 4 + 2];
+			}
+		}
+
+		_aligned_free(pixelBuf);
+		_aligned_free(depth);
+
+		VideoRenderer::drawFrame(demoCurrentTime, nwhHexColors);
+	}
+};
+
+#endif 
+
 
 #endif

@@ -227,6 +227,69 @@
     <ClCompile Include="..\shared\VideoRenderer.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Interop\Bitmap.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\2D\Font.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Helper\FPSCounter.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Rasterizer\FragmentRasterizer.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Helper\FreeLook.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\2D\Graphics.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Interop\Input.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Math\Math_.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Mesh\Mesh.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Helper\PrimitiveFactory.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\RenderStates.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\RenderStatistics.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\RenderUnit.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Rasterizer\ShadowMapRasterizer.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Helper\Stopwatch.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Mesh\Surface.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Interop\System.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Mesh\Texture.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Interop\ThreadPool.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Interop\Window.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\fastpix3d\FastPix3D\Rasterizer\WireframeRasterizer.cpp">
+      <Filter>fastpix3d</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">

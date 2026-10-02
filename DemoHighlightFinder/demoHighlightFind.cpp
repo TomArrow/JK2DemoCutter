@@ -409,6 +409,13 @@ public:
 	//bool filterFightBotKills = false;
 	//bool filterFightBotRets = false;
 	int videoMinMsec = 0;
+	int videoRenderer = 
+#if _WIN64
+		1
+#else
+		2
+#endif
+		;
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
 	int throughWallChecks = 0; // 1 = all kills, 2 = only saber
@@ -5558,7 +5565,18 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	sharedVariables_t sharedVars;
 
 	if (opts.makeVideo) {
-		sharedVars.renderer = new S3LRenderer();
+#if DOFASTPIX
+		if (opts.videoRenderer == 1) {
+			sharedVars.renderer = new FastPix3DRenderer();
+		} else
+#endif
+		if (opts.videoRenderer == 2) {
+			sharedVars.renderer = new S3LRenderer();
+		}
+		if (!sharedVars.renderer) {
+			std::cerr << "Error. Specified renderer " << opts.videoRenderer << " did not match anything on this platform. Defaulting to small3dlib\n";
+			sharedVars.renderer = new S3LRenderer();
+		}
 	}
 
 	int64_t			demoCurrentTime = 0;
@@ -13062,6 +13080,14 @@ int main(int argcO, char** argvO) {
 	auto j = op.add<popl::Implicit<int>>("j", "find-jumpbugs", "Finds instances of jumpbugs in demos.",1);
 	auto v = op.add<popl::Value<std::string>>("v", "make-video", "Make a little preview video AVI.");
 	auto V = op.add<popl::Implicit<int>>("V", "video-maxfps", "Max FPS for video generation, default 1000", 1000);
+	auto w = op.add<popl::Implicit<int>>("w", "video-renderer", "Use specific renderer. 1 = FastPix3D, 2 = small3dlib. Default is 1 for x64 and 2 for x86 (x86 doesn't support FastPix3D)",
+#if _WIN64
+		1
+#else
+		2
+#endif
+		
+		);
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");
 	auto f = op.add<popl::Value<std::string>>("f", "filter", "Filter kills/captures/sprees/laughs. Each time this option is specified, a new database is used for the results. Add one with 'rest' to save all the rest. Filters are checked in order. If it fits, it goes in. If not, other filters are checked.\n\tgametype:[gametype]:[gametype2]\n\tmap:[*mapnamepart*]\n\trest (matches anything)");
 	auto o = op.add<popl::Implicit<int>>("o", "through-wall", "Properly check whether a kill happened through a wall by tracing from the attacker to the fragged location. Pass 1 as a value to do this only for saber kills.",0);
@@ -13187,6 +13213,11 @@ int main(int argcO, char** argvO) {
 	if (v->is_set()) {
 		opts.makeVideo = true;
 		opts.videoPath = v->value();
+#if _WIN64
+		opts.videoRenderer = w->is_set() ? std::clamp(w->value(), 1, 2) : 1;
+#else
+		opts.videoRenderer = 2;
+#endif
 		opts.videoMinMsec = 1000 / V->value();
 	}
 	if (b->is_set()) {
