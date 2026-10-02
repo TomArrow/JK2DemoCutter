@@ -27,6 +27,7 @@ typedef struct drawProperties3dModel_s {
 	byte	color[3];
 	bool	transparent;
 	bool	isCube;
+	bool	isWorld;
 } drawProperties3dModel_t;
 
 #define VIDEOWIDTH 400
@@ -113,7 +114,7 @@ protected:
 
 	std::vector<drawProperties3dModel_t>	scene3dmodelProperties;
 
-	std::vector<videoFrame_t> videoFrames;
+	std::vector<std::unique_ptr<videoFrame_t>> videoFrames;
 
 	std::vector<lightmap_t>		mapLightmaps;
 
@@ -158,7 +159,9 @@ protected:
 		inline virtual  drawProperties3dModel_t* startDrawingMap(CModel* cm) {
 
 			renderingMap = true;
-			return &scene3dmodelProperties.emplace_back();
+			drawProperties3dModel_t* mapModelProps = &scene3dmodelProperties.emplace_back();
+			mapModelProps->isWorld = qtrue;
+			return mapModelProps;
 		};
 		inline virtual void initMap(CModel* cm) {
 
@@ -186,26 +189,27 @@ protected:
 		inline virtual void drawFrame(int64_t demoCurrentTime, bool nwhHexColors) {
 
 			videoDrawText(demoCurrentTime, nwhHexColors);
-
-			videoFrames.push_back({ demoCurrentTime,{0} });
-			memcpy(videoFrames.back().image, drawBuffer, sizeof(drawBuffer));
+			;
+			videoFrames.push_back(std::make_unique<videoFrame_t>());
+			videoFrames.back()->demoTime = demoCurrentTime;
+			memcpy(videoFrames.back()->image, drawBuffer, sizeof(drawBuffer));
 		}
 		inline void saveVideo(const char* videoPath) {
 			if (!videoFrames.size()) {
 				return;
 			}
 			void* gmav = gmav_open(videoPath, VIDEOWIDTH, VIDEOHEIGHT, 1000);
-			int64_t lastTime = videoFrames.size() ? videoFrames.front().demoTime : 0;
+			int64_t lastTime = videoFrames.size() ? videoFrames.front()->demoTime : 0;
 			for (auto it = videoFrames.begin(); it != videoFrames.end(); it++) {
-				while (it->demoTime - lastTime > 1) {
-					if (it->demoTime - lastTime > 100) {
-						lastTime = it->demoTime - 100;
+				while (it->get()->demoTime - lastTime > 1) {
+					if (it->get()->demoTime - lastTime > 100) {
+						lastTime = it->get()->demoTime - 100;
 					}
 					gmav_add(gmav, NULL);
 					lastTime++;
 				}
-				gmav_add(gmav, it->image);
-				lastTime = it->demoTime;
+				gmav_add(gmav, it->get()->image);
+				lastTime = it->get()->demoTime;
 			}
 			gmav_finish(gmav);
 		}
@@ -504,6 +508,32 @@ static inline void drawPixel(S3L_PixelInfo* p) {
 
 class FastPix3DRenderer : public VideoRenderer {
 	
+
+	const float cubeVertices[24] = { 
+							0.5f, -0.5f, -0.5f,
+							-0.5f, -0.5f, -0.5f,
+							0.5f, 0.5f, -0.5f,
+							-0.5f, 0.5f, -0.5f,
+							0.5f, -0.5f, 0.5f,
+							-0.5f, -0.5f, 0.5f,
+							0.5f, 0.5f, 0.5f,
+							-0.5f, 0.5f, 0.5f };
+
+	const int cubeVertexCount = sizeof(cubeVertices) / sizeof(cubeVertices[0]);
+	const int cubeTriangleIndexes[36] = { 3, 0, 2,
+							  1, 0, 3,
+							  0, 4, 2,
+							  2, 4, 6,
+							  4, 5, 6,
+							  7, 6, 5,
+							  3, 7, 1,
+							  1, 7, 5,
+							  6, 3, 2,
+							  7, 3, 6,
+							  1, 4, 0,
+							  5, 4, 1 };
+	const int cubeIndexCount = sizeof(cubeTriangleIndexes) / sizeof(cubeTriangleIndexes[0]);
+
 	std::vector<std::unique_ptr<Texture>>		lightmapTextures;
 	std::vector<vertXYZ_t>						faceVerts;
 
@@ -596,7 +626,39 @@ public:
 
 		drawProperties3dModel_t* props = VideoRenderer::startDrawingCube(position, scale, rotation);
 
-			
+		Mesh* cube = new Mesh();
+
+		Surface* surf = cube->AddSurface(cubeVertexCount/3,cubeIndexCount/3);
+
+		surf->set_Alpha(0.5f);
+		for (int i = 0; i < cubeVertexCount / 3; i++) {
+			surf->SetVertex(i,vfloat3(cubeVertices[i*3], cubeVertices[i * 3 + 1], -cubeVertices[i * 3 + 2]));
+		}
+		for (int i = 0; i < cubeIndexCount / 3; i++) {
+			surf->SetTriangle(i,cubeTriangleIndexes[i*3], cubeTriangleIndexes[i * 3 + 1], cubeTriangleIndexes[i * 3 + 2]);
+		}
+		surf->CullMode = CullMode::Back;
+
+		Matrix4 transform = Matrix4::Identity();
+		if (scale) {
+			transform *= Matrix4::Scale(TOFASTPIXCOORDS(scale[0], scale[1], scale[2]));
+		}
+		if (rotation) {
+			if (rotation[PITCH]) {
+				transform *= Matrix4::RotateX(rotation[PITCH]);
+			}
+			if (rotation[YAW]) {
+				transform *= Matrix4::RotateY(-(rotation[YAW] + 180.0f));
+			}
+		}
+		if (position) {
+			transform *= Matrix4::Translate(TOFASTPIXCOORDS(position[0], position[1], position[2]));
+		}
+		cube->TransformVertices(transform);
+
+		cube->SetBlendMode(BlendMode::Alpha);
+
+		renderMeshes.push_back(std::unique_ptr<Mesh>(cube));
 
 		return props;
 	}
@@ -604,6 +666,39 @@ public:
 	inline drawProperties3dModel_t* startDrawingObject(int* indices, int indexCount, vec3_t* points, int pointCount, const vec3_t position, const vec3_t scale, const vec3_t rotation, bool backFaceCulling) override {
 		drawProperties3dModel_t* props = VideoRenderer::startDrawingObject(indices, indexCount, points, pointCount, position, scale, rotation, backFaceCulling);
 
+		Mesh* object = new Mesh();
+
+		Surface* surf = object->AddSurface(pointCount, indexCount / 3);
+
+		surf->set_Alpha(0.5f);
+		for (int i = 0; i < pointCount; i++) {
+			surf->SetVertex(i, vfloat3(TOFASTPIXCOORDS(points[i][0],points[i][1],points[i][2])));
+		}
+		for (int i = 0; i < indexCount / 3; i++) {
+			surf->SetTriangle(i, indices[i * 3], indices[i * 3 + 1], indices[i * 3 + 2]);
+		}
+		surf->CullMode = backFaceCulling ? CullMode::Back : CullMode::None;
+
+		Matrix4 transform = Matrix4::Identity();
+		if (scale) {
+			transform *= Matrix4::Scale(TOFASTPIXCOORDS(scale[0], scale[1], scale[2]));
+		}
+		if (rotation) {
+			if (rotation[PITCH]) {
+				transform *= Matrix4::RotateX(rotation[PITCH]);
+			}
+			if (rotation[YAW]) {
+				transform *= Matrix4::RotateY(-(rotation[YAW] + 180.0f));
+			}
+		}
+		if (position) {
+			transform *= Matrix4::Translate(TOFASTPIXCOORDS(position[0], position[1], position[2]));
+		}
+		object->TransformVertices(transform);
+
+		object->SetBlendMode(BlendMode::Alpha);
+
+		renderMeshes.push_back(std::unique_ptr<Mesh>(object));
 
 		return props;
 	}
@@ -651,6 +746,16 @@ public:
 		ru.ClearFrameBuffer(state, 0, 0, 0);
 		ru.ClearDepthBuffer(state);
 
+		int index = 0;
+		for (auto& thing : renderMeshes) {
+			if (index < scene3dmodelProperties.size()) {
+				drawProperties3dModel_t& props = scene3dmodelProperties[index];
+				if (!props.isWorld) {
+					thing->SetVertexColors(props.color[0], props.color[1], props.color[2]);
+				}
+			}
+			index++;
+		}
 
 		ThreadPool::Run(8, [this](WorkPartition workPartition)
 		{

@@ -7606,7 +7606,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 							flagDrawPos[2] = zCenter;
 							VectorSet(cubeScale, 2, 10, 15);
 
-							drawProperties3dModel_t* modelProps2 = renderer->startDrawingCube(playerDrawPos, cubeScale, demo.cut.Cl.snap.ps.viewangles);
+							drawProperties3dModel_t* modelProps2 = renderer->startDrawingCube(flagDrawPos, cubeScale, demo.cut.Cl.snap.ps.viewangles);
 
 							setModelColor<max_clients>(modelProps2, -(flagTeam + 1));
 							modelProps2->transparent = false;
