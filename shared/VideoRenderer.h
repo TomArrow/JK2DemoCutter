@@ -714,7 +714,7 @@ public:
 
 
 		state.ClipFar = 32768.0f;
-		state.ClipNear = 1.0f;
+		state.ClipNear = 10.0f;
 
 		state.Zoom = 0.5f;
 		//state.Rasterizer = Rasterizer::Wireframe;
@@ -722,7 +722,7 @@ public:
 		state.ViewMatrix = Matrix4::Translate(vfloat3(TOFASTPIXCOORDS(-camerapos[0], -camerapos[1], -camerapos[2]))) *Matrix4::RotateY(viewangles[YAW]+180.0f )* Matrix4::RotateX(-viewangles[PITCH]);
 
 		state.TextureEnable = true;
-		state.TextureFilteringEnable = false;
+		state.TextureFilteringEnable = true;
 		state.DepthMode = DepthMode::ReadWrite;
 	}
 
