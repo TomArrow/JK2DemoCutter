@@ -13110,6 +13110,8 @@ qboolean demoHighlightFind(const char* sourceDemoFile, int bufferTime, const cha
 
 int main(int argcO, char** argvO) {
 
+	setLowProcessPriority();
+
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");
 	auto s = op.add<popl::Switch>("s", "only-log-saber-kills", "Only log saber kills (.db as well as .bat)");

@@ -1285,6 +1285,7 @@ cuterror:
 
 
 int main(int argcO, char** argvO) {
+	setLowProcessPriority();
 
 	popl::OptionParser op("Allowed options");
 	auto h = op.add<popl::Switch>("h", "help", "Show help");

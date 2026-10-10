@@ -12,6 +12,10 @@
 
 #include "include/rapidjson/document.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <processthreadsapi.h>
+#endif
 
 constexpr const char* postEOFMetadataMarker = "HIDDENMETA";
 constexpr const char* postEOFUcmdMarker = "HIDDENUCMD";
@@ -8761,6 +8765,19 @@ int64_t demoCutGetDemoNameTruncationOffset(const char* demoName) {
 	}
 	return 0L;
 }
+
+
+void setLowProcessPriority() {
+#if defined(_MSC_VER)
+	if (!SetPriorityClass(GetCurrentProcess(), PROCESS_MODE_BACKGROUND_BEGIN)) {
+		std::cerr << "Setting background processing mode failed. Trying Idle mode;\n";
+		if (!SetPriorityClass(GetCurrentProcess(), IDLE_PRIORITY_CLASS)) {
+			std::cerr << "Setting idle CPU priority failed.\n";
+		}
+	}
+#endif
+}
+
 
 
 qboolean demoCutGetDemoType(const char* demoFile, char extOutput[7], char outputNameNoExt[MAX_OSPATH], demoType_t* demoType, qboolean* isCompressed, clientConnection_t* clcCut) {

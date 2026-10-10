@@ -1327,6 +1327,7 @@ cuterror:
 
 int main(int argcO, char** argvO) {
 
+	setLowProcessPriority();
 
 	popl::OptionParser op("Allowed options");
 	auto b = op.add<popl::Value<std::string>>("b", "bsp-directory", "Directory containing bsp files");

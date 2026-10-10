@@ -439,6 +439,7 @@ cuterror:
 
 
 int main(int argc, char** argv) {
+	setLowProcessPriority();
 	if (argc <3) {
 		std::cout << "need 2 arguments at least: outputname, demoname1, [demoname2, demoname3,...]";
 		return 1;

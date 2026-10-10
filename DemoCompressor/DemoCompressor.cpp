@@ -459,10 +459,13 @@ cuterror:
 
 
 int main(int argc, char** argv) {
+	setLowProcessPriority();
+
 	if (argc < 2) {
 		std::cout << "need 1 arguments at least: demoname, outputfile(optional)";
 		return 1;
 	}
+
 	initializeGameInfos();
 	char* demoName = NULL;
 	char* outputName = NULL;

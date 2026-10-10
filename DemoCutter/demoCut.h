@@ -5355,6 +5355,7 @@ int strNumLen(const char* s);
 int atoiWhileNumber(const char* s);
 int atoiWhileNumber(const char** s);
 
+void setLowProcessPriority();
 
 
 extern void initializeGameInfos();
