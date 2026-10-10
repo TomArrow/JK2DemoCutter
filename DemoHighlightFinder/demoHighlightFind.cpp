@@ -248,6 +248,10 @@ struct ioHandlesKillDb_t {
 	sqlite3_stmt* insertAngleStatement;
 	sqlite3_stmt* insertDemoDatabaseProperty;
 	sqlite3_stmt* insertDemoMeta;
+#if NETFIELD_STATS
+	sqlite3_stmt* insertNetFieldStatement;
+	sqlite3_stmt* updateNetFieldCountStatement;
+#endif
 	sqlite3_stmt* selectLastInsertRowIdStatement;
 };
 
@@ -323,6 +327,7 @@ struct sharedVariables_t {
 	std::string oldBasename;
 	time_t oldDemoDateModified;
 	int64_t demoFilesize;
+	demoType_t demoType;
 
 	VideoRenderer* renderer;
 };
@@ -4553,6 +4558,14 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			"); ",
 			NULL, NULL, NULL);
 
+#if NETFIELD_STATS
+		sqlite3_exec(io.killDb[i].killDb, "CREATE TABLE netFields ("
+			"type INTEGER NOT NULL,demoType INTEGER NOT NULL,name TEXT NOT NULL,reads INTEGER NOT NULL,writes INTEGER NOT NULL,"
+			"PRIMARY KEY(type,demoType,name)"
+			"); ",
+			NULL, NULL, NULL);
+#endif
+
 // TODO: Would be more efficient to do the inserts manually somewhere and then inject the id. but lets keep it like this for now so we can quickly adapt the code without major restructuring
 
 		/*char* preparedStatementText = "INSERT INTO kills"
@@ -4698,6 +4711,15 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 			" VALUES "
 			"( @demoName, @demoPath, @fileSize, @demoTimeDuration, @demoDateTime, @demoRecorderNames, @demoRecorderNamesStripped, @demoErrorFlags, @demoErrors,@demoDerivativeFlags,@demoServerBuildTime,@demoServerBuildPlatform,@droppedPackets,@minMsec,@averageFrameDuration)";
 		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertDemoMeta, NULL);
+
+
+#if NETFIELD_STATS
+		preparedStatementText = "INSERT OR IGNORE INTO netFields (type,demoType,name,reads,writes) VALUES (@type,@demoType,@name, 0,0);";
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].insertNetFieldStatement, NULL);
+		
+		preparedStatementText = "UPDATE netFields SET reads = reads + @reads WHERE type=@type AND demoType=@demoType AND name=@name;";
+		sqlite3_prepare_v2(io.killDb[i].killDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.killDb[i].updateNetFieldCountStatement, NULL);
+#endif
 
 		preparedStatementText = "SELECT last_insert_rowid();";
 
@@ -5156,7 +5178,7 @@ void executeEarlyQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	handleUniqueGame(&uniqueGameCurrent,io,opts,true);
 }
 
-void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
+void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType_t demoType) {
 
 	// Animstances
 #ifdef DEBUGSTATSDB
@@ -5489,6 +5511,44 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	}
 
 
+#if NETFIELD_STATS
+	// netfields
+	if (io.killDb[0].killDb) {
+		for (int i = 0; i < NETFIELD_STATS_VARIANTS; i++) {
+			const netField_t* netField = NULL;
+			int count = 0;
+			int64_t* reads = NULL;
+			MSG_GetNetFields(demoType, &netField, &count, i, &reads);
+			if (!netField) {
+				continue;
+			}
+			for (int j = 0; j < count; j++, netField++,reads++) {
+				if (!*reads) {
+					continue;
+				}
+				SQLDelayedQuery* query = new SQLDelayedQuery();
+				SQLBIND_DELAYED(query, int, "@type", i);
+				SQLBIND_DELAYED(query, int, "@demoType", demoType);
+				SQLBIND_DELAYED_TEXT(query, "@name", netField->name);
+				SQLBIND_DELAYED(query, int, "@reads", *reads);
+				query->bind(io.killDb[0].insertNetFieldStatement);
+				query->bind(io.killDb[0].updateNetFieldCountStatement);
+				//wasDoingSQLiteExecution = true;
+				int queryResult = sqlite3_step(io.killDb[0].insertNetFieldStatement);
+				if (queryResult != SQLITE_DONE) {
+					std::cerr << "Error inserting netField data into database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[0].killDb) << "(" << DPrintFLocation << ")" << "\n";
+				}
+				sqlite3_reset(io.killDb[0].insertNetFieldStatement);
+				queryResult = sqlite3_step(io.killDb[0].updateNetFieldCountStatement);
+				if (queryResult != SQLITE_DONE) {
+					std::cerr << "Error updating netField data count in database: " << queryResult << ":" << sqlite3_errmsg(io.killDb[0].killDb) << "(" << DPrintFLocation << ")" << "\n";
+				}
+				sqlite3_reset(io.killDb[0].updateNetFieldCountStatement);
+			}
+		}
+	}
+#endif
+
 
 	if (opts.entityDataToDb) {
 		// ? Not yet implemented anyway.
@@ -5731,7 +5791,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 	}
 
 	executeEarlyQueries(io, opts);
-	executeAllQueries(io, opts);
+	executeAllQueries(io, opts, sharedVars.demoType);
 
 	if (doFinalizeSQLite) {
 #ifdef DEBUGSTATSDB
@@ -5756,6 +5816,8 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 			sqlite3_finalize(io.killDb[i].insertAngleStatement);
 			sqlite3_finalize(io.killDb[i].insertDemoDatabaseProperty);
 			sqlite3_finalize(io.killDb[i].insertDemoMeta);
+			sqlite3_finalize(io.killDb[i].insertNetFieldStatement);
+			sqlite3_finalize(io.killDb[i].updateNetFieldCountStatement);
 			sqlite3_finalize(io.killDb[i].selectLastInsertRowIdStatement);
 			sqlite3_finalize(io.killDb[i].insertEntryMetaStatement);
 			sqlite3_finalize(io.killDb[i].insertPlayerNameStatement);
@@ -6799,6 +6861,7 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 	//memset(&demo.cut.Clc, 0, sizeof(demo.cut.Clc));
 	memset(&demo, 0, sizeof(demo));
 	demoCutGetDemoType(sourceDemoFile,ext, oldName,&demoType,&isCompressedFile,&demo.cut.Clc);
+	sharedVars.demoType = demoType;
 
 	int CS_PLAYERS_here = getCS_PLAYERS(demoType);
 	int CS_MODELS_here = getCS_MODELS(demoType);

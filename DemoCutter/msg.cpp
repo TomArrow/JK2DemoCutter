@@ -18,6 +18,10 @@ extern bool debugRead;
 extern std::stringstream ssDebugRead;
 extern std::stringstream ssDebugWrite;
 
+#if NETFIELD_STATS
+int64_t netFieldReads[DEMOTYPE_COUNT][NETFIELD_STATS_VARIANTS][200] = { 0 }; // hope 200 is enuff
+#endif
+
 ankerl::unordered_dense::map< demoTypeFieldOffset, size_t, ankerl::unordered_dense::hash<demoTypeFieldOffset>> readOverflows;
 
 #define FASTHUFFMAN // Based on: https://github.com/mightycow/uberdemotools/commit/685b132abc4803f4c813fa07928cd9a4099e5d59
@@ -536,7 +540,7 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 		int32_t bitIndex = msg->bit;
 		if (nbits)
 		{
-			const int16_t allBits = *(const int16_t*)(bufferData + (bitIndex >> 3)) >> (bitIndex & 7);
+			const int16_t allBits = LittleShort(*(const int16_t*)(bufferData + (bitIndex >> 3))) >> (bitIndex & 7);
 			value = allBits & ((1 << nbits) - 1);
 			bitIndex += nbits;
 			bits -= nbits;
@@ -546,7 +550,7 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 		{
 			for (int32_t i = 0; i < bits; i += 8)
 			{
-				const uint16_t code = ((*(const uint32_t*)(bufferData + (bitIndex >> 3))) >> ((uint32_t)bitIndex & 7)) & 0x7FF;
+				const uint16_t code = LittleLong(((*(const uint32_t*)(bufferData + (bitIndex >> 3))) >> ((uint32_t)bitIndex & 7))) & 0x7FF;
 				const uint16_t entry = HuffmanDecoderTable[code];
 				value |= (int32_t(entry & 0xFF) << (i + nbits));
 				bitIndex += int32_t(entry >> 8);
@@ -2960,8 +2964,16 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 	int startBytes,endBytes;
 #endif
 
+#if NETFIELD_STATS
+	int64_t* reads = netFieldReads[demoType][0];
+#endif
+
 	//for ( i = 0, field = demo15detected ? entityStateFields15 : entityStateFields ; i < lc ; i++, field++ ) {
-	for ( i = 0, field = esFields; i < lc ; i++, field++ ) {
+	for ( i = 0, field = esFields; i < lc ; i++, field++
+#if NETFIELD_STATS
+		, reads++
+#endif
+		) {
 		//if (i >= numFields) {
 		//	continue; // hardening against corrupted demos. likely won't recover anyway but oh well. Actualy, strike that, didnt help anyway
 		//}
@@ -2977,7 +2989,9 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 			// no change
 			*toF = *fromF;
 		} else {
-
+#if NETFIELD_STATS
+			(*reads)++; // ew xd
+#endif
 			if (isMOHAADemo) {
 				// MOHAA demos are ... very special.
 				switch (field->type) {
@@ -3559,6 +3573,67 @@ void MSG_PrintFieldErrors(demoType_t demoType) {
 	}
 }
 
+void MSG_GetNetFields(demoType_t demoType, const netField_t** netfields, int* count, int variant
+#if NETFIELD_STATS
+	, int64_t** reads
+#endif
+) {
+#if NETFIELD_STATS
+	*reads = NULL;
+	if (variant >= 0 && variant < NETFIELD_STATS_VARIANTS && demoType >= 0 && demoType < DEMOTYPE_COUNT) {
+		*reads = netFieldReads[demoType][variant];
+	}
+#endif
+	*netfields = NULL;
+	*count = 0;
+	if (variant == 0) {
+
+		if (!getEntityStateFields(netfields, count, demoType)) {
+			throw new std::exception("failed to get entitystatefields for writing");
+		}
+		return;
+	}
+	else if (variant >= 5) {
+		if (variant == 5) {
+			if (!getPlayerStateFields(netfields, count, demoType)) {
+				throw std::exception("could not get playerstatefields for demotype");
+			}
+			return;
+		}
+		if (variant >= 6 && variant <= 9 && playerStateRequiresSpecialHandling(demoType)) {
+			switch (demoType) {
+				case DM_25:
+				case DM_26:
+					*netfields = playerStateFieldsJKA;
+					if (variant == 6)
+					{//a vehicle playerstate
+						*count = sizeof(vehPlayerStateFieldsJKA) / sizeof(vehPlayerStateFieldsJKA[0]);
+						*netfields = vehPlayerStateFieldsJKA;
+					}
+					else if(variant >= 7 && variant <= 8)
+					{
+						int isPilot = variant == 7;
+						if (isPilot)
+						{//pilot riding *inside* a vehicle!
+							*count = sizeof(pilotPlayerStateFieldsJKA) / sizeof(pilotPlayerStateFieldsJKA[0]) -82; // Why -82? jedis repository has this but eternaljk doesnt. Hmm.
+							*netfields = pilotPlayerStateFieldsJKA;
+						}
+						else
+						{//normal client
+							*count = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+						}
+					}
+					break;
+				default:
+					throw std::exception("handling of playerstate reading for this demoType not supported");
+					break;
+			}
+		}
+
+	}
+
+}
+
 /*
 ===================
 MSG_ReadDeltaPlayerstate
@@ -3607,6 +3682,10 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	else
 		numFields = sizeof( playerStateFields ) / sizeof( playerStateFields[0] );*/
 
+#if NETFIELD_STATS
+	int psType = 5;
+#endif
+
 	if (!getPlayerStateFields(&psFields,&numFields,demoType)) {
 		throw std::exception("could not get playerstatefields for reading demotype");
 	}
@@ -3630,6 +3709,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				{//a vehicle playerstate
 					numFields = sizeof(vehPlayerStateFieldsJKA) / sizeof(vehPlayerStateFieldsJKA[0]);
 					psFields = vehPlayerStateFieldsJKA;
+#if NETFIELD_STATS
+					psType = 6;
+#endif
 				}
 				else
 				{
@@ -3638,10 +3720,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 					{//pilot riding *inside* a vehicle!
 						numFields = sizeof(pilotPlayerStateFieldsJKA) / sizeof(pilotPlayerStateFieldsJKA[0]) -82; // Why -82? jedis repository has this but eternaljk doesnt. Hmm.
 						psFields = pilotPlayerStateFieldsJKA;
+#if NETFIELD_STATS
+						psType = 7;
+#endif
 					}
 					else
 					{//normal client
 						numFields = sizeof(playerStateFieldsJKA) / sizeof(playerStateFieldsJKA[0]);
+#if NETFIELD_STATS
+						psType = 8;
+#endif
 					}
 				}
 				//=====_OPTIMIZED_VEHICLE_NETWORKING=======================================================================
@@ -3668,8 +3756,17 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	int startBytes,endBytes;
 #endif
 
+#if NETFIELD_STATS
+	int64_t* reads = netFieldReads[demoType][psType];
+#endif
+
+
 	//for ( i = 0, field = demo15detected ? playerStateFields15 : playerStateFields ; i < lc ; i++, field++ ) {
-	for ( i = 0, field = psFields ; i < lc ; i++, field++ ) {
+	for ( i = 0, field = psFields ; i < lc ; i++, field++
+#if NETFIELD_STATS
+	,reads++
+#endif
+		) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 
@@ -3684,7 +3781,9 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 			// no change
 			*toF = *fromF;
 		} else {
-
+#if NETFIELD_STATS
+			(*reads)++;
+#endif
 			if (isMOHAADemo) {
 
 				switch (field->type) {

@@ -7,6 +7,10 @@
 #ifndef DEMOCUT_H
 #define DEMOCUT_H
 
+#if NETFIELD_STATS
+#define NETFIELD_STATS_VARIANTS 10
+#endif
+
 typedef struct IUnknown IUnknown;
 
 #define _USE_MATH_DEFINES
@@ -2102,7 +2106,6 @@ void MSG_ReadDeltaEntity(msg_t* msg, entityState_t* from, entityState_t* to,
 
 void MSG_WriteDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, qboolean isVehiclePS, demoType_t demoType, float frameTime); // frametime is for MOHAA
 void MSG_ReadDeltaPlayerstate(msg_t* msg, struct playerState_s* from, struct playerState_s* to, demoType_t demoType, qboolean isVehiclePS, playerState_t* currentPS=NULL);
-
 
 void MSG_ReportChangeVectors_f(void);
 
@@ -4928,6 +4931,13 @@ typedef struct {
 	int		bits;		// 0 = float
 	netFieldType_t type; // OpenMOHAA only.
 } netField_t;
+
+
+void MSG_GetNetFields(demoType_t demoType, const netField_t** netfields, int* count, int variant
+#if NETFIELD_STATS
+	, int64_t** reads
+#endif
+);
 
 // using the stringizing operator to save typing...
 #ifdef _MSC_VER 
