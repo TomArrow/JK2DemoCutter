@@ -4356,6 +4356,10 @@ static const int saberMoveJK2ToGeneral[] {
 typedef std::tuple<demoType_t, int, int> demoTypeFieldOffset; // demoType, field offset, ispsfield
 extern ankerl::unordered_dense::map< demoTypeFieldOffset, size_t, ankerl::unordered_dense::hash<demoTypeFieldOffset>> readOverflows;
 
+#if NETFIELD_STATS
+typedef ankerl::unordered_dense::map < int, size_t, ankerl::unordered_dense::hash<int>> demoTypeFieldOffsetValueMap;
+#endif
+
 extern ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberMoveNames_general;
 extern ankerl::unordered_dense::map <int, std::string, ankerl::unordered_dense::hash<int>>  saberStyleNames;
 extern ankerl::unordered_dense::map <std::string, int, ankerl::unordered_dense::hash<std::string>>  mohaaWeaponModelMap;
@@ -4935,7 +4939,7 @@ typedef struct {
 
 void MSG_GetNetFields(demoType_t demoType, const netField_t** netfields, int* count, int variant
 #if NETFIELD_STATS
-	, int64_t** reads
+	, int64_t** reads, int64_t* totalCountType, demoTypeFieldOffsetValueMap** valueMap
 #endif
 );
 

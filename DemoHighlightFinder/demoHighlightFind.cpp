@@ -48,6 +48,7 @@
 // forward declarations for v142 :/
 extern int playerTeams[MAX_CLIENTS_MAX];
 
+extern bool debugNetFieldValues;
 
 enum trackedEntityType_t {
 	TET_NONE,
@@ -277,6 +278,10 @@ struct ioHandles_t {
 	sqlite3_stmt* updateFrameInfoViewModelAnimCountStatement;
 	sqlite3_stmt* insertFrameInfoViewModelAnimStatementSimple;
 	sqlite3_stmt* updateFrameInfoViewModelAnimCountStatementSimple;
+#if NETFIELD_STATS
+	sqlite3_stmt* insertNetfieldValueStatement;
+	sqlite3_stmt* updateNetfieldValueCountStatement;
+#endif
 
 	// Demostats (optionaal)
 	sqlite3* demoStatsDb;
@@ -424,6 +429,10 @@ public:
 	std::string videoPath;
 	std::vector<std::string> bspDirectories;
 	int throughWallChecks = 0; // 1 = all kills, 2 = only saber
+
+#if NETFIELD_STATS
+	int netFieldValueStats = -1; // value is percentage of a particular value compared to the total to be saved
+#endif
 
 	std::vector<ResultFilter> filters;
 	int	killDbsCount = 1; // pretty much sorta just filters.size() but minimum 1 always gg
@@ -4985,6 +4994,15 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 		"PRIMARY KEY(demoVersion,type,viewModelAnim,frameInfoIndex)"
 		"); ",
 		NULL, NULL, NULL);
+	
+#if NETFIELD_STATS
+	sqlite3_exec(io.debugStatsDb, "CREATE TABLE netFieldValues ("
+		"type INTEGER NOT NULL,demoType INTEGER NOT NULL,name TEXT NOT NULL, value INTEGER NOT NULL, valueAsFloat REAL NOT NULL,count INTEGER NOT NULL, total INTEGER NOT NULL,"
+		"PRIMARY KEY(type,demoType,name,value)"
+		"); ",
+		NULL, NULL, NULL);
+#endif
+
 	preparedStatementText = "INSERT OR IGNORE INTO animStances (demoVersion,saberHolstered,torsoAnim,legsAnim,saberMove,stance,countFound) VALUES (@demoVersion,@saberHolstered,@torsoAnim,@legsAnim,@saberMove,@stance, 0);";
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertAnimStanceStatement, NULL);
 
@@ -5004,6 +5022,15 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateFrameInfoViewModelAnimCountStatementSimple, NULL);
 
 	sqlite3_exec(io.debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+
+#if NETFIELD_STATS
+	preparedStatementText = "INSERT OR IGNORE INTO netFieldValues (type,demoType,name,value,valueAsFloat,count,total) VALUES (@type,@demoType,@name, @value,@valueAsFloat,0,0);";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertNetfieldValueStatement, NULL);
+
+	preparedStatementText = "UPDATE netFieldValues SET count = count + @count,  total = total + @total  WHERE type=@type AND demoType=@demoType AND name=@name AND value=@value;";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateNetfieldValueCountStatement, NULL);
+#endif
+
 #endif
 }
 
@@ -5518,7 +5545,8 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 			const netField_t* netField = NULL;
 			int count = 0;
 			int64_t* reads = NULL;
-			MSG_GetNetFields(demoType, &netField, &count, i, &reads);
+			int64_t totalCountType = 0;
+			MSG_GetNetFields(demoType, &netField, &count, i, &reads, &totalCountType,NULL);
 			if (!netField) {
 				continue;
 			}
@@ -5547,6 +5575,53 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 			}
 		}
 	}
+#ifdef DEBUGSTATSDB
+	if (opts.netFieldValueStats >= 0) {
+		for (int i = 0; i < NETFIELD_STATS_VARIANTS; i++) {
+			const netField_t* netField = NULL;
+			int count = 0;
+			int64_t* reads = NULL;
+			int64_t totalCountType = 0;
+			demoTypeFieldOffsetValueMap* valueMap = NULL;
+			MSG_GetNetFields(demoType, &netField, &count, i, &reads, &totalCountType,&valueMap);
+			if (!netField) {
+				continue;
+			}
+			for (int j = 0; j < count; j++, netField++,reads++, valueMap++) {
+				if (!*reads) {
+					continue;
+				}
+				for (auto kvp : *valueMap) {
+					if (100*kvp.second/ totalCountType < opts.netFieldValueStats) {
+						continue;
+					}
+					SQLDelayedQuery* query = new SQLDelayedQuery();
+					SQLBIND_DELAYED(query, int, "@type", i);
+					SQLBIND_DELAYED(query, int, "@demoType", demoType);
+					SQLBIND_DELAYED_TEXT(query, "@name", netField->name);
+					SQLBIND_DELAYED(query, int, "@value", kvp.first);
+					SQLBIND_DELAYED(query, float, "@valueAsFloat", *(float*)&kvp.first);
+					SQLBIND_DELAYED(query, int, "@count", kvp.second);
+					SQLBIND_DELAYED(query, int, "@total", totalCountType);
+					query->bind(io.insertNetfieldValueStatement);
+					query->bind(io.updateNetfieldValueCountStatement);
+					//wasDoingSQLiteExecution = true;
+					int queryResult = sqlite3_step(io.insertNetfieldValueStatement);
+					if (queryResult != SQLITE_DONE) {
+						std::cerr << "Error inserting netField value data into database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+					}
+					sqlite3_reset(io.insertNetfieldValueStatement);
+					queryResult = sqlite3_step(io.updateNetfieldValueCountStatement);
+					if (queryResult != SQLITE_DONE) {
+						std::cerr << "Error updating netField value data count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+					}
+					sqlite3_reset(io.updateNetfieldValueCountStatement);
+					delete query;
+				}
+			}
+		}
+	}
+#endif
 #endif
 
 
@@ -5803,6 +5878,10 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 		sqlite3_finalize(io.updateFrameInfoViewModelAnimCountStatement);
 		sqlite3_finalize(io.insertFrameInfoViewModelAnimStatementSimple);
 		sqlite3_finalize(io.updateFrameInfoViewModelAnimCountStatementSimple);
+#if NETFIELD_STATS
+		sqlite3_finalize(io.insertNetfieldValueStatement);
+		sqlite3_finalize(io.updateNetfieldValueCountStatement);
+#endif
 		sqlite3_close(io.debugStatsDb);
 #endif
 
@@ -13123,6 +13202,9 @@ int main(int argcO, char** argvO) {
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
+#if NETFIELD_STATS
+	auto N = op.add<popl::Implicit<int>>("N", "debug-fieldValues", "Create statistics about values in fields. Optionally call with a number that specifies how many percent of packets must have a specific value to save that value",10);
+#endif
 	auto t = op.add<popl::Switch>("t", "test-only", "Don't write anything, only run through the demo for testing.");
 	auto A = op.add<popl::Implicit<int>>("A", "teleport-analysis", "Find teleports in demo and make script to speed up time of repeated attempts with teleports putting the player back. Optionally, set to 2 to not only analyze teleports but all locations.",1);
 	auto x = op.add<popl::Value<std::string>>("x", "teleport-analysis-endtime", "Provide parameters for teleport analysis as numbers, separated by empty space: demotime of detection end, buffer around fast forward segments post, same thing pre (used so u dont cut off gameplay). Fourth and fifth value is distance to consider 'same place' in mode 2 (horizontal and vertical). Fifth value: minimum amount of time to consider fast-forwarding (excluding buffertimes). Defaults: 0 5000 2000 100 40 10000");
@@ -13223,6 +13305,12 @@ int main(int argcO, char** argvO) {
 	//opts.filterBotRets = B->is_set() ? (B->value() & 2) : false;
 	//opts.filterFightBotKills = B->is_set() ? (B->value() & 4) : false;
 	//opts.filterFightBotRets = B->is_set() ? (B->value() & 8) : false;
+#if NETFIELD_STATS
+	opts.netFieldValueStats = N->is_set() ? N->value() : -1;
+	if (opts.netFieldValueStats >= 0) {
+		debugNetFieldValues = true;
+	}
+#endif
 
 	if (opts.doStatsDb) {
 		serverInfoComboMap = &_serverInfoComboMap;

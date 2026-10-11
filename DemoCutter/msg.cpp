@@ -20,6 +20,9 @@ extern std::stringstream ssDebugWrite;
 
 #if NETFIELD_STATS
 int64_t netFieldReads[DEMOTYPE_COUNT][NETFIELD_STATS_VARIANTS][200] = { 0 }; // hope 200 is enuff
+int64_t netFieldTypeFinds[DEMOTYPE_COUNT][NETFIELD_STATS_VARIANTS] = { 0 };
+demoTypeFieldOffsetValueMap netfieldValues[DEMOTYPE_COUNT][NETFIELD_STATS_VARIANTS][200];
+bool debugNetFieldValues = false;
 #endif
 
 ankerl::unordered_dense::map< demoTypeFieldOffset, size_t, ankerl::unordered_dense::hash<demoTypeFieldOffset>> readOverflows;
@@ -3099,6 +3102,16 @@ void MSG_ReadDeltaEntity( msg_t *msg, entityState_t *from, entityState_t *to,
 		}
 	}
 
+#if NETFIELD_STATS
+	if (debugNetFieldValues) {
+		for (i = 0, field = esFields; i < numFields; i++, field++) {
+			toF = (int*)((byte*)to + field->offset);
+			netfieldValues[demoType][0][i][*toF]++;
+		}
+		netFieldTypeFinds[demoType][0]++;
+	}
+#endif
+
 	if ( print ) {
 		if ( msg->bit == 0 ) {
 			endBit = msg->readcount * 8 - GENTITYNUM_BITS;
@@ -3575,13 +3588,18 @@ void MSG_PrintFieldErrors(demoType_t demoType) {
 
 void MSG_GetNetFields(demoType_t demoType, const netField_t** netfields, int* count, int variant
 #if NETFIELD_STATS
-	, int64_t** reads
+	, int64_t** reads, int64_t* totalCountType, demoTypeFieldOffsetValueMap** valueMap
 #endif
 ) {
 #if NETFIELD_STATS
 	*reads = NULL;
+	*totalCountType = 0;
 	if (variant >= 0 && variant < NETFIELD_STATS_VARIANTS && demoType >= 0 && demoType < DEMOTYPE_COUNT) {
 		*reads = netFieldReads[demoType][variant];
+		*totalCountType = netFieldTypeFinds[demoType][variant];
+		if (valueMap) {
+			*valueMap = netfieldValues[demoType][variant];
+		}
 	}
 #endif
 	*netfields = NULL;
@@ -3857,6 +3875,16 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 		// no change
 		*toF = *fromF;
 	}
+
+#if NETFIELD_STATS
+	if (debugNetFieldValues) {
+		for (i = 0, field = psFields; i < numFields; i++, field++) {
+			toF = (int*)((byte*)to + field->offset);
+			netfieldValues[demoType][psType][i][*toF]++;
+		}
+		netFieldTypeFinds[demoType][psType]++;
+	}
+#endif
 
 	// read the arrays
 #ifdef _DONETPROFILE_
