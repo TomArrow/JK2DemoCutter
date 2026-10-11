@@ -281,6 +281,7 @@ struct ioHandles_t {
 #if NETFIELD_STATS
 	sqlite3_stmt* insertNetfieldValueStatement;
 	sqlite3_stmt* updateNetfieldValueCountStatement;
+	sqlite3_stmt* updateNetfieldValueTotalCountStatement;
 #endif
 
 	// Demostats (optionaal)
@@ -4997,7 +4998,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	
 #if NETFIELD_STATS
 	sqlite3_exec(io.debugStatsDb, "CREATE TABLE netFieldValues ("
-		"type INTEGER NOT NULL,demoType INTEGER NOT NULL,name TEXT NOT NULL, value INTEGER NOT NULL, valueAsFloat REAL NOT NULL,count INTEGER NOT NULL, total INTEGER NOT NULL,"
+		"type INTEGER NOT NULL,demoType INTEGER NOT NULL,name TEXT NOT NULL, value INTEGER NOT NULL, valueAsFloat REAL NOT NULL,count INTEGER NOT NULL, total INTEGER NOT NULL,totalLocal INTEGER NOT NULL,"
 		"PRIMARY KEY(type,demoType,name,value)"
 		"); ",
 		NULL, NULL, NULL);
@@ -5024,11 +5025,14 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	sqlite3_exec(io.debugStatsDb, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
 #if NETFIELD_STATS
-	preparedStatementText = "INSERT OR IGNORE INTO netFieldValues (type,demoType,name,value,valueAsFloat,count,total) VALUES (@type,@demoType,@name, @value,@valueAsFloat,0,0);";
+	preparedStatementText = "INSERT OR IGNORE INTO netFieldValues (type,demoType,name,value,valueAsFloat,count,total,totalLocal) VALUES (@type,@demoType,@name, @value,@valueAsFloat,0,0,0);";
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.insertNetfieldValueStatement, NULL);
 
-	preparedStatementText = "UPDATE netFieldValues SET count = count + @count,  total = total + @total  WHERE type=@type AND demoType=@demoType AND name=@name AND value=@value;";
+	preparedStatementText = "UPDATE netFieldValues SET count = count + @count,  totalLocal = totalLocal + @totalLocal  WHERE type=@type AND demoType=@demoType AND name=@name AND value=@value;";
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateNetfieldValueCountStatement, NULL);
+
+	preparedStatementText = "UPDATE netFieldValues SET total = total + @total  WHERE type=@type AND demoType=@demoType AND name=@name;";
+	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateNetfieldValueTotalCountStatement, NULL);
 #endif
 
 #endif
@@ -5602,7 +5606,7 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 					SQLBIND_DELAYED(query, int, "@value", kvp.first);
 					SQLBIND_DELAYED(query, float, "@valueAsFloat", *(float*)&kvp.first);
 					SQLBIND_DELAYED(query, int, "@count", kvp.second);
-					SQLBIND_DELAYED(query, int, "@total", totalCountType);
+					SQLBIND_DELAYED(query, int, "@totalLocal", totalCountType);
 					query->bind(io.insertNetfieldValueStatement);
 					query->bind(io.updateNetfieldValueCountStatement);
 					//wasDoingSQLiteExecution = true;
@@ -5618,6 +5622,19 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 					sqlite3_reset(io.updateNetfieldValueCountStatement);
 					delete query;
 				}
+				SQLDelayedQuery* query = new SQLDelayedQuery();
+				SQLBIND_DELAYED(query, int, "@type", i);
+				SQLBIND_DELAYED(query, int, "@demoType", demoType);
+				SQLBIND_DELAYED_TEXT(query, "@name", netField->name);
+				SQLBIND_DELAYED(query, int, "@total", totalCountType);
+				query->bind(io.updateNetfieldValueTotalCountStatement);
+				int queryResult = sqlite3_step(io.updateNetfieldValueTotalCountStatement);
+				if (queryResult != SQLITE_DONE) {
+					std::cerr << "Error updating netField value total data count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+				}
+				sqlite3_reset(io.updateNetfieldValueTotalCountStatement);
+				delete query;
+				
 			}
 		}
 	}
@@ -5881,6 +5898,7 @@ qboolean demoHighlightFindExceptWrapper(const char* sourceDemoFile, int bufferTi
 #if NETFIELD_STATS
 		sqlite3_finalize(io.insertNetfieldValueStatement);
 		sqlite3_finalize(io.updateNetfieldValueCountStatement);
+		sqlite3_finalize(io.updateNetfieldValueTotalCountStatement);
 #endif
 		sqlite3_close(io.debugStatsDb);
 #endif
