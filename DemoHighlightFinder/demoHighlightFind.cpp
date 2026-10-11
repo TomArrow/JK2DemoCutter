@@ -5031,7 +5031,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	preparedStatementText = "UPDATE netFieldValues SET count = count + @count,  totalLocal = totalLocal + @totalLocal  WHERE type=@type AND demoType=@demoType AND name=@name AND value=@value;";
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateNetfieldValueCountStatement, NULL);
 
-	preparedStatementText = "UPDATE netFieldValues SET total = total + @total  WHERE type=@type AND demoType=@demoType AND name=@name;";
+	preparedStatementText = "UPDATE netFieldValues SET total = total + @total  WHERE type=@type AND demoType=@demoType;"; //  AND name=@name
 	sqlite3_prepare_v2(io.debugStatsDb, preparedStatementText, strlen(preparedStatementText) + 1, &io.updateNetfieldValueTotalCountStatement, NULL);
 #endif
 
@@ -5622,20 +5622,21 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 					sqlite3_reset(io.updateNetfieldValueCountStatement);
 					delete query;
 				}
-				SQLDelayedQuery* query = new SQLDelayedQuery();
-				SQLBIND_DELAYED(query, int, "@type", i);
-				SQLBIND_DELAYED(query, int, "@demoType", demoType);
-				SQLBIND_DELAYED_TEXT(query, "@name", netField->name);
-				SQLBIND_DELAYED(query, int, "@total", totalCountType);
-				query->bind(io.updateNetfieldValueTotalCountStatement);
-				int queryResult = sqlite3_step(io.updateNetfieldValueTotalCountStatement);
-				if (queryResult != SQLITE_DONE) {
-					std::cerr << "Error updating netField value total data count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
-				}
-				sqlite3_reset(io.updateNetfieldValueTotalCountStatement);
-				delete query;
 				
 			}
+			SQLDelayedQuery* query = new SQLDelayedQuery();
+			SQLBIND_DELAYED(query, int, "@type", i);
+			SQLBIND_DELAYED(query, int, "@demoType", demoType);
+			//SQLBIND_DELAYED_TEXT(query, "@name", netField->name);
+			SQLBIND_DELAYED(query, int, "@total", totalCountType);
+			query->bind(io.updateNetfieldValueTotalCountStatement);
+			int queryResult = sqlite3_step(io.updateNetfieldValueTotalCountStatement);
+			if (queryResult != SQLITE_DONE) {
+				std::cerr << "Error updating netField value total data count in database: " << queryResult << ":" << sqlite3_errmsg(io.debugStatsDb) << "(" << DPrintFLocation << ")" << "\n";
+			}
+			sqlite3_reset(io.updateNetfieldValueTotalCountStatement);
+			delete query;
+
 		}
 	}
 #endif
