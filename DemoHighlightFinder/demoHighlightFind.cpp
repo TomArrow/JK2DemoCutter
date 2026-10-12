@@ -4998,7 +4998,7 @@ void openAndSetupDb(ioHandles_t& io, const ExtraSearchOptions& opts) {
 	
 #if NETFIELD_STATS
 	sqlite3_exec(io.debugStatsDb, "CREATE TABLE netFieldValues ("
-		"type INTEGER NOT NULL,demoType INTEGER NOT NULL,name TEXT NOT NULL, value INTEGER NOT NULL, valueAsFloat REAL NOT NULL,count INTEGER NOT NULL, total INTEGER NOT NULL,totalLocal INTEGER NOT NULL,"
+		"type INTEGER NOT NULL,demoType INTEGER NOT NULL,name TEXT NOT NULL, value INTEGER NOT NULL, valueAsFloat REAL,count INTEGER NOT NULL, total INTEGER NOT NULL,totalLocal INTEGER NOT NULL,"
 		"PRIMARY KEY(type,demoType,name,value)"
 		"); ",
 		NULL, NULL, NULL);
@@ -5592,9 +5592,6 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 				continue;
 			}
 			for (int j = 0; j < count; j++, netField++,reads++, valueMap++) {
-				if (!*reads) {
-					continue;
-				}
 				for (auto kvp : *valueMap) {
 					if (100*kvp.second/ totalCountType < opts.netFieldValueStats) {
 						continue;
@@ -5604,7 +5601,10 @@ void executeAllQueries(ioHandles_t& io, const ExtraSearchOptions& opts, demoType
 					SQLBIND_DELAYED(query, int, "@demoType", demoType);
 					SQLBIND_DELAYED_TEXT(query, "@name", netField->name);
 					SQLBIND_DELAYED(query, int, "@value", kvp.first);
-					SQLBIND_DELAYED(query, float, "@valueAsFloat", *(float*)&kvp.first);
+					float floatVal = *(float*)&kvp.first;
+					//if (fpclassify(floatVal) == FP_NAN) {
+					//}
+					SQLBIND_DELAYED(query, float, "@valueAsFloat", floatVal);
 					SQLBIND_DELAYED(query, int, "@count", kvp.second);
 					SQLBIND_DELAYED(query, int, "@totalLocal", totalCountType);
 					query->bind(io.insertNetfieldValueStatement);

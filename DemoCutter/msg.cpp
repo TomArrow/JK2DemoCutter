@@ -3611,7 +3611,7 @@ void MSG_GetNetFields(demoType_t demoType, const netField_t** netfields, int* co
 		}
 		return;
 	}
-	else if (variant >= 5) {
+	else if (variant >= 5 && variant <= 8) {
 		if (variant == 5) {
 			if (!getPlayerStateFields(netfields, count, demoType)) {
 				throw std::exception("could not get playerstatefields for demotype");
@@ -3650,6 +3650,17 @@ void MSG_GetNetFields(demoType_t demoType, const netField_t** netfields, int* co
 
 	}
 
+	else if (variant == 9) {
+		bool isMOHAADemo = demoTypeIsMOHAA(demoType);
+		if (!isMOHAADemo) {
+			*netfields = playerStateFieldsStatStuff;
+			*count = sizeof(playerStateFieldsStatStuff) / sizeof(playerStateFieldsStatStuff[0]);
+		}
+		else {
+			*netfields = playerStateFieldsStatStuffMOHAA;
+			*count = sizeof(playerStateFieldsStatStuffMOHAA) / sizeof(playerStateFieldsStatStuffMOHAA[0]);
+		}
+	}
 }
 
 /*
@@ -4215,6 +4226,24 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 #ifdef _DONETPROFILE_
 		endBytes=msg->readcount;
 		ClReadProf().AddField("PS_POWERUPS",endBytes-startBytes);
+#endif
+
+#if NETFIELD_STATS
+	if (debugNetFieldValues) {
+		if (!isMOHAADemo) {
+			psFields = playerStateFieldsStatStuff;
+			numFields = sizeof(playerStateFieldsStatStuff) / sizeof(playerStateFieldsStatStuff[0]);
+		}
+		else {
+			psFields = playerStateFieldsStatStuffMOHAA;
+			numFields = sizeof(playerStateFieldsStatStuffMOHAA) / sizeof(playerStateFieldsStatStuffMOHAA[0]);
+		}
+		for (i = 0, field = psFields; i < numFields; i++, field++) {
+			toF = (int*)((byte*)to + field->offset);
+			netfieldValues[demoType][9][i][*toF]++;
+		}
+		netFieldTypeFinds[demoType][9]++;
+	}
 #endif
 
 	if ( print ) {
