@@ -7465,6 +7465,8 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 					goto cuterror;
 				}
 
+				sharedVars.demoType = demoType;
+
 				demoFpsMetaTracker.canTrackMsec = false;
 
 				std::cout << "gamestate\n";
