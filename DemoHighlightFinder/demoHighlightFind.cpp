@@ -367,7 +367,8 @@ public:
 
 class ExtraSearchOptions {
 public:
-	bool quickSkipNonSaberExclusive = false; // Not implemented (yet). Skip demoss that aren't saber only
+	bool quickSkipNonSaberExclusive = false; 
+	bool quickSkipNonJK2103 = false; 
 	bool onlyLogSaberKills = false;
 	bool entityDataToDb = false;
 	int onlyLogKillSpreesWithSaberKills = 0;
@@ -7534,8 +7535,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 				updateGameInfo(&demo.cut.Cl, demoType,opts,true,isMOHAADemo);
 				CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
 				setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
-				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
-					std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
+				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh || opts.quickSkipNonJK2103 && demoType != DM_15_1_03) {
+					if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
+						std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
+					}
+					if (opts.quickSkipNonJK2103 && demoType != DM_15_1_03) {
+						std::cout << "Quick skipping demo that isn't DM_15 version 1.03.";
+					}
 					goto cutcomplete;
 				}
 				updatePlayerDemoStatsArrayPointers<max_clients>(demoType, opts);
@@ -13022,8 +13028,13 @@ qboolean inline demoHighlightFindReal(const char* sourceDemoFile, int bufferTime
 			updateGameInfo(&demo.cut.Cl,demoType,opts, rebuildUniqueGameCSHash, isMOHAADemo);
 			CheckForNameChanges<max_clients>(&demo.cut.Cl, io, demoType, wasDoingSQLiteExecution, opts);
 			setPlayerAndTeamData<max_clients>(&demo.cut.Cl, demoType);
-			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
-				std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
+			if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh || opts.quickSkipNonJK2103 && demoType != DM_15_1_03) {
+				if (opts.quickSkipNonSaberExclusive && !gameIsSaberOnlyIsh) {
+					std::cout << "Quick skipping demo of game that allows other weapons than saber/melee/explosives.";
+				}
+				if (opts.quickSkipNonJK2103 && demoType != DM_15_1_03) {
+					std::cout << "Quick skipping demo that isn't DM_15 version 1.03.";
+				}
 				goto cutcomplete;
 			}
 			updatePlayerDemoStatsArrayPointers<max_clients>(demoType, opts);
@@ -13219,7 +13230,7 @@ int main(int argcO, char** argvO) {
 	auto d = op.add<popl::Implicit<int>>("d", "write-demo-packet-stats", "Write stats about packet size and rate over time. If specified without a value, each packet gets an entry. Otherwise, a number can be provided as the interval in milliseconds to write stats.",0);
 	//auto j = op.add<popl::Implicit<int>>("j", "jump-meta-events", "Track jumps as meta events. Optionally, number to limit time around kill that they are tracked in milliseconds.",0);
 	auto c = op.add<popl::Switch>("c", "only-log-captures-with-saber-kills", "Only log captures that had at least one saber kill by the flag carrier");
-	auto q = op.add<popl::Switch>("q", "quickskip-non-saber-exclusive", "If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it");
+	auto q = op.add<popl::Implicit<int>>("q", "quickskip-non-saber-exclusive", "Bitmask: 1 (default): If demo is of a game that allows other weapons than saber/melee/explosives, immediately skip it. 2: If demo isnt DM_15 1.03, quickly skip it.",1);
 	auto l = op.add<popl::Switch>("l", "long-killstreaks", "Finds very long killstreaks with up to 18 seconds between kills (default is 9 seconds)");
 	auto e = op.add<popl::Switch>("e", "entity-to-database", "Writes playerState, entityState and configstring to an sqlite database. (in progress, needs a lot of space)");
 	auto n = op.add<popl::Switch>("n", "no-finds-output", "Don't output found highlights in the terminal. Useful for seeing error messages.");
@@ -13299,7 +13310,8 @@ int main(int argcO, char** argvO) {
 	opts.jumpMetaEventsLimit = bufferTime;//j->is_set() ? (j->value() == 0 ? bufferTime : j->value()) : 0;
 	opts.writeDemoPacketStats = d->is_set() ? (d->value() <= 0 ? -1 : d->value()) : 0;
 	opts.onlyLogCapturesWithSaberKills = c->is_set();
-	opts.quickSkipNonSaberExclusive =  q->value();
+	opts.quickSkipNonSaberExclusive = q->is_set() ? (q->value() & 1) : 0;
+	opts.quickSkipNonJK2103 = q->is_set() ? (q->value() & 2) : 0;
 	opts.findSuperSlowKillStreaks = l->value();
 	opts.noFindOutput = n->value();
 	opts.testOnly = t->value();
